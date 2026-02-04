@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:laundry_management/core/theme/color_manager.dart';
 import 'package:laundry_management/features/home/presentation/home_screen.dart';
+import 'package:laundry_management/features/orders/presentation/orders_screen.dart';
 
 class RootScreen extends StatefulWidget {
   const RootScreen({super.key});
@@ -12,7 +14,7 @@ class _RootScreenState extends State<RootScreen> {
   int currentIndex = 0;
   var pages = [
     const HomeScreen(),
-    const Center(child: Text('صفحة الطلبات')),
+    const OrdersScreen(),
     const Center(child: Text('التقارير')),
     const Center(child: Text('الإعدادات')),
   ];
@@ -29,9 +31,9 @@ class _RootScreenState extends State<RootScreen> {
             currentIndex = index;
           });
         },
-
-        selectedItemColor: Colors.blue,
-        unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: ColorManager.primary,
+        unselectedItemColor: ColorManager.textSecondary,
 
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'الرئيسية'),
