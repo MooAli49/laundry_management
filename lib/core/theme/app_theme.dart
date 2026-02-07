@@ -9,11 +9,11 @@ class AppTheme {
     primaryColor: ColorManager.primary,
     scaffoldBackgroundColor: Colors.white,
     appBarTheme: AppBarTheme(
-      backgroundColor: ColorManager.primary,
+      backgroundColor: Colors.grey[100],
       elevation: 0,
       centerTitle: true,
       titleTextStyle: AppStyles.headingMedium.copyWith(
-        color: ColorManager.textPrimary,
+        color: ColorManager.darkInputBackground,
       ),
     ),
     textTheme: TextTheme(
@@ -48,6 +48,7 @@ class AppTheme {
       backgroundColor: ColorManager.primary,
       foregroundColor: ColorManager.textPrimary,
     ),
+    cardColor: Colors.white,
   );
 
   static ThemeData darkTheme = ThemeData(
@@ -95,5 +96,6 @@ class AppTheme {
       backgroundColor: ColorManager.primary,
       foregroundColor: ColorManager.textPrimary,
     ),
+    cardColor: ColorManager.textSecondary.withOpacity(0.1),
   );
 }
