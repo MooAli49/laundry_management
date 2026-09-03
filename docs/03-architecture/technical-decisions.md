@@ -226,7 +226,7 @@ Examples:
 
 The exact Dependency Injection package:
 
-    TBD
+    get_it
 
 The AI must not permanently select a DI package without an explicit decision.
 
@@ -329,7 +329,7 @@ Status:
 
 The exact networking package:
 
-    TBD
+    Dio + Retrofit
 
 The network layer must be centralized.
 
@@ -399,7 +399,7 @@ The project should use one routing solution consistently.
 
 The exact routing package:
 
-    TBD
+    go_router
 
 Feature screens must not create independent navigation systems.
 
