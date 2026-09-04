@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:laundry_management/core/constants/app_constants.dart';
+import 'package:laundry_management/core/localization/app_strings.dart';
 import 'package:laundry_management/core/routing/app_routes.dart';
 import 'package:laundry_management/core/theme/app_colors.dart';
+import 'package:laundry_management/core/theme/app_spacing.dart';
 import 'package:laundry_management/core/theme/app_text_styles.dart';
 
 class AppShell extends StatelessWidget {
-  final Widget child;
+  final Widget mainContent;
 
-  const AppShell({super.key, required this.child});
+  const AppShell({super.key, required this.mainContent});
 
   int _calculateSelectedIndex(BuildContext context) {
     final String location = GoRouterState.of(context).uri.path;
@@ -59,17 +61,17 @@ class AppShell extends StatelessWidget {
                   _onItemTapped(index, context),
               leading: Padding(
                 padding: const EdgeInsets.symmetric(
-                  vertical: 16.0,
-                  horizontal: 12.0,
+                  vertical: AppSpacing.lg,
+                  horizontal: AppSpacing.md,
                 ),
                 child: Row(
                   children: [
                     const Icon(
                       Icons.local_laundry_service,
                       color: AppColors.primary,
-                      size: 32,
+                      size: AppSpacing.xxxl,
                     ),
-                    const SizedBox(width: 12),
+                    AppSpacing.gapHorizontalMd,
                     Text(AppConstants.appName, style: AppTextStyles.titleLarge),
                   ],
                 ),
@@ -78,37 +80,37 @@ class AppShell extends StatelessWidget {
                 NavigationRailDestination(
                   icon: Icon(Icons.dashboard_outlined),
                   selectedIcon: Icon(Icons.dashboard),
-                  label: Text('الرئيسية'),
+                  label: Text(AppStrings.dashboard),
                 ),
                 NavigationRailDestination(
                   icon: Icon(Icons.receipt_long_outlined),
                   selectedIcon: Icon(Icons.receipt_long),
-                  label: Text('الطلبات'),
+                  label: Text(AppStrings.orders),
                 ),
                 NavigationRailDestination(
                   icon: Icon(Icons.people_outline),
                   selectedIcon: Icon(Icons.people),
-                  label: Text('العملاء'),
+                  label: Text(AppStrings.customers),
                 ),
                 NavigationRailDestination(
                   icon: Icon(Icons.inventory_2_outlined),
                   selectedIcon: Icon(Icons.inventory_2),
-                  label: Text('التخزين'),
+                  label: Text(AppStrings.storage),
                 ),
                 NavigationRailDestination(
                   icon: Icon(Icons.bar_chart_outlined),
                   selectedIcon: Icon(Icons.bar_chart),
-                  label: Text('التقارير'),
+                  label: Text(AppStrings.reports),
                 ),
                 NavigationRailDestination(
                   icon: Icon(Icons.settings_outlined),
                   selectedIcon: Icon(Icons.settings),
-                  label: Text('الإعدادات'),
+                  label: Text(AppStrings.settings),
                 ),
               ],
             ),
             const VerticalDivider(thickness: 1, width: 1),
-            Expanded(child: child),
+            Expanded(child: mainContent),
           ],
         ),
       ),

@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:laundry_management/core/routing/app_routes.dart';
 import 'package:laundry_management/core/widgets/app_shell.dart';
+import 'package:laundry_management/features/customers/presentation/screens/customers_screen.dart';
+import 'package:laundry_management/features/dashboard/presentation/screens/dashboard_screen.dart';
+import 'package:laundry_management/features/orders/presentation/screens/orders_screen.dart';
+import 'package:laundry_management/features/reports/presentation/screens/reports_screen.dart';
+import 'package:laundry_management/features/settings/presentation/screens/settings_screen.dart';
+import 'package:laundry_management/features/storage/presentation/screens/storage_screen.dart';
 
 class AppRouter {
   AppRouter._();
@@ -18,57 +24,35 @@ class AppRouter {
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
         builder: (context, state, child) {
-          return AppShell(child: child);
+          return AppShell(mainContent: child);
         },
         routes: [
           GoRoute(
             path: AppRoutes.dashboard,
-            builder: (context, state) =>
-                const _FoundationPlaceholderScreen(title: 'الرئيسية'),
+            builder: (context, state) => const DashboardScreen(),
           ),
           GoRoute(
             path: AppRoutes.orders,
-            builder: (context, state) =>
-                const _FoundationPlaceholderScreen(title: 'الطلبات'),
+            builder: (context, state) => const OrdersScreen(),
           ),
           GoRoute(
             path: AppRoutes.customers,
-            builder: (context, state) =>
-                const _FoundationPlaceholderScreen(title: 'العملاء'),
+            builder: (context, state) => const CustomersScreen(),
           ),
           GoRoute(
             path: AppRoutes.storage,
-            builder: (context, state) =>
-                const _FoundationPlaceholderScreen(title: 'التخزين'),
+            builder: (context, state) => const StorageScreen(),
           ),
           GoRoute(
             path: AppRoutes.reports,
-            builder: (context, state) =>
-                const _FoundationPlaceholderScreen(title: 'التقارير'),
+            builder: (context, state) => const ReportsScreen(),
           ),
           GoRoute(
             path: AppRoutes.settings,
-            builder: (context, state) =>
-                const _FoundationPlaceholderScreen(title: 'الإعدادات'),
+            builder: (context, state) => const SettingsScreen(),
           ),
         ],
       ),
     ],
   );
-}
-
-class _FoundationPlaceholderScreen extends StatelessWidget {
-  final String title;
-
-  const _FoundationPlaceholderScreen({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Text(title, style: Theme.of(context).textTheme.headlineLarge),
-      ),
-    );
-  }
 }

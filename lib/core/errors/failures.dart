@@ -1,3 +1,5 @@
+import 'package:laundry_management/core/localization/app_strings.dart';
+
 abstract class Failure {
   final String message;
 
@@ -5,15 +7,13 @@ abstract class Failure {
 }
 
 class ServerFailure extends Failure {
-  const ServerFailure([super.message = 'حدث خطأ في الاتصال بالخادم']);
+  const ServerFailure([super.message = AppStrings.serverError]);
 }
 
 class CacheFailure extends Failure {
-  const CacheFailure([
-    super.message = 'حدث خطأ في الوصول إلى البيانات المحلية',
-  ]);
+  const CacheFailure([super.message = AppStrings.cacheError]);
 }
 
 class NetworkFailure extends Failure {
-  const NetworkFailure([super.message = 'يرجى التحقق من الاتصال بالإنترنت']);
+  const NetworkFailure([super.message = AppStrings.networkError]);
 }
