@@ -36,6 +36,12 @@ import '../../domain/repositories/order_repository.dart';
 import '../../domain/repositories/payment_repository.dart';
 import '../../domain/repositories/service_repository.dart';
 import '../../domain/repositories/settings_repository.dart';
+import '../../application/use_cases/cancel_order_use_case.dart';
+import '../../application/use_cases/change_order_status_use_case.dart';
+import '../../application/use_cases/complete_order_use_case.dart';
+import '../../application/use_cases/create_order_use_case.dart';
+import '../../application/use_cases/move_stored_item_use_case.dart';
+import '../../application/use_cases/store_order_items_use_case.dart';
 import '../../domain/repositories/storage_location_repository.dart';
 import '../../domain/repositories/storage_repository.dart';
 
@@ -201,4 +207,54 @@ Future<void> initDependencies() async {
       ),
     );
   }
+
+  // 4. Application UseCases
+  if (!getIt.isRegistered<CreateOrderUseCase>()) {
+    getIt.registerLazySingleton<CreateOrderUseCase>(
+      () => CreateOrderUseCase(
+        orderRepository: getIt<OrderRepository>(),
+        customerRepository: getIt<CustomerRepository>(),
+        serviceRepository: getIt<ServiceRepository>(),
+        itemTypeRepository: getIt<ItemTypeRepository>(),
+        itemDefinitionRepository: getIt<ItemDefinitionRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<StoreOrderItemsUseCase>()) {
+    getIt.registerLazySingleton<StoreOrderItemsUseCase>(
+      () => StoreOrderItemsUseCase(
+        orderRepository: getIt<OrderRepository>(),
+        storageRepository: getIt<StorageRepository>(),
+        storageLocationRepository: getIt<StorageLocationRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<MoveStoredItemUseCase>()) {
+    getIt.registerLazySingleton<MoveStoredItemUseCase>(
+      () => MoveStoredItemUseCase(
+        orderRepository: getIt<OrderRepository>(),
+        storageRepository: getIt<StorageRepository>(),
+        storageLocationRepository: getIt<StorageLocationRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<ChangeOrderStatusUseCase>()) {
+    getIt.registerLazySingleton<ChangeOrderStatusUseCase>(
+      () => ChangeOrderStatusUseCase(getIt<OrderRepository>()),
+    );
+  }
+  if (!getIt.isRegistered<CompleteOrderUseCase>()) {
+    getIt.registerLazySingleton<CompleteOrderUseCase>(
+      () => CompleteOrderUseCase(
+        orderRepository: getIt<OrderRepository>(),
+        paymentRepository: getIt<PaymentRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<CancelOrderUseCase>()) {
+    getIt.registerLazySingleton<CancelOrderUseCase>(
+      () => CancelOrderUseCase(getIt<OrderRepository>()),
+    );
+  }
 }
+

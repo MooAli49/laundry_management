@@ -1039,6 +1039,26 @@ Status:
 
 Any exception requires an explicit architectural decision.
 
+### Architectural Exception — Task #04 Application / UseCase Workflows
+
+Status:
+
+    Approved
+
+An Application layer (`lib/application/use_cases/`) is explicitly approved for complex, multi-step business workflow orchestration:
+- `CreateOrderUseCase`
+- `StoreOrderItemsUseCase`
+- `MoveStoredItemUseCase`
+- `ChangeOrderStatusUseCase`
+- `CompleteOrderUseCase`
+- `CancelOrderUseCase`
+
+**Principles**:
+- UseCases are selective workflow orchestrators, NOT mandatory CRUD wrappers.
+- Simple entity CRUD remains direct between Presentation/Cubits and Repositories.
+- Application UseCases remain pure Dart with zero Flutter, Drift, SQLite, or DAO dependencies.
+- UseCases encapsulate cross-repository transactions, lifecycle transition matrices, physical item expansion, positive pricing validation, and handover/balance verification.
+
 ---
 
 ## 50. AI Coding Tool Policy

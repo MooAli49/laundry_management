@@ -252,6 +252,24 @@ void main() {
       final activeBefore = await storageRepository.getActiveRecordForOrderItem('item-2');
       expect(activeBefore, isNotNull);
 
+      // Attempt completeOrder directly on Processing order -> rejected
+      expect(
+        () => orderRepository.completeOrder(
+          orderId: 'ord-2',
+          handoverConfirmed: true,
+        ),
+        throwsA(
+          isA<BusinessRuleFailure>().having(
+            (e) => e.message,
+            'message',
+            contains('Only Ready orders can be completed'),
+          ),
+        ),
+      );
+
+      // Move order to Ready before completion
+      await orderRepository.markOrderReady('ord-2');
+
       // Attempt completeOrder without handover confirmation
       expect(
         () => orderRepository.completeOrder(
@@ -261,7 +279,7 @@ void main() {
         throwsA(isA<BusinessRuleFailure>()),
       );
 
-      // Complete order with handover confirmed
+      // Complete order with handover confirmed -> allowed
       final completedOrder = await orderRepository.completeOrder(
         orderId: 'ord-2',
         handoverConfirmed: true,
@@ -270,6 +288,21 @@ void main() {
       expect(completedOrder.status, OrderStatus.completed);
       expect(completedOrder.completedAt, isNotNull);
       expect(completedOrder.customerHandoverConfirmedAt, completedOrder.completedAt);
+
+      // Attempt completeOrder on already Completed order -> rejected
+      expect(
+        () => orderRepository.completeOrder(
+          orderId: 'ord-2',
+          handoverConfirmed: true,
+        ),
+        throwsA(
+          isA<BusinessRuleFailure>().having(
+            (e) => e.message,
+            'message',
+            contains('already completed'),
+          ),
+        ),
+      );
 
       // Active storage record should be deactivated
       final activeAfter = await storageRepository.getActiveRecordForOrderItem('item-2');
@@ -343,6 +376,21 @@ void main() {
       expect(cancelledOrder.status, OrderStatus.cancelled);
       expect(cancelledOrder.cancelledAt, isNotNull);
       expect(cancelledOrder.cancellationReason, 'طلب العميل إلغاء الطلب');
+
+      // Attempt completeOrder on Cancelled order -> rejected
+      expect(
+        () => orderRepository.completeOrder(
+          orderId: 'ord-3',
+          handoverConfirmed: true,
+        ),
+        throwsA(
+          isA<BusinessRuleFailure>().having(
+            (e) => e.message,
+            'message',
+            contains('Cannot complete a cancelled order'),
+          ),
+        ),
+      );
     });
 
     test('correctOrderStatus moves from completed to processing without reactivating storage (BR-034)', () async {
@@ -393,6 +441,7 @@ void main() {
         updatedAt: now,
       );
       await orderRepository.createOrder(order: order, items: [item]);
+      await orderRepository.markOrderReady('ord-4');
       await orderRepository.completeOrder(orderId: 'ord-4', handoverConfirmed: true);
 
       // Correct order status back to processing

@@ -744,12 +744,13 @@ This is required because storage operates at physical OrderItem level.
 
 The Orders feature must respect the selected PricingType.
 
-Supported PricingTypes:
+Supported V1 Operational PricingTypes:
 
 - Per Piece
-- Per Kilogram
-- Per Square Meter
 - Fixed Price
+- Per Square Meter
+
+*(Note: Per Kilogram pricing has been completely removed from V1 operations).*
 
 The feature must not assume:
 
@@ -1655,45 +1656,27 @@ The current approved structure centralizes Data implementations.
 
 ---
 
-## 74. No Use Case Layer
+## 74. Selective Use Cases Layer (Task #04 Approved)
 
-Do not introduce:
+Use Cases are NOT a mandatory layer for every feature or simple CRUD operation.
 
-CreateOrderUseCase
+However, for complex multi-step transactional business workflows, the Application UseCases layer (`lib/application/use_cases/`) is explicitly approved:
+- `CreateOrderUseCase`
+- `StoreOrderItemsUseCase`
+- `MoveStoredItemUseCase`
+- `ChangeOrderStatusUseCase`
+- `CompleteOrderUseCase`
+- `CancelOrderUseCase`
 
-CreateExpenseUseCase
-
-RecordPaymentUseCase
-
-GetDashboardUseCase
-
-as a mandatory layer.
-
-V1 uses:
-
-Cubit
-↓
-Repository Contract
-↓
-Data
-
-Business logic belongs in Domain where appropriate.
-
-Repository operations provide the required application-facing data access.
+Simple entity operations continue to use direct interaction between Cubits and Repository Contracts without mandatory UseCase wrappers.
 
 ---
 
-## 75. No Application Layer
+## 75. Selective Application Layer (Task #04 Approved)
 
-Do not create an Application layer simply to add another abstraction between:
+An Application layer is approved specifically for orchestrating multi-repository business workflows (such as physical item expansion, storage rules, status matrices, and handover/balance verification).
 
-Cubit
-
-and:
-
-Repository
-
-The architecture intentionally remains lightweight for V1.
+The Application layer must remain pure Dart with zero Flutter, Drift, SQLite, or DAO imports. It must not be used as an unnecessary generic wrapper for simple CRUD operations.
 
 ---
 

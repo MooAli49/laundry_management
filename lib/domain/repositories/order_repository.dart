@@ -17,6 +17,8 @@ abstract class OrderRepository {
 
   Future<List<OrderItem>> getOrderItems(String orderId);
 
+  Future<OrderItem?> getOrderItemById(String id);
+
   Future<List<Order>> getOrders({
     OrderStatus? status,
     OrderDate? expectedPickupDate,

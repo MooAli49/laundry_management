@@ -14,7 +14,10 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
 
     final query = select(db.orders)
       ..where((t) => t.orderNumber.like(pattern))
-      ..orderBy([(t) => OrderingTerm.desc(t.orderNumber)])
+      ..orderBy([
+        (t) => OrderingTerm.desc(t.orderNumber.length),
+        (t) => OrderingTerm.desc(t.orderNumber),
+      ])
       ..limit(1);
 
     final latest = await query.getSingleOrNull();
@@ -76,6 +79,24 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
         carpet: row.readTableOrNull(db.orderItemCarpets),
       );
     }).toList();
+  }
+
+  Future<({app_db.OrderItem item, app_db.OrderItemCarpet? carpet})?> getOrderItemWithCarpetById(
+    String id,
+  ) async {
+    final query = select(db.orderItems).join([
+      leftOuterJoin(
+        db.orderItemCarpets,
+        db.orderItemCarpets.orderItemId.equalsExp(db.orderItems.id),
+      ),
+    ])..where(db.orderItems.id.equals(id));
+
+    final row = await query.getSingleOrNull();
+    if (row == null) return null;
+    return (
+      item: row.readTable(db.orderItems),
+      carpet: row.readTableOrNull(db.orderItemCarpets),
+    );
   }
 
   Future<List<app_db.Order>> getOrders({

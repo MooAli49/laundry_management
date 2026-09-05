@@ -49,11 +49,15 @@ The architecture should follow this principle:
 
 ## 3. High-Level Architecture
 
-The simplified V1 architecture is:
+The approved V1 architecture is:
 
-    Presentation
+    Presentation (Screens / Widgets / Cubits)
          ↓
-    Repository
+    Application UseCases (Selective Workflows) OR Direct Repository
+         ↓
+    Repository Contracts (Domain)
+         ↓
+    Repository Implementations (Data)
          ↓
     Local / Remote Data Source
 
@@ -64,10 +68,17 @@ The Domain layer provides:
 - Repository contracts
 - Important domain logic
 
+The Application layer (`lib/application/use_cases/`) provides:
+
+- Selective orchestration for complex, multi-step business workflows (e.g. Order Creation, Storage, Relocation, Status Transitions, Completion, Cancellation)
+- Cross-repository orchestration without coupling Cubits to multi-step business logic
+- Strict pure Dart implementation (no Flutter, Drift, SQLite, or DAO dependencies)
+- Note: UseCases are NOT mandatory CRUD wrappers; simple entity operations go directly to Repositories.
+
 The Data layer provides:
 
 - Repository implementations
-- Local database
+- Local database (SQLite / Drift)
 - Remote API
 - Data models when needed
 - Synchronization infrastructure
@@ -76,10 +87,11 @@ The Data layer provides:
 
 ## 4. Main Layers
 
-The project consists of four main architectural areas:
+The project consists of five main architectural areas:
 
     Core
     Domain
+    Application
     Data
     Features
 
@@ -89,7 +101,17 @@ Conceptually:
     │                Features                 │
     │       Screens / Widgets / Cubits        │
     └────────────────────┬────────────────────┘
-                         ↓
+                         │
+         ┌───────────────┴───────────────┐
+         │ (Complex Workflows)           │ (Simple CRUD)
+         ↓                               ↓
+    ┌─────────────────────────┐          │
+    │       Application       │          │
+    │  Selective Use Cases    │          │
+    └────────────┬────────────┘          │
+                 │                       │
+                 └───────────┬───────────┘
+                             ↓
     ┌─────────────────────────────────────────┐
     │                 Domain                  │
     │ Entities / Enums / Contracts / Rules   │
@@ -800,12 +822,13 @@ Pricing logic should not be implemented directly inside widgets.
 
 The pricing calculation should be performed by Domain logic or a small Domain Service when appropriate.
 
-Supported Pricing Types are:
+Supported V1 Operational Pricing Types are:
 
     Per Piece
-    Per Kilogram
-    Per Square Meter
     Fixed Price
+    Per Square Meter
+
+*(Note: Per Kilogram pricing has been completely removed from the V1 operational model and workflow by locked business decision).*
 
 Historical OrderItem pricing must be preserved.
 

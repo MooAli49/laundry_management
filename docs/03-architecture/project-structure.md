@@ -37,20 +37,19 @@ The approved application flow is:
         ↓
     Cubit / Bloc
         ↓
-    Repository Contract
+    Application UseCases (Selective Workflows) OR Direct Repository Contract
         ↓
     Repository Implementation
         ↓
     Local / Remote Data Source
 
-The project intentionally does not use:
+The project intentionally avoids:
 
-- UseCases layer
+- Mechanical UseCases for simple/generic CRUD operations
 - Mappers layer
-- Separate Application layer
 - Unnecessary abstraction layers
 
-The architecture should remain simple and practical for V1.
+UseCases exist selectively in `lib/application/use_cases/` to orchestrate complex multi-step business workflows (order creation, item storage, storage moves, lifecycle status transitions, order completion, cancellation) without polluting Cubits with complex business choreography or creating premature transaction abstractions.
 
 ---
 
@@ -61,11 +60,13 @@ The main `lib/` structure is:
     lib/
     ├── core/
     ├── domain/
+    ├── application/
+    │   └── use_cases/
     ├── data/
     ├── features/
     └── main.dart
 
-Each area has a clear responsibility.
+Each area has a clear responsibility. Simple CRUD features interact directly with Domain Repository contracts, while complex multi-step business operations interact through the Application UseCases layer.
 
 ---
 

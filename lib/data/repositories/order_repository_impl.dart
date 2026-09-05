@@ -52,11 +52,15 @@ class OrderRepositoryImpl implements OrderRepository {
       }
 
       return await _db.transaction(() async {
+        final finalOrderNumber = order.orderNumber.isNotEmpty
+            ? order.orderNumber
+            : await _ordersDao.generateNextOrderNumber();
+
         // Insert order
         await _ordersDao.insertOrder(
           app_db.OrdersCompanion(
             id: Value(order.id),
-            orderNumber: Value(order.orderNumber),
+            orderNumber: Value(finalOrderNumber),
             customerId: Value(order.customerId),
             status: Value(order.status.name),
             expectedPickupDate: Value(order.expectedPickupDate.toDateTime()),
@@ -123,7 +127,7 @@ class OrderRepositoryImpl implements OrderRepository {
           operationType: 'create',
         );
 
-        return order;
+        return order.copyWith(orderNumber: finalOrderNumber);
       });
     } on ArgumentError catch (e) {
       throw ValidationFailure(e.message.toString());
@@ -207,6 +211,17 @@ class OrderRepositoryImpl implements OrderRepository {
     try {
       final rows = await _ordersDao.getOrderItemsWithCarpets(orderId);
       return rows.map((r) => _mapOrderItemToDomain(r.item, r.carpet)).toList();
+    } catch (e) {
+      if (e is Failure) rethrow;
+      throw DatabaseFailure(e.toString());
+    }
+  }
+
+  @override
+  Future<OrderItem?> getOrderItemById(String id) async {
+    try {
+      final row = await _ordersDao.getOrderItemWithCarpetById(id);
+      return row != null ? _mapOrderItemToDomain(row.item, row.carpet) : null;
     } catch (e) {
       if (e is Failure) rethrow;
       throw DatabaseFailure(e.toString());
@@ -330,11 +345,14 @@ class OrderRepositoryImpl implements OrderRepository {
         if (existing == null) {
           throw ValidationFailure('Order not found');
         }
-        if (existing.status == OrderStatus.completed.name) {
-          throw BusinessRuleFailure('Order is already completed');
-        }
-        if (existing.status == OrderStatus.cancelled.name) {
-          throw BusinessRuleFailure('Cannot complete a cancelled order');
+        if (existing.status != OrderStatus.ready.name) {
+          if (existing.status == OrderStatus.completed.name) {
+            throw BusinessRuleFailure('Order is already completed');
+          }
+          if (existing.status == OrderStatus.cancelled.name) {
+            throw BusinessRuleFailure('Cannot complete a cancelled order');
+          }
+          throw BusinessRuleFailure('Only Ready orders can be completed');
         }
 
         final now = DateTime.now();

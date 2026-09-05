@@ -268,9 +268,12 @@ Example:
 
 ## BR-026 — Manual Status Override
 
-The user may manually change the order status when necessary to correct an operational mistake.
+The user may manually change the order status when necessary to correct an operational mistake according to the approved transition matrix.
 
-However, manual changes must not automatically create incorrect Storage state.
+- A manual transition from Processing to Ready requires an explicit, non-empty operational override reason.
+- A manual transition from Completed back to Processing requires an explicit, non-empty operational reason.
+- Manual status changes must not automatically alter storage state (e.g., Completed → Processing does not reactivate storage records; items must be explicitly stored again).
+- Ready → Completed is forbidden through manual status override (must go through CompleteOrder workflow with payment and handover validation).
 
 ---
 
@@ -513,12 +516,23 @@ Deactivating a service must not modify historical orders.
 
 ## BR-055 — Supported Pricing Types
 
-The domain supports:
+The supported V1 operational pricing types are:
 
 - Per Piece
-- Per Kilogram
-- Per Square Meter
 - Fixed Price
+- Per Square Meter
+
+*(Note: Per Kilogram pricing has been completely removed from the V1 operational workflow and domain model by locked business decision. No PerKg items, migrations, or workflows exist in V1).*
+
+---
+
+## BR-055A — Zero Pricing Forbidden
+
+For V1, an order item's final unit price must be strictly positive:
+
+> `unitPrice > Money.zero`
+
+This requirement applies to both the Service's default price and any `customUnitPrice`. Zero price and negative price are strictly invalid and rejected.
 
 ---
 
@@ -611,9 +625,18 @@ V1 does not support individual discounts per OrderItem.
 
 ## BR-066 — Total
 
-Current V1 calculation:
+The approved V1 calculation is:
 
-Subtotal - Discount = Total
+```text
+Total = Subtotal - Discount + Customer Pickup Fee + Customer Delivery Fee + Tax
+```
+
+Rules:
+- **Subtotal**: Sum of all expanded `OrderItem.calculatedTotal`.
+- **Discount**: Applied at order level; must be `>= Money.zero` and `<= Subtotal`.
+- **Customer Pickup Fee**: Added when pickup is requested; must be zero if pickup is not requested.
+- **Customer Delivery Fee**: Added when delivery is requested; must be zero if delivery is not requested.
+- **Tax**: Reserved and zero/disabled in normal V1 operation (`Tax = Money.zero`).
 
 ---
 

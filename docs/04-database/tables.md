@@ -1058,14 +1058,13 @@ Examples:
     Per Piece:
     1
 
-    Per Kilogram:
-    3.5
-
     Per Square Meter:
     6.25
 
     Fixed Price:
     1
+
+    (Note: Per Kilogram pricing is not supported in V1 operations)
 
 The exact physical representation of decimal quantities must follow the approved implementation strategy.
 
