@@ -29,3 +29,11 @@ class NetworkException extends AppException {
     super.cause,
   ]);
 }
+
+class DatabaseException extends AppException {
+  const DatabaseException([
+    super.message = 'Database persistence exception occurred',
+    super.cause,
+  ]);
+}
+
