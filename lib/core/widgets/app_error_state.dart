@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:laundry_management/core/localization/app_strings.dart';
 import 'package:laundry_management/core/theme/app_colors.dart';
+import 'package:laundry_management/core/theme/app_colors_extension.dart';
 import 'package:laundry_management/core/theme/app_spacing.dart';
 import 'package:laundry_management/core/theme/app_text_styles.dart';
 import 'package:laundry_management/core/widgets/app_button.dart';
@@ -26,6 +27,8 @@ class AppErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final appColors = AppColorsExtension.of(context);
+
     return Center(
       child: Padding(
         padding: AppSpacing.paddingXl,
@@ -33,7 +36,7 @@ class AppErrorState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 64, color: AppColors.error),
+            Icon(icon, size: 64, color: appColors.error),
             AppSpacing.gapMd,
             Text(
               title,

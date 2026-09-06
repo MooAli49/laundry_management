@@ -99,5 +99,28 @@ void main() {
       expect(theme.dialogTheme.backgroundColor, equals(AppColors.surface));
       expect(theme.bottomSheetTheme.backgroundColor, equals(AppColors.surface));
     });
+
+    testWidgets('AppColorsExtension can be retrieved from BuildContext at runtime', (
+      WidgetTester tester,
+    ) async {
+      AppColorsExtension? retrievedExt;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: Builder(
+            builder: (context) {
+              retrievedExt = Theme.of(context).extension<AppColorsExtension>();
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      expect(retrievedExt, isNotNull);
+      expect(retrievedExt!.success, equals(AppColors.success));
+      expect(retrievedExt!.error, equals(AppColors.error));
+      expect(retrievedExt!.disabledBackground, equals(AppColors.disabledBackground));
+    });
   });
 }
