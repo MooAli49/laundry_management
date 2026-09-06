@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:laundry_management/core/theme/app_colors.dart';
+import 'package:laundry_management/core/theme/app_colors_extension.dart';
 import 'package:laundry_management/core/theme/app_spacing.dart';
 import 'package:laundry_management/core/theme/app_text_styles.dart';
 
@@ -16,6 +16,7 @@ class AppTextField extends StatelessWidget {
   final FormFieldValidator<String>? validator;
   final int maxLines;
   final bool enabled;
+  final FocusNode? focusNode;
 
   const AppTextField({
     super.key,
@@ -31,10 +32,14 @@ class AppTextField extends StatelessWidget {
     this.validator,
     this.maxLines = 1,
     this.enabled = true,
+    this.focusNode,
   });
 
   @override
   Widget build(BuildContext context) {
+    final appColors = AppColorsExtension.of(context);
+    final effectiveFillColor = enabled ? null : appColors.disabledBackground;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -45,6 +50,7 @@ class AppTextField extends StatelessWidget {
         ],
         TextFormField(
           controller: controller,
+          focusNode: focusNode,
           obscureText: obscureText,
           keyboardType: keyboardType,
           onChanged: onChanged,
@@ -57,37 +63,7 @@ class AppTextField extends StatelessWidget {
             errorText: errorText,
             prefixIcon: prefixIcon,
             suffixIcon: suffixIcon,
-            filled: true,
-            fillColor: enabled
-                ? AppColors.surface
-                : AppColors.backgroundSecondary,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-              borderSide: const BorderSide(color: AppColors.border),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-              borderSide: const BorderSide(color: AppColors.border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-              borderSide: const BorderSide(
-                color: AppColors.borderFocused,
-                width: 1.5,
-              ),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-              borderSide: const BorderSide(color: AppColors.error),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-              borderSide: const BorderSide(color: AppColors.error, width: 1.5),
-            ),
+            fillColor: effectiveFillColor,
           ),
         ),
       ],

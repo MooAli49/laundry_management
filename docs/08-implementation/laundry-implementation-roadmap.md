@@ -20,8 +20,8 @@ The implementation workflow remains:
 | Task #02 | Database | Implement and verify the local SQLite/Drift database baseline. | Completed |
 | Task #03 | Domain + Data Layer | Establish domain entities/value objects, repository contracts, DAOs, repository implementations, and data-layer foundation. | Completed |
 | Task #04 | Application Workflows | Implement the core business workflows through selective Application-layer UseCases. | Completed / Locked |
-| **Task #05** | **Core Presentation Foundation** | Establish the core Flutter presentation foundation and prepare the first production-ready screen flow. | **Next** |
-| Task #06 | Orders — End-to-End | Implement the core Order experience from creation through order management, using the existing business workflows. | Planned |
+| Task #05 | Core Presentation Foundation | Establish the core Flutter presentation foundation and prepare the first production-ready screen flow. | Completed / Locked |
+| **Task #06** | **Orders — End-to-End** | Implement the core Order experience from creation through order management, using the existing business workflows. | **Next** |
 | Task #07 | Customers | Implement customer management and its integration with Orders. | Planned |
 | Task #08 | Storage | Implement the operational storage workflow for physical OrderItems, including storing and moving items. | Planned |
 | Task #09 | Payments | Implement the payment workflow and payment-related Order experience. | Planned |
@@ -408,10 +408,9 @@ Task #01  Foundation / Architecture       ✅
 Task #02  Database                         ✅
 Task #03  Domain + Data Layer              ✅
 Task #04  Application Workflows            ✅ LOCKED
+Task #05  Core Presentation Foundation     ✅ LOCKED
 
-Task #05  Core Presentation Foundation     ← CURRENT NEXT TASK
-
-Task #06  Orders — End-to-End
+Task #06  Orders — End-to-End              ← CURRENT NEXT TASK
 Task #07  Customers
 Task #08  Storage
 Task #09  Payments

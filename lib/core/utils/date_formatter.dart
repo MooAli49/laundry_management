@@ -24,4 +24,12 @@ class DateFormatter {
     final minute = date.minute.toString().padLeft(2, '0');
     return '$ymd $hour:$minute';
   }
+
+  /// Formats DateTime as DD/MM/YYYY HH:mm
+  static String formatDMYTime(DateTime date) {
+    final dmy = formatDMY(date);
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$dmy $hour:$minute';
+  }
 }

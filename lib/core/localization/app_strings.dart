@@ -17,6 +17,8 @@ class AppStrings {
   static const String currencyCode = 'EGP';
 
   // Technical Errors / Failures
+  static const String errorTitle = 'حدث خطأ ما';
+  static const String errorDescription = 'تعذر إتمام العملية، يرجى المحاولة مرة أخرى';
   static const String serverError = 'حدث خطأ في الاتصال بالخادم';
   static const String cacheError = 'حدث خطأ في الوصول إلى البيانات المحلية';
   static const String networkError = 'يرجى التحقق من الاتصال بالإنترنت';

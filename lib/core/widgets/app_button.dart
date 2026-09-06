@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:laundry_management/core/theme/app_colors.dart';
+import 'package:laundry_management/core/theme/app_colors_extension.dart';
 import 'package:laundry_management/core/theme/app_spacing.dart';
 import 'package:laundry_management/core/theme/app_text_styles.dart';
 
-enum AppButtonVariant { primary, secondary, outline }
+enum AppButtonVariant { primary, secondary, outline, destructive, text }
 
 class AppButton extends StatelessWidget {
   final String label;
@@ -25,25 +26,39 @@ class AppButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final appColors = AppColorsExtension.of(context);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     Color backgroundColor;
     Color foregroundColor;
     BorderSide? borderSide;
 
     switch (variant) {
       case AppButtonVariant.primary:
-        backgroundColor = AppColors.primary;
-        foregroundColor = AppColors.onPrimary;
+        backgroundColor = colorScheme.primary;
+        foregroundColor = colorScheme.onPrimary;
         borderSide = null;
         break;
       case AppButtonVariant.secondary:
-        backgroundColor = AppColors.secondary;
-        foregroundColor = Colors.white;
+        backgroundColor = colorScheme.secondary;
+        foregroundColor = AppColors.onSecondary;
         borderSide = null;
         break;
       case AppButtonVariant.outline:
         backgroundColor = Colors.transparent;
-        foregroundColor = AppColors.primary;
-        borderSide = const BorderSide(color: AppColors.primary, width: 1.5);
+        foregroundColor = colorScheme.primary;
+        borderSide = BorderSide(color: colorScheme.primary, width: 1.5);
+        break;
+      case AppButtonVariant.destructive:
+        backgroundColor = appColors.error;
+        foregroundColor = appColors.onError;
+        borderSide = null;
+        break;
+      case AppButtonVariant.text:
+        backgroundColor = Colors.transparent;
+        foregroundColor = colorScheme.primary;
+        borderSide = null;
         break;
     }
 
@@ -74,11 +89,15 @@ class AppButton extends StatelessWidget {
           );
 
     final button = ElevatedButton(
-      onPressed: isLoading ? null : onPressed,
+      onPressed: (isLoading || onPressed == null) ? null : onPressed,
       style: ElevatedButton.styleFrom(
         backgroundColor: backgroundColor,
         foregroundColor: foregroundColor,
+        shadowColor: Colors.transparent,
+        disabledBackgroundColor: isLoading ? backgroundColor : null,
+        disabledForegroundColor: isLoading ? foregroundColor : null,
         elevation: 0,
+        side: borderSide,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
           side: borderSide ?? BorderSide.none,
