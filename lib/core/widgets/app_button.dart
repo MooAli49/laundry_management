@@ -3,7 +3,7 @@ import 'package:laundry_management/core/theme/app_colors.dart';
 import 'package:laundry_management/core/theme/app_spacing.dart';
 import 'package:laundry_management/core/theme/app_text_styles.dart';
 
-enum AppButtonVariant { primary, secondary, outline }
+enum AppButtonVariant { primary, secondary, outline, destructive, text }
 
 class AppButton extends StatelessWidget {
   final String label;
@@ -37,13 +37,23 @@ class AppButton extends StatelessWidget {
         break;
       case AppButtonVariant.secondary:
         backgroundColor = AppColors.secondary;
-        foregroundColor = Colors.white;
+        foregroundColor = AppColors.onSecondary;
         borderSide = null;
         break;
       case AppButtonVariant.outline:
         backgroundColor = Colors.transparent;
         foregroundColor = AppColors.primary;
         borderSide = const BorderSide(color: AppColors.primary, width: 1.5);
+        break;
+      case AppButtonVariant.destructive:
+        backgroundColor = AppColors.error;
+        foregroundColor = AppColors.onError;
+        borderSide = null;
+        break;
+      case AppButtonVariant.text:
+        backgroundColor = Colors.transparent;
+        foregroundColor = AppColors.primary;
+        borderSide = null;
         break;
     }
 
@@ -74,10 +84,13 @@ class AppButton extends StatelessWidget {
           );
 
     final button = ElevatedButton(
-      onPressed: isLoading ? null : onPressed,
+      onPressed: (isLoading || onPressed == null) ? null : onPressed,
       style: ElevatedButton.styleFrom(
         backgroundColor: backgroundColor,
         foregroundColor: foregroundColor,
+        shadowColor: Colors.transparent,
+        disabledBackgroundColor: isLoading ? backgroundColor : null,
+        disabledForegroundColor: isLoading ? foregroundColor : null,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),

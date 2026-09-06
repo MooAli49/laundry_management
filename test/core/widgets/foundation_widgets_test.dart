@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:laundry_management/core/theme/app_theme.dart';
 import 'package:laundry_management/core/widgets/app_button.dart';
 import 'package:laundry_management/core/widgets/app_card.dart';
+import 'package:laundry_management/core/widgets/app_error_state.dart';
 import 'package:laundry_management/core/widgets/app_text_field.dart';
 import 'package:laundry_management/core/widgets/empty_state.dart';
 import 'package:laundry_management/core/widgets/loading_indicator.dart';
+import 'package:laundry_management/core/widgets/page_header.dart';
 
 void main() {
   group('Foundation UI Widgets Tests', () {
@@ -134,6 +137,134 @@ void main() {
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.text('جاري تحميل البيانات...'), findsOneWidget);
+    });
+
+    testWidgets('AppButton renders destructive, text, outline variants and honors null onPressed', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: Scaffold(
+            body: Column(
+              children: [
+                AppButton(
+                  label: 'حذف',
+                  variant: AppButtonVariant.destructive,
+                  onPressed: () {},
+                ),
+                AppButton(
+                  label: 'إلغاء',
+                  variant: AppButtonVariant.text,
+                  onPressed: () {},
+                ),
+                AppButton(
+                  label: 'مخطط',
+                  variant: AppButtonVariant.outline,
+                  onPressed: () {},
+                ),
+                const AppButton(
+                  label: 'معطل',
+                  onPressed: null,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('حذف'), findsOneWidget);
+      expect(find.text('إلغاء'), findsOneWidget);
+      expect(find.text('مخطط'), findsOneWidget);
+      expect(find.text('معطل'), findsOneWidget);
+
+      final buttons = tester.widgetList<ElevatedButton>(find.byType(ElevatedButton)).toList();
+      // The 4th button has null onPressed
+      expect(buttons[3].onPressed, isNull);
+    });
+
+    testWidgets('AppTextField renders disabled state and error message', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: const Scaffold(
+            body: Column(
+              children: [
+                AppTextField(
+                  label: 'حقل معطل',
+                  enabled: false,
+                  hintText: 'غير متاح',
+                ),
+                AppTextField(
+                  label: 'حقل بخطأ',
+                  errorText: 'القيمة غير صالحة',
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('حقل معطل'), findsOneWidget);
+      expect(find.text('غير متاح'), findsOneWidget);
+      expect(find.text('حقل بخطأ'), findsOneWidget);
+      expect(find.text('القيمة غير صالحة'), findsOneWidget);
+    });
+
+    testWidgets('PageHeader renders title, subtitle, and action widgets in RTL', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: const Directionality(
+            textDirection: TextDirection.rtl,
+            child: Scaffold(
+              body: PageHeader(
+                title: 'شاشة تجريبية',
+                subtitle: 'وصف إضافي للشاشة',
+                actions: [
+                  ElevatedButton(onPressed: null, child: Text('إجراء')),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('شاشة تجريبية'), findsOneWidget);
+      expect(find.text('وصف إضافي للشاشة'), findsOneWidget);
+      expect(find.text('إجراء'), findsOneWidget);
+    });
+
+    testWidgets('AppErrorState renders error icon, title, message, and handles retry', (
+      WidgetTester tester,
+    ) async {
+      bool retried = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: Scaffold(
+            body: AppErrorState(
+              title: 'خطأ في الاتصال',
+              message: 'تعذر الوصول إلى الخادم',
+              onRetry: () => retried = true,
+              retryLabel: 'إعادة المحاولة',
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('خطأ في الاتصال'), findsOneWidget);
+      expect(find.text('تعذر الوصول إلى الخادم'), findsOneWidget);
+      expect(find.byIcon(Icons.error_outline), findsOneWidget);
+      expect(find.text('إعادة المحاولة'), findsOneWidget);
+
+      await tester.tap(find.text('إعادة المحاولة'));
+      expect(retried, isTrue);
     });
   });
 }
