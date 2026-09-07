@@ -306,8 +306,8 @@ class InvoicePreviewDialog extends StatelessWidget {
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('تم إرسال الفاتورة إلى أمر الطباعة بنجاح'),
-                          backgroundColor: AppColors.success,
+                          content: Text('ميزة الطباعة غير مفعلة حالياً - جاري إعداد خدمة الطباعة'),
+                          backgroundColor: AppColors.info,
                         ),
                       );
                       Navigator.of(context).pop();

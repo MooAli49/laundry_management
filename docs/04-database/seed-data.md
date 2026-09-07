@@ -2013,3 +2013,15 @@ After initialization:
         ↓
 
     Historical Data Remains Protected
+
+---
+
+## 58. Dedicated Development / Test Data (`DevTestData`)
+
+For local testing, UI development, and end-to-end verification, a dedicated `DevTestData` class is provided in `lib/data/local/database/dev_test_data.dart`.
+
+### Strict Separation Rules:
+1. **Production Seed Safety**: Production `SeedData` initializes ONLY system master data (`BusinessSettings`, default `ItemTypes`, and default `ExpenseCategories`). It NEVER creates Customers, Orders, OrderItems, Payments, Expenses, or StorageRecords.
+2. **DevTestData Scope**: Populates 12 synthetic customers and 18 synthetic orders covering all operational test scenarios (processing, ready, completed, cancelled, partial storage, discount, pickup/delivery fees, carpet dimensions, price overrides, multi-payments).
+3. **Strict Gate**: DevTestData is NEVER executed in production by default. It is gated by `--dart-define=ENABLE_DEV_TEST_DATA=true` (or programmatic flag in tests).
+4. **Idempotency**: All synthetic records use deterministic IDs and `INSERT OR IGNORE` so repeated runs do not duplicate data.

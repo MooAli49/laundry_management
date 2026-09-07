@@ -14,6 +14,7 @@ import '../../data/local/daos/storage_locations_dao.dart';
 import '../../data/local/daos/storage_records_dao.dart';
 import '../../data/local/daos/sync_operations_dao.dart';
 import '../../data/local/database/app_database.dart';
+import '../../data/local/database/dev_test_data.dart';
 import '../../data/repositories/carpet_size_repository_impl.dart';
 import '../../data/repositories/customer_repository_impl.dart';
 import '../../data/repositories/expense_category_repository_impl.dart';
@@ -50,7 +51,7 @@ import '../../features/orders/presentation/cubit/orders_list_cubit.dart';
 
 final getIt = GetIt.instance;
 
-Future<void> initDependencies() async {
+Future<void> initDependencies({bool? enableDevTestData}) async {
   // 1. Core Local Database
   if (!getIt.isRegistered<AppDatabase>()) {
     getIt.registerLazySingleton<AppDatabase>(() => AppDatabase());
@@ -298,6 +299,12 @@ Future<void> initDependencies() async {
         cancelOrderUseCase: getIt<CancelOrderUseCase>(),
       ),
     );
+  }
+
+  // 6. Optional Dev / Test Data seeding (Strictly gated by flag or parameter)
+  final shouldSeedDevData = enableDevTestData ?? DevTestData.isEnabled;
+  if (shouldSeedDevData) {
+    await DevTestData.seedDevData(getIt<AppDatabase>());
   }
 }
 

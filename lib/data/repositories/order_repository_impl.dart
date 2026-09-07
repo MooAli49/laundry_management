@@ -51,84 +51,101 @@ class OrderRepositoryImpl implements OrderRepository {
         );
       }
 
-      return await _db.transaction(() async {
-        final finalOrderNumber = order.orderNumber.isNotEmpty
-            ? order.orderNumber
-            : await _ordersDao.generateNextOrderNumber();
+      const maxRetries = 5;
+      for (var attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          return await _db.transaction(() async {
+            final finalOrderNumber = order.orderNumber.isNotEmpty
+                ? order.orderNumber
+                : await _ordersDao.generateNextOrderNumber();
 
-        // Insert order
-        await _ordersDao.insertOrder(
-          app_db.OrdersCompanion(
-            id: Value(order.id),
-            orderNumber: Value(finalOrderNumber),
-            customerId: Value(order.customerId),
-            status: Value(order.status.name),
-            expectedPickupDate: Value(order.expectedPickupDate.toDateTime()),
-            notes: Value(order.notes),
-            customerPickupRequested: Value(order.customerPickupRequested),
-            customerPickupFee: Value(order.customerPickupFee.piastres),
-            customerDeliveryRequested: Value(order.customerDeliveryRequested),
-            customerDeliveryFee: Value(order.customerDeliveryFee.piastres),
-            subtotal: Value(order.subtotal.piastres),
-            discount: Value(order.discount.piastres),
-            tax: Value(order.tax.piastres),
-            total: Value(order.total.piastres),
-            completedAt: Value(order.completedAt),
-            cancelledAt: Value(order.cancelledAt),
-            cancellationReason: Value(order.cancellationReason),
-            createdAt: Value(order.createdAt),
-            updatedAt: Value(order.updatedAt),
-          ),
-        );
-
-        // Insert items & carpets
-        for (final item in items) {
-          await _ordersDao.insertOrderItem(
-            app_db.OrderItemsCompanion(
-              id: Value(item.id),
-              orderId: Value(order.id),
-              itemTypeId: Value(item.itemTypeId),
-              itemDefinitionId: Value(item.itemDefinitionId),
-              serviceId: Value(item.serviceId),
-              itemTypeNameSnapshot: Value(item.itemTypeNameSnapshot),
-              itemDefinitionNameSnapshot: Value(item.itemDefinitionNameSnapshot),
-              serviceNameSnapshot: Value(item.serviceNameSnapshot),
-              pricingType: Value(item.pricingType.name),
-              quantity: Value(item.quantity),
-              unitPrice: Value(item.unitPrice.piastres),
-              calculatedTotal: Value(item.calculatedTotal.piastres),
-              notes: Value(item.notes),
-              createdAt: Value(item.createdAt),
-              updatedAt: Value(item.updatedAt),
-            ),
-          );
-
-          if (item.carpetData != null) {
-            final carpet = item.carpetData!;
-            await _ordersDao.insertOrderItemCarpet(
-              app_db.OrderItemCarpetsCompanion(
-                id: Value(carpet.id),
-                orderItemId: Value(item.id),
-                carpetSizeId: Value(carpet.carpetSizeId),
-                length: Value(carpet.length),
-                width: Value(carpet.width),
-                area: Value(carpet.area),
-                createdAt: Value(carpet.createdAt),
-                updatedAt: Value(carpet.updatedAt),
+            // Insert order
+            await _ordersDao.insertOrder(
+              app_db.OrdersCompanion(
+                id: Value(order.id),
+                orderNumber: Value(finalOrderNumber),
+                customerId: Value(order.customerId),
+                status: Value(order.status.name),
+                expectedPickupDate: Value(order.expectedPickupDate.toDateTime()),
+                notes: Value(order.notes),
+                customerPickupRequested: Value(order.customerPickupRequested),
+                customerPickupFee: Value(order.customerPickupFee.piastres),
+                customerDeliveryRequested: Value(order.customerDeliveryRequested),
+                customerDeliveryFee: Value(order.customerDeliveryFee.piastres),
+                subtotal: Value(order.subtotal.piastres),
+                discount: Value(order.discount.piastres),
+                tax: Value(order.tax.piastres),
+                total: Value(order.total.piastres),
+                completedAt: Value(order.completedAt),
+                cancelledAt: Value(order.cancelledAt),
+                cancellationReason: Value(order.cancellationReason),
+                createdAt: Value(order.createdAt),
+                updatedAt: Value(order.updatedAt),
               ),
             );
+
+            // Insert items & carpets
+            for (final item in items) {
+              await _ordersDao.insertOrderItem(
+                app_db.OrderItemsCompanion(
+                  id: Value(item.id),
+                  orderId: Value(order.id),
+                  itemTypeId: Value(item.itemTypeId),
+                  itemDefinitionId: Value(item.itemDefinitionId),
+                  serviceId: Value(item.serviceId),
+                  itemTypeNameSnapshot: Value(item.itemTypeNameSnapshot),
+                  itemDefinitionNameSnapshot: Value(item.itemDefinitionNameSnapshot),
+                  serviceNameSnapshot: Value(item.serviceNameSnapshot),
+                  pricingType: Value(item.pricingType.name),
+                  quantity: Value(item.quantity),
+                  unitPrice: Value(item.unitPrice.piastres),
+                  calculatedTotal: Value(item.calculatedTotal.piastres),
+                  notes: Value(item.notes),
+                  createdAt: Value(item.createdAt),
+                  updatedAt: Value(item.updatedAt),
+                ),
+              );
+
+              if (item.carpetData != null) {
+                final carpet = item.carpetData!;
+                await _ordersDao.insertOrderItemCarpet(
+                  app_db.OrderItemCarpetsCompanion(
+                    id: Value(carpet.id),
+                    orderItemId: Value(item.id),
+                    carpetSizeId: Value(carpet.carpetSizeId),
+                    length: Value(carpet.length),
+                    width: Value(carpet.width),
+                    area: Value(carpet.area),
+                    createdAt: Value(carpet.createdAt),
+                    updatedAt: Value(carpet.updatedAt),
+                  ),
+                );
+              }
+            }
+
+            // Record sync operation
+            await _syncOperationsDao.recordOperation(
+              entityType: 'order',
+              entityId: order.id,
+              operationType: 'create',
+            );
+
+            return order.copyWith(orderNumber: finalOrderNumber);
+          });
+        } catch (e) {
+          final isUniqueConstraint = e.toString().toLowerCase().contains('unique') ||
+              e.toString().toLowerCase().contains('sqliteexception(1555)') ||
+              e.toString().toLowerCase().contains('orders.order_number');
+
+          if (isUniqueConstraint && attempt < maxRetries && order.orderNumber.isEmpty) {
+            // Abort/rollback this failed transaction and retry the ENTIRE creation transaction from the beginning
+            continue;
           }
+          if (e is Failure) rethrow;
+          throw DatabaseFailure(e.toString());
         }
-
-        // Record sync operation
-        await _syncOperationsDao.recordOperation(
-          entityType: 'order',
-          entityId: order.id,
-          operationType: 'create',
-        );
-
-        return order.copyWith(orderNumber: finalOrderNumber);
-      });
+      }
+      throw const DatabaseFailure('Failed to generate a unique order number after 5 attempts.');
     } on ArgumentError catch (e) {
       throw ValidationFailure(e.message.toString());
     } catch (e) {
@@ -146,10 +163,14 @@ class OrderRepositoryImpl implements OrderRepository {
           throw ValidationFailure('Order with id ${order.id} not found');
         }
 
+        if (order.orderNumber != existing.orderNumber) {
+          throw const BusinessRuleFailure('Order number is immutable and cannot be changed.');
+        }
+
         await _ordersDao.updateOrder(
           app_db.OrdersCompanion(
             id: Value(order.id),
-            orderNumber: Value(order.orderNumber),
+            orderNumber: Value(existing.orderNumber),
             customerId: Value(order.customerId),
             status: Value(order.status.name),
             expectedPickupDate: Value(order.expectedPickupDate.toDateTime()),
@@ -176,7 +197,7 @@ class OrderRepositoryImpl implements OrderRepository {
           operationType: 'update',
         );
 
-        return order;
+        return order.copyWith(orderNumber: existing.orderNumber);
       });
     } catch (e) {
       if (e is Failure) rethrow;
@@ -359,6 +380,18 @@ class OrderRepositoryImpl implements OrderRepository {
           throw BusinessRuleFailure('Only Ready orders can be completed');
         }
 
+        // Re-read payments and verify remaining balance == 0
+        final payments = await (_db.select(_db.payments)
+              ..where((t) => t.orderId.equals(orderId)))
+            .get();
+        final totalPaid = payments.fold<int>(0, (sum, p) => sum + p.amount);
+        final remaining = existing.total - totalPaid;
+        if (remaining > 0) {
+          throw BusinessRuleFailure(
+            'Cannot complete order with remaining balance ($remaining piastres)',
+          );
+        }
+
         final now = DateTime.now();
 
         // Release/deactivate active storage records for this order's items upon handover
@@ -455,19 +488,54 @@ class OrderRepositoryImpl implements OrderRepository {
           throw ValidationFailure('Order not found');
         }
 
-        final now = DateTime.now();
-        DateTime? completedAt;
-        DateTime? cancelledAt;
-        String? cancellationReason;
-
-        if (newStatus == OrderStatus.completed) {
-          completedAt = existing.completedAt ?? now;
-        } else if (newStatus == OrderStatus.cancelled) {
-          cancelledAt = existing.cancelledAt ?? now;
-          cancellationReason = reason ?? existing.cancellationReason ?? 'تصحيح الحالة';
+        if (existing.status == OrderStatus.cancelled.name) {
+          throw const BusinessRuleFailure('Cancelled orders cannot transition to any other status');
         }
 
-        // Note BR-034: Moving from Completed back to Processing does NOT reactivate storage records.
+        if (newStatus == OrderStatus.completed) {
+          throw const BusinessRuleFailure(
+            'Generic transition to Completed is forbidden. Use CompleteOrderUseCase / completeOrder().',
+          );
+        }
+
+        final now = DateTime.now();
+        DateTime? completedAt = existing.completedAt;
+        DateTime? cancelledAt = existing.cancelledAt;
+        String? cancellationReason = existing.cancellationReason;
+
+        if (existing.status == OrderStatus.ready.name && newStatus == OrderStatus.processing) {
+          if (reason == null || reason.trim().isEmpty) {
+            throw const ValidationFailure('Operational reason is required to correct Ready order back to Processing');
+          }
+          // Deactivate ALL currently active StorageRecords belonging to the order's physical OrderItems
+          final items = await _ordersDao.getOrderItemsRaw(orderId);
+          for (final item in items) {
+            await _storageRecordsDao.deactivateActiveRecord(item.id, now);
+          }
+        } else if (existing.status == OrderStatus.processing.name && newStatus == OrderStatus.ready) {
+          if (reason == null || reason.trim().isEmpty) {
+            throw const ValidationFailure('Operational reason is required to manually override Processing order to Ready');
+          }
+          // Manual override MUST NOT create, delete, deactivate, or reactivate storage records.
+        } else if (existing.status == OrderStatus.completed.name && newStatus == OrderStatus.processing) {
+          if (reason == null || reason.trim().isEmpty) {
+            throw const ValidationFailure('Operational reason is required to correct Completed order back to Processing');
+          }
+          completedAt = null;
+          // Completed -> Processing: storage remains inactive.
+        } else if (existing.status == OrderStatus.completed.name && newStatus != OrderStatus.processing) {
+          throw const BusinessRuleFailure('Completed orders can only be corrected back to Processing');
+        }
+
+        if (newStatus == OrderStatus.cancelled) {
+          cancelledAt = now;
+          cancellationReason = reason ?? existing.cancellationReason ?? 'تصحيح الحالة';
+          final items = await _ordersDao.getOrderItemsRaw(orderId);
+          for (final item in items) {
+            await _storageRecordsDao.deactivateActiveRecord(item.id, now);
+          }
+        }
+
         await _ordersDao.updateOrderStatus(
           orderId: orderId,
           status: newStatus.name,

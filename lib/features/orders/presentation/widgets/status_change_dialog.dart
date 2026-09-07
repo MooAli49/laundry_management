@@ -8,11 +8,13 @@ import '../../../../core/widgets/app_text_field.dart';
 import '../../../../domain/enums/order_status.dart';
 
 class StatusChangeDialog extends StatefulWidget {
+  final OrderStatus currentStatus;
   final OrderStatus targetStatus;
   final Future<void> Function(String reason) onConfirm;
 
   const StatusChangeDialog({
     super.key,
+    this.currentStatus = OrderStatus.processing,
     required this.targetStatus,
     required this.onConfirm,
   });
@@ -32,23 +34,59 @@ class _StatusChangeDialogState extends State<StatusChangeDialog> {
     super.dispose();
   }
 
-  String get _statusLabel {
-    switch (widget.targetStatus) {
-      case OrderStatus.processing:
-        return 'قيد التجهيز';
-      case OrderStatus.ready:
-        return 'جاهز';
-      case OrderStatus.completed:
-        return 'مكتمل';
-      case OrderStatus.cancelled:
-        return 'ملغي';
+  String get _dialogTitle {
+    if (widget.targetStatus == OrderStatus.processing) {
+      return 'تصحيح تشغيلي — إعادة إلى قيد التجهيز';
     }
+    return 'تعديل حالة الطلب يدويًا';
+  }
+
+  String get _consequenceExplanation {
+    if (widget.currentStatus == OrderStatus.ready &&
+        widget.targetStatus == OrderStatus.processing) {
+      return 'تنبيه: هذا الإجراء تصحيح تشغيلي.\n'
+          '• سيتم إلغاء تفعيل كافة سجلات التخزين الحالية لعناصر الطلب.\n'
+          '• يتم الاحتفاظ بالسجلات التاريخية للتخزين دون حذف.\n'
+          '• ستصبح كافة العناصر غير مخزنة ويجب تخزينها يدويًا مرة أخرى.\n'
+          '• لن يتم إعادة تفعيل التخزين تلقائيًا.';
+    }
+
+    if (widget.currentStatus == OrderStatus.completed &&
+        widget.targetStatus == OrderStatus.processing) {
+      return 'تنبيه: هذا الإجراء تصحيح تشغيلي.\n'
+          '• ستتم إعادة الطلب إلى حالة "قيد التجهيز".\n'
+          '• لن يتم استرجاع التخزين تلقائيًا وتبقى العناصر غير مخزنة.\n'
+          '• يجب تخزين العناصر يدويًا مرة أخرى إذا لزم الأمر.';
+    }
+
+    if (widget.currentStatus == OrderStatus.processing &&
+        widget.targetStatus == OrderStatus.ready) {
+      return 'تنبيه: هذا الإجراء تعديل يدوي للحالة فقط.\n'
+          '• لن يتم تعديل، إنشاء، أو حذف أي سجلات تخزين حالية.\n'
+          '• الحالة التشغيلية للتخزين تبقى كما هي بالضبط.';
+    }
+
+    return 'يتطلب هذا التعديل سببًا تشغيليًا إلزاميًا وواضحًا للمتابعة.';
+  }
+
+  Color get _bannerColor {
+    if (widget.targetStatus == OrderStatus.processing) {
+      return AppColors.warningLight;
+    }
+    return AppColors.infoLight;
+  }
+
+  Color get _bannerTextColor {
+    if (widget.targetStatus == OrderStatus.processing) {
+      return AppColors.warningDark;
+    }
+    return AppColors.infoDark;
   }
 
   Future<void> _handleConfirm() async {
     final reason = _reasonController.text.trim();
     if (reason.isEmpty) {
-      setState(() => _errorMessage = 'سبب التعديل اليدوي مطلوب');
+      setState(() => _errorMessage = 'سبب التعديل التشغيلي مطلوب');
       return;
     }
 
@@ -65,7 +103,7 @@ class _StatusChangeDialogState extends State<StatusChangeDialog> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = e.toString().replaceFirst('ValidationFailure: ', '');
+        _errorMessage = e.toString().replaceFirst('ValidationFailure: ', '').replaceFirst('BusinessRuleFailure: ', '');
       });
     }
   }
@@ -77,7 +115,7 @@ class _StatusChangeDialogState extends State<StatusChangeDialog> {
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
       ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
+        constraints: const BoxConstraints(maxWidth: 520),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.xl),
           child: Column(
@@ -87,7 +125,7 @@ class _StatusChangeDialogState extends State<StatusChangeDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('تغيير حالة الطلب يدويًا', style: AppTextStyles.titleLarge),
+                  Text(_dialogTitle, style: AppTextStyles.titleLarge),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close),
@@ -96,9 +134,23 @@ class _StatusChangeDialogState extends State<StatusChangeDialog> {
               ),
               AppSpacing.gapMd,
 
-              Text(
-                'سيتم تغيير حالة الطلب إلى "$_statusLabel". يتطلب هذا التغيير سبباً تشغيلياً واضحاً.',
-                style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: _bannerColor,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  border: Border.all(
+                    color: _bannerTextColor.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  _consequenceExplanation,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: _bannerTextColor,
+                    height: 1.5,
+                  ),
+                ),
               ),
               AppSpacing.gapLg,
 
@@ -112,8 +164,8 @@ class _StatusChangeDialogState extends State<StatusChangeDialog> {
 
               AppTextField(
                 controller: _reasonController,
-                label: 'سبب التعديل *',
-                hintText: 'اكتب سبب التعديل اليدوي للحالة...',
+                label: 'سبب التعديل التشغيلي *',
+                hintText: 'اكتب سبباً تشغيلياً دقيقاً لهذا التعديل...',
                 maxLines: 3,
               ),
               AppSpacing.gapXl,

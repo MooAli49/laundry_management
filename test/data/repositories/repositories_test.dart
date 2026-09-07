@@ -279,6 +279,34 @@ void main() {
         throwsA(isA<BusinessRuleFailure>()),
       );
 
+      // Attempt completeOrder without paying remaining balance -> rejected
+      expect(
+        () => orderRepository.completeOrder(
+          orderId: 'ord-2',
+          handoverConfirmed: true,
+        ),
+        throwsA(
+          isA<BusinessRuleFailure>().having(
+            (e) => e.message,
+            'message',
+            contains('remaining balance'),
+          ),
+        ),
+      );
+
+      // Pay remaining balance
+      await paymentRepository.recordPayment(
+        Payment(
+          id: 'pay-2',
+          orderId: 'ord-2',
+          amount: const Money.fromPiastres(1000),
+          paymentMethod: PaymentMethod.cash,
+          paidAt: now,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
       // Complete order with handover confirmed -> allowed
       final completedOrder = await orderRepository.completeOrder(
         orderId: 'ord-2',
@@ -442,6 +470,17 @@ void main() {
       );
       await orderRepository.createOrder(order: order, items: [item]);
       await orderRepository.markOrderReady('ord-4');
+      await paymentRepository.recordPayment(
+        Payment(
+          id: 'pay-4',
+          orderId: 'ord-4',
+          amount: const Money.fromPiastres(2000),
+          paymentMethod: PaymentMethod.cash,
+          paidAt: now,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
       await orderRepository.completeOrder(orderId: 'ord-4', handoverConfirmed: true);
 
       // Correct order status back to processing

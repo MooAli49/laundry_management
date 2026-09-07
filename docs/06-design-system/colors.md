@@ -1101,3 +1101,47 @@ The Laundry Management System should use color to communicate:
 
 while keeping the overall interface clean, professional, readable, and
 appropriate for long daily operational use.
+
+---
+
+## 46. Approved Figma Design System Tokens (V1 Production Tokens)
+
+The application implements the approved Figma design system tokens centralized in `AppColors`:
+
+### Primary Brand
+- `primary`: `#0F766E` (`0xFF0F766E`)
+- `primaryLight`: `#14A89C` (`0xFF14A89C`)
+- `primaryLighter`: `#E4F3F1` (`0xFFE4F3F1`)
+- `primaryDark`: `#0B5A54` (`0xFF0B5A54`)
+
+### Secondary & Backgrounds
+- `secondary`: `#EEF1F3` (`0xFFEEF1F3`)
+- `background`: `#F5F7F8` (`0xFFF5F7F8`)
+- `backgroundSecondary`: `#EEF1F3` (`0xFFEEF1F3`)
+- `surfaceSelected`: `#E4F3F1` (`0xFFE4F3F1`)
+
+### Typography / Text
+- `textPrimary`: `#17212E` (`0xFF17212E`)
+- `textSecondary`: `#5C6775` (`0xFF5C6775`)
+- `textTertiary`: `#8B95A1` (`0xFF8B95A1`)
+
+### Borders & Dividers
+- `border`: `#E3E7EA` (`0xFFE3E7EA`)
+- `borderStrong`: `#CDD4DA` (`0xFFCDD4DA`)
+- `borderFocused`: `#0F766E` (`0xFF0F766E`)
+- `divider`: `#EDF0F2` (`0xFFEDF0F2`)
+
+### Feedback & Status
+- `success`: `#1F8A4C` (`0xFF1F8A4C`)
+- `successLight`: `#E6F4EC` (`0xFFE6F4EC`)
+- `warning`: `#B9770F` (`0xFFB9770F`)
+- `warningLight`: `#FBF1DF` (`0xFFFBF1DF`)
+- `error`: `#C62828` (`0xFFC62828`)
+- `errorLight`: `#FBEAEA` (`0xFFFBEAEA`)
+- `info`: `#2563A8` (`0xFF2563A8`)
+- `infoLight`: `#E8F0F9` (`0xFFE8F0F9`)
+
+### Selection Tokens
+- `selectionBackground`: `#E4F3F1` (`0xFFE4F3F1`)
+- `selectionBorder`: `#0F766E` (`0xFF0F766E`)
+- `selectionContent`: `#0B5A54` (`0xFF0B5A54`)

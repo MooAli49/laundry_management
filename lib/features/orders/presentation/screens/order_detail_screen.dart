@@ -241,16 +241,36 @@ class _OrderDetailView extends StatelessWidget {
           ),
 
           // Delivery info
-          if (order.customerDeliveryRequested) ...[
+          if (order.customerPickupRequested || order.customerDeliveryRequested) ...[
             const Divider(height: AppSpacing.xxl, color: AppColors.divider),
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.local_shipping, size: 20, color: AppColors.primary),
-                AppSpacing.gapHorizontalSm,
-                Text(
-                  'طلب توصيل (+ ${order.customerDeliveryFee.toEgp.toStringAsFixed(2)} ج.م)',
-                  style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
-                ),
+                if (order.customerPickupRequested)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.hail, size: 20, color: AppColors.primary),
+                        AppSpacing.gapHorizontalSm,
+                        Text(
+                          'استلام من العميل (العميل → المغسلة) (+ ${order.customerPickupFee.toEgp.toStringAsFixed(2)} ج.م)',
+                          style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (order.customerDeliveryRequested)
+                  Row(
+                    children: [
+                      const Icon(Icons.local_shipping, size: 20, color: AppColors.primary),
+                      AppSpacing.gapHorizontalSm,
+                      Text(
+                        'توصيل للعميل (المغسلة → العميل) (+ ${order.customerDeliveryFee.toEgp.toStringAsFixed(2)} ج.م)',
+                        style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
               ],
             ),
           ],
@@ -623,8 +643,10 @@ class _OrderDetailView extends StatelessWidget {
           ),
           AppSpacing.gapMd,
           _buildSummaryRow('المجموع الفرعي', '${order.subtotal.toEgp.toStringAsFixed(2)} ج.م'),
+          if (order.customerPickupFee > Money.zero)
+            _buildSummaryRow('رسوم استلام من العميل', '+ ${order.customerPickupFee.toEgp.toStringAsFixed(2)} ج.م'),
           if (order.customerDeliveryFee > Money.zero)
-            _buildSummaryRow('رسوم التوصيل', '+ ${order.customerDeliveryFee.toEgp.toStringAsFixed(2)} ج.م'),
+            _buildSummaryRow('رسوم توصيل للعميل', '+ ${order.customerDeliveryFee.toEgp.toStringAsFixed(2)} ج.م'),
           if (order.discount > Money.zero)
             _buildSummaryRow('الخصم', '- ${order.discount.toEgp.toStringAsFixed(2)} ج.م', isNegative: true),
           if (order.tax > Money.zero)
@@ -711,23 +733,69 @@ class _OrderDetailView extends StatelessWidget {
   Widget _buildActionsCard(BuildContext context, OrderDetailState state) {
     final cubit = context.read<OrderDetailCubit>();
     final order = state.order!;
-    final isFinal = order.status == OrderStatus.completed || order.status == OrderStatus.cancelled;
 
-    if (isFinal) {
+    if (order.status == OrderStatus.cancelled) {
       return AppCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'حالة الطلب نهائية',
+              'حالة الطلب نهائية (ملغي)',
               style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
             ),
             AppSpacing.gapSm,
             Text(
-              order.status == OrderStatus.completed
-                  ? 'تم إكمال هذا الطلب وتسليمه للعميل.'
-                  : 'تم إلغاء هذا الطلب (${order.cancellationReason ?? ''}).',
+              'تم إلغاء هذا الطلب (${order.cancellationReason ?? ''}). الطلب ملغي للقراءة التاريخية فقط ولا يمكن إجراء أي عمليات عليه.',
               style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (order.status == OrderStatus.completed) {
+      return AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.check_circle, color: AppColors.success, size: 20),
+                AppSpacing.gapHorizontalSm,
+                Text(
+                  'طلب مكتمل ومُسلّم',
+                  style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            AppSpacing.gapSm,
+            Text(
+              'تم تسليم هذا الطلب للعميل واستيفاء كامل الحساب بنجاح.',
+              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+            ),
+            AppSpacing.gapLg,
+            const Divider(height: AppSpacing.md, color: AppColors.divider),
+            AppSpacing.gapSm,
+            SizedBox(
+              width: double.infinity,
+              child: AppButton(
+                label: 'إعادة إلى قيد التجهيز (تصحيح)',
+                icon: Icons.restart_alt,
+                variant: AppButtonVariant.secondary,
+                isLoading: state.isActionLoading,
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (_) => StatusChangeDialog(
+                      currentStatus: OrderStatus.completed,
+                      targetStatus: OrderStatus.processing,
+                      onConfirm: (reason) async {
+                        await cubit.changeStatus(newStatus: OrderStatus.processing, reason: reason);
+                      },
+                    ),
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -746,7 +814,7 @@ class _OrderDetailView extends StatelessWidget {
           ),
           AppSpacing.gapMd,
 
-          // Manual Status Transition Dropdown (Excludes 'completed' by design)
+          // Manual Status Transition Section (Excludes 'completed' by design)
           _buildStatusTransitionSection(context, state),
           AppSpacing.gapLg,
 
@@ -808,53 +876,63 @@ class _OrderDetailView extends StatelessWidget {
     final cubit = context.read<OrderDetailCubit>();
     final order = state.order!;
 
-    // Allowed manual transitions:
-    // processing -> ready (only if all items stored)
-    // Note: completed is strictly handled by CompleteOrderUseCase!
-    final allowedStatuses = <OrderStatus>[];
+    if (order.status == OrderStatus.ready) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('تصحيح الحالة التشغيلية', style: AppTextStyles.labelLarge),
+          AppSpacing.gapXs,
+          AppButton(
+            label: 'إعادة إلى قيد التجهيز (تصحيح)',
+            icon: Icons.restart_alt,
+            variant: AppButtonVariant.secondary,
+            isLoading: state.isActionLoading,
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (_) => StatusChangeDialog(
+                  currentStatus: OrderStatus.ready,
+                  targetStatus: OrderStatus.processing,
+                  onConfirm: (reason) async {
+                    await cubit.changeStatus(newStatus: OrderStatus.processing, reason: reason);
+                  },
+                ),
+              );
+            },
+          ),
+        ],
+      );
+    }
+
     if (order.status == OrderStatus.processing) {
-      if (state.areAllItemsStored) {
-        allowedStatuses.add(OrderStatus.ready);
-      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('تحديث الحالة يدوياً', style: AppTextStyles.labelLarge),
+          AppSpacing.gapXs,
+          AppButton(
+            label: 'تحديد كـ جاهز (تعديل يدوي)',
+            icon: Icons.done_all,
+            variant: AppButtonVariant.secondary,
+            isLoading: state.isActionLoading,
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (_) => StatusChangeDialog(
+                  currentStatus: OrderStatus.processing,
+                  targetStatus: OrderStatus.ready,
+                  onConfirm: (reason) async {
+                    await cubit.changeStatus(newStatus: OrderStatus.ready, reason: reason);
+                  },
+                ),
+              );
+            },
+          ),
+        ],
+      );
     }
 
-    if (allowedStatuses.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('تحديث الحالة يدوياً', style: AppTextStyles.labelLarge),
-        AppSpacing.gapXs,
-        Wrap(
-          spacing: AppSpacing.sm,
-          children: allowedStatuses.map((targetStatus) {
-            final label = switch (targetStatus) {
-              OrderStatus.ready => 'تحديد كـ جاهز',
-              _ => targetStatus.name,
-            };
-
-            return AppButton(
-              label: label,
-              variant: AppButtonVariant.secondary,
-              isLoading: state.isActionLoading,
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (_) => StatusChangeDialog(
-                    targetStatus: targetStatus,
-                    onConfirm: (reason) async {
-                      await cubit.changeStatus(newStatus: targetStatus, reason: reason);
-                    },
-                  ),
-                );
-              },
-            );
-          }).toList(),
-        ),
-      ],
-    );
+    return const SizedBox.shrink();
   }
 
   void _confirmAndCompleteOrder(BuildContext context, OrderDetailCubit cubit) {
