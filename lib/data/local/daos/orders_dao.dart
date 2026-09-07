@@ -103,25 +103,86 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     String? status,
     DateTime? expectedPickupDate,
     String? customerId,
+    bool? hasRemaining,
+    String? query,
     int limit = 20,
     int offset = 0,
   }) async {
-    final query = select(db.orders);
-    if (status != null) {
-      query.where((t) => t.status.equals(status));
-    }
-    if (expectedPickupDate != null) {
-      query.where((t) => t.expectedPickupDate.equals(expectedPickupDate));
-    }
-    if (customerId != null) {
-      query.where((t) => t.customerId.equals(customerId));
-    }
+    final sanitizedQuery = query?.trim();
+    final hasSearchQuery = sanitizedQuery != null && sanitizedQuery.isNotEmpty;
 
-    query
-      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
-      ..limit(limit, offset: offset);
+    if (hasSearchQuery) {
+      final selectQuery = select(db.orders).join([
+        innerJoin(db.customers, db.customers.id.equalsExp(db.orders.customerId)),
+      ]);
 
-    return query.get();
+      selectQuery.where(
+        db.orders.orderNumber.like('%$sanitizedQuery%') |
+            db.customers.name.like('%$sanitizedQuery%') |
+            db.customers.phone.like('%$sanitizedQuery%'),
+      );
+
+      if (status != null) {
+        selectQuery.where(db.orders.status.equals(status));
+      }
+      if (expectedPickupDate != null) {
+        selectQuery.where(db.orders.expectedPickupDate.equals(expectedPickupDate));
+      }
+      if (customerId != null) {
+        selectQuery.where(db.orders.customerId.equals(customerId));
+      }
+      if (hasRemaining == true) {
+        selectQuery.where(
+          const CustomExpression<bool>(
+            'orders.total > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)',
+          ),
+        );
+      } else if (hasRemaining == false) {
+        selectQuery.where(
+          const CustomExpression<bool>(
+            'orders.total <= (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)',
+          ),
+        );
+      }
+
+      selectQuery
+        ..orderBy([OrderingTerm.desc(db.orders.createdAt)])
+        ..limit(limit, offset: offset);
+
+      final rows = await selectQuery.get();
+      return rows.map((row) => row.readTable(db.orders)).toList();
+    } else {
+      final selectQuery = select(db.orders);
+
+      if (status != null) {
+        selectQuery.where((t) => t.status.equals(status));
+      }
+      if (expectedPickupDate != null) {
+        selectQuery.where((t) => t.expectedPickupDate.equals(expectedPickupDate));
+      }
+      if (customerId != null) {
+        selectQuery.where((t) => t.customerId.equals(customerId));
+      }
+      if (hasRemaining == true) {
+        selectQuery.where(
+          (t) => const CustomExpression<bool>(
+            'orders.total > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)',
+          ),
+        );
+      } else if (hasRemaining == false) {
+        selectQuery.where(
+          (t) => const CustomExpression<bool>(
+            'orders.total <= (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)',
+          ),
+        );
+      }
+
+      selectQuery
+        ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+        ..limit(limit, offset: offset);
+
+      return selectQuery.get();
+    }
   }
 
   Future<List<app_db.Order>> searchOrders({
@@ -129,23 +190,7 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     int limit = 20,
     int offset = 0,
   }) async {
-    final sanitized = query.trim();
-    final selectQuery = select(db.orders).join([
-      innerJoin(db.customers, db.customers.id.equalsExp(db.orders.customerId)),
-    ]);
-
-    selectQuery.where(
-      db.orders.orderNumber.like('%$sanitized%') |
-          db.customers.name.like('%$sanitized%') |
-          db.customers.phone.like('%$sanitized%'),
-    );
-
-    selectQuery
-      ..orderBy([OrderingTerm.desc(db.orders.createdAt)])
-      ..limit(limit, offset: offset);
-
-    final rows = await selectQuery.get();
-    return rows.map((row) => row.readTable(db.orders)).toList();
+    return getOrders(query: query, limit: limit, offset: offset);
   }
 
   Stream<List<app_db.Order>> watchRecentOrders({int limit = 20}) {

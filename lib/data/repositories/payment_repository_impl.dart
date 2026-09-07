@@ -32,7 +32,13 @@ class PaymentRepositoryImpl implements PaymentRepository {
       return await _db.transaction(() async {
         final order = await _ordersDao.getOrderById(payment.orderId);
         if (order == null) {
-          throw ValidationFailure('Order not found');
+          throw const ValidationFailure('Order not found');
+        }
+
+        final paidPiastres = await _paymentsDao.getTotalPaidForOrder(payment.orderId);
+        final remainingPiastres = order.total - paidPiastres;
+        if (payment.amount.piastres > remainingPiastres) {
+          throw const BusinessRuleFailure('Payment amount exceeds remaining order balance');
         }
 
         await _paymentsDao.insertPayment(

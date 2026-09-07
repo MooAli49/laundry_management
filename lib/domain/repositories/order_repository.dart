@@ -23,6 +23,8 @@ abstract class OrderRepository {
     OrderStatus? status,
     OrderDate? expectedPickupDate,
     String? customerId,
+    bool? hasRemaining,
+    String? query,
     int limit = 20,
     int offset = 0,
   });

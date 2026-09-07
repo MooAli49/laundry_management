@@ -1,11 +1,14 @@
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/app.dart';
 import 'package:laundry_management/core/constants/app_constants.dart';
+import 'package:laundry_management/core/di/injection.dart';
 import 'package:laundry_management/core/localization/app_strings.dart';
 import 'package:laundry_management/core/routing/app_router.dart';
 import 'package:laundry_management/core/routing/app_routes.dart';
 import 'package:laundry_management/core/widgets/app_shell.dart';
+import 'package:laundry_management/data/local/database/app_database.dart';
 import 'package:laundry_management/features/customers/presentation/screens/customers_screen.dart';
 import 'package:laundry_management/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:laundry_management/features/orders/presentation/screens/orders_screen.dart';
@@ -14,6 +17,19 @@ import 'package:laundry_management/features/settings/presentation/screens/settin
 import 'package:laundry_management/features/storage/presentation/screens/storage_screen.dart';
 
 void main() {
+  setUp(() async {
+    await getIt.reset();
+    getIt.registerLazySingleton<AppDatabase>(() => AppDatabase(NativeDatabase.memory()));
+    await initDependencies();
+  });
+
+  tearDown(() async {
+    if (getIt.isRegistered<AppDatabase>()) {
+      await getIt<AppDatabase>().close();
+    }
+    await getIt.reset();
+  });
+
   group('Foundation App Bootstrap & Navigation Tests', () {
     testWidgets(
       'boots app, verifies RTL directionality, and renders dashboard',

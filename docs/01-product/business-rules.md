@@ -162,11 +162,11 @@ Every order must have a unique human-readable Order Number.
 
 The intended format is:
 
-> YYMMDD-XXX
+> YY-XXX
 
 Example:
 
-> 260823-001
+> 26-001
 
 The exact generation mechanism is an implementation detail, but uniqueness is mandatory.
 
@@ -688,7 +688,9 @@ Order Total - Total Paid
 
 ## BR-073 — Payment Cannot Exceed Remaining
 
-The system must not allow the user to record a payment greater than the current remaining amount.
+The system must reject any payment where amount <= 0 or amount > current remaining amount.
+
+This validation must be enforced authoritatively at the Domain/Application/Data repository boundary, rejecting invalid payments even if callers bypass the UI.
 
 ---
 

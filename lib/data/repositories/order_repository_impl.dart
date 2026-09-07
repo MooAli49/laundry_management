@@ -233,6 +233,8 @@ class OrderRepositoryImpl implements OrderRepository {
     OrderStatus? status,
     OrderDate? expectedPickupDate,
     String? customerId,
+    bool? hasRemaining,
+    String? query,
     int limit = 20,
     int offset = 0,
   }) async {
@@ -241,6 +243,8 @@ class OrderRepositoryImpl implements OrderRepository {
         status: status?.name,
         expectedPickupDate: expectedPickupDate?.toDateTime(),
         customerId: customerId,
+        hasRemaining: hasRemaining,
+        query: query,
         limit: limit,
         offset: offset,
       );
