@@ -14,6 +14,7 @@ import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../core/widgets/page_header.dart';
 import '../cubit/orders_list_cubit.dart';
 import '../cubit/orders_list_state.dart';
+import '../models/order_list_filter.dart';
 import '../widgets/order_card.dart';
 import '../widgets/orders_filter_bar.dart';
 
@@ -48,10 +49,10 @@ class _OrdersView extends StatelessWidget {
               builder: (context, state) {
                 return PageHeader(
                   title: AppStrings.orders,
-                  subtitle: '${state.orders.length} طلب',
+                  subtitle: 'إجمالي ${state.orders.length} طلب',
                   actions: [
                     AppButton(
-                      label: '+ إضافة طلب',
+                      label: 'إضافة طلب',
                       icon: Icons.add,
                       onPressed: () => context.go(AppRoutes.ordersNew),
                     ),
@@ -63,7 +64,7 @@ class _OrdersView extends StatelessWidget {
 
             // Search Bar
             AppTextField(
-              hintText: 'ابحث برقم الطلب أو اسم العميل أو الهاتف...',
+              hintText: 'بحث برقم الطلب، اسم العميل، أو رقم الهاتف...',
               prefixIcon: const Icon(Icons.search),
               onChanged: cubit.search,
             ),
@@ -98,9 +99,18 @@ class _OrdersView extends StatelessWidget {
                   }
 
                   if (state.orders.isEmpty) {
-                    return const EmptyState(
-                      title: 'لا توجد طلبات مطابقة',
+                    return EmptyState(
+                      icon: Icons.receipt_long_outlined,
+                      title: 'لا توجد طلبات مطابقة للبحث',
                       message: 'لم يتم العثور على أي طلبات وفقاً لمعايير البحث أو الفلتر المحددة.',
+                      actionButton: AppButton(
+                        label: 'إعادة ضبط الفلاتر',
+                        variant: AppButtonVariant.secondary,
+                        onPressed: () {
+                          cubit.setFilter(OrderListFilter.all);
+                          cubit.search('');
+                        },
+                      ),
                     );
                   }
 

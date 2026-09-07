@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../../core/routing/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -77,12 +78,19 @@ class _OrderDetailView extends StatelessWidget {
           );
         }
 
+        void handleBack() {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go(AppRoutes.orders);
+          }
+        }
+
         if (state.errorMessage != null && state.order == null) {
           return Scaffold(
             appBar: AppBar(
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => context.pop(),
+              leading: BackButton(
+                onPressed: handleBack,
               ),
             ),
             body: AppErrorState(
@@ -104,9 +112,8 @@ class _OrderDetailView extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => context.pop(),
+            leading: BackButton(
+              onPressed: handleBack,
             ),
             title: Row(
               children: [
@@ -125,7 +132,7 @@ class _OrderDetailView extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                   child: AppButton(
                     label: 'معاينة الفاتورة',
-                    icon: Icons.receipt_long,
+                    icon: Icons.visibility_outlined,
                     variant: AppButtonVariant.secondary,
                     onPressed: () {
                       showDialog(
@@ -155,6 +162,58 @@ class _OrderDetailView extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Status Helper Banner (Figma parity)
+                      if (order.status == OrderStatus.processing)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: AppColors.infoLight,
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.inventory_2_outlined, color: AppColors.info, size: 18),
+                              AppSpacing.gapHorizontalSm,
+                              Expanded(
+                                child: Text(
+                                  'يصبح الطلب «جاهز» تلقائياً بعد تخزين جميع العناصر في المستودع.',
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: AppColors.info,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else if (order.status == OrderStatus.ready)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryLighter,
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.check_circle_outline, color: AppColors.primaryDark, size: 18),
+                              AppSpacing.gapHorizontalSm,
+                              Expanded(
+                                child: Text(
+                                  'الطلب جاهز للتسليم للعميل. لا يمكن إكمال الطلب إلا بعد سداد كامل المبلغ.',
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: AppColors.primaryDark,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
                       // Header Meta Card
                       _buildHeaderMetaCard(context, state),
                       AppSpacing.gapLg,
@@ -496,36 +555,30 @@ class _OrderDetailView extends StatelessWidget {
           ),
         ),
 
-        // Storage status badge
+        // Storage status badge (Figma parity pill)
         Container(
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.xs,
+            horizontal: 10,
+            vertical: 3,
           ),
           decoration: BoxDecoration(
-            color: isStored
-                ? AppColors.success.withValues(alpha: 0.1)
-                : AppColors.warning.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-            border: Border.all(
-              color: isStored
-                  ? AppColors.success.withValues(alpha: 0.3)
-                  : AppColors.warning.withValues(alpha: 0.3),
-            ),
+            color: isStored ? AppColors.successLight : AppColors.warningLight,
+            borderRadius: BorderRadius.circular(999),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                isStored ? Icons.inventory : Icons.pending,
-                size: 14,
+                isStored ? Icons.check_circle_outline : Icons.schedule,
+                size: 13,
                 color: isStored ? AppColors.success : AppColors.warning,
               ),
-              AppSpacing.gapHorizontalXs,
+              const SizedBox(width: 4),
               Text(
                 isStored ? 'مخزن: ${location.name}' : 'غير مخزنة',
-                style: AppTextStyles.labelSmall.copyWith(
-                  fontWeight: FontWeight.w600,
+                style: AppTextStyles.bodySmall.copyWith(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 12,
                   color: isStored ? AppColors.success : AppColors.warning,
                 ),
               ),
@@ -666,7 +719,7 @@ class _OrderDetailView extends StatelessWidget {
             'المتبقي',
             '${state.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
             isBold: true,
-            color: state.isFullyPaid ? AppColors.success : AppColors.error,
+            color: state.isFullyPaid ? AppColors.success : AppColors.warning,
           ),
           AppSpacing.gapLg,
 

@@ -105,7 +105,7 @@ void main() {
       expect(find.text('#26-001'), findsOneWidget);
       expect(find.text('عمرو خالد'), findsOneWidget);
       expect(find.text('قيد التجهيز'), findsOneWidget);
-      expect(find.text('الإجمالي: 50.00 ج.م'), findsOneWidget);
+      expect(find.text('50.00 ج.م'), findsOneWidget);
       expect(find.text('المتبقي: 30.00 ج.م'), findsOneWidget);
 
       await tester.tap(find.byType(OrderCard));

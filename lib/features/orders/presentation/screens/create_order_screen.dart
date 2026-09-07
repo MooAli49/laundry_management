@@ -108,12 +108,26 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                   // Top Navigation Bar
                   Row(
                     children: [
-                      IconButton(
-                        onPressed: () => context.go(AppRoutes.orders),
-                        icon: const Icon(Icons.arrow_forward), // In RTL arrow_forward points right (back)
+                      BackButton(
+                        onPressed: () {
+                          if (context.canPop()) {
+                            context.pop();
+                          } else {
+                            context.go(AppRoutes.orders);
+                          }
+                        },
                       ),
                       AppSpacing.gapHorizontalSm,
-                      Text('إضافة طلب جديد', style: AppTextStyles.headlineSmall),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('إضافة طلب', style: AppTextStyles.headlineSmall.copyWith(fontWeight: FontWeight.bold)),
+                          Text(
+                            'إنشاء طلب غسيل جديد وتحديد الأصناف والخدمات',
+                            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                   AppSpacing.gapLg,
@@ -304,7 +318,7 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                             value: state.customerPickupRequested,
                                             onChanged: (val) => cubit.updateDelivery(pickupRequested: val ?? false),
                                           ),
-                                          Text('استلام من العميل (Customer → Laundry)', style: AppTextStyles.bodyMedium),
+                                          Text('استلام من العميل (العميل → المغسلة)', style: AppTextStyles.bodyMedium),
                                           if (state.customerPickupRequested) ...[
                                             AppSpacing.gapHorizontalMd,
                                             SizedBox(
@@ -331,7 +345,7 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                             value: state.customerDeliveryRequested,
                                             onChanged: (val) => cubit.updateDelivery(deliveryRequested: val ?? false),
                                           ),
-                                          Text('توصيل للعميل (Laundry → Customer)', style: AppTextStyles.bodyMedium),
+                                          Text('توصيل للعميل (المغسلة → العميل)', style: AppTextStyles.bodyMedium),
                                           if (state.customerDeliveryRequested) ...[
                                             AppSpacing.gapHorizontalMd,
                                             SizedBox(

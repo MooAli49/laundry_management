@@ -55,7 +55,7 @@ class _CancelOrderDialogState extends State<CancelOrderDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
@@ -88,7 +88,7 @@ class _CancelOrderDialogState extends State<CancelOrderDialog> {
                 ),
                 child: Text(
                   'هل أنت متأكد من رغبتك في إلغاء هذا الطلب؟ سيتم تحويل حالة الطلب إلى ملغي وإلغاء حجز أماكن التخزين. الطلبات الملغاة تصبح للقراءة فقط ولا يمكن التراجع عنها.',
-                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.errorDark),
+                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.error, fontSize: 13),
                 ),
               ),
               AppSpacing.gapLg,

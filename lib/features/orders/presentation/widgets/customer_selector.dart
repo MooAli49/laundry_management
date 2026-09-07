@@ -63,12 +63,12 @@ class _CustomerSelectorState extends State<CustomerSelector> {
         child: Row(
           children: [
             CircleAvatar(
-              radius: 22,
-              backgroundColor: AppColors.primaryLight,
+              radius: 20,
+              backgroundColor: AppColors.primaryLighter,
               child: Text(
                 customer.name.isNotEmpty ? customer.name[0] : 'ع',
                 style: AppTextStyles.titleMedium.copyWith(
-                  color: AppColors.primary,
+                  color: AppColors.primaryDark,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -78,18 +78,34 @@ class _CustomerSelectorState extends State<CustomerSelector> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(customer.name, style: AppTextStyles.titleMedium),
-                  AppSpacing.gapXs,
                   Text(
-                    customer.phone,
-                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+                    customer.name,
+                    style: AppTextStyles.titleSmall.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.phone_outlined,
+                        size: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        customer.phone,
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
             AppButton(
               label: 'تغيير',
-              variant: AppButtonVariant.outline,
+              variant: AppButtonVariant.secondary,
               onPressed: () => widget.onSelectCustomer(null),
             ),
           ],

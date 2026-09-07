@@ -24,50 +24,54 @@ class OrderCard extends StatelessWidget {
 
     return AppCard(
       onTap: onTap,
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Row(
         children: [
-          // Receipt Icon Box
+          // Receipt Icon Box (Figma: size-10 rounded-lg bg-secondary text-text-secondary)
           Container(
-            width: 44,
-            height: 44,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: AppColors.primaryLight,
+              color: AppColors.secondary,
               borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
             ),
             child: const Icon(
-              Icons.receipt_long,
-              color: AppColors.primary,
-              size: 24,
+              Icons.receipt_long_outlined,
+              color: AppColors.textSecondary,
+              size: 20,
             ),
           ),
           AppSpacing.gapHorizontalMd,
 
           // Order # & Customer
           Expanded(
-            flex: 3,
+            flex: 4,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
                       '#${order.orderNumber}',
                       style: AppTextStyles.titleMedium.copyWith(
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
+                        fontSize: 15,
                       ),
                     ),
-                    AppSpacing.gapHorizontalSm,
                     OrderStatusBadge(status: order.status),
                   ],
                 ),
                 AppSpacing.gapXs,
                 Text(
                   customer?.name ?? 'عميل غير مسجل',
-                  style: AppTextStyles.bodyMedium.copyWith(
+                  style: AppTextStyles.bodySmall.copyWith(
                     color: AppColors.textSecondary,
+                    fontSize: 13,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -78,22 +82,24 @@ class OrderCard extends StatelessWidget {
 
           // Expected Pickup Date
           Expanded(
-            flex: 2,
+            flex: 3,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'الاستلام',
-                  style: AppTextStyles.labelSmall.copyWith(
-                    color: AppColors.textTertiary,
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
                   ),
                 ),
-                AppSpacing.gapXs,
+                const SizedBox(height: 2),
                 Text(
                   order.expectedPickupDate.toString(),
-                  style: AppTextStyles.bodyMedium.copyWith(
+                  style: AppTextStyles.bodySmall.copyWith(
                     color: item.isOverdue ? AppColors.error : AppColors.textPrimary,
-                    fontWeight: item.isOverdue ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
                   ),
                 ),
               ],
@@ -107,27 +113,30 @@ class OrderCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  'الإجمالي: ${order.total.toEgp.toStringAsFixed(2)} ج.م',
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w600,
+                  '${order.total.toEgp.toStringAsFixed(2)} ج.م',
+                  style: AppTextStyles.titleMedium.copyWith(
+                    fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
+                    fontSize: 14,
                   ),
                 ),
-                AppSpacing.gapXs,
+                const SizedBox(height: 2),
                 if (item.isFullyPaid)
                   Text(
                     'مدفوع بالكامل',
-                    style: AppTextStyles.labelMedium.copyWith(
+                    style: AppTextStyles.caption.copyWith(
                       color: AppColors.success,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 12,
                     ),
                   )
                 else
                   Text(
                     'المتبقي: ${item.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
-                    style: AppTextStyles.labelMedium.copyWith(
+                    style: AppTextStyles.caption.copyWith(
                       color: AppColors.warning,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 12,
                     ),
                   ),
               ],

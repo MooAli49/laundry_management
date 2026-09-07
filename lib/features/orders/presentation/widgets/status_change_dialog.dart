@@ -78,9 +78,9 @@ class _StatusChangeDialogState extends State<StatusChangeDialog> {
 
   Color get _bannerTextColor {
     if (widget.targetStatus == OrderStatus.processing) {
-      return AppColors.warningDark;
+      return AppColors.warning;
     }
-    return AppColors.infoDark;
+    return AppColors.info;
   }
 
   Future<void> _handleConfirm() async {
@@ -112,7 +112,7 @@ class _StatusChangeDialogState extends State<StatusChangeDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),

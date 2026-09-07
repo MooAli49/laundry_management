@@ -76,7 +76,7 @@ class _StoreItemsDialogState extends State<StoreItemsDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),

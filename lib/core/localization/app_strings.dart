@@ -3,6 +3,7 @@ class AppStrings {
 
   // Application
   static const String appName = 'نظام إدارة المغسلة';
+  static const String defaultBusinessName = 'المغسلة الحديثة';
 
   // Primary Navigation & Route Titles
   static const String dashboard = 'الرئيسية';

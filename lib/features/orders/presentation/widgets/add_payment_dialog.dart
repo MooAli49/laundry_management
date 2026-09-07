@@ -106,25 +106,28 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
               ),
               AppSpacing.gapLg,
 
-              // Remaining Banner
+              // Remaining Banner (Figma: warning-light background with warning text)
               Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  color: AppColors.warningLight,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       'المبلغ المتبقي',
-                      style: AppTextStyles.bodyMedium.copyWith(color: AppColors.primaryDark),
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.warning,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     Text(
                       '${widget.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
                       style: AppTextStyles.titleMedium.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: AppColors.primaryDark,
+                        color: AppColors.warning,
                       ),
                     ),
                   ],
@@ -172,7 +175,7 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
                     padding: const EdgeInsets.only(bottom: 2),
                     child: AppButton(
                       label: 'المبلغ كامل',
-                      variant: AppButtonVariant.outline,
+                      variant: AppButtonVariant.secondary,
                       onPressed: _fillFullAmount,
                     ),
                   ),
@@ -186,15 +189,15 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
               Row(
                 children: [
                   Expanded(
-                    child: _buildMethodButton(PaymentMethod.cash, 'كاش', Icons.money),
+                    child: _buildMethodButton(PaymentMethod.cash, 'كاش', Icons.payments_outlined),
                   ),
                   AppSpacing.gapHorizontalSm,
                   Expanded(
-                    child: _buildMethodButton(PaymentMethod.instapay, 'InstaPay', Icons.flash_on),
+                    child: _buildMethodButton(PaymentMethod.instapay, 'إنستاباي', Icons.flash_on),
                   ),
                   AppSpacing.gapHorizontalSm,
                   Expanded(
-                    child: _buildMethodButton(PaymentMethod.ewallet, 'محفظة إلكترونية', Icons.account_balance_wallet),
+                    child: _buildMethodButton(PaymentMethod.ewallet, 'محفظة إلكترونية', Icons.account_balance_wallet_outlined),
                   ),
                 ],
               ),
@@ -228,30 +231,32 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
     final isSelected = _selectedMethod == method;
     return InkWell(
       onTap: () => setState(() => _selectedMethod = method),
-      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.selectionBackground : AppColors.surface,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          color: isSelected ? AppColors.surfaceSelected : AppColors.surface,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
           border: Border.all(
             color: isSelected ? AppColors.primary : AppColors.border,
-            width: isSelected ? 2 : 1,
+            width: isSelected ? 1.5 : 1.0,
           ),
         ),
         child: Column(
           children: [
             Icon(
               icon,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              color: isSelected ? AppColors.primaryDark : AppColors.textSecondary,
               size: 20,
             ),
-            AppSpacing.gapXs,
+            const SizedBox(height: 6),
             Text(
               label,
-              style: AppTextStyles.labelMedium.copyWith(
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? AppColors.primary : AppColors.textPrimary,
+              style: AppTextStyles.bodySmall.copyWith(
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected ? AppColors.primaryDark : AppColors.textSecondary,
+                fontSize: 13.0,
               ),
               textAlign: TextAlign.center,
             ),

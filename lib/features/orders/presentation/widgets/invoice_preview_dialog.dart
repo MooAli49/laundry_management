@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/localization/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -31,11 +32,12 @@ class InvoicePreviewDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final businessName = settings?.businessName ?? 'مغسلة النقاء';
-    final address = settings?.address ?? '14 شارع التحرير، المهندسين، الجيزة';
-    final phone = settings?.phone ?? '0223456789';
-    final footer = settings?.invoiceFooterText ??
-        'شكراً لتعاملكم معنا - يرجى الاحتفاظ بالفاتورة عند الاستلام.';
+    final businessName = (settings?.businessName != null && settings!.businessName.trim().isNotEmpty)
+        ? settings!.businessName
+        : AppStrings.defaultBusinessName;
+    final address = settings?.address;
+    final phone = settings?.phone;
+    final footer = settings?.invoiceFooterText ?? 'شكراً لتعاملكم معنا!';
 
     return Dialog(
       shape: RoundedRectangleBorder(
@@ -66,7 +68,7 @@ class InvoicePreviewDialog extends StatelessWidget {
                   padding: const EdgeInsets.all(AppSpacing.xl),
                   decoration: BoxDecoration(
                     color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                     border: Border.all(color: AppColors.border),
                   ),
                   child: SingleChildScrollView(
@@ -77,25 +79,41 @@ class InvoicePreviewDialog extends StatelessWidget {
                         Center(
                           child: Column(
                             children: [
-                              const Icon(
-                                Icons.local_laundry_service,
-                                size: 40,
-                                color: AppColors.primary,
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryLighter,
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                                ),
+                                child: const Icon(
+                                  Icons.local_laundry_service_outlined,
+                                  size: 28,
+                                  color: AppColors.primary,
+                                ),
                               ),
-                              AppSpacing.gapXs,
+                              AppSpacing.gapSm,
                               Text(
                                 businessName,
-                                style: AppTextStyles.headlineSmall.copyWith(fontWeight: FontWeight.bold),
+                                style: AppTextStyles.headlineSmall.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
                               ),
-                              AppSpacing.gapXs,
-                              Text(
-                                address,
-                                style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
-                              ),
-                              Text(
-                                phone,
-                                style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
-                              ),
+                              if (address != null && address.trim().isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  address,
+                                  style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
+                                ),
+                              ],
+                              if (phone != null && phone.trim().isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  'هاتف: $phone',
+                                  style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
+                                ),
+                              ],
                             ],
                           ),
                         ),
