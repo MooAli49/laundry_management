@@ -1,7 +1,12 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:laundry_management/data/local/daos/orders_dao.dart';
+import 'package:laundry_management/data/local/daos/payments_dao.dart';
+import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
 import 'package:laundry_management/data/local/database/app_database.dart';
 import 'package:laundry_management/data/local/database/dev_test_data.dart';
+import 'package:laundry_management/data/repositories/payment_repository_impl.dart';
+import 'package:laundry_management/domain/enums/payment_method.dart';
 
 void main() {
   group('DevTestData & Production Seed Safety Tests', () {
@@ -133,7 +138,7 @@ void main() {
       // Verify multiple payment methods
       final allPayments = await db.select(db.payments).get();
       final methods = allPayments.map((p) => p.paymentMethod).toSet();
-      expect(methods, containsAll(['cash', 'instapay', 'wallet']));
+      expect(methods, containsAll(['cash', 'instapay', 'ewallet']));
 
       // Verify carpet with dimensions
       final carpets = await db.select(db.orderItemCarpets).get();
@@ -163,6 +168,45 @@ void main() {
       expect(orderCount2, orderCount1);
       expect(itemCount2, itemCount1);
       expect(payCount2, payCount1);
+
+      await db.close();
+    });
+
+    test('E-Wallet payment from DevTestData successfully travels through domain mapping to PaymentMethod.ewallet', () async {
+      final db = AppDatabase(NativeDatabase.memory());
+      await DevTestData.seedDevData(db);
+
+      final paymentRepository = PaymentRepositoryImpl(
+        paymentsDao: PaymentsDao(db),
+        ordersDao: OrdersDao(db),
+        syncOperationsDao: SyncOperationsDao(db),
+        db: db,
+      );
+
+      // Order 16 (26-016) is fully paid with E-Wallet in DevTestData
+      final orders = await db.select(db.orders).get();
+      final ord16 = orders.firstWhere((o) => o.orderNumber == '26-016');
+
+      final ord16Payments = await paymentRepository.getPaymentsForOrder(ord16.id);
+      expect(ord16Payments, isNotEmpty);
+      expect(ord16Payments.first.paymentMethod, equals(PaymentMethod.ewallet));
+      expect(ord16Payments.first.amount.piastres, equals(8000));
+
+      // Order 11 (26-011) also includes an E-Wallet payment
+      final ord11 = orders.firstWhere((o) => o.orderNumber == '26-011');
+      final ord11Payments = await paymentRepository.getPaymentsForOrder(ord11.id);
+      final ewalletPayments11 = ord11Payments.where((p) => p.paymentMethod == PaymentMethod.ewallet).toList();
+      expect(ewalletPayments11, isNotEmpty);
+      expect(ewalletPayments11.first.paymentMethod, equals(PaymentMethod.ewallet));
+      expect(ewalletPayments11.first.amount.piastres, equals(15000));
+
+      // Order 18 (26-018) also includes an E-Wallet payment
+      final ord18 = orders.firstWhere((o) => o.orderNumber == '26-018');
+      final ord18Payments = await paymentRepository.getPaymentsForOrder(ord18.id);
+      final ewalletPayments18 = ord18Payments.where((p) => p.paymentMethod == PaymentMethod.ewallet).toList();
+      expect(ewalletPayments18, isNotEmpty);
+      expect(ewalletPayments18.first.paymentMethod, equals(PaymentMethod.ewallet));
+      expect(ewalletPayments18.first.amount.piastres, equals(10000));
 
       await db.close();
     });

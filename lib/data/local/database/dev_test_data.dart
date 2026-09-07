@@ -784,7 +784,7 @@ class DevTestData {
       id: _formatUuid(11, 4),
       orderId: ord11,
       amount: 15000,
-      method: 'wallet',
+      method: 'ewallet',
     );
 
     // -------------------------------------------------------------
@@ -1008,7 +1008,7 @@ class DevTestData {
       id: _formatUuid(11, 8),
       orderId: ord16,
       amount: 8000,
-      method: 'wallet',
+      method: 'ewallet',
     );
 
     // -------------------------------------------------------------
@@ -1091,7 +1091,7 @@ class DevTestData {
       id: _formatUuid(11, 10),
       orderId: ord18,
       amount: 10000,
-      method: 'wallet',
+      method: 'ewallet',
     );
   }
 

@@ -116,28 +116,92 @@ void main() {
     test('order number collision triggers entire transaction retry and succeeds', () async {
       final now = DateTime.now();
       final yearPrefix = (now.year % 100).toString().padLeft(2, '0');
+      final collidingNumber = '$yearPrefix-001';
 
       // Manually insert an order with 'YY-001' to create a collision condition
       final nowTimestamp = now.toUtc().millisecondsSinceEpoch ~/ 1000;
       await db.customStatement(
         'INSERT INTO orders (id, order_number, customer_id, status, expected_pickup_date, '
         'subtotal, total, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);',
-        ['colliding-ord', '$yearPrefix-001', 'cust-test', 'processing', nowTimestamp, 2000, 2000, nowTimestamp, nowTimestamp],
+        ['colliding-ord', collidingNumber, 'cust-test', 'processing', nowTimestamp, 2000, 2000, nowTimestamp, nowTimestamp],
+      );
+
+      // Inject _CollidingOrdersDao to force Attempt 1 to generate the existing order number ('YY-001').
+      // This guarantees an actual SQLite UNIQUE constraint violation during Attempt 1.
+      final testOrdersDao = _CollidingOrdersDao(db, collidingNumber: collidingNumber);
+      final testOrderRepo = OrderRepositoryImpl(
+        ordersDao: testOrdersDao,
+        storageRecordsDao: storageRecordsDao,
+        syncOperationsDao: syncOperationsDao,
+        db: db,
       );
 
       // Now call createOrder without orderNumber.
-      // Even if generateNextOrderNumber had evaluated 001, it must resolve to 002.
-      final created = await orderRepository.createOrder(
+      // Attempt 1: generates 'YY-001' -> UNIQUE collision -> transaction rolls back.
+      // Attempt 2: generates 'YY-002' -> succeeds -> transaction commits.
+      final created = await testOrderRepo.createOrder(
         order: createDraftOrder(id: 'ord-new'),
         items: [createOrderItem(id: 'item-new', orderId: 'ord-new')],
       );
 
+      // Verify Attempt 1 collided, rolled back, and Attempt 2 succeeded
+      expect(testOrdersDao.generateCallCount, 2);
+      expect(testOrdersDao.generatedNumbers, [collidingNumber, '$yearPrefix-002']);
       expect(created.orderNumber, '$yearPrefix-002');
 
       // Verify the persisted order in database
       final persisted = await ordersDao.getOrderById('ord-new');
       expect(persisted, isNotNull);
       expect(persisted!.orderNumber, '$yearPrefix-002');
+
+      // Verify transaction atomicity: items from rolled-back Attempt 1 do not linger
+      final items = await (db.select(db.orderItems)..where((t) => t.orderId.equals('ord-new'))).get();
+      expect(items.length, 1);
+      expect(items.first.id, 'item-new');
+
+      // Verify sync operation was recorded only once
+      final syncOps = await (db.select(db.syncOperations)..where((t) => t.entityId.equals('ord-new'))).get();
+      expect(syncOps.length, 1);
+    });
+
+    test('order number collision exhausts 5 retries and rolls back transaction', () async {
+      final now = DateTime.now();
+      final yearPrefix = (now.year % 100).toString().padLeft(2, '0');
+      final collidingNumber = '$yearPrefix-001';
+
+      // Manually insert an order with 'YY-001'
+      final nowTimestamp = now.toUtc().millisecondsSinceEpoch ~/ 1000;
+      await db.customStatement(
+        'INSERT INTO orders (id, order_number, customer_id, status, expected_pickup_date, '
+        'subtotal, total, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);',
+        ['colliding-ord-exhaust', collidingNumber, 'cust-test', 'processing', nowTimestamp, 2000, 2000, nowTimestamp, nowTimestamp],
+      );
+
+      final alwaysCollidingDao = _AlwaysCollidingOrdersDao(db, collidingNumber: collidingNumber);
+      final testOrderRepo = OrderRepositoryImpl(
+        ordersDao: alwaysCollidingDao,
+        storageRecordsDao: storageRecordsDao,
+        syncOperationsDao: syncOperationsDao,
+        db: db,
+      );
+
+      await expectLater(
+        () => testOrderRepo.createOrder(
+          order: createDraftOrder(id: 'ord-fail'),
+          items: [createOrderItem(id: 'item-fail', orderId: 'ord-fail')],
+        ),
+        throwsA(isA<DatabaseFailure>()),
+      );
+
+      // Verify all 5 attempts were made before giving up
+      expect(alwaysCollidingDao.generateCallCount, 5);
+
+      // Verify transaction was rolled back and order was NOT saved
+      final persisted = await ordersDao.getOrderById('ord-fail');
+      expect(persisted, isNull);
+
+      final items = await (db.select(db.orderItems)..where((t) => t.orderId.equals('ord-fail'))).get();
+      expect(items, isEmpty);
     });
 
     test('rapid / concurrent order creations succeed without collisions or duplicates', () async {
@@ -199,4 +263,38 @@ void main() {
       expect(reloaded!.orderNumber, originalNumber);
     });
   });
+}
+
+class _CollidingOrdersDao extends OrdersDao {
+  _CollidingOrdersDao(super.db, {required this.collidingNumber});
+
+  final String collidingNumber;
+  int generateCallCount = 0;
+  final List<String> generatedNumbers = [];
+
+  @override
+  Future<String> generateNextOrderNumber() async {
+    generateCallCount++;
+    if (generateCallCount == 1) {
+      // Return existing order number to guarantee SQLite UNIQUE constraint collision on attempt 1
+      generatedNumbers.add(collidingNumber);
+      return collidingNumber;
+    }
+    final next = await super.generateNextOrderNumber();
+    generatedNumbers.add(next);
+    return next;
+  }
+}
+
+class _AlwaysCollidingOrdersDao extends OrdersDao {
+  _AlwaysCollidingOrdersDao(super.db, {required this.collidingNumber});
+
+  final String collidingNumber;
+  int generateCallCount = 0;
+
+  @override
+  Future<String> generateNextOrderNumber() async {
+    generateCallCount++;
+    return collidingNumber;
+  }
 }
