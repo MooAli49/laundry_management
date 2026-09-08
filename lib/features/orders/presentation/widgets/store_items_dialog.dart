@@ -9,7 +9,8 @@ import '../../../../domain/entities/storage_location.dart';
 
 class StoreItemsDialog extends StatefulWidget {
   final List<OrderItem> unstoredItems;
-  final List<StorageLocation> availableLocations;
+  final List<StorageLocation>? availableLocations;
+  final Map<String, List<StorageLocation>>? compatibleLocationsByItemType;
   final Future<void> Function({
     required List<String> orderItemIds,
     required String storageLocationId,
@@ -18,7 +19,8 @@ class StoreItemsDialog extends StatefulWidget {
   const StoreItemsDialog({
     super.key,
     required this.unstoredItems,
-    required this.availableLocations,
+    this.availableLocations,
+    this.compatibleLocationsByItemType,
     required this.onStore,
   });
 
@@ -32,13 +34,57 @@ class _StoreItemsDialogState extends State<StoreItemsDialog> {
   String? _errorMessage;
   bool _isLoading = false;
 
+  List<StorageLocation> get _effectiveLocations {
+    if (widget.compatibleLocationsByItemType == null ||
+        widget.compatibleLocationsByItemType!.isEmpty) {
+      return widget.availableLocations ?? [];
+    }
+
+    final selectedItems = widget.unstoredItems
+        .where((i) => _selectedItemIds.contains(i.id))
+        .toList();
+    if (selectedItems.isEmpty) return [];
+
+    List<StorageLocation>? intersection;
+    for (final item in selectedItems) {
+      final compatible =
+          widget.compatibleLocationsByItemType![item.itemTypeId] ?? [];
+      if (intersection == null) {
+        intersection = List.of(compatible);
+      } else {
+        intersection = intersection
+            .where((loc) => compatible.any((c) => c.id == loc.id))
+            .toList();
+      }
+    }
+    return intersection ?? [];
+  }
+
   @override
   void initState() {
     super.initState();
     _selectedItemIds = widget.unstoredItems.map((i) => i.id).toSet();
-    if (widget.availableLocations.isNotEmpty) {
-      _selectedLocation = widget.availableLocations.first;
+    final effective = _effectiveLocations;
+    if (effective.isNotEmpty) {
+      _selectedLocation = effective.first;
     }
+  }
+
+  void _onItemToggled(String itemId, bool isChecked) {
+    setState(() {
+      if (isChecked) {
+        _selectedItemIds.add(itemId);
+      } else {
+        _selectedItemIds.remove(itemId);
+      }
+      final effective = _effectiveLocations;
+      if (_selectedLocation != null &&
+          !effective.any((l) => l.id == _selectedLocation!.id)) {
+        _selectedLocation = effective.isNotEmpty ? effective.first : null;
+      } else if (_selectedLocation == null && effective.isNotEmpty) {
+        _selectedLocation = effective.first;
+      }
+    });
   }
 
   Future<void> _handleStore() async {
@@ -67,13 +113,16 @@ class _StoreItemsDialogState extends State<StoreItemsDialog> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = e.toString().replaceFirst('Failure: ', '');
+        _errorMessage = e.toString().replaceFirst('BusinessRuleFailure: ', '').replaceFirst('Failure: ', '');
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final effectiveLocations = _effectiveLocations;
+    final hasConflictingTypes = _selectedItemIds.isNotEmpty && effectiveLocations.isEmpty;
+
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
@@ -143,34 +192,56 @@ class _StoreItemsDialogState extends State<StoreItemsDialog> {
                         style: AppTextStyles.bodyMedium,
                       ),
                       subtitle: item.notes != null ? Text(item.notes!, style: AppTextStyles.labelSmall) : null,
-                      onChanged: (val) {
-                        setState(() {
-                          if (val == true) {
-                            _selectedItemIds.add(item.id);
-                          } else {
-                            _selectedItemIds.remove(item.id);
-                          }
-                        });
-                      },
+                      onChanged: (val) => _onItemToggled(item.id, val == true),
                     );
                   },
                 ),
               ),
               AppSpacing.gapLg,
 
+              if (hasConflictingTypes) ...[
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: AppColors.warningLight,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: AppColors.warning),
+                      AppSpacing.gapHorizontalSm,
+                      Expanded(
+                        child: Text(
+                          'القطع المحددة تتطلب أماكن تخزين مختلفة (أنواع مختلفة). يرجى تخزين كل نوع على حدة.',
+                          style: AppTextStyles.bodySmall.copyWith(color: AppColors.warning),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                AppSpacing.gapMd,
+              ],
+
               Text('مكان التخزين *', style: AppTextStyles.labelLarge),
               AppSpacing.gapXs,
               DropdownButtonFormField<StorageLocation>(
+                key: ValueKey('storage_loc_${_selectedLocation?.id}'),
                 initialValue: _selectedLocation,
                 isExpanded: true,
-                decoration: const InputDecoration(hintText: 'اختر موقع التخزين'),
-                items: widget.availableLocations.map((loc) {
+                decoration: InputDecoration(
+                  hintText: effectiveLocations.isEmpty
+                      ? 'لا توجد أماكن تخزين متوافقة متاحة'
+                      : 'اختر موقع التخزين المتوافق',
+                ),
+                items: effectiveLocations.map((loc) {
                   return DropdownMenuItem<StorageLocation>(
                     value: loc,
                     child: Text(loc.name, style: AppTextStyles.bodyMedium),
                   );
                 }).toList(),
-                onChanged: (loc) => setState(() => _selectedLocation = loc),
+                onChanged: effectiveLocations.isEmpty
+                    ? null
+                    : (loc) => setState(() => _selectedLocation = loc),
               ),
               AppSpacing.gapXl,
 
@@ -186,7 +257,9 @@ class _StoreItemsDialogState extends State<StoreItemsDialog> {
                   AppButton(
                     label: 'تخزين',
                     isLoading: _isLoading,
-                    onPressed: _handleStore,
+                    onPressed: (_isLoading || _selectedLocation == null || _selectedItemIds.isEmpty)
+                        ? null
+                        : _handleStore,
                   ),
                 ],
               ),

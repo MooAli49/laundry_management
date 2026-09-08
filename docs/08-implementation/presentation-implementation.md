@@ -234,15 +234,19 @@ At minimum, screens that load asynchronous data should be able to represent:
 - Empty
 - Error
 
-The exact state implementation may use:
+## V1 State Management Standard
 
-- A sealed-state style
-- Equatable state classes
-- A state object with a status field
+All Cubit states use immutable State objects with copyWith().
 
-The chosen implementation must remain consistent with the project's coding standards.
+V1 does not use sealed state hierarchies.
 
-Do not mix multiple state patterns unnecessarily.
+State objects may contain multiple independent state dimensions when required by the UI.
+
+Finite workflow/state distinctions should be represented inside the State object using explicit fields/enums where appropriate, rather than introducing a second state-management pattern.
+
+The purpose is consistency, simplicity, predictable state updates, and preservation of UI data during partial loading/error/action states.
+
+This is a V1 architectural convention and may be revisited only through an explicit architecture decision.
 
 ---
 

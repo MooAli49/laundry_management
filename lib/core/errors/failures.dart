@@ -67,8 +67,7 @@ class IncompatibleServiceFailure extends BusinessRuleFailure {
     required this.itemTypeId,
     String? message,
   }) : super(
-          message ??
-              'Service $serviceId is not compatible with ItemType $itemTypeId',
+          message ?? 'الخدمة المحددة غير متوافقة مع نوع العنصر',
         );
 }
 
@@ -81,8 +80,7 @@ class IncompatibleStorageLocationFailure extends BusinessRuleFailure {
     required this.itemTypeId,
     String? message,
   }) : super(
-          message ??
-              'StorageLocation $storageLocationId is not compatible with ItemType $itemTypeId',
+          message ?? 'الموقع المحدد غير متوافق مع نوع العنصر',
         );
 }
 

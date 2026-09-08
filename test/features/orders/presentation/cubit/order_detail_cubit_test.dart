@@ -237,6 +237,38 @@ void main() {
       expect(cubit.state.remainingAmount, const Money.fromPiastres(10000));
       expect(cubit.state.allItemsStored, isFalse);
       expect(cubit.state.unstoredItems.length, 2);
+      expect(cubit.state.compatibleLocationsByItemType, isNotEmpty);
+      expect(cubit.state.compatibleLocationsForItems(cubit.state.unstoredItems).length, 1);
+      expect(cubit.state.compatibleLocationsForItems(cubit.state.unstoredItems).first.id, 'loc-1');
+    });
+
+    test('storeItems with incompatible location sets Arabic error message', () async {
+      await seedTestOrder(orderId: 'ord-compat-test', customerId: 'cust-compat', totalPiastres: 10000);
+      final itemTypes = await db.select(db.itemTypes).get();
+      final now = DateTime.now();
+
+      // Create an incompatible location (e.g. for a different item type)
+      final otherItemType = itemTypes.last;
+      await storageLocationRepository.createStorageLocation(
+        StorageLocation(
+          id: 'loc-incompatible',
+          name: 'موقع غير متوافق',
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        ),
+        supportedItemTypeIds: [otherItemType.id],
+      );
+
+      await cubit.loadOrderDetail('ord-compat-test');
+
+      await cubit.storeItems(
+        orderItemIds: ['item-1-ord-compat-test'],
+        storageLocationId: 'loc-incompatible',
+      );
+
+      expect(cubit.state.errorMessage, equals('الموقع المحدد غير متوافق مع نوع العنصر'));
+      expect(cubit.state.allItemsStored, isFalse);
     });
 
     test('recordPayment rejects overpayment and records valid payment', () async {

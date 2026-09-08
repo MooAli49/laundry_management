@@ -28,6 +28,7 @@ class OrdersListState {
     bool? isLoadingMore,
     bool? hasMore,
     String? errorMessage,
+    bool clearErrorMessage = false,
   }) {
     return OrdersListState(
       orders: orders ?? this.orders,
@@ -36,7 +37,7 @@ class OrdersListState {
       isLoading: isLoading ?? this.isLoading,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       hasMore: hasMore ?? this.hasMore,
-      errorMessage: errorMessage,
+      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
     );
   }
 }

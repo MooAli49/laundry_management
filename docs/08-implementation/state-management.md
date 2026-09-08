@@ -433,7 +433,7 @@ OrdersState
 ├── filters
 └── failure
 
-The exact implementation may use a sealed hierarchy or a status-based immutable state according to the approved coding conventions.
+The implementation uses an immutable state object with `copyWith()` according to the approved V1 State Management Standard.
 
 ---
 
@@ -1920,20 +1920,19 @@ The state model should remain immutable.
 
 ---
 
-## 114. Sealed State Classes
+## 114. V1 State Management Standard
 
-Sealed state hierarchies may be used when the feature benefits from explicit state variants.
+All Cubit states use immutable State objects with copyWith().
 
-Example conceptual structure:
+V1 does not use sealed state hierarchies.
 
-OrdersState
-├── Initial
-├── Loading
-├── Loaded
-├── Empty
-└── Failure
+State objects may contain multiple independent state dimensions when required by the UI.
 
-The project should use one consistent approach rather than mixing styles arbitrarily.
+Finite workflow/state distinctions should be represented inside the State object using explicit fields/enums where appropriate, rather than introducing a second state-management pattern.
+
+The purpose is consistency, simplicity, predictable state updates, and preservation of UI data during partial loading/error/action states.
+
+This is a V1 architectural convention and may be revisited only through an explicit architecture decision.
 
 ---
 

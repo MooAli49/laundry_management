@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/domain/entities/customer.dart';
 import 'package:laundry_management/domain/entities/order.dart';
+import 'package:laundry_management/domain/entities/order_item.dart';
+import 'package:laundry_management/domain/entities/storage_location.dart';
 import 'package:laundry_management/domain/enums/order_status.dart';
 import 'package:laundry_management/domain/enums/payment_method.dart';
+import 'package:laundry_management/domain/enums/pricing_type.dart';
 import 'package:laundry_management/domain/value_objects/money.dart';
 import 'package:laundry_management/domain/value_objects/order_date.dart';
 import 'package:laundry_management/features/orders/presentation/models/order_list_filter.dart';
@@ -13,6 +16,7 @@ import 'package:laundry_management/features/orders/presentation/widgets/cancel_o
 import 'package:laundry_management/features/orders/presentation/widgets/order_card.dart';
 import 'package:laundry_management/features/orders/presentation/widgets/order_status_badge.dart';
 import 'package:laundry_management/features/orders/presentation/widgets/orders_filter_bar.dart';
+import 'package:laundry_management/features/orders/presentation/widgets/store_items_dialog.dart';
 
 Widget testBoilerplate(Widget child) {
   return MaterialApp(
@@ -164,6 +168,95 @@ void main() {
 
       expect(submittedAmount, const Money.fromPiastres(5000));
       expect(submittedMethod, PaymentMethod.cash);
+    });
+
+    testWidgets('StoreItemsDialog filters locations to only compatible and warns on conflicting items', (tester) async {
+      final now = DateTime(2026, 9, 1);
+      final clothesItem = OrderItem(
+        id: 'item-clothes-1',
+        orderId: 'ord-1',
+        itemTypeId: 'type-clothes',
+        serviceId: 'srv-1',
+        itemTypeNameSnapshot: 'قميص',
+        serviceNameSnapshot: 'غسيل',
+        pricingType: PricingType.perPiece,
+        quantity: 1.0,
+        unitPrice: const Money.fromPiastres(1500),
+        calculatedTotal: const Money.fromPiastres(1500),
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final carpetItem = OrderItem(
+        id: 'item-carpet-1',
+        orderId: 'ord-1',
+        itemTypeId: 'type-carpet',
+        serviceId: 'srv-1',
+        itemTypeNameSnapshot: 'سجادة',
+        serviceNameSnapshot: 'غسيل سجاد',
+        pricingType: PricingType.perSquareMeter,
+        quantity: 6.0,
+        unitPrice: const Money.fromPiastres(1000),
+        calculatedTotal: const Money.fromPiastres(6000),
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final rackLocation = StorageLocation(
+        id: 'loc-rack-1',
+        name: 'رف ملابس A-1',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final carpetLocation = StorageLocation(
+        id: 'loc-carpet-1',
+        name: 'مخزن سجاد',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      List<String>? confirmedItemIds;
+      String? confirmedLocationId;
+
+      await tester.pumpWidget(testBoilerplate(
+        StoreItemsDialog(
+          unstoredItems: [clothesItem, carpetItem],
+          availableLocations: [rackLocation, carpetLocation],
+          compatibleLocationsByItemType: {
+            'type-clothes': [rackLocation],
+            'type-carpet': [carpetLocation],
+          },
+          onStore: ({required orderItemIds, required storageLocationId}) async {
+            confirmedItemIds = orderItemIds;
+            confirmedLocationId = storageLocationId;
+          },
+        ),
+      ));
+
+      // Both items are selected by default -> conflicting types warning should be visible
+      expect(find.text('القطع المحددة تتطلب أماكن تخزين مختلفة (أنواع مختلفة). يرجى تخزين كل نوع على حدة.'), findsOneWidget);
+
+      // Deselect carpet item so only clothes is selected
+      await tester.tap(find.text('سجادة - غسيل سجاد'));
+      await tester.pumpAndSettle();
+
+      // Conflicting warning must disappear
+      expect(find.text('القطع المحددة تتطلب أماكن تخزين مختلفة (أنواع مختلفة). يرجى تخزين كل نوع على حدة.'), findsNothing);
+
+      // "رف ملابس A-1" is auto-selected as the only compatible location
+      expect(find.text('رف ملابس A-1'), findsOneWidget);
+      // Incompatible location "مخزن سجاد" must NOT be displayed
+      expect(find.text('مخزن سجاد'), findsNothing);
+
+      // Tap confirm
+      await tester.tap(find.text('تخزين'));
+      await tester.pumpAndSettle();
+
+      expect(confirmedItemIds, ['item-clothes-1']);
+      expect(confirmedLocationId, 'loc-rack-1');
     });
   });
 }

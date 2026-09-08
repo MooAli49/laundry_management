@@ -1,11 +1,15 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:laundry_management/core/errors/failures.dart';
 import 'package:laundry_management/data/local/daos/orders_dao.dart';
 import 'package:laundry_management/data/local/daos/payments_dao.dart';
+import 'package:laundry_management/data/local/daos/storage_locations_dao.dart';
+import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
 import 'package:laundry_management/data/local/database/app_database.dart';
 import 'package:laundry_management/data/local/database/dev_test_data.dart';
 import 'package:laundry_management/data/repositories/payment_repository_impl.dart';
+import 'package:laundry_management/data/repositories/storage_repository_impl.dart';
 import 'package:laundry_management/domain/enums/payment_method.dart';
 
 void main() {
@@ -207,6 +211,103 @@ void main() {
       expect(ewalletPayments18, isNotEmpty);
       expect(ewalletPayments18.first.paymentMethod, equals(PaymentMethod.ewallet));
       expect(ewalletPayments18.first.amount.piastres, equals(10000));
+
+      await db.close();
+    });
+
+    test('DevTestData storage location compatibility is internally consistent and seeded', () async {
+      final db = AppDatabase(NativeDatabase.memory());
+      await DevTestData.seedDevData(db);
+
+      // Verify storage_location_item_types has been populated
+      final mappings = await db.select(db.storageLocationItemTypes).get();
+      expect(mappings, isNotEmpty);
+      expect(mappings.length, 9);
+
+      final storageLocationsDao = StorageLocationsDao(db);
+
+      // Regression Test for Task #06.3 runtime error:
+      // StorageLocation 00000000-0000-0000-0006-000000000001 must be compatible with ItemType 00000000-0000-0000-0001-000000000001
+      final supportedTypes = await storageLocationsDao.getSupportedItemTypeIds(DevTestData.locRackA1Id);
+      expect(supportedTypes.contains(DevTestData.typeClothingId), isTrue,
+          reason: 'locRackA1Id must be compatible with typeClothingId');
+
+      // Verify clothes compatible locations (Rack A1, Rack A2, Rack B1)
+      final clothingLocations = await storageLocationsDao.getCompatibleLocationsForItemType(DevTestData.typeClothingId);
+      final clothingLocIds = clothingLocations.map((l) => l.id).toList();
+      expect(clothingLocIds, containsAll([DevTestData.locRackA1Id, DevTestData.locRackA2Id, DevTestData.locRackB1Id]));
+      expect(clothingLocIds, isNot(contains(DevTestData.locCarpetSectionId)));
+
+      // Verify carpet compatible locations (Carpet section only)
+      final carpetLocations = await storageLocationsDao.getCompatibleLocationsForItemType(DevTestData.typeCarpetsId);
+      final carpetLocIds = carpetLocations.map((l) => l.id).toList();
+      expect(carpetLocIds, contains(DevTestData.locCarpetSectionId));
+      expect(carpetLocIds, isNot(contains(DevTestData.locRackA1Id)));
+
+      // Verify blanket compatible locations (Blanket section)
+      final blanketLocations = await storageLocationsDao.getCompatibleLocationsForItemType(DevTestData.typeBlanketsId);
+      final blanketLocIds = blanketLocations.map((l) => l.id).toList();
+      expect(blanketLocIds, contains(DevTestData.locBlanketSectionId));
+      expect(blanketLocIds, isNot(contains(DevTestData.locRackA1Id)));
+
+      // Verify storing an item with compatible location succeeds
+      final storageRecordsDao = StorageRecordsDao(db);
+      final syncDao = SyncOperationsDao(db);
+      final storageRepo = StorageRepositoryImpl(
+        storageRecordsDao: storageRecordsDao,
+        storageLocationsDao: storageLocationsDao,
+        syncOperationsDao: syncDao,
+        db: db,
+      );
+
+      // Order 26-001 has no stored items
+      final orders = await db.select(db.orders).get();
+      final ord1 = orders.firstWhere((o) => o.orderNumber == '26-001');
+      final ord1Items = await (db.select(db.orderItems)..where((t) => t.orderId.equals(ord1.id))).get();
+      final unstoredClothing = ord1Items.firstWhere((i) => i.itemTypeId == DevTestData.typeClothingId);
+
+      // Compatible location storage succeeds
+      await storageRepo.bulkStoreItems(
+        orderItemIds: [unstoredClothing.id],
+        storageLocationId: DevTestData.locRackA1Id,
+      );
+      final record = await storageRepo.getActiveRecordForOrderItem(unstoredClothing.id);
+      expect(record, isNotNull);
+      expect(record!.storageLocationId, DevTestData.locRackA1Id);
+
+      await db.close();
+    });
+
+    test('StorageRepository rejects incompatible storage location with Arabic error message', () async {
+      final db = AppDatabase(NativeDatabase.memory());
+      await DevTestData.seedDevData(db);
+
+      final storageLocationsDao = StorageLocationsDao(db);
+      final storageRecordsDao = StorageRecordsDao(db);
+      final syncDao = SyncOperationsDao(db);
+      final storageRepo = StorageRepositoryImpl(
+        storageRecordsDao: storageRecordsDao,
+        storageLocationsDao: storageLocationsDao,
+        syncOperationsDao: syncDao,
+        db: db,
+      );
+
+      // Attempting to store clothing into carpet section must throw IncompatibleStorageLocationFailure
+      final orders = await db.select(db.orders).get();
+      final ord1 = orders.firstWhere((o) => o.orderNumber == '26-001');
+      final ord1Items = await (db.select(db.orderItems)..where((t) => t.orderId.equals(ord1.id))).get();
+      final clothingItem = ord1Items.firstWhere((i) => i.itemTypeId == DevTestData.typeClothingId);
+
+      await expectLater(
+        () => storageRepo.bulkStoreItems(
+          orderItemIds: [clothingItem.id],
+          storageLocationId: DevTestData.locCarpetSectionId,
+        ),
+        throwsA(
+          isA<IncompatibleStorageLocationFailure>()
+              .having((f) => f.message, 'message', equals('الموقع المحدد غير متوافق مع نوع العنصر')),
+        ),
+      );
 
       await db.close();
     });

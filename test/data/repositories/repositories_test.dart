@@ -241,7 +241,7 @@ void main() {
           createdAt: now,
           updatedAt: now,
         ),
-        supportedItemTypeIds: [],
+        supportedItemTypeIds: [item.itemTypeId],
       );
       await storageRepository.storeItem(
         orderItemId: 'item-2',
@@ -596,13 +596,14 @@ void main() {
   group('StorageRepositoryImpl Move and Bulk Store', () {
     test('moveItem deactivates old location and activates new location', () async {
       final now = DateTime.now();
+      final itemTypes = await db.select(db.itemTypes).get();
       await storageLocationRepository.createStorageLocation(
         StorageLocation(id: 'loc-A', name: 'رف A', createdAt: now, updatedAt: now),
-        supportedItemTypeIds: [],
+        supportedItemTypeIds: [itemTypes.first.id],
       );
       await storageLocationRepository.createStorageLocation(
         StorageLocation(id: 'loc-B', name: 'رف B', createdAt: now, updatedAt: now),
-        supportedItemTypeIds: [],
+        supportedItemTypeIds: [itemTypes.first.id],
       );
 
       // Create prerequisite customer, order, and item
@@ -615,7 +616,6 @@ void main() {
           updatedAt: now,
         ),
       );
-      final itemTypes = await db.select(db.itemTypes).get();
       await servicesDao.insertService(
         db_pkg.ServicesCompanion.insert(
           id: 'srv-100',

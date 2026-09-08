@@ -157,6 +157,30 @@ class DevTestData {
       );
     }
 
+    // Storage Location Item Type Compatibility
+    final storageCompatibilities = [
+      // Clothes Racks compatible with Clothing and Covers
+      {'id': '00000000-0000-0000-0008-000000000001', 'loc_id': locRackA1Id, 'type_id': typeClothingId},
+      {'id': '00000000-0000-0000-0008-000000000002', 'loc_id': locRackA1Id, 'type_id': typeCoversId},
+      {'id': '00000000-0000-0000-0008-000000000003', 'loc_id': locRackA2Id, 'type_id': typeClothingId},
+      {'id': '00000000-0000-0000-0008-000000000004', 'loc_id': locRackA2Id, 'type_id': typeCoversId},
+      {'id': '00000000-0000-0000-0008-000000000005', 'loc_id': locRackB1Id, 'type_id': typeClothingId},
+      {'id': '00000000-0000-0000-0008-000000000006', 'loc_id': locRackB1Id, 'type_id': typeCoversId},
+      // Carpet Section compatible with Carpets
+      {'id': '00000000-0000-0000-0008-000000000007', 'loc_id': locCarpetSectionId, 'type_id': typeCarpetsId},
+      // Blanket Section compatible with Blankets and Covers
+      {'id': '00000000-0000-0000-0008-000000000008', 'loc_id': locBlanketSectionId, 'type_id': typeBlanketsId},
+      {'id': '00000000-0000-0000-0008-000000000009', 'loc_id': locBlanketSectionId, 'type_id': typeCoversId},
+    ];
+
+    for (final compat in storageCompatibilities) {
+      await db.customStatement(
+        'INSERT OR IGNORE INTO storage_location_item_types (id, storage_location_id, item_type_id, created_at) '
+        'VALUES (?, ?, ?, ?);',
+        [compat['id'], compat['loc_id'], compat['type_id'], nowTimestamp],
+      );
+    }
+
     // Carpet Sizes
     final carpetSizes = [
       {'id': carpetSize2x3Id, 'length': 2.0, 'width': 3.0, 'area': 6.0},

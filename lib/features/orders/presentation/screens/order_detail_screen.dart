@@ -29,10 +29,7 @@ import '../widgets/store_items_dialog.dart';
 class OrderDetailScreen extends StatelessWidget {
   final String orderId;
 
-  const OrderDetailScreen({
-    super.key,
-    required this.orderId,
-  });
+  const OrderDetailScreen({super.key, required this.orderId});
 
   @override
   Widget build(BuildContext context) {
@@ -73,9 +70,7 @@ class _OrderDetailView extends StatelessWidget {
       },
       builder: (context, state) {
         if (state.isLoading) {
-          return const Scaffold(
-            body: Center(child: LoadingIndicator()),
-          );
+          return const Scaffold(body: Center(child: LoadingIndicator()));
         }
 
         void handleBack() {
@@ -88,11 +83,7 @@ class _OrderDetailView extends StatelessWidget {
 
         if (state.errorMessage != null && state.order == null) {
           return Scaffold(
-            appBar: AppBar(
-              leading: BackButton(
-                onPressed: handleBack,
-              ),
-            ),
+            appBar: AppBar(leading: BackButton(onPressed: handleBack)),
             body: AppErrorState(
               title: 'تعذر تحميل بيانات الطلب',
               message: state.errorMessage!,
@@ -103,23 +94,21 @@ class _OrderDetailView extends StatelessWidget {
 
         final order = state.order;
         if (order == null) {
-          return const Scaffold(
-            body: Center(child: Text('الطلب غير موجود')),
-          );
+          return const Scaffold(body: Center(child: Text('الطلب غير موجود')));
         }
 
         final isCancelled = order.status == OrderStatus.cancelled;
 
         return Scaffold(
           appBar: AppBar(
-            leading: BackButton(
-              onPressed: handleBack,
-            ),
+            leading: BackButton(onPressed: handleBack),
             title: Row(
               children: [
                 Text(
                   'طلب #${order.orderNumber}',
-                  style: AppTextStyles.titleLarge.copyWith(fontWeight: FontWeight.bold),
+                  style: AppTextStyles.titleLarge.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 AppSpacing.gapHorizontalMd,
                 OrderStatusBadge(status: order.status),
@@ -129,7 +118,9 @@ class _OrderDetailView extends StatelessWidget {
               // Cancelled orders MUST NOT have any invoice actions!
               if (!isCancelled)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                  ),
                   child: AppButton(
                     label: 'معاينة الفاتورة',
                     icon: Icons.visibility_outlined,
@@ -166,14 +157,23 @@ class _OrderDetailView extends StatelessWidget {
                       if (order.status == OrderStatus.processing)
                         Container(
                           margin: const EdgeInsets.only(bottom: AppSpacing.md),
-                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.infoLight,
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusMd,
+                            ),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.inventory_2_outlined, color: AppColors.info, size: 18),
+                              const Icon(
+                                Icons.inventory_2_outlined,
+                                color: AppColors.info,
+                                size: 18,
+                              ),
                               AppSpacing.gapHorizontalSm,
                               Expanded(
                                 child: Text(
@@ -191,14 +191,23 @@ class _OrderDetailView extends StatelessWidget {
                       else if (order.status == OrderStatus.ready)
                         Container(
                           margin: const EdgeInsets.only(bottom: AppSpacing.md),
-                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.primaryLighter,
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusMd,
+                            ),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.check_circle_outline, color: AppColors.primaryDark, size: 18),
+                              const Icon(
+                                Icons.check_circle_outline,
+                                color: AppColors.primaryDark,
+                                size: 18,
+                              ),
                               AppSpacing.gapHorizontalSm,
                               Expanded(
                                 child: Text(
@@ -273,12 +282,16 @@ class _OrderDetailView extends StatelessWidget {
                 children: [
                   Text(
                     'تاريخ الاستلام المتوقع',
-                    style: AppTextStyles.labelMedium.copyWith(color: AppColors.textSecondary),
+                    style: AppTextStyles.labelMedium.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   AppSpacing.gapXs,
                   Text(
                     pickupDate.toString(),
-                    style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
+                    style: AppTextStyles.titleMedium.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -287,7 +300,9 @@ class _OrderDetailView extends StatelessWidget {
                 children: [
                   Text(
                     'تاريخ الإنشاء',
-                    style: AppTextStyles.labelMedium.copyWith(color: AppColors.textSecondary),
+                    style: AppTextStyles.labelMedium.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   AppSpacing.gapXs,
                   Text(
@@ -300,7 +315,8 @@ class _OrderDetailView extends StatelessWidget {
           ),
 
           // Delivery info
-          if (order.customerPickupRequested || order.customerDeliveryRequested) ...[
+          if (order.customerPickupRequested ||
+              order.customerDeliveryRequested) ...[
             const Divider(height: AppSpacing.xxl, color: AppColors.divider),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -310,11 +326,17 @@ class _OrderDetailView extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                     child: Row(
                       children: [
-                        const Icon(Icons.hail, size: 20, color: AppColors.primary),
+                        const Icon(
+                          Icons.hail,
+                          size: 20,
+                          color: AppColors.primary,
+                        ),
                         AppSpacing.gapHorizontalSm,
                         Text(
-                          'استلام من العميل (العميل → المغسلة) (+ ${order.customerPickupFee.toEgp.toStringAsFixed(2)} ج.م)',
-                          style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+                          'استلام من العميل ${order.customerPickupFee.toEgp.toStringAsFixed(2)} ج.م',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
@@ -322,11 +344,17 @@ class _OrderDetailView extends StatelessWidget {
                 if (order.customerDeliveryRequested)
                   Row(
                     children: [
-                      const Icon(Icons.local_shipping, size: 20, color: AppColors.primary),
+                      const Icon(
+                        Icons.local_shipping,
+                        size: 20,
+                        color: AppColors.primary,
+                      ),
                       AppSpacing.gapHorizontalSm,
                       Text(
-                        'توصيل للعميل (المغسلة → العميل) (+ ${order.customerDeliveryFee.toEgp.toStringAsFixed(2)} ج.م)',
-                        style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+                        'توصيل للعميل ${order.customerDeliveryFee.toEgp.toStringAsFixed(2)} ج.م',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
@@ -340,12 +368,18 @@ class _OrderDetailView extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.notes, size: 20, color: AppColors.textSecondary),
+                const Icon(
+                  Icons.notes,
+                  size: 20,
+                  color: AppColors.textSecondary,
+                ),
                 AppSpacing.gapHorizontalSm,
                 Expanded(
                   child: Text(
                     'ملاحظات الطلب: ${order.notes}',
-                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ),
               ],
@@ -377,13 +411,17 @@ class _OrderDetailView extends StatelessWidget {
                   children: [
                     Text(
                       customer?.name ?? 'عميل غير مسجل',
-                      style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
+                      style: AppTextStyles.titleMedium.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     if (customer?.phone != null) ...[
                       AppSpacing.gapXs,
                       Text(
                         customer!.phone,
-                        style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                   ],
@@ -395,7 +433,9 @@ class _OrderDetailView extends StatelessWidget {
             AppSpacing.gapSm,
             Text(
               'ملاحظات العميل: ${customer.notes}',
-              style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.textTertiary,
+              ),
             ),
           ],
         ],
@@ -408,7 +448,9 @@ class _OrderDetailView extends StatelessWidget {
     final items = state.items;
     final unstoredCount = state.unstoredItems.length;
     final order = state.order!;
-    final isFinal = order.status == OrderStatus.completed || order.status == OrderStatus.cancelled;
+    final isFinal =
+        order.status == OrderStatus.completed ||
+        order.status == OrderStatus.cancelled;
 
     return AppCard(
       child: Column(
@@ -418,8 +460,10 @@ class _OrderDetailView extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'عناصر الطلب (${items.length} قطع فيزيائية)',
-                style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
+                'عناصر الطلب (${items.length})',
+                style: AppTextStyles.titleMedium.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               if (!isFinal && unstoredCount > 0)
                 AppButton(
@@ -431,13 +475,21 @@ class _OrderDetailView extends StatelessWidget {
                       context: context,
                       builder: (_) => StoreItemsDialog(
                         unstoredItems: state.unstoredItems,
-                        availableLocations: state.allActiveLocations,
-                        onStore: ({required orderItemIds, required storageLocationId}) async {
-                          await cubit.storeItems(
-                            orderItemIds: orderItemIds,
-                            storageLocationId: storageLocationId,
-                          );
-                        },
+                        availableLocations: state.compatibleLocationsForItems(
+                          state.unstoredItems,
+                        ),
+                        compatibleLocationsByItemType:
+                            state.compatibleLocationsByItemType,
+                        onStore:
+                            ({
+                              required orderItemIds,
+                              required storageLocationId,
+                            }) async {
+                              await cubit.storeItems(
+                                orderItemIds: orderItemIds,
+                                storageLocationId: storageLocationId,
+                              );
+                            },
                       ),
                     );
                   },
@@ -453,16 +505,24 @@ class _OrderDetailView extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.warning.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: AppColors.warning.withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, color: AppColors.warning, size: 20),
+                  const Icon(
+                    Icons.info_outline,
+                    color: AppColors.warning,
+                    size: 20,
+                  ),
                   AppSpacing.gapHorizontalSm,
                   Expanded(
                     child: Text(
                       'يوجد $unstoredCount عناصر لم يتم تخزينها بعد. لن يتحول الطلب إلى "جاهز" حتى يتم تخزين جميع العناصر.',
-                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.textPrimary),
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ),
                 ],
@@ -474,7 +534,8 @@ class _OrderDetailView extends StatelessWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: items.length,
-            separatorBuilder: (_, __) => const Divider(height: AppSpacing.lg, color: AppColors.divider),
+            separatorBuilder: (_, __) =>
+                const Divider(height: AppSpacing.lg, color: AppColors.divider),
             itemBuilder: (context, index) {
               final item = items[index];
               return _buildPhysicalItemRow(context, item, index + 1, state);
@@ -492,7 +553,9 @@ class _OrderDetailView extends StatelessWidget {
     OrderDetailState state,
   ) {
     final storageRecord = state.activeStorageRecords[item.id];
-    final location = storageRecord != null ? state.storageLocations[storageRecord.storageLocationId] : null;
+    final location = storageRecord != null
+        ? state.storageLocations[storageRecord.storageLocationId]
+        : null;
 
     final isStored = location != null;
     final isCarpet = item.pricingType == PricingType.perSquareMeter;
@@ -512,7 +575,9 @@ class _OrderDetailView extends StatelessWidget {
           ),
           child: Text(
             '$displayIndex',
-            style: AppTextStyles.labelSmall.copyWith(fontWeight: FontWeight.bold),
+            style: AppTextStyles.labelSmall.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
         AppSpacing.gapHorizontalMd,
@@ -526,20 +591,26 @@ class _OrderDetailView extends StatelessWidget {
                 children: [
                   Text(
                     '${item.itemTypeNameSnapshot} - ${item.serviceNameSnapshot}',
-                    style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   if (item.itemDefinitionNameSnapshot != null) ...[
                     AppSpacing.gapHorizontalSm,
                     Text(
                       '(${item.itemDefinitionNameSnapshot})',
-                      style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                   if (isCarpet && carpet != null) ...[
                     AppSpacing.gapHorizontalSm,
                     Text(
                       '(${carpet.length} × ${carpet.width} م = ${carpet.area} م²)',
-                      style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ],
@@ -548,7 +619,9 @@ class _OrderDetailView extends StatelessWidget {
                 AppSpacing.gapXs,
                 Text(
                   'ملاحظة: ${item.notes}',
-                  style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
                 ),
               ],
             ],
@@ -557,10 +630,7 @@ class _OrderDetailView extends StatelessWidget {
 
         // Storage status badge (Figma parity pill)
         Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 10,
-            vertical: 3,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
           decoration: BoxDecoration(
             color: isStored ? AppColors.successLight : AppColors.warningLight,
             borderRadius: BorderRadius.circular(999),
@@ -596,7 +666,10 @@ class _OrderDetailView extends StatelessWidget {
     );
   }
 
-  Widget _buildPaymentHistoryCard(BuildContext context, OrderDetailState state) {
+  Widget _buildPaymentHistoryCard(
+    BuildContext context,
+    OrderDetailState state,
+  ) {
     final payments = state.payments;
 
     return AppCard(
@@ -605,7 +678,9 @@ class _OrderDetailView extends StatelessWidget {
         children: [
           Text(
             'سجل المدفوعات',
-            style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
+            style: AppTextStyles.titleMedium.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           AppSpacing.gapMd,
           if (payments.isEmpty)
@@ -614,7 +689,9 @@ class _OrderDetailView extends StatelessWidget {
               child: Center(
                 child: Text(
                   'لم يتم تسجيل أي مدفوعات بعد.',
-                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
             )
@@ -623,7 +700,10 @@ class _OrderDetailView extends StatelessWidget {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: payments.length,
-              separatorBuilder: (_, __) => const Divider(height: AppSpacing.md, color: AppColors.divider),
+              separatorBuilder: (_, __) => const Divider(
+                height: AppSpacing.md,
+                color: AppColors.divider,
+              ),
               itemBuilder: (context, index) {
                 final payment = payments[index];
                 return _buildPaymentRow(context, payment);
@@ -659,12 +739,16 @@ class _OrderDetailView extends StatelessWidget {
               children: [
                 Text(
                   methodLabel,
-                  style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 AppSpacing.gapXs,
                 Text(
                   '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}',
-                  style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -681,10 +765,15 @@ class _OrderDetailView extends StatelessWidget {
     );
   }
 
-  Widget _buildFinancialSummaryCard(BuildContext context, OrderDetailState state) {
+  Widget _buildFinancialSummaryCard(
+    BuildContext context,
+    OrderDetailState state,
+  ) {
     final order = state.order!;
     final cubit = context.read<OrderDetailCubit>();
-    final isFinal = order.status == OrderStatus.completed || order.status == OrderStatus.cancelled;
+    final isFinal =
+        order.status == OrderStatus.completed ||
+        order.status == OrderStatus.cancelled;
 
     return AppCard(
       child: Column(
@@ -692,18 +781,36 @@ class _OrderDetailView extends StatelessWidget {
         children: [
           Text(
             'الملخص المالي',
-            style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
+            style: AppTextStyles.titleMedium.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           AppSpacing.gapMd,
-          _buildSummaryRow('المجموع الفرعي', '${order.subtotal.toEgp.toStringAsFixed(2)} ج.م'),
+          _buildSummaryRow(
+            'المجموع الفرعي',
+            '${order.subtotal.toEgp.toStringAsFixed(2)} ج.م',
+          ),
           if (order.customerPickupFee > Money.zero)
-            _buildSummaryRow('رسوم استلام من العميل', '+ ${order.customerPickupFee.toEgp.toStringAsFixed(2)} ج.م'),
+            _buildSummaryRow(
+              'رسوم استلام من العميل',
+              '+ ${order.customerPickupFee.toEgp.toStringAsFixed(2)} ج.م',
+            ),
           if (order.customerDeliveryFee > Money.zero)
-            _buildSummaryRow('رسوم توصيل للعميل', '+ ${order.customerDeliveryFee.toEgp.toStringAsFixed(2)} ج.م'),
+            _buildSummaryRow(
+              'رسوم توصيل للعميل',
+              '+ ${order.customerDeliveryFee.toEgp.toStringAsFixed(2)} ج.م',
+            ),
           if (order.discount > Money.zero)
-            _buildSummaryRow('الخصم', '- ${order.discount.toEgp.toStringAsFixed(2)} ج.م', isNegative: true),
+            _buildSummaryRow(
+              'الخصم',
+              '- ${order.discount.toEgp.toStringAsFixed(2)} ج.م',
+              isNegative: true,
+            ),
           if (order.tax > Money.zero)
-            _buildSummaryRow('الضريبة', '+ ${order.tax.toEgp.toStringAsFixed(2)} ج.م'),
+            _buildSummaryRow(
+              'الضريبة',
+              '+ ${order.tax.toEgp.toStringAsFixed(2)} ج.م',
+            ),
           const Divider(height: AppSpacing.lg, color: AppColors.divider),
           _buildSummaryRow(
             'الإجمالي',
@@ -736,7 +843,10 @@ class _OrderDetailView extends StatelessWidget {
                     builder: (_) => AddPaymentDialog(
                       remainingAmount: state.remainingAmount,
                       onConfirm: ({required amount, required method}) async {
-                        await cubit.recordPayment(amount: amount, method: method);
+                        await cubit.recordPayment(
+                          amount: amount,
+                          method: method,
+                        );
                       },
                     ),
                   );
@@ -764,7 +874,9 @@ class _OrderDetailView extends StatelessWidget {
             label,
             style: isBold
                 ? AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold)
-                : AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                : AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
           ),
           Text(
             value,
@@ -775,7 +887,9 @@ class _OrderDetailView extends StatelessWidget {
                   )
                 : AppTextStyles.bodySmall.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: isNegative ? AppColors.error : color ?? AppColors.textPrimary,
+                    color: isNegative
+                        ? AppColors.error
+                        : color ?? AppColors.textPrimary,
                   ),
           ),
         ],
@@ -794,12 +908,16 @@ class _OrderDetailView extends StatelessWidget {
           children: [
             Text(
               'حالة الطلب نهائية (ملغي)',
-              style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
+              style: AppTextStyles.titleMedium.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
             AppSpacing.gapSm,
             Text(
               'تم إلغاء هذا الطلب (${order.cancellationReason ?? ''}). الطلب ملغي للقراءة التاريخية فقط ولا يمكن إجراء أي عمليات عليه.',
-              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -813,18 +931,26 @@ class _OrderDetailView extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.check_circle, color: AppColors.success, size: 20),
+                const Icon(
+                  Icons.check_circle,
+                  color: AppColors.success,
+                  size: 20,
+                ),
                 AppSpacing.gapHorizontalSm,
                 Text(
                   'طلب مكتمل ومُسلّم',
-                  style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
+                  style: AppTextStyles.titleMedium.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
             AppSpacing.gapSm,
             Text(
               'تم تسليم هذا الطلب للعميل واستيفاء كامل الحساب بنجاح.',
-              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
             AppSpacing.gapLg,
             const Divider(height: AppSpacing.md, color: AppColors.divider),
@@ -843,7 +969,10 @@ class _OrderDetailView extends StatelessWidget {
                       currentStatus: OrderStatus.completed,
                       targetStatus: OrderStatus.processing,
                       onConfirm: (reason) async {
-                        await cubit.changeStatus(newStatus: OrderStatus.processing, reason: reason);
+                        await cubit.changeStatus(
+                          newStatus: OrderStatus.processing,
+                          reason: reason,
+                        );
                       },
                     ),
                   );
@@ -855,7 +984,9 @@ class _OrderDetailView extends StatelessWidget {
       );
     }
 
-    final canComplete = order.status == OrderStatus.ready && state.remainingAmount <= Money.zero;
+    final canComplete =
+        order.status == OrderStatus.ready &&
+        state.remainingAmount <= Money.zero;
 
     return AppCard(
       child: Column(
@@ -863,7 +994,9 @@ class _OrderDetailView extends StatelessWidget {
         children: [
           Text(
             'إجراءات الطلب',
-            style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
+            style: AppTextStyles.titleMedium.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           AppSpacing.gapMd,
 
@@ -889,12 +1022,16 @@ class _OrderDetailView extends StatelessWidget {
             if (order.status != OrderStatus.ready)
               Text(
                 '• يجب أن يكون الطلب في حالة "جاهز" للتسليم (جميع العناصر مخزنة).',
-                style: AppTextStyles.labelSmall.copyWith(color: AppColors.error),
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: AppColors.error,
+                ),
               ),
             if (state.remainingAmount > Money.zero)
               Text(
                 '• يجب سداد المبلغ المتبقي بالكامل أولاً (${state.remainingAmount.toEgp.toStringAsFixed(2)} ج.م).',
-                style: AppTextStyles.labelSmall.copyWith(color: AppColors.error),
+                style: AppTextStyles.labelSmall.copyWith(
+                  color: AppColors.error,
+                ),
               ),
           ],
 
@@ -925,7 +1062,10 @@ class _OrderDetailView extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusTransitionSection(BuildContext context, OrderDetailState state) {
+  Widget _buildStatusTransitionSection(
+    BuildContext context,
+    OrderDetailState state,
+  ) {
     final cubit = context.read<OrderDetailCubit>();
     final order = state.order!;
 
@@ -947,7 +1087,10 @@ class _OrderDetailView extends StatelessWidget {
                   currentStatus: OrderStatus.ready,
                   targetStatus: OrderStatus.processing,
                   onConfirm: (reason) async {
-                    await cubit.changeStatus(newStatus: OrderStatus.processing, reason: reason);
+                    await cubit.changeStatus(
+                      newStatus: OrderStatus.processing,
+                      reason: reason,
+                    );
                   },
                 ),
               );
@@ -975,7 +1118,10 @@ class _OrderDetailView extends StatelessWidget {
                   currentStatus: OrderStatus.processing,
                   targetStatus: OrderStatus.ready,
                   onConfirm: (reason) async {
-                    await cubit.changeStatus(newStatus: OrderStatus.ready, reason: reason);
+                    await cubit.changeStatus(
+                      newStatus: OrderStatus.ready,
+                      reason: reason,
+                    );
                   },
                 ),
               );

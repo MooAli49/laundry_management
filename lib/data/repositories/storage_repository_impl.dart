@@ -51,6 +51,18 @@ class StorageRepositoryImpl implements StorageRepository {
           );
         }
 
+        final orderItem = await (_db.select(_db.orderItems)..where((t) => t.id.equals(orderItemId))).getSingleOrNull();
+        if (orderItem != null) {
+          final compatibleLocations = await _storageLocationsDao.getCompatibleLocationsForItemType(orderItem.itemTypeId);
+          final isCompatible = compatibleLocations.any((loc) => loc.id == storageLocationId);
+          if (!isCompatible) {
+            throw IncompatibleStorageLocationFailure(
+              storageLocationId: storageLocationId,
+              itemTypeId: orderItem.itemTypeId,
+            );
+          }
+        }
+
         final now = DateTime.now();
         final newId = const Uuid().v4();
         await _storageRecordsDao.insertRecord(
@@ -103,6 +115,18 @@ class StorageRepositoryImpl implements StorageRepository {
         final activeRecord = await _storageRecordsDao.getActiveRecordForOrderItem(orderItemId);
         if (activeRecord == null) {
           throw BusinessRuleFailure('Item has no active storage location to move from');
+        }
+
+        final orderItem = await (_db.select(_db.orderItems)..where((t) => t.id.equals(orderItemId))).getSingleOrNull();
+        if (orderItem != null) {
+          final compatibleLocations = await _storageLocationsDao.getCompatibleLocationsForItemType(orderItem.itemTypeId);
+          final isCompatible = compatibleLocations.any((loc) => loc.id == newStorageLocationId);
+          if (!isCompatible) {
+            throw IncompatibleStorageLocationFailure(
+              storageLocationId: newStorageLocationId,
+              itemTypeId: orderItem.itemTypeId,
+            );
+          }
         }
 
         final now = DateTime.now();

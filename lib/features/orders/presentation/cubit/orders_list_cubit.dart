@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/errors/failures.dart';
 import '../../../../domain/repositories/customer_repository.dart';
 import '../../../../domain/repositories/order_repository.dart';
 import '../../../../domain/repositories/payment_repository.dart';
@@ -26,7 +27,7 @@ class OrdersListCubit extends Cubit<OrdersListState> {
   Future<void> loadOrders({bool refresh = false}) async {
     if (state.isLoading && !refresh) return;
 
-    emit(state.copyWith(isLoading: true, errorMessage: null));
+    emit(state.copyWith(isLoading: true, clearErrorMessage: true));
 
     try {
       final orders = await _orderRepository.getOrders(
@@ -44,6 +45,11 @@ class OrdersListCubit extends Cubit<OrdersListState> {
         isLoading: false,
         hasMore: orders.length == _pageSize,
       ));
+    } on Failure catch (f) {
+      emit(state.copyWith(
+        isLoading: false,
+        errorMessage: f.message,
+      ));
     } catch (e) {
       emit(state.copyWith(
         isLoading: false,
@@ -55,7 +61,7 @@ class OrdersListCubit extends Cubit<OrdersListState> {
   Future<void> loadMore() async {
     if (state.isLoading || state.isLoadingMore || !state.hasMore) return;
 
-    emit(state.copyWith(isLoadingMore: true));
+    emit(state.copyWith(isLoadingMore: true, clearErrorMessage: true));
 
     try {
       final nextOrders = await _orderRepository.getOrders(
@@ -72,6 +78,11 @@ class OrdersListCubit extends Cubit<OrdersListState> {
         orders: [...state.orders, ...nextViewModels],
         isLoadingMore: false,
         hasMore: nextOrders.length == _pageSize,
+      ));
+    } on Failure catch (f) {
+      emit(state.copyWith(
+        isLoadingMore: false,
+        errorMessage: f.message,
       ));
     } catch (e) {
       emit(state.copyWith(

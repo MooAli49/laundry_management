@@ -16,6 +16,7 @@ class OrderDetailState {
   final Map<String, StorageRecord> activeStorageRecords; // orderItemId -> StorageRecord
   final Map<String, StorageLocation> storageLocations; // locationId -> StorageLocation
   final List<StorageLocation> allActiveLocations;
+  final Map<String, List<StorageLocation>> compatibleLocationsByItemType; // itemTypeId -> compatible locations
   final List<Payment> payments;
   final Money totalPaid;
   final Money remainingAmount;
@@ -32,6 +33,7 @@ class OrderDetailState {
     this.activeStorageRecords = const {},
     this.storageLocations = const {},
     this.allActiveLocations = const [],
+    this.compatibleLocationsByItemType = const {},
     this.payments = const [],
     this.totalPaid = Money.zero,
     this.remainingAmount = Money.zero,
@@ -47,6 +49,23 @@ class OrderDetailState {
   List<OrderItem> get unstoredItems =>
       items.where((i) => !activeStorageRecords.containsKey(i.id)).toList();
 
+  /// Returns the intersection of compatible active locations for the given items.
+  List<StorageLocation> compatibleLocationsForItems(List<OrderItem> targetItems) {
+    if (targetItems.isEmpty || compatibleLocationsByItemType.isEmpty) {
+      return allActiveLocations;
+    }
+    List<StorageLocation>? intersection;
+    for (final item in targetItems) {
+      final compatible = compatibleLocationsByItemType[item.itemTypeId] ?? [];
+      if (intersection == null) {
+        intersection = List.of(compatible);
+      } else {
+        intersection = intersection.where((loc) => compatible.any((c) => c.id == loc.id)).toList();
+      }
+    }
+    return intersection ?? [];
+  }
+
   OrderDetailState copyWith({
     bool? isLoading,
     bool? isActionLoading,
@@ -56,6 +75,7 @@ class OrderDetailState {
     Map<String, StorageRecord>? activeStorageRecords,
     Map<String, StorageLocation>? storageLocations,
     List<StorageLocation>? allActiveLocations,
+    Map<String, List<StorageLocation>>? compatibleLocationsByItemType,
     List<Payment>? payments,
     Money? totalPaid,
     Money? remainingAmount,
@@ -74,6 +94,8 @@ class OrderDetailState {
       activeStorageRecords: activeStorageRecords ?? this.activeStorageRecords,
       storageLocations: storageLocations ?? this.storageLocations,
       allActiveLocations: allActiveLocations ?? this.allActiveLocations,
+      compatibleLocationsByItemType:
+          compatibleLocationsByItemType ?? this.compatibleLocationsByItemType,
       payments: payments ?? this.payments,
       totalPaid: totalPaid ?? this.totalPaid,
       remainingAmount: remainingAmount ?? this.remainingAmount,

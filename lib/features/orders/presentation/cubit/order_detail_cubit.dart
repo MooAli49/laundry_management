@@ -103,6 +103,14 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
         }
       }
 
+      final compatibleMap = <String, List<StorageLocation>>{};
+      for (final item in items) {
+        if (!compatibleMap.containsKey(item.itemTypeId)) {
+          final compatible = await _storageLocationRepository.getCompatibleLocationsForItemType(item.itemTypeId);
+          compatibleMap[item.itemTypeId] = compatible;
+        }
+      }
+
       emit(state.copyWith(
         isLoading: false,
         order: order,
@@ -111,6 +119,7 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
         activeStorageRecords: activeStorageRecords,
         storageLocations: locationMap,
         allActiveLocations: allActiveLocations,
+        compatibleLocationsByItemType: compatibleMap,
         payments: payments,
         totalPaid: totalPaid,
         remainingAmount: remaining,
