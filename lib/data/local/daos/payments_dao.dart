@@ -33,4 +33,19 @@ class PaymentsDao extends DatabaseAccessor<app_db.AppDatabase> {
     final result = await query.map((row) => row.read(sumExp)).getSingle();
     return result ?? 0;
   }
+
+  Future<Map<String, int>> getTotalPaidForOrders(List<String> orderIds) async {
+    if (orderIds.isEmpty) return {};
+    final sumExp = db.payments.amount.sum();
+    final query = selectOnly(db.payments)
+      ..where(db.payments.orderId.isIn(orderIds))
+      ..addColumns([db.payments.orderId, sumExp])
+      ..groupBy([db.payments.orderId]);
+    final rows = await query.get();
+    return {
+      for (final row in rows)
+        if (row.read(db.payments.orderId) != null)
+          row.read(db.payments.orderId)!: row.read(sumExp) ?? 0,
+    };
+  }
 }

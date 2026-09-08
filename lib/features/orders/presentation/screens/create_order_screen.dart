@@ -20,12 +20,15 @@ import '../widgets/order_item_form.dart';
 import '../widgets/order_summary_card.dart';
 
 class CreateOrderScreen extends StatelessWidget {
-  const CreateOrderScreen({super.key});
+  final String? initialCustomerId;
+
+  const CreateOrderScreen({super.key, this.initialCustomerId});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => getIt<CreateOrderCubit>()..initialize(),
+      create: (_) => getIt<CreateOrderCubit>()
+        ..initialize(initialCustomerId: initialCustomerId),
       child: const _CreateOrderView(),
     );
   }

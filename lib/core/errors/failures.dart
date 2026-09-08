@@ -84,6 +84,15 @@ class IncompatibleStorageLocationFailure extends BusinessRuleFailure {
         );
 }
 
+class DuplicateCustomerPhoneFailure extends ValidationFailure {
+  final String? phone;
+
+  const DuplicateCustomerPhoneFailure([
+    super.message = AppStrings.duplicateCustomerPhone,
+    this.phone,
+  ]);
+}
+
 class UnexpectedFailure extends Failure {
   const UnexpectedFailure([super.message = AppStrings.unexpectedError]);
 }

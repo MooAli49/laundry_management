@@ -53,12 +53,17 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
           ),
         ));
 
-  Future<void> initialize() async {
+  Future<void> initialize({String? initialCustomerId}) async {
     emit(state.copyWith(isInitialLoading: true, clearErrorMessage: true));
     try {
       final itemTypes = await _itemTypeRepository.getActiveItemTypes();
       final carpetSizes = await _carpetSizeRepository.getActiveCarpetSizes();
       final settings = await _settingsRepository.getSettings();
+
+      Customer? initialCustomer;
+      if (initialCustomerId != null && initialCustomerId.isNotEmpty) {
+        initialCustomer = await _customerRepository.getCustomerById(initialCustomerId);
+      }
 
       if (isClosed) return;
       emit(state.copyWith(
@@ -66,6 +71,7 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
         itemTypes: itemTypes,
         carpetSizes: carpetSizes,
         settings: settings,
+        selectedCustomer: initialCustomer,
       ));
     } catch (e) {
       if (isClosed) return;

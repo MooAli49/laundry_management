@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../../core/utils/phone_utils.dart';
 import '../database/app_database.dart' as app_db;
 
 class CustomersDao extends DatabaseAccessor<app_db.AppDatabase> {
@@ -31,14 +32,48 @@ class CustomersDao extends DatabaseAccessor<app_db.AppDatabase> {
     final queryBuilder = select(db.customers);
     if (query != null && query.trim().isNotEmpty) {
       final sanitized = query.trim();
-      queryBuilder.where(
-        (t) => t.name.like('%$sanitized%') | t.phone.like('%$sanitized%'),
-      );
+      final normalized = PhoneUtils.normalizePhoneNumber(sanitized);
+      final hasDigits = RegExp(r'[0-9]').hasMatch(normalized);
+      if (hasDigits) {
+        queryBuilder.where(
+          (t) =>
+              t.name.like('%$sanitized%') |
+              t.phone.like('%$normalized%') |
+              t.phone.like('%$sanitized%'),
+        );
+      } else {
+        queryBuilder.where(
+          (t) => t.name.like('%$sanitized%') | t.phone.like('%$sanitized%'),
+        );
+      }
     }
     queryBuilder
       ..orderBy([(t) => OrderingTerm.asc(t.name)])
       ..limit(limit, offset: offset);
     return queryBuilder.get();
+  }
+
+  Future<int> getCustomersCount({String? query}) async {
+    final countExp = db.customers.id.count();
+    final queryBuilder = selectOnly(db.customers)..addColumns([countExp]);
+    if (query != null && query.trim().isNotEmpty) {
+      final sanitized = query.trim();
+      final normalized = PhoneUtils.normalizePhoneNumber(sanitized);
+      final hasDigits = RegExp(r'[0-9]').hasMatch(normalized);
+      if (hasDigits) {
+        queryBuilder.where(
+          db.customers.name.like('%$sanitized%') |
+              db.customers.phone.like('%$normalized%') |
+              db.customers.phone.like('%$sanitized%'),
+        );
+      } else {
+        queryBuilder.where(
+          db.customers.name.like('%$sanitized%') | db.customers.phone.like('%$sanitized%'),
+        );
+      }
+    }
+    final result = await queryBuilder.map((row) => row.read(countExp)).getSingle();
+    return result ?? 0;
   }
 
   Stream<List<app_db.Customer>> watchCustomers() {

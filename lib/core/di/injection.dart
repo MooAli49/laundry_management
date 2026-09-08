@@ -45,6 +45,8 @@ import '../../application/use_cases/move_stored_item_use_case.dart';
 import '../../application/use_cases/store_order_items_use_case.dart';
 import '../../domain/repositories/storage_location_repository.dart';
 import '../../domain/repositories/storage_repository.dart';
+import '../../features/customers/presentation/cubit/customer_detail_cubit.dart';
+import '../../features/customers/presentation/cubit/customers_list_cubit.dart';
 import '../../features/orders/presentation/cubit/create_order_cubit.dart';
 import '../../features/orders/presentation/cubit/order_detail_cubit.dart';
 import '../../features/orders/presentation/cubit/orders_list_cubit.dart';
@@ -297,6 +299,23 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
         changeOrderStatusUseCase: getIt<ChangeOrderStatusUseCase>(),
         completeOrderUseCase: getIt<CompleteOrderUseCase>(),
         cancelOrderUseCase: getIt<CancelOrderUseCase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<CustomersListCubit>()) {
+    getIt.registerFactory<CustomersListCubit>(
+      () => CustomersListCubit(
+        customerRepository: getIt<CustomerRepository>(),
+        orderRepository: getIt<OrderRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<CustomerDetailCubit>()) {
+    getIt.registerFactory<CustomerDetailCubit>(
+      () => CustomerDetailCubit(
+        customerRepository: getIt<CustomerRepository>(),
+        orderRepository: getIt<OrderRepository>(),
+        paymentRepository: getIt<PaymentRepository>(),
       ),
     );
   }

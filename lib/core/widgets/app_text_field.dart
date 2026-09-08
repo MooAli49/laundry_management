@@ -57,6 +57,9 @@ class AppTextField extends StatelessWidget {
           validator: validator,
           maxLines: maxLines,
           enabled: enabled,
+          onTapOutside: (event) {
+            FocusScope.of(context).unfocus();
+          },
           style: AppTextStyles.bodyMedium,
           decoration: InputDecoration(
             hintText: hintText,
