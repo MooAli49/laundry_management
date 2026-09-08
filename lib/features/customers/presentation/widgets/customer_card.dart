@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/localization/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -38,7 +39,7 @@ class CustomerCard extends StatelessWidget {
             child: Text(
               customer.name.trim().isNotEmpty
                   ? customer.name.trim().characters.first
-                  : 'ع',
+                  : AppStrings.defaultCustomerInitial,
               style: AppTextStyles.titleMedium.copyWith(
                 color: AppColors.primary,
                 fontWeight: FontWeight.bold,
@@ -104,7 +105,9 @@ class CustomerCard extends StatelessWidget {
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
-                orderCount > 0 ? '$orderCount طلبات' : 'لا توجد طلبات',
+                orderCount > 0
+                    ? AppStrings.customerOrdersCount(orderCount)
+                    : AppStrings.noOrdersYet,
                 style: AppTextStyles.bodySmall.copyWith(
                   color: orderCount > 0 ? AppColors.primary : AppColors.textTertiary,
                   fontWeight: FontWeight.w500,

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../../core/localization/app_strings.dart';
 import '../../../../core/routing/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -58,6 +59,7 @@ class _CustomerDetailView extends StatelessWidget {
               notes: notes,
             );
           },
+          onFindDuplicate: cubit.getCustomerByPhone,
         );
       },
     );
@@ -84,7 +86,7 @@ class _CustomerDetailView extends StatelessWidget {
           if (state.errorMessage != null && state.data == null) {
             return Center(
               child: AppErrorState(
-                title: 'تعذر تحميل بيانات العميل',
+                title: AppStrings.failedToLoadCustomerDetails,
                 message: state.errorMessage!,
                 onRetry: () => cubit.loadCustomerDetail(customerId),
               ),
@@ -94,7 +96,7 @@ class _CustomerDetailView extends StatelessWidget {
           if (state.data == null) {
             return const Center(
               child: EmptyState(
-                title: 'العميل غير موجود',
+                title: AppStrings.customerNotFound,
                 icon: Icons.person_off_outlined,
               ),
             );
@@ -116,7 +118,7 @@ class _CustomerDetailView extends StatelessWidget {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.arrow_forward),
-                        tooltip: 'رجوع',
+                        tooltip: AppStrings.back,
                         onPressed: () {
                           if (context.canPop()) {
                             context.pop();
@@ -159,7 +161,7 @@ class _CustomerDetailView extends StatelessWidget {
                       ),
                       AppSpacing.gapHorizontalMd,
                       AppButton(
-                        label: 'إنشاء طلب',
+                        label: AppStrings.createOrder,
                         icon: Icons.add,
                         onPressed: () {
                           context
@@ -169,7 +171,7 @@ class _CustomerDetailView extends StatelessWidget {
                       ),
                       AppSpacing.gapHorizontalSm,
                       AppButton(
-                        label: 'تعديل العميل',
+                        label: AppStrings.editCustomer,
                         variant: AppButtonVariant.secondary,
                         icon: Icons.edit_outlined,
                         onPressed: () => _showEditCustomerDialog(context, state),
@@ -217,7 +219,7 @@ class _CustomerDetailView extends StatelessWidget {
                     children: [
                       Expanded(
                         child: _KpiCard(
-                          title: 'إجمالي الطلبات',
+                          title: AppStrings.totalOrders,
                           value: '${data.totalOrdersCount}',
                           icon: Icons.receipt_long_outlined,
                           color: AppColors.primary,
@@ -227,7 +229,7 @@ class _CustomerDetailView extends StatelessWidget {
                       AppSpacing.gapHorizontalMd,
                       Expanded(
                         child: _KpiCard(
-                          title: 'طلبات جارية',
+                          title: AppStrings.activeOrders,
                           value: '${data.activeOrdersCount}',
                           icon: Icons.pending_actions_outlined,
                           color: AppColors.warning,
@@ -237,7 +239,7 @@ class _CustomerDetailView extends StatelessWidget {
                       AppSpacing.gapHorizontalMd,
                       Expanded(
                         child: _KpiCard(
-                          title: 'طلبات مكتملة',
+                          title: AppStrings.completedOrders,
                           value: '${data.completedOrdersCount}',
                           icon: Icons.check_circle_outline,
                           color: AppColors.success,
@@ -252,8 +254,8 @@ class _CustomerDetailView extends StatelessWidget {
                     children: [
                       Expanded(
                         child: _KpiCard(
-                          title: 'إجمالي المدفوع',
-                          value: '${data.totalPaid.toEgp.toStringAsFixed(2)} ج.م',
+                          title: AppStrings.totalPaid,
+                          value: '${data.totalPaid.toEgp.toStringAsFixed(2)} ${AppStrings.currency}',
                           icon: Icons.payments_outlined,
                           color: AppColors.success,
                           backgroundColor: AppColors.successLight,
@@ -263,8 +265,8 @@ class _CustomerDetailView extends StatelessWidget {
                       AppSpacing.gapHorizontalMd,
                       Expanded(
                         child: _KpiCard(
-                          title: 'إجمالي المتبقي',
-                          value: '${data.totalRemaining.toEgp.toStringAsFixed(2)} ج.م',
+                          title: AppStrings.totalRemaining,
+                          value: '${data.totalRemaining.toEgp.toStringAsFixed(2)} ${AppStrings.currency}',
                           icon: Icons.account_balance_wallet_outlined,
                           color: data.totalRemaining.isZero
                               ? AppColors.textSecondary
@@ -282,7 +284,7 @@ class _CustomerDetailView extends StatelessWidget {
 
                   // Order History Section Header
                   Text(
-                    'سجل الطلبات (${data.totalOrdersCount})',
+                    AppStrings.orderHistoryWithCount(data.totalOrdersCount),
                     style: AppTextStyles.titleLarge.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -293,10 +295,10 @@ class _CustomerDetailView extends StatelessWidget {
                   if (data.orders.isEmpty)
                     EmptyState(
                       icon: Icons.receipt_long_outlined,
-                      title: 'لا توجد طلبات لهذا العميل',
-                      message: 'يمكنك إنشاء طلب جديد لهذا العميل بالضغط على زر إنشاء طلب.',
+                      title: AppStrings.noOrdersForCustomer,
+                      message: AppStrings.createFirstOrderForCustomerPrompt,
                       actionButton: AppButton(
-                        label: 'إنشاء طلب',
+                        label: AppStrings.createOrder,
                         icon: Icons.add,
                         onPressed: () {
                           context
@@ -378,14 +380,14 @@ class _CustomerDetailView extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    '${order.total.toEgp.toStringAsFixed(2)} ج.م',
+                                    '${order.total.toEgp.toStringAsFixed(2)} ${AppStrings.currency}',
                                     style: AppTextStyles.titleSmall.copyWith(
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                   AppSpacing.gapXs,
                                   Text(
-                                    'المدفوع: ${paid.toEgp.toStringAsFixed(2)} ج.م',
+                                    AppStrings.paidAmount(paid.toEgp.toStringAsFixed(2)),
                                     style: AppTextStyles.bodySmall.copyWith(
                                       color: AppColors.textSecondary,
                                     ),
@@ -393,8 +395,8 @@ class _CustomerDetailView extends StatelessWidget {
                                   AppSpacing.gapXs,
                                   Text(
                                     isFullyPaid
-                                        ? 'مدفوع بالكامل'
-                                        : 'المتبقي: ${remaining.toEgp.toStringAsFixed(2)} ج.م',
+                                        ? AppStrings.fullyPaid
+                                        : AppStrings.remainingAmount(remaining.toEgp.toStringAsFixed(2)),
                                     style: AppTextStyles.bodySmall.copyWith(
                                       color: isFullyPaid
                                           ? AppColors.success
@@ -421,7 +423,7 @@ class _CustomerDetailView extends StatelessWidget {
                     AppSpacing.gapMd,
                     Center(
                       child: AppButton(
-                        label: 'تحميل المزيد من الطلبات',
+                        label: AppStrings.loadMoreOrders,
                         variant: AppButtonVariant.secondary,
                         icon: Icons.expand_more,
                         isLoading: state.isLoadingMore,

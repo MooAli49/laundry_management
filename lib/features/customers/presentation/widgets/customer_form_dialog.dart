@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/di/injection.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../core/localization/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -10,7 +9,6 @@ import '../../../../core/utils/phone_utils.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../domain/entities/customer.dart';
-import '../../../../domain/repositories/customer_repository.dart';
 
 class CustomerFormDialog extends StatefulWidget {
   final Customer? customer;
@@ -19,12 +17,14 @@ class CustomerFormDialog extends StatefulWidget {
     required String phone,
     String? notes,
   }) onSave;
+  final Future<Customer?> Function(String phone)? onFindDuplicate;
   final void Function(Customer existingCustomer)? onViewExisting;
 
   const CustomerFormDialog({
     super.key,
     this.customer,
     required this.onSave,
+    this.onFindDuplicate,
     this.onViewExisting,
   });
 
@@ -66,21 +66,21 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
 
     if (name.isEmpty) {
       setState(() {
-        _errorMessage = 'اسم العميل مطلوب';
+        _errorMessage = AppStrings.customerNameRequired;
         _duplicateCustomer = null;
       });
       return;
     }
     if (phone.isEmpty) {
       setState(() {
-        _errorMessage = 'رقم الهاتف مطلوب';
+        _errorMessage = AppStrings.customerPhoneRequired;
         _duplicateCustomer = null;
       });
       return;
     }
     if (!PhoneUtils.isValidCustomerPhone(phone)) {
       setState(() {
-        _errorMessage = 'رقم الهاتف غير صحيح';
+        _errorMessage = AppStrings.customerPhoneInvalid;
         _duplicateCustomer = null;
       });
       return;
@@ -105,9 +105,11 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
       }
     } on DuplicateCustomerPhoneFailure catch (e) {
       Customer? existing;
-      try {
-        existing = await getIt<CustomerRepository>().getCustomerByPhone(phone);
-      } catch (_) {}
+      if (widget.onFindDuplicate != null) {
+        try {
+          existing = await widget.onFindDuplicate!(phone);
+        } catch (_) {}
+      }
 
       if (mounted) {
         setState(() {
@@ -151,7 +153,7 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    _isEditing ? 'تعديل بيانات العميل' : 'إضافة عميل جديد',
+                    _isEditing ? AppStrings.editCustomerTitle : AppStrings.addCustomerTitle,
                     style: AppTextStyles.titleLarge,
                   ),
                   IconButton(
@@ -197,7 +199,7 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
                               widget.onViewExisting!(existing);
                             },
                             icon: const Icon(Icons.visibility_outlined, size: 16),
-                            label: const Text('عرض العميل'),
+                            label: const Text(AppStrings.viewCustomer),
                             style: TextButton.styleFrom(
                               foregroundColor: AppColors.primary,
                             ),
@@ -212,23 +214,23 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
 
               AppTextField(
                 controller: _nameController,
-                label: 'اسم العميل *',
-                hintText: 'مثال: محمد أحمد',
+                label: AppStrings.customerNameLabel,
+                hintText: AppStrings.customerNameHint,
               ),
               AppSpacing.gapMd,
 
               AppTextField(
                 controller: _phoneController,
-                label: 'رقم الهاتف *',
-                hintText: 'مثال: 01012345678',
+                label: AppStrings.customerPhoneLabel,
+                hintText: AppStrings.customerPhoneHint,
                 keyboardType: TextInputType.phone,
               ),
               AppSpacing.gapMd,
 
               AppTextField(
                 controller: _notesController,
-                label: 'ملاحظات',
-                hintText: 'أي ملاحظات خاصة بالعميل',
+                label: AppStrings.notesLabel,
+                hintText: AppStrings.customerNotesHint,
                 maxLines: 2,
               ),
               AppSpacing.gapXl,
@@ -237,13 +239,13 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   AppButton(
-                    label: 'إلغاء',
+                    label: AppStrings.cancel,
                     variant: AppButtonVariant.secondary,
                     onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
                   ),
                   AppSpacing.gapHorizontalMd,
                   AppButton(
-                    label: _isEditing ? 'حفظ التعديلات' : 'حفظ العميل',
+                    label: _isEditing ? AppStrings.saveChanges : AppStrings.saveCustomer,
                     isLoading: _isLoading,
                     onPressed: _handleSave,
                   ),

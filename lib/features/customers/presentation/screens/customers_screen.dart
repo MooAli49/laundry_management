@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../../core/localization/app_strings.dart';
 import '../../../../core/routing/app_routes.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_button.dart';
@@ -12,8 +12,6 @@ import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../core/widgets/page_header.dart';
-import '../../../../domain/entities/customer.dart';
-import '../../../../domain/repositories/customer_repository.dart';
 import '../cubit/customers_list_cubit.dart';
 import '../cubit/customers_list_state.dart';
 import '../widgets/customer_card.dart';
@@ -53,19 +51,12 @@ class _CustomersViewState extends State<_CustomersView> {
       context: context,
       builder: (dialogContext) {
         return CustomerFormDialog(
-          onSave: ({required name, required phone, notes}) async {
-            final now = DateTime.now();
-            final newCustomer = Customer(
-              id: const Uuid().v4(),
-              name: name,
-              phone: phone,
-              notes: notes,
-              createdAt: now,
-              updatedAt: now,
-            );
-            await getIt<CustomerRepository>().createCustomer(newCustomer);
-            cubit.loadCustomers();
-          },
+          onSave: ({required name, required phone, notes}) => cubit.createCustomer(
+            name: name,
+            phone: phone,
+            notes: notes,
+          ),
+          onFindDuplicate: cubit.getCustomerByPhone,
           onViewExisting: (existingCustomer) {
             context.push(AppRoutes.customerDetailPath(existingCustomer.id)).then((_) {
               if (mounted) cubit.loadCustomers();
@@ -86,18 +77,18 @@ class _CustomersViewState extends State<_CustomersView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with "+ إضافة عميل"
+            // Header with "+ Add Customer"
             BlocBuilder<CustomersListCubit, CustomersListState>(
               buildWhen: (prev, curr) =>
                   prev.totalCustomersCount != curr.totalCustomersCount ||
                   prev.customers.length != curr.customers.length,
               builder: (context, state) {
                 return PageHeader(
-                  title: 'العملاء',
-                  subtitle: 'إجمالي ${state.totalCustomersCount} عميل',
+                  title: AppStrings.customers,
+                  subtitle: AppStrings.totalCustomersCount(state.totalCustomersCount),
                   actions: [
                     AppButton(
-                      label: 'إضافة عميل',
+                      label: AppStrings.addCustomer,
                       icon: Icons.add,
                       onPressed: () => _showAddCustomerDialog(context),
                     ),
@@ -110,7 +101,7 @@ class _CustomersViewState extends State<_CustomersView> {
             // Search Bar
             AppTextField(
               controller: _searchController,
-              hintText: 'بحث باسم العميل أو رقم الهاتف...',
+              hintText: AppStrings.searchCustomerPlaceholder,
               prefixIcon: const Icon(Icons.search),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
@@ -139,7 +130,7 @@ class _CustomersViewState extends State<_CustomersView> {
 
                   if (state.errorMessage != null && state.customers.isEmpty) {
                     return AppErrorState(
-                      title: 'تعذر تحميل العملاء',
+                      title: AppStrings.failedToLoadCustomers,
                       message: state.errorMessage!,
                       onRetry: () => cubit.loadCustomers(refresh: true),
                     );
@@ -150,14 +141,14 @@ class _CustomersViewState extends State<_CustomersView> {
                     return EmptyState(
                       icon: isSearching ? Icons.search_off : Icons.people_outline,
                       title: isSearching
-                          ? 'لا توجد نتائج مطابقة'
-                          : 'لا يوجد عملاء حتى الآن',
+                          ? AppStrings.noMatchingResults
+                          : AppStrings.noCustomersYet,
                       message: isSearching
-                          ? 'لم يتم العثور على عملاء مطابقين لنص البحث.'
-                          : 'قم بإضافة عميلك الأول لبدء إدارة الطلبات.',
+                          ? AppStrings.noMatchingCustomersMessage
+                          : AppStrings.addFirstCustomerPrompt,
                       actionButton: isSearching
                           ? AppButton(
-                              label: 'مسح البحث',
+                              label: AppStrings.clearSearch,
                               variant: AppButtonVariant.secondary,
                               onPressed: () {
                                 _searchController.clear();
@@ -166,7 +157,7 @@ class _CustomersViewState extends State<_CustomersView> {
                               },
                             )
                           : AppButton(
-                              label: 'إضافة عميل',
+                              label: AppStrings.addCustomer,
                               icon: Icons.add,
                               onPressed: () => _showAddCustomerDialog(context),
                             ),
@@ -180,28 +171,54 @@ class _CustomersViewState extends State<_CustomersView> {
 
                       return RefreshIndicator(
                         onRefresh: () => cubit.loadCustomers(refresh: true),
-                        child: GridView.builder(
+                        child: CustomScrollView(
                           physics: const AlwaysScrollableScrollPhysics(),
-                          itemCount: state.customers.length,
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: crossAxisCount,
-                            crossAxisSpacing: AppSpacing.md,
-                            mainAxisSpacing: AppSpacing.sm,
-                            mainAxisExtent: 88,
-                          ),
-                          itemBuilder: (context, index) {
-                            final item = state.customers[index];
-                            return CustomerCard(
-                              item: item,
-                              onTap: () {
-                                context
-                                    .push(AppRoutes.customerDetailPath(item.customer.id))
-                                    .then((_) {
-                                  if (mounted) cubit.loadCustomers();
-                                });
-                              },
-                            );
-                          },
+                          slivers: [
+                            SliverGrid(
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: crossAxisCount,
+                                crossAxisSpacing: AppSpacing.md,
+                                mainAxisSpacing: AppSpacing.sm,
+                                mainAxisExtent: 88,
+                              ),
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  final item = state.customers[index];
+                                  return CustomerCard(
+                                    item: item,
+                                    onTap: () {
+                                      context
+                                          .push(AppRoutes.customerDetailPath(
+                                              item.customer.id))
+                                          .then((_) {
+                                        if (mounted) cubit.loadCustomers();
+                                      });
+                                    },
+                                  );
+                                },
+                                childCount: state.customers.length,
+                              ),
+                            ),
+                            if (state.hasMoreCustomers)
+                              SliverToBoxAdapter(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: AppSpacing.lg),
+                                  child: Center(
+                                    child: AppButton(
+                                      label: AppStrings.loadMoreCustomers,
+                                      variant: AppButtonVariant.secondary,
+                                      icon: Icons.expand_more,
+                                      isLoading: state.isLoadingMore,
+                                      onPressed: state.isLoadingMore
+                                          ? null
+                                          : () => cubit.loadMoreCustomers(),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       );
                     },

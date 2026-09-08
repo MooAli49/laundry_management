@@ -88,7 +88,7 @@ class DuplicateCustomerPhoneFailure extends ValidationFailure {
   final String? phone;
 
   const DuplicateCustomerPhoneFailure([
-    super.message = 'يوجد عميل مسجل بهذا الرقم',
+    super.message = AppStrings.duplicateCustomerPhone,
     this.phone,
   ]);
 }

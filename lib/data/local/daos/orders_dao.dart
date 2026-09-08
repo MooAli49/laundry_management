@@ -233,17 +233,26 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     return result ?? 0;
   }
 
-  Future<Map<String, int>> getOrderCountsGroupedByCustomer() async {
+  Future<Map<String, int>> getOrderCountsGroupedByCustomer({List<String>? customerIds}) async {
+    if (customerIds != null && customerIds.isEmpty) return {};
     final countExp = db.orders.id.count();
     final query = selectOnly(db.orders)
-      ..addColumns([db.orders.customerId, countExp])
-      ..groupBy([db.orders.customerId]);
+      ..addColumns([db.orders.customerId, countExp]);
+    if (customerIds != null) {
+      query.where(db.orders.customerId.isIn(customerIds));
+    }
+    query.groupBy([db.orders.customerId]);
     final rows = await query.get();
     return {
       for (final row in rows)
         if (row.read(db.orders.customerId) != null)
           row.read(db.orders.customerId)!: row.read(countExp) ?? 0,
     };
+  }
+
+  Future<Map<String, int>> getOrderCountsByCustomerIds(List<String> customerIds) async {
+    if (customerIds.isEmpty) return {};
+    return getOrderCountsGroupedByCustomer(customerIds: customerIds);
   }
 
   Future<List<app_db.Order>> getOrdersByIds(List<String> orderIds) async {

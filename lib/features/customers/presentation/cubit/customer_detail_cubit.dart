@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/errors/failures.dart';
 import '../../../../core/localization/app_strings.dart';
+import '../../../../domain/entities/customer.dart';
 import '../../../../domain/repositories/customer_repository.dart';
 import '../../../../domain/repositories/order_repository.dart';
 import '../../../../domain/repositories/payment_repository.dart';
@@ -34,7 +35,7 @@ class CustomerDetailCubit extends Cubit<CustomerDetailState> {
         if (isClosed) return;
         emit(state.copyWith(
           isLoading: false,
-          errorMessage: 'العميل غير موجود',
+          errorMessage: AppStrings.customerNotFound,
         ));
         return;
       }
@@ -145,7 +146,7 @@ class CustomerDetailCubit extends Cubit<CustomerDetailState> {
       emit(state.copyWith(
         isSaving: false,
         data: state.data!.copyWith(customer: saved),
-        actionSuccessMessage: 'تم تحديث بيانات العميل بنجاح',
+        actionSuccessMessage: AppStrings.customerUpdatedSuccessfully,
       ));
       return true;
     } on Failure catch (e) {
@@ -163,5 +164,9 @@ class CustomerDetailCubit extends Cubit<CustomerDetailState> {
       ));
       return false;
     }
+  }
+
+  Future<Customer?> getCustomerByPhone(String phone) {
+    return _customerRepository.getCustomerByPhone(phone);
   }
 }

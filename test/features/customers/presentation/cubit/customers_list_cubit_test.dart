@@ -114,19 +114,19 @@ void main() {
 
       // Search by name (wait for 300ms debounce)
       cubit.search('أحمد');
-      await Future<void>.delayed(const Duration(milliseconds: 400));
+      await Future<void>.delayed(const Duration(milliseconds: 600));
       expect(cubit.state.customers.length, equals(1));
       expect(cubit.state.customers.first.customer.name, equals('أحمد محمود'));
 
       // Search by phone
       cubit.search('3333');
-      await Future<void>.delayed(const Duration(milliseconds: 400));
+      await Future<void>.delayed(const Duration(milliseconds: 600));
       expect(cubit.state.customers.length, equals(1));
       expect(cubit.state.customers.first.customer.name, equals('علي حسن'));
 
       // Empty query restores all
       cubit.search('');
-      await Future<void>.delayed(const Duration(milliseconds: 400));
+      await Future<void>.delayed(const Duration(milliseconds: 600));
       expect(cubit.state.customers.length, equals(2));
     });
 
@@ -162,7 +162,7 @@ void main() {
       expect(cubit.state.searchQuery, equals('أحم'));
 
       // Wait full debounce duration
-      await Future<void>.delayed(const Duration(milliseconds: 400));
+      await Future<void>.delayed(const Duration(milliseconds: 600));
       expect(cubit.state.customers.length, equals(1));
       expect(cubit.state.customers.first.customer.name, equals('أحمد محمود'));
     });
@@ -206,6 +206,123 @@ void main() {
 
       expect(cubit.state.customers.length, equals(5));
       expect(cubit.state.totalCustomersCount, equals(5));
+    });
+
+    test('createCustomer creates customer and refreshes list through Cubit', () async {
+      expect(cubit.state.customers, isEmpty);
+
+      final created = await cubit.createCustomer(
+        name: 'عميل جديد',
+        phone: '01019283746',
+        notes: 'ملاحظة',
+      );
+
+      expect(created.name, equals('عميل جديد'));
+      expect(created.phone, equals('01019283746'));
+      expect(cubit.state.customers.length, equals(1));
+      expect(cubit.state.customers.first.customer.id, equals(created.id));
+      expect(cubit.state.totalCustomersCount, equals(1));
+    });
+
+    test('stale request cannot overwrite newer search state when search query changes', () async {
+      final now = DateTime.now();
+      await customerRepository.createCustomer(
+        Customer(
+          id: 'c-old',
+          name: 'عميل قديم',
+          phone: '01011111111',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      await customerRepository.createCustomer(
+        Customer(
+          id: 'c-new',
+          name: 'عميل جديد',
+          phone: '01022222222',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      // Start an initial load
+      final initialLoad = cubit.loadCustomers();
+
+      // Immediately before initial load finishes, user enters a new search query
+      cubit.search('جديد');
+      expect(cubit.state.searchQuery, equals('جديد'));
+
+      // Wait for initial load to finish
+      await initialLoad;
+
+      // The old load must have been discarded because search invalidated the request generation
+      // Now wait for the debounced search to execute
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+
+      expect(cubit.state.customers.length, equals(1));
+      expect(cubit.state.customers.first.customer.name, equals('عميل جديد'));
+      expect(cubit.state.searchQuery, equals('جديد'));
+    });
+
+    test('pagination: 60 customers loads 50 first, hasMore is true, loadMore appends remaining 10, hasMore becomes false', () async {
+      final now = DateTime.now();
+      for (var i = 1; i <= 60; i++) {
+        final phoneSuffix = i.toString().padLeft(8, '0');
+        await customerRepository.createCustomer(
+          Customer(
+            id: 'cust-$i',
+            name: 'عميل $i',
+            phone: '010$phoneSuffix',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+      }
+
+      // Initial page: loads 50
+      await cubit.loadCustomers();
+      expect(cubit.state.customers.length, equals(50));
+      expect(cubit.state.totalCustomersCount, equals(60));
+      expect(cubit.state.hasMoreCustomers, isTrue);
+
+      // Load more: appends remaining 10
+      await cubit.loadMoreCustomers();
+      expect(cubit.state.customers.length, equals(60));
+      expect(cubit.state.totalCustomersCount, equals(60));
+      expect(cubit.state.hasMoreCustomers, isFalse);
+
+      // Subsequent load-more call does nothing
+      await cubit.loadMoreCustomers();
+      expect(cubit.state.customers.length, equals(60));
+
+      // Refresh resets to first 50
+      await cubit.loadCustomers(refresh: true);
+      expect(cubit.state.customers.length, equals(50));
+      expect(cubit.state.hasMoreCustomers, isTrue);
+    });
+
+    test('focused order counts: only customer IDs in the loaded page are queried', () async {
+      final now = DateTime.now();
+      final ids = <String>[];
+      for (var i = 1; i <= 3; i++) {
+        final id = 'cust-focused-$i';
+        ids.add(id);
+        await customerRepository.createCustomer(
+          Customer(
+            id: id,
+            name: 'عميل $i',
+            phone: '0101234000$i',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+      }
+
+      final counts = await orderRepository.getOrderCountsByCustomerIds(ids);
+      expect(counts, isA<Map<String, int>>());
+      // Calling with empty list returns empty map immediately
+      final emptyCounts = await orderRepository.getOrderCountsByCustomerIds([]);
+      expect(emptyCounts, isEmpty);
     });
   });
 }

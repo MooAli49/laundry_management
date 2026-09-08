@@ -655,6 +655,17 @@ class OrderRepositoryImpl implements OrderRepository {
   }
 
   @override
+  Future<Map<String, int>> getOrderCountsByCustomerIds(List<String> customerIds) async {
+    try {
+      if (customerIds.isEmpty) return {};
+      return await _ordersDao.getOrderCountsByCustomerIds(customerIds);
+    } catch (e) {
+      if (e is Failure) rethrow;
+      throw DatabaseFailure(e.toString());
+    }
+  }
+
+  @override
   Future<CustomerOrderAggregate> getCustomerOrderAggregate(String customerId) async {
     try {
       final res = await _ordersDao.getCustomerOrderAggregate(customerId);
