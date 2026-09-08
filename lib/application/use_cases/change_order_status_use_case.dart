@@ -63,10 +63,15 @@ class ChangeOrderStatusUseCase {
 
       case OrderStatus.ready:
         if (input.newStatus == OrderStatus.processing) {
+          if (input.reason == null || input.reason!.trim().isEmpty) {
+            throw const ValidationFailure(
+              'Operational reason is required to correct Ready order back to Processing',
+            );
+          }
           return await _orderRepository.correctOrderStatus(
             orderId: input.orderId,
             newStatus: OrderStatus.processing,
-            reason: input.reason?.trim(),
+            reason: input.reason!.trim(),
           );
         } else if (input.newStatus == OrderStatus.cancelled) {
           if (input.reason == null || input.reason!.trim().isEmpty) {

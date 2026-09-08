@@ -36,13 +36,13 @@ void main() {
     });
 
     test('AppColors defines required status and brand tokens', () {
-      expect(AppColors.primary, equals(const Color(0xFF2563EB)));
-      expect(AppColors.secondary, equals(const Color(0xFF0F172A)));
-      expect(AppColors.success, equals(const Color(0xFF16A34A)));
-      expect(AppColors.warning, equals(const Color(0xFFD97706)));
-      expect(AppColors.error, equals(const Color(0xFFDC2626)));
-      expect(AppColors.disabledBackground, equals(const Color(0xFFF1F5F9)));
-      expect(AppColors.disabledBorder, equals(const Color(0xFFCBD5E1)));
+      expect(AppColors.primary, equals(const Color(0xFF0F766E)));
+      expect(AppColors.secondary, equals(const Color(0xFFEEF1F3)));
+      expect(AppColors.success, equals(const Color(0xFF1F8A4C)));
+      expect(AppColors.warning, equals(const Color(0xFFB9770F)));
+      expect(AppColors.error, equals(const Color(0xFFC62828)));
+      expect(AppColors.disabledBackground, equals(const Color(0xFFEEF1F3)));
+      expect(AppColors.disabledBorder, equals(const Color(0xFFCDD4DA)));
     });
 
     test('AppSpacing includes extended section, page, and major tokens', () {

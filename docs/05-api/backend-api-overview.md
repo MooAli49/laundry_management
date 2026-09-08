@@ -257,11 +257,11 @@ This applies to:
 
 The approved Order Number format is:
 
-    YYMMDD-XXX
+    YY-XXX
 
 Example:
 
-    260825-001
+    26-001
 
 The Order Number is separate from:
 
@@ -482,13 +482,12 @@ The Payment ID is the stable business entity identity.
 The backend must enforce:
 
 - Valid Order ID
-- Positive Payment amount
+- Strictly positive Payment amount (amount > 0)
+- Payment amount cannot exceed the order's current remaining balance (amount <= remaining)
 - Supported Payment Method
 - Stable Payment ID
 - No duplicate Payment ID
 - Valid monetary representation
-
-The backend should also enforce the approved rule that a payment must not exceed the current remaining amount where the API contract requires server-side payment validation.
 
 ---
 

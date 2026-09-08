@@ -261,7 +261,7 @@ void main() {
       );
     });
 
-    test('rejects storage location incompatible with item type', () async {
+    test('rejects storage location incompatible with item type with Arabic user message', () async {
       expect(
         () => useCase.execute(
           const StoreOrderItemsInput(
@@ -270,7 +270,10 @@ void main() {
             storageLocationId: 'loc-carpet-only',
           ),
         ),
-        throwsA(isA<IncompatibleStorageLocationFailure>()),
+        throwsA(
+          isA<IncompatibleStorageLocationFailure>()
+              .having((e) => e.message, 'message', equals('الموقع المحدد غير متوافق مع نوع العنصر')),
+        ),
       );
     });
 

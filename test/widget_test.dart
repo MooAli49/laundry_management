@@ -1,11 +1,14 @@
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/app.dart';
 import 'package:laundry_management/core/constants/app_constants.dart';
+import 'package:laundry_management/core/di/injection.dart';
 import 'package:laundry_management/core/localization/app_strings.dart';
 import 'package:laundry_management/core/routing/app_router.dart';
 import 'package:laundry_management/core/routing/app_routes.dart';
 import 'package:laundry_management/core/widgets/app_shell.dart';
+import 'package:laundry_management/data/local/database/app_database.dart';
 import 'package:laundry_management/features/customers/presentation/screens/customers_screen.dart';
 import 'package:laundry_management/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:laundry_management/features/orders/presentation/screens/orders_screen.dart';
@@ -14,6 +17,21 @@ import 'package:laundry_management/features/settings/presentation/screens/settin
 import 'package:laundry_management/features/storage/presentation/screens/storage_screen.dart';
 
 void main() {
+  setUp(() async {
+    await getIt.reset();
+    getIt.registerLazySingleton<AppDatabase>(
+      () => AppDatabase(NativeDatabase.memory()),
+    );
+    await initDependencies();
+  });
+
+  tearDown(() async {
+    if (getIt.isRegistered<AppDatabase>()) {
+      await getIt<AppDatabase>().close();
+    }
+    await getIt.reset();
+  });
+
   group('Foundation App Bootstrap & Navigation Tests', () {
     testWidgets(
       'boots app, verifies RTL directionality, and renders dashboard',
@@ -34,36 +52,54 @@ void main() {
     );
 
     testWidgets(
-      'renders all six primary navigation destinations in NavigationRail',
+      'renders all six primary navigation destinations in AppSidebar',
       (WidgetTester tester) async {
         await tester.pumpWidget(const LaundryManagementApp());
         await tester.pumpAndSettle();
 
-        final railFinder = find.byType(NavigationRail);
+        final navFinder = find.byType(AppSidebar);
 
-        // Verify the 6 primary destinations in Arabic inside NavigationRail
+        // Verify the 6 primary destinations in Arabic inside AppSidebar
         expect(
-          find.descendant(of: railFinder, matching: find.text(AppStrings.dashboard)),
+          find.descendant(
+            of: navFinder,
+            matching: find.text(AppStrings.dashboard),
+          ),
           findsOneWidget,
         );
         expect(
-          find.descendant(of: railFinder, matching: find.text(AppStrings.orders)),
+          find.descendant(
+            of: navFinder,
+            matching: find.text(AppStrings.orders),
+          ),
           findsOneWidget,
         );
         expect(
-          find.descendant(of: railFinder, matching: find.text(AppStrings.customers)),
+          find.descendant(
+            of: navFinder,
+            matching: find.text(AppStrings.customers),
+          ),
           findsOneWidget,
         );
         expect(
-          find.descendant(of: railFinder, matching: find.text(AppStrings.storage)),
+          find.descendant(
+            of: navFinder,
+            matching: find.text(AppStrings.storage),
+          ),
           findsOneWidget,
         );
         expect(
-          find.descendant(of: railFinder, matching: find.text(AppStrings.reports)),
+          find.descendant(
+            of: navFinder,
+            matching: find.text(AppStrings.reports),
+          ),
           findsOneWidget,
         );
         expect(
-          find.descendant(of: railFinder, matching: find.text(AppStrings.settings)),
+          find.descendant(
+            of: navFinder,
+            matching: find.text(AppStrings.settings),
+          ),
           findsOneWidget,
         );
       },
@@ -75,7 +111,7 @@ void main() {
       await tester.pumpWidget(const LaundryManagementApp());
       await tester.pumpAndSettle();
 
-      final railFinder = find.byType(NavigationRail);
+      final navFinder = find.byType(AppSidebar);
 
       // Helper to check GoRouter current path
       String currentPath() =>
@@ -87,7 +123,7 @@ void main() {
 
       // 1. Navigate to Orders
       await tester.tap(
-        find.descendant(of: railFinder, matching: find.text(AppStrings.orders)),
+        find.descendant(of: navFinder, matching: find.text(AppStrings.orders)),
       );
       await tester.pumpAndSettle();
       expect(currentPath(), equals(AppRoutes.orders));
@@ -95,7 +131,10 @@ void main() {
 
       // 2. Navigate to Customers
       await tester.tap(
-        find.descendant(of: railFinder, matching: find.text(AppStrings.customers)),
+        find.descendant(
+          of: navFinder,
+          matching: find.text(AppStrings.customers),
+        ),
       );
       await tester.pumpAndSettle();
       expect(currentPath(), equals(AppRoutes.customers));
@@ -103,7 +142,7 @@ void main() {
 
       // 3. Navigate to Storage
       await tester.tap(
-        find.descendant(of: railFinder, matching: find.text(AppStrings.storage)),
+        find.descendant(of: navFinder, matching: find.text(AppStrings.storage)),
       );
       await tester.pumpAndSettle();
       expect(currentPath(), equals(AppRoutes.storage));
@@ -111,7 +150,7 @@ void main() {
 
       // 4. Navigate to Reports
       await tester.tap(
-        find.descendant(of: railFinder, matching: find.text(AppStrings.reports)),
+        find.descendant(of: navFinder, matching: find.text(AppStrings.reports)),
       );
       await tester.pumpAndSettle();
       expect(currentPath(), equals(AppRoutes.reports));
@@ -119,7 +158,10 @@ void main() {
 
       // 5. Navigate to Settings
       await tester.tap(
-        find.descendant(of: railFinder, matching: find.text(AppStrings.settings)),
+        find.descendant(
+          of: navFinder,
+          matching: find.text(AppStrings.settings),
+        ),
       );
       await tester.pumpAndSettle();
       expect(currentPath(), equals(AppRoutes.settings));
@@ -127,11 +169,32 @@ void main() {
 
       // 6. Navigate back to Dashboard
       await tester.tap(
-        find.descendant(of: railFinder, matching: find.text(AppStrings.dashboard)),
+        find.descendant(
+          of: navFinder,
+          matching: find.text(AppStrings.dashboard),
+        ),
       );
       await tester.pumpAndSettle();
       expect(currentPath(), equals(AppRoutes.dashboard));
       expect(find.byType(DashboardScreen), findsOneWidget);
     });
+
+    testWidgets(
+      'renders AppSidebar on constrained height viewport without overflowing',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(800, 381);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        await tester.pumpWidget(const LaundryManagementApp());
+        await tester.pumpAndSettle();
+
+        expect(find.byType(AppSidebar), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }

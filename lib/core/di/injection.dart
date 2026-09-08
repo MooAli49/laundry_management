@@ -14,6 +14,7 @@ import '../../data/local/daos/storage_locations_dao.dart';
 import '../../data/local/daos/storage_records_dao.dart';
 import '../../data/local/daos/sync_operations_dao.dart';
 import '../../data/local/database/app_database.dart';
+import '../../data/local/database/dev_test_data.dart';
 import '../../data/repositories/carpet_size_repository_impl.dart';
 import '../../data/repositories/customer_repository_impl.dart';
 import '../../data/repositories/expense_category_repository_impl.dart';
@@ -44,10 +45,13 @@ import '../../application/use_cases/move_stored_item_use_case.dart';
 import '../../application/use_cases/store_order_items_use_case.dart';
 import '../../domain/repositories/storage_location_repository.dart';
 import '../../domain/repositories/storage_repository.dart';
+import '../../features/orders/presentation/cubit/create_order_cubit.dart';
+import '../../features/orders/presentation/cubit/order_detail_cubit.dart';
+import '../../features/orders/presentation/cubit/orders_list_cubit.dart';
 
 final getIt = GetIt.instance;
 
-Future<void> initDependencies() async {
+Future<void> initDependencies({bool? enableDevTestData}) async {
   // 1. Core Local Database
   if (!getIt.isRegistered<AppDatabase>()) {
     getIt.registerLazySingleton<AppDatabase>(() => AppDatabase());
@@ -255,6 +259,52 @@ Future<void> initDependencies() async {
     getIt.registerLazySingleton<CancelOrderUseCase>(
       () => CancelOrderUseCase(getIt<OrderRepository>()),
     );
+  }
+
+  // 5. Presentation Cubits
+  if (!getIt.isRegistered<OrdersListCubit>()) {
+    getIt.registerFactory<OrdersListCubit>(
+      () => OrdersListCubit(
+        orderRepository: getIt<OrderRepository>(),
+        customerRepository: getIt<CustomerRepository>(),
+        paymentRepository: getIt<PaymentRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<CreateOrderCubit>()) {
+    getIt.registerFactory<CreateOrderCubit>(
+      () => CreateOrderCubit(
+        customerRepository: getIt<CustomerRepository>(),
+        itemTypeRepository: getIt<ItemTypeRepository>(),
+        itemDefinitionRepository: getIt<ItemDefinitionRepository>(),
+        serviceRepository: getIt<ServiceRepository>(),
+        carpetSizeRepository: getIt<CarpetSizeRepository>(),
+        settingsRepository: getIt<SettingsRepository>(),
+        createOrderUseCase: getIt<CreateOrderUseCase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<OrderDetailCubit>()) {
+    getIt.registerFactory<OrderDetailCubit>(
+      () => OrderDetailCubit(
+        orderRepository: getIt<OrderRepository>(),
+        customerRepository: getIt<CustomerRepository>(),
+        paymentRepository: getIt<PaymentRepository>(),
+        storageRepository: getIt<StorageRepository>(),
+        storageLocationRepository: getIt<StorageLocationRepository>(),
+        settingsRepository: getIt<SettingsRepository>(),
+        storeOrderItemsUseCase: getIt<StoreOrderItemsUseCase>(),
+        changeOrderStatusUseCase: getIt<ChangeOrderStatusUseCase>(),
+        completeOrderUseCase: getIt<CompleteOrderUseCase>(),
+        cancelOrderUseCase: getIt<CancelOrderUseCase>(),
+      ),
+    );
+  }
+
+  // 6. Optional Dev / Test Data seeding (Strictly gated by flag or parameter)
+  final shouldSeedDevData = enableDevTestData ?? DevTestData.isEnabled;
+  if (shouldSeedDevData) {
+    await DevTestData.seedDevData(getIt<AppDatabase>());
   }
 }
 

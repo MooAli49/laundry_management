@@ -241,7 +241,7 @@ void main() {
           createdAt: now,
           updatedAt: now,
         ),
-        supportedItemTypeIds: [],
+        supportedItemTypeIds: [item.itemTypeId],
       );
       await storageRepository.storeItem(
         orderItemId: 'item-2',
@@ -277,6 +277,34 @@ void main() {
           handoverConfirmed: false,
         ),
         throwsA(isA<BusinessRuleFailure>()),
+      );
+
+      // Attempt completeOrder without paying remaining balance -> rejected
+      expect(
+        () => orderRepository.completeOrder(
+          orderId: 'ord-2',
+          handoverConfirmed: true,
+        ),
+        throwsA(
+          isA<BusinessRuleFailure>().having(
+            (e) => e.message,
+            'message',
+            contains('remaining balance'),
+          ),
+        ),
+      );
+
+      // Pay remaining balance
+      await paymentRepository.recordPayment(
+        Payment(
+          id: 'pay-2',
+          orderId: 'ord-2',
+          amount: const Money.fromPiastres(1000),
+          paymentMethod: PaymentMethod.cash,
+          paidAt: now,
+          createdAt: now,
+          updatedAt: now,
+        ),
       );
 
       // Complete order with handover confirmed -> allowed
@@ -442,6 +470,17 @@ void main() {
       );
       await orderRepository.createOrder(order: order, items: [item]);
       await orderRepository.markOrderReady('ord-4');
+      await paymentRepository.recordPayment(
+        Payment(
+          id: 'pay-4',
+          orderId: 'ord-4',
+          amount: const Money.fromPiastres(2000),
+          paymentMethod: PaymentMethod.cash,
+          paidAt: now,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
       await orderRepository.completeOrder(orderId: 'ord-4', handoverConfirmed: true);
 
       // Correct order status back to processing
@@ -557,13 +596,14 @@ void main() {
   group('StorageRepositoryImpl Move and Bulk Store', () {
     test('moveItem deactivates old location and activates new location', () async {
       final now = DateTime.now();
+      final itemTypes = await db.select(db.itemTypes).get();
       await storageLocationRepository.createStorageLocation(
         StorageLocation(id: 'loc-A', name: 'رف A', createdAt: now, updatedAt: now),
-        supportedItemTypeIds: [],
+        supportedItemTypeIds: [itemTypes.first.id],
       );
       await storageLocationRepository.createStorageLocation(
         StorageLocation(id: 'loc-B', name: 'رف B', createdAt: now, updatedAt: now),
-        supportedItemTypeIds: [],
+        supportedItemTypeIds: [itemTypes.first.id],
       );
 
       // Create prerequisite customer, order, and item
@@ -576,7 +616,6 @@ void main() {
           updatedAt: now,
         ),
       );
-      final itemTypes = await db.select(db.itemTypes).get();
       await servicesDao.insertService(
         db_pkg.ServicesCompanion.insert(
           id: 'srv-100',

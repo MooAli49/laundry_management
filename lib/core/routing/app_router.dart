@@ -4,6 +4,8 @@ import 'package:laundry_management/core/routing/app_routes.dart';
 import 'package:laundry_management/core/widgets/app_shell.dart';
 import 'package:laundry_management/features/customers/presentation/screens/customers_screen.dart';
 import 'package:laundry_management/features/dashboard/presentation/screens/dashboard_screen.dart';
+import 'package:laundry_management/features/orders/presentation/screens/create_order_screen.dart';
+import 'package:laundry_management/features/orders/presentation/screens/order_detail_screen.dart';
 import 'package:laundry_management/features/orders/presentation/screens/orders_screen.dart';
 import 'package:laundry_management/features/reports/presentation/screens/reports_screen.dart';
 import 'package:laundry_management/features/settings/presentation/screens/settings_screen.dart';
@@ -34,6 +36,17 @@ class AppRouter {
           GoRoute(
             path: AppRoutes.orders,
             builder: (context, state) => const OrdersScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.ordersNew,
+            builder: (context, state) => const CreateOrderScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.ordersDetail,
+            builder: (context, state) {
+              final id = state.pathParameters['id'] ?? '';
+              return OrderDetailScreen(orderId: id);
+            },
           ),
           GoRoute(
             path: AppRoutes.customers,

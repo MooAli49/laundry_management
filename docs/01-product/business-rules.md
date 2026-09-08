@@ -162,21 +162,21 @@ Every order must have a unique human-readable Order Number.
 
 The intended format is:
 
-> YYMMDD-XXX
+> YY-XXX
 
 Example:
 
-> 260823-001
+> 26-001
 
 The exact generation mechanism is an implementation detail, but uniqueness is mandatory.
 
 ---
 
-## BR-018 — Order Number Immutability
+## BR-018 — Order Number Immutability & Concurrency Retry
 
-Once an Order Number is assigned, it must not change.
-
-Editing an order must never generate a new Order Number.
+- Once an Order Number is assigned, it must never change. Updating an order must always preserve the existing Order Number, and attempting to mutate it is strictly rejected with a `BusinessRuleFailure`.
+- Final Order Number format is strictly `YY-XXX` (e.g. `26-001`).
+- During order creation, order number collision against the UNIQUE database constraint on `orders.order_number` triggers an immediate rollback and a whole-transaction retry from the beginning (up to 5 attempts), generating a fresh order number.
 
 ---
 
@@ -266,26 +266,53 @@ Example:
 
 ---
 
-## BR-026 — Manual Status Override
+## BR-026 — Status Transitions & Operational Corrections
 
-The user may manually change the order status when necessary to correct an operational mistake according to the approved transition matrix.
+Status changes follow strict operational rules:
 
-- A manual transition from Processing to Ready requires an explicit, non-empty operational override reason.
-- A manual transition from Completed back to Processing requires an explicit, non-empty operational reason.
-- Manual status changes must not automatically alter storage state (e.g., Completed → Processing does not reactivate storage records; items must be explicitly stored again).
-- Ready → Completed is forbidden through manual status override (must go through CompleteOrder workflow with payment and handover validation).
+1. **Processing → Ready**:
+   - Automatic readiness: when all physical OrderItems are stored.
+   - Manual operational override: allowed via `ChangeOrderStatusUseCase` / correction mechanism; requires an explicit, non-empty operational reason. Manual override MUST NOT modify StorageRecords. Existing storage state remains untouched.
+
+2. **Ready → Processing (Operational Correction)**:
+   - Approved operational correction workflow.
+   - Requires an explicit, non-empty operational reason.
+   - Must execute atomically: status becomes `Processing`, and MUST deactivate ALL currently active StorageRecords belonging to the order's physical OrderItems.
+   - Historical StorageRecords remain preserved (`is_active = false`).
+   - Items become unstored, and the user must explicitly store them again. Storage is NOT automatically reactivated.
+
+3. **Processing → Completed & Ready → Completed**:
+   - Strictly FORBIDDEN through generic/manual status change.
+   - Completion is ONLY allowed through `CompleteOrderUseCase` / `OrderRepository.completeOrder` when Ready, remaining == 0, and customer handover is confirmed.
+
+4. **Completed → Processing (Operational Correction)**:
+   - Requires an explicit, non-empty operational reason.
+   - Status becomes `Processing`, and `completedAt` is cleared.
+   - Storage records remain inactive; items must be explicitly stored again if needed.
+
+5. **Cancelled is Terminal**:
+   - Cancelled orders cannot transition to any other status.
+   - Cancellation requires confirmation and non-empty reason.
+   - Deactivates active StorageRecords and preserves payment history without automatic refund.
 
 ---
 
 # 8. Completed Status Rules
 
-## BR-027 — Completion Preconditions
+## BR-027 — Completion Preconditions & Timestamp Model
 
-An order can become Completed only when:
+An order can become Completed ONLY through `CompleteOrderUseCase` when ALL preconditions are met at the database transaction boundary:
+- Order status is `Ready`.
+- Current remaining balance is exactly zero (`remaining == 0`), verified by re-reading payments within the transaction.
+- Explicit customer handover confirmation (`handoverConfirmed == true`).
 
-- Order status is Ready.
-- Remaining payment amount is zero.
-- The user confirms that the order was handed over to the customer.
+Completion atomically:
+- Marks order as `Completed`.
+- Sets `completedAt = now`.
+- Deactivates all active StorageRecords for the order's physical items.
+
+### Customer Handover Timestamp — V1 Option A Decision:
+In V1, completion is atomic with explicit customer handover confirmation. Therefore, `customerHandoverConfirmedAt` is a semantic getter derived from `completedAt`. Both timestamps are semantically identical in V1.
 
 ---
 
@@ -686,9 +713,18 @@ Order Total - Total Paid
 
 ---
 
-## BR-073 — Payment Cannot Exceed Remaining
+## BR-073 — Payment Validation & Restrictions
 
-The system must not allow the user to record a payment greater than the current remaining amount.
+Payment validation is authoritative at the database transaction boundary in `PaymentRepository.recordPayment`:
+1. Verify the order exists (reject with `ValidationFailure`).
+2. Read current order status:
+   - Reject if status is `Completed` (`BusinessRuleFailure`).
+   - Reject if status is `Cancelled` (`BusinessRuleFailure`).
+3. Validate payment amount:
+   - Reject if amount <= 0 (`ValidationFailure`).
+   - Reject if amount > current remaining balance (`BusinessRuleFailure`).
+4. Multiple payments are allowed up to the total order balance.
+5. Payments are immutable historical records once recorded.
 
 ---
 

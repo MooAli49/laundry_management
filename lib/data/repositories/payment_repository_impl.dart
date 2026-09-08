@@ -29,10 +29,27 @@ class PaymentRepositoryImpl implements PaymentRepository {
   @override
   Future<Payment> recordPayment(Payment payment) async {
     try {
+      if (payment.amount.piastres <= 0) {
+        throw const ValidationFailure('Payment amount must be greater than zero');
+      }
+
       return await _db.transaction(() async {
         final order = await _ordersDao.getOrderById(payment.orderId);
         if (order == null) {
-          throw ValidationFailure('Order not found');
+          throw const ValidationFailure('Order not found');
+        }
+
+        if (order.status == 'completed') {
+          throw const BusinessRuleFailure('Cannot record payment for a completed order');
+        }
+        if (order.status == 'cancelled') {
+          throw const BusinessRuleFailure('Cannot record payment for a cancelled order');
+        }
+
+        final paidPiastres = await _paymentsDao.getTotalPaidForOrder(payment.orderId);
+        final remainingPiastres = order.total - paidPiastres;
+        if (payment.amount.piastres > remainingPiastres) {
+          throw const BusinessRuleFailure('Payment amount exceeds remaining order balance');
         }
 
         await _paymentsDao.insertPayment(

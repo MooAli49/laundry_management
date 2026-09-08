@@ -21,13 +21,13 @@ class EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: AppSpacing.paddingXl,
+      child: SingleChildScrollView(
+        padding: AppSpacing.paddingLg,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 64, color: AppColors.textTertiary),
+            Icon(icon, size: 48, color: AppColors.textTertiary),
             AppSpacing.gapMd,
             Text(
               title,

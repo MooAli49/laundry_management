@@ -140,6 +140,25 @@ void main() {
       expect(find.text('جاري تحميل البيانات...'), findsOneWidget);
     });
 
+    testWidgets('LoadingIndicator renders inside tightly constrained container without overflowing', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              height: 40,
+              width: 100,
+              child: LoadingIndicator(),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('AppButton renders destructive, text, outline variants and honors null onPressed', (
       WidgetTester tester,
     ) async {
