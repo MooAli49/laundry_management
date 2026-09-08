@@ -48,6 +48,9 @@ class _OrderItemFormState extends State<OrderItemForm> {
     if (widget.state.draftCarpetWidth > 0) {
       _widthController.text = widget.state.draftCarpetWidth.toString();
     }
+    if (widget.state.draftNotes != null) {
+      _notesController.text = widget.state.draftNotes!;
+    }
   }
 
   @override
@@ -69,6 +72,12 @@ class _OrderItemFormState extends State<OrderItemForm> {
       _widthController.text = widget.state.draftCarpetWidth > 0
           ? widget.state.draftCarpetWidth.toString()
           : '';
+    }
+    if (widget.state.draftNotes != oldWidget.state.draftNotes) {
+      final newNotes = widget.state.draftNotes ?? '';
+      if (_notesController.text != newNotes) {
+        _notesController.text = newNotes;
+      }
     }
   }
 

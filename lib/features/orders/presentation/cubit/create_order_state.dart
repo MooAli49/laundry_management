@@ -138,6 +138,7 @@ class CreateOrderState {
     double? draftCarpetLength,
     double? draftCarpetWidth,
     String? draftNotes,
+    bool clearDraftNotes = false,
     List<OrderItemDraft>? items,
     OrderDate? expectedPickupDate,
     Money? discount,
@@ -178,7 +179,8 @@ class CreateOrderState {
           : (draftCarpetSize ?? this.draftCarpetSize),
       draftCarpetLength: draftCarpetLength ?? this.draftCarpetLength,
       draftCarpetWidth: draftCarpetWidth ?? this.draftCarpetWidth,
-      draftNotes: draftNotes ?? this.draftNotes,
+      draftNotes:
+          clearDraftNotes ? null : (draftNotes ?? this.draftNotes),
       items: items ?? this.items,
       expectedPickupDate: expectedPickupDate ?? this.expectedPickupDate,
       discount: discount ?? this.discount,

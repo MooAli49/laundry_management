@@ -9,8 +9,10 @@ import 'package:laundry_management/domain/enums/payment_method.dart';
 import 'package:laundry_management/domain/enums/pricing_type.dart';
 import 'package:laundry_management/domain/value_objects/money.dart';
 import 'package:laundry_management/domain/value_objects/order_date.dart';
+import 'package:laundry_management/core/theme/app_theme.dart';
 import 'package:laundry_management/features/orders/presentation/models/order_list_filter.dart';
 import 'package:laundry_management/features/orders/presentation/models/order_list_item_view_model.dart';
+import 'package:laundry_management/features/orders/presentation/widgets/add_customer_dialog.dart';
 import 'package:laundry_management/features/orders/presentation/widgets/add_payment_dialog.dart';
 import 'package:laundry_management/features/orders/presentation/widgets/cancel_order_dialog.dart';
 import 'package:laundry_management/features/orders/presentation/widgets/order_card.dart';
@@ -20,6 +22,7 @@ import 'package:laundry_management/features/orders/presentation/widgets/store_it
 
 Widget testBoilerplate(Widget child) {
   return MaterialApp(
+    theme: AppTheme.lightTheme,
     home: Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(body: child),
@@ -257,6 +260,23 @@ void main() {
 
       expect(confirmedItemIds, ['item-clothes-1']);
       expect(confirmedLocationId, 'loc-rack-1');
+    });
+
+    testWidgets('AddCustomerDialog renders in constrained height viewport without overflowing', (tester) async {
+      tester.view.physicalSize = const Size(800, 270);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(testBoilerplate(
+        AddCustomerDialog(onSave: ({required name, required phone, notes}) async {}),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('إضافة عميل جديد'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 }

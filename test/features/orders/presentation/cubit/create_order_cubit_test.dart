@@ -267,5 +267,106 @@ void main() {
         expect(item.calculatedTotal, const Money.fromPiastres(5000));
       }
     });
+
+    test('CreateOrderState.copyWith clearDraftNotes explicitly resets draftNotes to null', () {
+      final stateWithNotes = cubit.state.copyWith(draftNotes: 'بقعة حبر قديمة');
+      expect(stateWithNotes.draftNotes, 'بقعة حبر قديمة');
+
+      // Without clearDraftNotes flag, passing draftNotes: null retains previous value
+      final untouched = stateWithNotes.copyWith(draftNotes: null);
+      expect(untouched.draftNotes, 'بقعة حبر قديمة');
+
+      // With clearDraftNotes: true, draftNotes is explicitly reset to null
+      final cleared = stateWithNotes.copyWith(clearDraftNotes: true);
+      expect(cleared.draftNotes, isNull);
+    });
+
+    test('updateDraftNotes with null explicitly resets draftNotes via clearDraftNotes', () {
+      cubit.updateDraftNotes('ملاحظة أولية');
+      expect(cubit.state.draftNotes, 'ملاحظة أولية');
+
+      cubit.updateDraftNotes(null);
+      expect(cubit.state.draftNotes, isNull);
+    });
+
+    test('addItemDraftToOrder persists notes on added item and resets draftNotes in state', () async {
+      await cubit.initialize();
+      final itemType = cubit.state.itemTypes.first;
+      final service = Service(
+        id: 'srv-notes-1',
+        name: 'كي بالبخار',
+        pricingType: PricingType.perPiece,
+        price: const Money.fromPiastres(3000),
+        isActive: true,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      await serviceRepository.createService(service, supportedItemTypeIds: [itemType.id]);
+
+      await cubit.selectItemType(itemType);
+      cubit.selectService(service);
+      cubit.updateDraftNotes('بقعة زيت على الكم الأيمن');
+
+      expect(cubit.state.draftNotes, 'بقعة زيت على الكم الأيمن');
+
+      cubit.addItemDraftToOrder();
+
+      expect(cubit.state.items.length, 1);
+      final addedItem = cubit.state.items.first;
+      // Notes on the saved draft item remain intact
+      expect(addedItem.notes, 'بقعة زيت على الكم الأيمن');
+      // Draft notes in cubit state are cleared for the next item
+      expect(cubit.state.draftNotes, isNull);
+    });
+
+    test('addItemDraftToOrder prevents note leakage to subsequent items', () async {
+      await cubit.initialize();
+      final itemType = cubit.state.itemTypes.first;
+      final service1 = Service(
+        id: 'srv-leak-1',
+        name: 'غسيل خاص',
+        pricingType: PricingType.perPiece,
+        price: const Money.fromPiastres(4000),
+        isActive: true,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      final service2 = Service(
+        id: 'srv-leak-2',
+        name: 'تنظيف جاف',
+        pricingType: PricingType.perPiece,
+        price: const Money.fromPiastres(6000),
+        isActive: true,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      await serviceRepository.createService(service1, supportedItemTypeIds: [itemType.id]);
+      await serviceRepository.createService(service2, supportedItemTypeIds: [itemType.id]);
+
+      // Add First Item with a specific note
+      await cubit.selectItemType(itemType);
+      cubit.selectService(service1);
+      cubit.updateDraftNotes('ملاحظة خاصة بالقطعة الأولى فقط');
+      cubit.addItemDraftToOrder();
+
+      expect(cubit.state.items.length, 1);
+      expect(cubit.state.items[0].notes, 'ملاحظة خاصة بالقطعة الأولى فقط');
+      expect(cubit.state.draftNotes, isNull);
+
+      // Add Second Item WITHOUT providing notes
+      await cubit.selectItemType(itemType);
+      cubit.selectService(service2);
+      // Ensure we do not set any draft notes for the second item
+      expect(cubit.state.draftNotes, isNull);
+      cubit.addItemDraftToOrder();
+
+      expect(cubit.state.items.length, 2);
+      // First item notes must stay intact
+      expect(cubit.state.items[0].notes, 'ملاحظة خاصة بالقطعة الأولى فقط');
+      // Second item must NOT inherit any notes from the first item
+      expect(cubit.state.items[1].notes, isNull);
+      // State draft notes remains null
+      expect(cubit.state.draftNotes, isNull);
+    });
   });
 }

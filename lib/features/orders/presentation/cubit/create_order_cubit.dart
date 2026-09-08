@@ -225,7 +225,11 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
   }
 
   void updateDraftNotes(String? notes) {
-    emit(state.copyWith(draftNotes: notes));
+    if (notes == null) {
+      emit(state.copyWith(clearDraftNotes: true));
+    } else {
+      emit(state.copyWith(draftNotes: notes));
+    }
   }
 
   void addItemDraftToOrder() {
@@ -280,7 +284,7 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
       clearDraftCarpetSize: true,
       draftCarpetLength: 0.0,
       draftCarpetWidth: 0.0,
-      draftNotes: null,
+      clearDraftNotes: true,
       draftQuantity: 1,
       compatibleServices: [],
       itemDefinitions: [],

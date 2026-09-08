@@ -114,67 +114,80 @@ class AppSidebar extends StatelessWidget {
     return Container(
       width: 220,
       color: AppColors.surface,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              vertical: AppSpacing.lg,
-              horizontal: AppSpacing.md,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight.isFinite ? constraints.maxHeight : 0.0,
+              ),
+              child: IntrinsicHeight(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.lg,
+                        horizontal: AppSpacing.md,
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.local_laundry_service,
+                            color: AppColors.primary,
+                            size: AppSpacing.xxxl,
+                          ),
+                          AppSpacing.gapHorizontalMd,
+                          Expanded(
+                            child: Text(
+                              AppConstants.appName,
+                              style: AppTextStyles.titleLarge,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    AppSpacing.gapSm,
+                    ...List.generate(_destinations.length, (index) {
+                      final destination = _destinations[index];
+                      final isSelected = index == selectedIndex;
+                      return _buildSidebarItem(
+                        context: context,
+                        index: index,
+                        destination: destination,
+                        isSelected: isSelected,
+                      );
+                    }),
+                    const Spacer(),
+                    Padding(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: AppColors.success,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          AppSpacing.gapHorizontalSm,
+                          Text(
+                            'متصل',
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.local_laundry_service,
-                  color: AppColors.primary,
-                  size: AppSpacing.xxxl,
-                ),
-                AppSpacing.gapHorizontalMd,
-                Expanded(
-                  child: Text(
-                    AppConstants.appName,
-                    style: AppTextStyles.titleLarge,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          AppSpacing.gapSm,
-          ...List.generate(_destinations.length, (index) {
-            final destination = _destinations[index];
-            final isSelected = index == selectedIndex;
-            return _buildSidebarItem(
-              context: context,
-              index: index,
-              destination: destination,
-              isSelected: isSelected,
-            );
-          }),
-          const Spacer(),
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: AppColors.success,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                AppSpacing.gapHorizontalSm,
-                Text(
-                  'متصل',
-                  style: AppTextStyles.labelSmall.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

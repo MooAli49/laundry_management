@@ -178,5 +178,23 @@ void main() {
       expect(currentPath(), equals(AppRoutes.dashboard));
       expect(find.byType(DashboardScreen), findsOneWidget);
     });
+
+    testWidgets(
+      'renders AppSidebar on constrained height viewport without overflowing',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(800, 381);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        await tester.pumpWidget(const LaundryManagementApp());
+        await tester.pumpAndSettle();
+
+        expect(find.byType(AppSidebar), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }
