@@ -343,5 +343,164 @@ void main() {
       expect(cubit.state.errorMessage, isNotNull);
       expect(cubit.state.errorMessage, contains('مسجل بهذا الرقم'));
     });
+
+    test('customer with >20 orders has authoritative full aggregate counts, paginated history, and working loadMore', () async {
+      final now = DateTime.now();
+      final customer = await customerRepository.createCustomer(
+        Customer(
+          id: 'cust-many-orders',
+          name: 'عميل الطلبات الكثيرة',
+          phone: '01033334444',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      final itemTypes = await db.select(db.itemTypes).get();
+      final services = await db.select(db.services).get();
+
+      // Create 25 orders:
+      // - 10 processing
+      // - 5 ready
+      // - 7 completed
+      // - 3 cancelled
+      // Total = 25
+      // Active = 15 (10 processing + 5 ready)
+      // Completed = 7
+      // Cancelled = 3
+
+      for (var i = 0; i < 25; i++) {
+        OrderStatus targetStatus;
+        if (i < 10) {
+          targetStatus = OrderStatus.processing;
+        } else if (i < 15) {
+          targetStatus = OrderStatus.ready;
+        } else if (i < 22) {
+          targetStatus = OrderStatus.completed;
+        } else {
+          targetStatus = OrderStatus.cancelled;
+        }
+
+        final order = Order(
+          id: 'ord-many-$i',
+          orderNumber: '26-${(300 + i).toString()}',
+          customerId: customer.id,
+          customerNameSnapshot: customer.name,
+          customerPhoneSnapshot: customer.phone,
+          status: OrderStatus.processing,
+          expectedPickupDate: OrderDate.fromDate(now.add(const Duration(days: 2))),
+          subtotal: const Money.fromPiastres(2000),
+          discount: Money.zero,
+          tax: Money.zero,
+          total: const Money.fromPiastres(2000),
+          createdAt: now.subtract(Duration(minutes: 25 - i)),
+          updatedAt: now,
+        );
+
+        final item = OrderItem(
+          id: 'itm-many-$i',
+          orderId: order.id,
+          itemTypeId: itemTypes.first.id,
+          serviceId: services.first.id,
+          itemTypeNameSnapshot: itemTypes.first.name,
+          serviceNameSnapshot: services.first.name,
+          pricingType: PricingType.fixedPrice,
+          quantity: 1,
+          unitPrice: const Money.fromPiastres(2000),
+          calculatedTotal: const Money.fromPiastres(2000),
+          createdAt: now,
+          updatedAt: now,
+        );
+        await orderRepository.createOrder(order: order, items: [item]);
+
+        int payAmount = 0;
+        if (i < 10) {
+          payAmount = 1000;
+        } else if (i < 22) {
+          payAmount = 2000;
+        } else if (i == 22) {
+          payAmount = 500; // cancelled order with historical payment
+        }
+
+        if (payAmount > 0) {
+          await paymentRepository.recordPayment(Payment(
+            id: 'pay-many-$i',
+            orderId: order.id,
+            amount: Money.fromPiastres(payAmount),
+            paymentMethod: PaymentMethod.cash,
+            paidAt: now,
+            createdAt: now,
+            updatedAt: now,
+          ));
+        }
+
+        if (targetStatus != OrderStatus.processing) {
+          await ordersDao.updateOrderStatus(
+            orderId: order.id,
+            status: targetStatus.name,
+            completedAt: targetStatus == OrderStatus.completed ? now : null,
+            cancelledAt: targetStatus == OrderStatus.cancelled ? now : null,
+            cancellationReason: targetStatus == OrderStatus.cancelled ? 'سبب الإلغاء' : null,
+            updatedAt: now,
+          );
+        }
+      }
+
+      await cubit.loadCustomerDetail(customer.id);
+
+      final data = cubit.state.data!;
+      // 1. Authoritative total order count is the full count (25), NOT 20!
+      expect(data.totalOrdersCount, equals(25));
+      expect(data.aggregate.totalOrders, equals(25));
+
+      // 2. Status counts are full counts across all 25 orders:
+      expect(data.activeOrdersCount, equals(15)); // 10 processing + 5 ready
+      expect(data.completedOrdersCount, equals(7));
+      expect(data.cancelledOrdersCount, equals(3));
+
+      // 3. Financial totals across all orders including cancelled order with payment:
+      expect(data.totalPaid, equals(const Money.fromPiastres(34500)));
+      expect(data.totalRemaining, equals(const Money.fromPiastres(15500)));
+
+      // 4. First history page remains limited to 20 orders:
+      expect(data.orders.length, equals(20));
+      expect(cubit.state.hasMoreOrders, isTrue);
+
+      // 5. Load additional history:
+      await cubit.loadMoreOrders();
+      expect(cubit.state.data!.orders.length, equals(25));
+      expect(cubit.state.hasMoreOrders, isFalse);
+
+      // 6. Verify newest order is first:
+      expect(cubit.state.data!.orders.first.id, equals('ord-many-24'));
+    });
+
+    test('loadCustomerDetail clears actionSuccessMessage on reload', () async {
+      final now = DateTime.now();
+      final customer = await customerRepository.createCustomer(
+        Customer(
+          id: 'cust-msg-1',
+          name: 'عميل الرسائل',
+          phone: '01011110000',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      await cubit.loadCustomerDetail(customer.id);
+      await cubit.updateCustomerInfo(name: 'اسم جديد', phone: '01011110000');
+      expect(cubit.state.actionSuccessMessage, equals('تم تحديث بيانات العميل بنجاح'));
+
+      // Reloading should clear the actionSuccessMessage (one-shot signal)
+      await cubit.loadCustomerDetail(customer.id);
+      expect(cubit.state.actionSuccessMessage, isNull);
+    });
+
+    test('unexpected exceptions emit localized generic Arabic error message', () async {
+      await cubit.loadCustomerDetail('non-existent-id');
+      expect(cubit.state.errorMessage, equals('العميل غير موجود'));
+      expect(cubit.state.errorMessage, isNot(contains('Exception')));
+      expect(cubit.state.errorMessage, isNot(contains('Error')));
+    });
   });
 }

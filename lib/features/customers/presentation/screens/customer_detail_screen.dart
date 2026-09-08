@@ -52,16 +52,11 @@ class _CustomerDetailView extends StatelessWidget {
         return CustomerFormDialog(
           customer: customer,
           onSave: ({required name, required phone, notes}) async {
-            final success = await cubit.updateCustomerInfo(
+            await cubit.updateCustomerInfo(
               name: name,
               phone: phone,
               notes: notes,
             );
-            if (success && context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('تم تحديث بيانات العميل بنجاح')),
-              );
-            }
           },
         );
       },
@@ -287,7 +282,7 @@ class _CustomerDetailView extends StatelessWidget {
 
                   // Order History Section Header
                   Text(
-                    'سجل الطلبات (${data.orders.length})',
+                    'سجل الطلبات (${data.totalOrdersCount})',
                     style: AppTextStyles.titleLarge.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -422,6 +417,18 @@ class _CustomerDetailView extends StatelessWidget {
                         );
                       },
                     ),
+                  if (state.hasMoreOrders) ...[
+                    AppSpacing.gapMd,
+                    Center(
+                      child: AppButton(
+                        label: 'تحميل المزيد من الطلبات',
+                        variant: AppButtonVariant.secondary,
+                        icon: Icons.expand_more,
+                        isLoading: state.isLoadingMore,
+                        onPressed: () => cubit.loadMoreOrders(),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

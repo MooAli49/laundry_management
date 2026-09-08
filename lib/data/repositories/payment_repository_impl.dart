@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../core/errors/failures.dart';
+import '../../domain/entities/order_payment_summary.dart';
 import '../../domain/entities/payment.dart';
 import '../../domain/enums/payment_method.dart';
 import '../../domain/repositories/payment_repository.dart';
@@ -124,6 +125,29 @@ class PaymentRepositoryImpl implements PaymentRepository {
       final paidPiastres = await _paymentsDao.getTotalPaidForOrder(orderId);
       final remaining = order.total - paidPiastres;
       return Money.fromPiastres(remaining);
+    } catch (e) {
+      if (e is Failure) rethrow;
+      throw DatabaseFailure(e.toString());
+    }
+  }
+
+  @override
+  Future<Map<String, OrderPaymentSummary>> getPaymentSummariesForOrders(List<String> orderIds) async {
+    try {
+      if (orderIds.isEmpty) return {};
+      final paidMap = await _paymentsDao.getTotalPaidForOrders(orderIds);
+      final orders = await _ordersDao.getOrdersByIds(orderIds);
+      final summaries = <String, OrderPaymentSummary>{};
+
+      for (final order in orders) {
+        final paidPiastres = paidMap[order.id] ?? 0;
+        final remainingPiastres = order.total - paidPiastres;
+        summaries[order.id] = OrderPaymentSummary(
+          totalPaid: Money.fromPiastres(paidPiastres),
+          remaining: Money.fromPiastres(remainingPiastres > 0 ? remainingPiastres : 0),
+        );
+      }
+      return summaries;
     } catch (e) {
       if (e is Failure) rethrow;
       throw DatabaseFailure(e.toString());

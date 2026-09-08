@@ -237,5 +237,18 @@ void main() {
       final finalTotalPaid = await paymentsDao.getTotalPaidForOrder('ord-active');
       expect(finalTotalPaid, 10000);
     });
+
+    test('getPaymentSummariesForOrders returns batch paid and remaining amounts accurately in a single grouped query', () async {
+      await paymentRepository.recordPayment(
+        createPayment(id: 'pay-batch-1', orderId: 'ord-active', amountPiastres: 4000),
+      );
+
+      final summaries = await paymentRepository.getPaymentSummariesForOrders(['ord-active', 'non-existent']);
+
+      expect(summaries.containsKey('ord-active'), isTrue);
+      expect(summaries['ord-active']!.totalPaid.piastres, equals(4000));
+      expect(summaries['ord-active']!.remaining.piastres, equals(6000));
+      expect(summaries.containsKey('non-existent'), isFalse);
+    });
   });
 }

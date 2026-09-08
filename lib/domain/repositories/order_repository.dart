@@ -1,3 +1,4 @@
+import '../entities/customer_order_aggregate.dart';
 import '../entities/order.dart';
 import '../entities/order_item.dart';
 import '../enums/order_status.dart';
@@ -60,4 +61,6 @@ abstract class OrderRepository {
   Future<int> getOrderCountByCustomerId(String customerId);
 
   Future<Map<String, int>> getOrderCountsByCustomer();
+
+  Future<CustomerOrderAggregate> getCustomerOrderAggregate(String customerId);
 }

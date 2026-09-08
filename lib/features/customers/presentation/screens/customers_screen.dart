@@ -88,11 +88,13 @@ class _CustomersViewState extends State<_CustomersView> {
           children: [
             // Header with "+ إضافة عميل"
             BlocBuilder<CustomersListCubit, CustomersListState>(
-              buildWhen: (prev, curr) => prev.customers.length != curr.customers.length,
+              buildWhen: (prev, curr) =>
+                  prev.totalCustomersCount != curr.totalCustomersCount ||
+                  prev.customers.length != curr.customers.length,
               builder: (context, state) {
                 return PageHeader(
                   title: 'العملاء',
-                  subtitle: 'إجمالي ${state.customers.length} عميل',
+                  subtitle: 'إجمالي ${state.totalCustomersCount} عميل',
                   actions: [
                     AppButton(
                       label: 'إضافة عميل',

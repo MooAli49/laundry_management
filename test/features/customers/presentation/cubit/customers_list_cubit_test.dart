@@ -112,22 +112,100 @@ void main() {
         ),
       );
 
-      // Search by name
+      // Search by name (wait for 300ms debounce)
       cubit.search('أحمد');
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await Future<void>.delayed(const Duration(milliseconds: 400));
       expect(cubit.state.customers.length, equals(1));
       expect(cubit.state.customers.first.customer.name, equals('أحمد محمود'));
 
       // Search by phone
       cubit.search('3333');
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await Future<void>.delayed(const Duration(milliseconds: 400));
       expect(cubit.state.customers.length, equals(1));
       expect(cubit.state.customers.first.customer.name, equals('علي حسن'));
 
       // Empty query restores all
       cubit.search('');
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await Future<void>.delayed(const Duration(milliseconds: 400));
       expect(cubit.state.customers.length, equals(2));
+    });
+
+    test('search debounces rapid input and avoids race conditions', () async {
+      final now = DateTime.now();
+      await customerRepository.createCustomer(
+        Customer(
+          id: 'c1',
+          name: 'أحمد محمود',
+          phone: '01011111111',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      await customerRepository.createCustomer(
+        Customer(
+          id: 'c2',
+          name: 'علي حسن',
+          phone: '01022223333',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      // Rapid keystrokes: 'أ', 'أح', 'أحم'
+      cubit.search('أ');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      cubit.search('أح');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      cubit.search('أحم');
+
+      // State query is updated immediately, but loading is debounced
+      expect(cubit.state.searchQuery, equals('أحم'));
+
+      // Wait full debounce duration
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      expect(cubit.state.customers.length, equals(1));
+      expect(cubit.state.customers.first.customer.name, equals('أحمد محمود'));
+    });
+
+    test('search with Arabic-Indic digits normalizes and finds customer by phone', () async {
+      final now = DateTime.now();
+      await customerRepository.createCustomer(
+        Customer(
+          id: 'c-arabic-phone',
+          name: 'محمود شاكر',
+          phone: '01012345678',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      // Search with Eastern Arabic-Indic numerals: ٠١٠١٢٣٤٥٦٧٨
+      cubit.search('٠١٠١٢٣٤٥٦٧٨');
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+
+      expect(cubit.state.customers.length, equals(1));
+      expect(cubit.state.customers.first.customer.name, equals('محمود شاكر'));
+      expect(cubit.state.customers.first.customer.phone, equals('01012345678'));
+    });
+
+    test('totalCustomersCount reflects authoritative count from repository', () async {
+      final now = DateTime.now();
+      for (var i = 0; i < 5; i++) {
+        await customerRepository.createCustomer(
+          Customer(
+            id: 'c-count-$i',
+            name: 'عميل رقم $i',
+            phone: '0101111000$i',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+      }
+
+      await cubit.loadCustomers();
+
+      expect(cubit.state.customers.length, equals(5));
+      expect(cubit.state.totalCustomersCount, equals(5));
     });
   });
 }

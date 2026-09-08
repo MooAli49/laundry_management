@@ -105,6 +105,7 @@ void main() {
 
       // Search for 'سارة'
       await tester.enterText(find.byType(TextField), 'سارة');
+      await tester.pump(const Duration(milliseconds: 350));
       await tester.pumpAndSettle();
 
       expect(find.byType(CustomerCard), findsOneWidget);
@@ -113,6 +114,7 @@ void main() {
 
       // Search for non-matching
       await tester.enterText(find.byType(TextField), 'لايوجد');
+      await tester.pump(const Duration(milliseconds: 350));
       await tester.pumpAndSettle();
 
       expect(find.byType(CustomerCard), findsNothing);

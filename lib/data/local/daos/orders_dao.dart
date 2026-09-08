@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../database/app_database.dart' as app_db;
+import '../queries/customer_order_aggregate_query_result.dart';
 
 class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
   OrdersDao(super.attachedDatabase);
@@ -243,5 +244,57 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
         if (row.read(db.orders.customerId) != null)
           row.read(db.orders.customerId)!: row.read(countExp) ?? 0,
     };
+  }
+
+  Future<List<app_db.Order>> getOrdersByIds(List<String> orderIds) async {
+    if (orderIds.isEmpty) return [];
+    return (select(db.orders)..where((t) => t.id.isIn(orderIds))).get();
+  }
+
+  Future<CustomerOrderAggregateQueryResult> getCustomerOrderAggregate(String customerId) async {
+    final query = db.customSelect(
+      '''
+      SELECT 
+        COUNT(o.id) AS total_count,
+        COALESCE(SUM(CASE WHEN o.status = 'processing' THEN 1 ELSE 0 END), 0) AS processing_count,
+        COALESCE(SUM(CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END), 0) AS ready_count,
+        COALESCE(SUM(CASE WHEN o.status = 'completed' THEN 1 ELSE 0 END), 0) AS completed_count,
+        COALESCE(SUM(CASE WHEN o.status = 'cancelled' THEN 1 ELSE 0 END), 0) AS cancelled_count,
+        COALESCE(SUM(COALESCE(p.paid_amount, 0)), 0) AS total_paid,
+        COALESCE(SUM(CASE 
+          WHEN o.total > COALESCE(p.paid_amount, 0) THEN o.total - COALESCE(p.paid_amount, 0) 
+          ELSE 0 
+        END), 0) AS total_remaining
+      FROM orders o
+      LEFT JOIN (
+        SELECT order_id, SUM(amount) AS paid_amount
+        FROM payments
+        GROUP BY order_id
+      ) p ON p.order_id = o.id
+      WHERE o.customer_id = ?
+      ''',
+      variables: [Variable.withString(customerId)],
+      readsFrom: {db.orders, db.payments},
+    );
+
+    final row = await query.getSingleOrNull();
+    if (row == null) {
+      return CustomerOrderAggregateQueryResult.empty;
+    }
+
+    final totalCount = row.read<int>('total_count');
+    if (totalCount == 0) {
+      return CustomerOrderAggregateQueryResult.empty;
+    }
+
+    return CustomerOrderAggregateQueryResult(
+      totalOrders: totalCount,
+      processingOrders: row.read<int>('processing_count'),
+      readyOrders: row.read<int>('ready_count'),
+      completedOrders: row.read<int>('completed_count'),
+      cancelledOrders: row.read<int>('cancelled_count'),
+      totalPaidPiastres: row.read<int>('total_paid'),
+      totalRemainingPiastres: row.read<int>('total_remaining'),
+    );
   }
 }

@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import '../../core/errors/failures.dart';
 import '../../domain/entities/carpet_item_data.dart';
+import '../../domain/entities/customer_order_aggregate.dart';
 import '../../domain/entities/order.dart';
 import '../../domain/entities/order_item.dart';
 import '../../domain/enums/order_status.dart';
@@ -647,6 +648,25 @@ class OrderRepositoryImpl implements OrderRepository {
   Future<Map<String, int>> getOrderCountsByCustomer() async {
     try {
       return await _ordersDao.getOrderCountsGroupedByCustomer();
+    } catch (e) {
+      if (e is Failure) rethrow;
+      throw DatabaseFailure(e.toString());
+    }
+  }
+
+  @override
+  Future<CustomerOrderAggregate> getCustomerOrderAggregate(String customerId) async {
+    try {
+      final res = await _ordersDao.getCustomerOrderAggregate(customerId);
+      return CustomerOrderAggregate(
+        totalOrders: res.totalOrders,
+        processingOrders: res.processingOrders,
+        readyOrders: res.readyOrders,
+        completedOrders: res.completedOrders,
+        cancelledOrders: res.cancelledOrders,
+        totalPaid: Money.fromPiastres(res.totalPaidPiastres),
+        totalRemaining: Money.fromPiastres(res.totalRemainingPiastres),
+      );
     } catch (e) {
       if (e is Failure) rethrow;
       throw DatabaseFailure(e.toString());

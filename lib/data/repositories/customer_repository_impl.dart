@@ -92,7 +92,7 @@ class CustomerRepositoryImpl implements CustomerRepository {
       return await _db.transaction(() async {
         final existing = await _customersDao.getCustomerById(normalizedCustomer.id);
         if (existing == null) {
-          throw ValidationFailure('Customer with id ${normalizedCustomer.id} not found');
+          throw const ValidationFailure('العميل غير موجود');
         }
 
         await _customersDao.updateCustomer(
@@ -163,6 +163,16 @@ class CustomerRepositoryImpl implements CustomerRepository {
         offset: offset,
       );
       return rows.map(_mapToDomain).toList();
+    } catch (e) {
+      if (e is Failure) rethrow;
+      throw DatabaseFailure(e.toString());
+    }
+  }
+
+  @override
+  Future<int> getCustomersCount({String? query}) async {
+    try {
+      return await _customersDao.getCustomersCount(query: query);
     } catch (e) {
       if (e is Failure) rethrow;
       throw DatabaseFailure(e.toString());
