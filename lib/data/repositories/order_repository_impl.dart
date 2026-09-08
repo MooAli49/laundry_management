@@ -632,4 +632,24 @@ class OrderRepositoryImpl implements OrderRepository {
       updatedAt: item.updatedAt,
     );
   }
+
+  @override
+  Future<int> getOrderCountByCustomerId(String customerId) async {
+    try {
+      return await _ordersDao.getOrderCountByCustomerId(customerId);
+    } catch (e) {
+      if (e is Failure) rethrow;
+      throw DatabaseFailure(e.toString());
+    }
+  }
+
+  @override
+  Future<Map<String, int>> getOrderCountsByCustomer() async {
+    try {
+      return await _ordersDao.getOrderCountsGroupedByCustomer();
+    } catch (e) {
+      if (e is Failure) rethrow;
+      throw DatabaseFailure(e.toString());
+    }
+  }
 }

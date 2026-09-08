@@ -56,4 +56,8 @@ abstract class OrderRepository {
     required OrderStatus newStatus,
     String? reason,
   });
+
+  Future<int> getOrderCountByCustomerId(String customerId);
+
+  Future<Map<String, int>> getOrderCountsByCustomer();
 }

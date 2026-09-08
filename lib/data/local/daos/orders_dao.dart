@@ -222,4 +222,26 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
       ),
     );
   }
+
+  Future<int> getOrderCountByCustomerId(String customerId) async {
+    final countExp = db.orders.id.count();
+    final query = selectOnly(db.orders)
+      ..where(db.orders.customerId.equals(customerId))
+      ..addColumns([countExp]);
+    final result = await query.map((row) => row.read(countExp)).getSingle();
+    return result ?? 0;
+  }
+
+  Future<Map<String, int>> getOrderCountsGroupedByCustomer() async {
+    final countExp = db.orders.id.count();
+    final query = selectOnly(db.orders)
+      ..addColumns([db.orders.customerId, countExp])
+      ..groupBy([db.orders.customerId]);
+    final rows = await query.get();
+    return {
+      for (final row in rows)
+        if (row.read(db.orders.customerId) != null)
+          row.read(db.orders.customerId)!: row.read(countExp) ?? 0,
+    };
+  }
 }

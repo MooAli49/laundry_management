@@ -113,6 +113,9 @@ One Customer can have multiple Orders.
 
 - Customer name is required.
 - Customer phone number is required.
+- Customer phone number must be a valid Egyptian mobile number (`^01[0125][0-9]{8}$` after normalizing Eastern Arabic-Indic numerals and trimming whitespace).
+- Canonical stored value in the database is the normalized local Egyptian mobile format (11 digits, prefixes: 010, 011, 012, 015).
+- Country code prefixes (+20, 0020) are not accepted.
 - Customer phone number should be unique.
 - Customer information may be edited.
 - Customer history must remain available.

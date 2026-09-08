@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:laundry_management/core/routing/app_routes.dart';
 import 'package:laundry_management/core/widgets/app_shell.dart';
+import 'package:laundry_management/features/customers/presentation/screens/customer_detail_screen.dart';
 import 'package:laundry_management/features/customers/presentation/screens/customers_screen.dart';
 import 'package:laundry_management/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:laundry_management/features/orders/presentation/screens/create_order_screen.dart';
@@ -39,7 +40,9 @@ class AppRouter {
           ),
           GoRoute(
             path: AppRoutes.ordersNew,
-            builder: (context, state) => const CreateOrderScreen(),
+            builder: (context, state) => CreateOrderScreen(
+              initialCustomerId: state.uri.queryParameters['customerId'],
+            ),
           ),
           GoRoute(
             path: AppRoutes.ordersDetail,
@@ -51,6 +54,13 @@ class AppRouter {
           GoRoute(
             path: AppRoutes.customers,
             builder: (context, state) => const CustomersScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.customersDetail,
+            builder: (context, state) {
+              final id = state.pathParameters['id'] ?? '';
+              return CustomerDetailScreen(customerId: id);
+            },
           ),
           GoRoute(
             path: AppRoutes.storage,

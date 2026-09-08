@@ -84,6 +84,15 @@ class IncompatibleStorageLocationFailure extends BusinessRuleFailure {
         );
 }
 
+class DuplicateCustomerPhoneFailure extends ValidationFailure {
+  final String? phone;
+
+  const DuplicateCustomerPhoneFailure([
+    super.message = 'يوجد عميل مسجل بهذا الرقم',
+    this.phone,
+  ]);
+}
+
 class UnexpectedFailure extends Failure {
   const UnexpectedFailure([super.message = AppStrings.unexpectedError]);
 }

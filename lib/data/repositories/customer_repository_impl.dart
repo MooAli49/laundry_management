@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../core/errors/failures.dart';
+import '../../core/utils/phone_utils.dart';
 import '../../domain/entities/customer.dart';
 import '../../domain/repositories/customer_repository.dart';
 import '../local/daos/customers_dao.dart';
@@ -23,30 +24,50 @@ class CustomerRepositoryImpl implements CustomerRepository {
   @override
   Future<Customer> createCustomer(Customer customer) async {
     try {
+      final normalizedPhone = PhoneUtils.normalizePhoneNumber(customer.phone);
+      if (normalizedPhone.isEmpty) {
+        throw const ValidationFailure('رقم الهاتف مطلوب');
+      }
+      if (!PhoneUtils.isValidCustomerPhone(normalizedPhone)) {
+        throw const ValidationFailure('رقم الهاتف غير صحيح');
+      }
+      final existingByPhone = await _customersDao.getCustomerByPhone(normalizedPhone);
+      if (existingByPhone != null) {
+        throw const DuplicateCustomerPhoneFailure();
+      }
+
+      final normalizedCustomer = customer.copyWith(phone: normalizedPhone);
+
       return await _db.transaction(() async {
         await _customersDao.insertCustomer(
           app_db.CustomersCompanion(
-            id: Value(customer.id),
-            name: Value(customer.name),
-            phone: Value(customer.phone),
-            notes: Value(customer.notes),
-            createdAt: Value(customer.createdAt),
-            updatedAt: Value(customer.updatedAt),
+            id: Value(normalizedCustomer.id),
+            name: Value(normalizedCustomer.name),
+            phone: Value(normalizedCustomer.phone),
+            notes: Value(normalizedCustomer.notes),
+            createdAt: Value(normalizedCustomer.createdAt),
+            updatedAt: Value(normalizedCustomer.updatedAt),
           ),
         );
 
         await _syncOperationsDao.recordOperation(
           entityType: 'customer',
-          entityId: customer.id,
+          entityId: normalizedCustomer.id,
           operationType: 'create',
         );
 
-        return customer;
+        return normalizedCustomer;
       });
     } on ArgumentError catch (e) {
       throw ValidationFailure(e.message.toString());
     } catch (e) {
       if (e is Failure) rethrow;
+      final isUniqueViolation = e.toString().toLowerCase().contains('unique') ||
+          e.toString().toLowerCase().contains('sqliteexception(1555)') ||
+          e.toString().toLowerCase().contains('customers.phone');
+      if (isUniqueViolation) {
+        throw const DuplicateCustomerPhoneFailure();
+      }
       throw DatabaseFailure(e.toString());
     }
   }
@@ -54,35 +75,55 @@ class CustomerRepositoryImpl implements CustomerRepository {
   @override
   Future<Customer> updateCustomer(Customer customer) async {
     try {
+      final normalizedPhone = PhoneUtils.normalizePhoneNumber(customer.phone);
+      if (normalizedPhone.isEmpty) {
+        throw const ValidationFailure('رقم الهاتف مطلوب');
+      }
+      if (!PhoneUtils.isValidCustomerPhone(normalizedPhone)) {
+        throw const ValidationFailure('رقم الهاتف غير صحيح');
+      }
+      final existingByPhone = await _customersDao.getCustomerByPhone(normalizedPhone);
+      if (existingByPhone != null && existingByPhone.id != customer.id) {
+        throw const DuplicateCustomerPhoneFailure();
+      }
+
+      final normalizedCustomer = customer.copyWith(phone: normalizedPhone);
+
       return await _db.transaction(() async {
-        final existing = await _customersDao.getCustomerById(customer.id);
+        final existing = await _customersDao.getCustomerById(normalizedCustomer.id);
         if (existing == null) {
-          throw ValidationFailure('Customer with id ${customer.id} not found');
+          throw ValidationFailure('Customer with id ${normalizedCustomer.id} not found');
         }
 
         await _customersDao.updateCustomer(
           app_db.CustomersCompanion(
-            id: Value(customer.id),
-            name: Value(customer.name),
-            phone: Value(customer.phone),
-            notes: Value(customer.notes),
-            createdAt: Value(customer.createdAt),
-            updatedAt: Value(customer.updatedAt),
+            id: Value(normalizedCustomer.id),
+            name: Value(normalizedCustomer.name),
+            phone: Value(normalizedCustomer.phone),
+            notes: Value(normalizedCustomer.notes),
+            createdAt: Value(normalizedCustomer.createdAt),
+            updatedAt: Value(normalizedCustomer.updatedAt),
           ),
         );
 
         await _syncOperationsDao.recordOperation(
           entityType: 'customer',
-          entityId: customer.id,
+          entityId: normalizedCustomer.id,
           operationType: 'update',
         );
 
-        return customer;
+        return normalizedCustomer;
       });
     } on ArgumentError catch (e) {
       throw ValidationFailure(e.message.toString());
     } catch (e) {
       if (e is Failure) rethrow;
+      final isUniqueViolation = e.toString().toLowerCase().contains('unique') ||
+          e.toString().toLowerCase().contains('sqliteexception(1555)') ||
+          e.toString().toLowerCase().contains('customers.phone');
+      if (isUniqueViolation) {
+        throw const DuplicateCustomerPhoneFailure();
+      }
       throw DatabaseFailure(e.toString());
     }
   }

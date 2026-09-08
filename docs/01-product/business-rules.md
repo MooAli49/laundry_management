@@ -80,7 +80,12 @@ Customer name is required.
 
 Customer phone number is required.
 
-The phone number must pass the application's Egyptian phone number validation rules.
+The phone number must pass the application's Egyptian phone number validation rules:
+- Customer phone must be an Egyptian mobile number.
+- Canonical format: `^01[0125][0-9]{8}$` (11 digits, mobile prefixes: 010, 011, 012, 015).
+- Eastern Arabic-Indic digits (٠-٩) are normalized to Western digits (0-9) before validation, along with trimming whitespace.
+- The canonical stored value in the database is the normalized local Egyptian mobile format.
+- Country code prefixes (+20, 0020) are not accepted unless explicitly documented as supported input formats.
 
 ---
 
