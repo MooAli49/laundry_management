@@ -160,12 +160,16 @@ class InvoicePreviewDialog extends StatelessWidget {
                                     style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
                                   ),
                                   Text(
-                                    customer?.name ?? 'عميل غير مسجل',
+                                    order.customerNameSnapshot.isNotEmpty
+                                        ? order.customerNameSnapshot
+                                        : (customer?.name ?? 'عميل غير مسجل'),
                                     style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
                                   ),
-                                  if (customer?.phone != null)
+                                  if (order.customerPhoneSnapshot.isNotEmpty || customer?.phone != null)
                                     Text(
-                                      customer!.phone,
+                                      order.customerPhoneSnapshot.isNotEmpty
+                                          ? order.customerPhoneSnapshot
+                                          : customer!.phone,
                                       style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
                                     ),
                                 ],

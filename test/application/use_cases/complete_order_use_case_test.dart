@@ -67,6 +67,8 @@ void main() {
       id: 'ord-ready-100',
       orderNumber: '26-001',
       customerId: 'cust-1',
+      customerNameSnapshot: 'عميل تجريبي',
+      customerPhoneSnapshot: '01012345678',
       status: OrderStatus.ready,
       expectedPickupDate: OrderDate.today(),
       subtotal: const Money.fromPiastres(10000), // 100 EGP
@@ -79,6 +81,8 @@ void main() {
       id: 'ord-proc',
       orderNumber: '26-002',
       customerId: 'cust-1',
+      customerNameSnapshot: 'عميل تجريبي',
+      customerPhoneSnapshot: '01012345678',
       status: OrderStatus.processing,
       expectedPickupDate: OrderDate.today(),
       subtotal: const Money.fromPiastres(5000),

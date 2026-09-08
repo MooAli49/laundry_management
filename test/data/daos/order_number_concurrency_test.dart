@@ -57,6 +57,8 @@ void main() {
       id: id,
       orderNumber: orderNumber,
       customerId: 'cust-test',
+      customerNameSnapshot: 'عميل التزامن',
+      customerPhoneSnapshot: '01011223344',
       status: OrderStatus.processing,
       expectedPickupDate: OrderDate(2026, 9, 15),
       subtotal: const Money.fromPiastres(2000),

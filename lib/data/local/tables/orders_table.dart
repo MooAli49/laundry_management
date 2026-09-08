@@ -9,6 +9,10 @@ class Orders extends Table {
   TextColumn get orderNumber => text().unique()();
   TextColumn get customerId =>
       text().references(Customers, #id, onDelete: KeyAction.restrict)();
+  TextColumn get customerNameSnapshot =>
+      text().withDefault(const Constant(''))();
+  TextColumn get customerPhoneSnapshot =>
+      text().withDefault(const Constant(''))();
   TextColumn get status => text().withDefault(const Constant('processing'))();
   DateTimeColumn get expectedPickupDate => dateTime()();
   TextColumn get notes => text().nullable()();

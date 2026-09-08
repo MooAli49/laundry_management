@@ -51,7 +51,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -60,7 +60,30 @@ class AppDatabase extends _$AppDatabase {
       await _createIndexes();
     },
     onUpgrade: (Migrator m, int from, int to) async {
-      // Migration foundation prepared for future schema upgrades
+      if (from < 2) {
+        await m.addColumn(orders, orders.customerNameSnapshot);
+        await m.addColumn(orders, orders.customerPhoneSnapshot);
+
+        await customStatement('''
+          UPDATE orders
+          SET customer_name_snapshot =
+                COALESCE(
+                  (SELECT name
+                   FROM customers
+                   WHERE customers.id = orders.customer_id),
+                  ''
+                ),
+              customer_phone_snapshot =
+                COALESCE(
+                  (SELECT phone
+                   FROM customers
+                   WHERE customers.id = orders.customer_id),
+                  ''
+                )
+          WHERE customer_name_snapshot = ''
+             OR customer_name_snapshot IS NULL;
+        ''');
+      }
     },
     beforeOpen: (OpeningDetails details) async {
       await customStatement('PRAGMA foreign_keys = ON;');

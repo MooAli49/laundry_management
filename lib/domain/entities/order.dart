@@ -6,6 +6,8 @@ class Order {
   final String id;
   final String orderNumber;
   final String customerId;
+  final String customerNameSnapshot;
+  final String customerPhoneSnapshot;
   final OrderStatus status;
   final OrderDate expectedPickupDate;
   final String? notes;
@@ -27,6 +29,8 @@ class Order {
     required this.id,
     required this.orderNumber,
     required this.customerId,
+    required this.customerNameSnapshot,
+    required this.customerPhoneSnapshot,
     this.status = OrderStatus.processing,
     required this.expectedPickupDate,
     this.notes,
@@ -105,6 +109,8 @@ class Order {
     String? id,
     String? orderNumber,
     String? customerId,
+    String? customerNameSnapshot,
+    String? customerPhoneSnapshot,
     OrderStatus? status,
     OrderDate? expectedPickupDate,
     String? notes,
@@ -126,6 +132,10 @@ class Order {
       id: id ?? this.id,
       orderNumber: orderNumber ?? this.orderNumber,
       customerId: customerId ?? this.customerId,
+      customerNameSnapshot:
+          customerNameSnapshot ?? this.customerNameSnapshot,
+      customerPhoneSnapshot:
+          customerPhoneSnapshot ?? this.customerPhoneSnapshot,
       status: status ?? this.status,
       expectedPickupDate: expectedPickupDate ?? this.expectedPickupDate,
       notes: notes ?? this.notes,
@@ -155,6 +165,8 @@ class Order {
           id == other.id &&
           orderNumber == other.orderNumber &&
           customerId == other.customerId &&
+          customerNameSnapshot == other.customerNameSnapshot &&
+          customerPhoneSnapshot == other.customerPhoneSnapshot &&
           status == other.status &&
           expectedPickupDate == other.expectedPickupDate &&
           notes == other.notes &&
@@ -173,10 +185,12 @@ class Order {
           updatedAt == other.updatedAt;
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
         id,
         orderNumber,
         customerId,
+        customerNameSnapshot,
+        customerPhoneSnapshot,
         status,
         expectedPickupDate,
         customerPickupRequested,
@@ -192,8 +206,9 @@ class Order {
         cancellationReason,
         createdAt,
         updatedAt,
-      );
+      ]);
 
   @override
-  String toString() => 'Order(id: $id, number: $orderNumber, status: $status, total: $total)';
+  String toString() =>
+      'Order(id: $id, number: $orderNumber, customer: $customerNameSnapshot ($customerPhoneSnapshot), status: $status, total: $total)';
 }

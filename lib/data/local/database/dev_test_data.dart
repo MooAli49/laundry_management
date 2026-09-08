@@ -43,6 +43,21 @@ class DevTestData {
   static const String carpetSize1_5x2Id = '00000000-0000-0000-0007-000000000002';
   static const String carpetSize1x4Id = '00000000-0000-0000-0007-000000000003';
 
+  static const List<String> customerNames = [
+    'أحمد محمود',
+    'محمد علي',
+    'سارة حسن',
+    'خالد إبراهيم',
+    'فاطمة عمر',
+    'عمرو يوسف',
+    'ياسمين طارق',
+    'هشام فوزي',
+    'رانيا مجدي',
+    'كريم مصطفى',
+    'ندى عبد الرحمن',
+    'عمر صلاح',
+  ];
+
   /// Seed development test data idempotently.
   static Future<void> seedDevData(GeneratedDatabase db) async {
     final nowTimestamp = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
@@ -52,20 +67,6 @@ class DevTestData {
     await _seedMasterData(db, nowTimestamp);
 
     // 2. Seed 12 Customers (idempotent)
-    final customerNames = [
-      'أحمد محمود',
-      'محمد علي',
-      'سارة حسن',
-      'خالد إبراهيم',
-      'فاطمة عمر',
-      'عمرو يوسف',
-      'ياسمين طارق',
-      'هشام فوزي',
-      'رانيا مجدي',
-      'كريم مصطفى',
-      'ندى عبد الرحمن',
-      'عمر صلاح',
-    ];
 
     for (var i = 1; i <= 12; i++) {
       final custId = _formatUuid(3, i);
@@ -218,16 +219,24 @@ class DevTestData {
       String? cancellationReason,
     }) async {
       final total = subtotal - discount + customerPickupFee + customerDeliveryFee;
+      final custIndex = int.tryParse(customerId.split('-').last) ?? 1;
+      final custName = (custIndex >= 1 && custIndex <= customerNames.length)
+          ? customerNames[custIndex - 1]
+          : 'عميل تجريبي';
+      final custPhone = '010000000${custIndex.toString().padLeft(2, '0')}';
+
       await db.customStatement(
         'INSERT OR IGNORE INTO orders ('
-        'id, order_number, customer_id, status, expected_pickup_date, notes, '
+        'id, order_number, customer_id, customer_name_snapshot, customer_phone_snapshot, status, expected_pickup_date, notes, '
         'customer_pickup_requested, customer_pickup_fee, customer_delivery_requested, customer_delivery_fee, '
         'subtotal, discount, tax, total, completed_at, cancelled_at, cancellation_reason, created_at, updated_at'
-        ') VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?);',
+        ') VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?);',
         [
           id,
           orderNumber,
           customerId,
+          custName,
+          custPhone,
           status,
           expectedPickupTimestamp,
           'طلب تجريبي $orderNumber',

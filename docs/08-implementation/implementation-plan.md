@@ -637,11 +637,7 @@ Implement:
 
 Format:
 
-YY-XXX
-
-Do not use:
-
-YYMMDD-XXX
+YY-XXX (e.g. 26-001)
 
 ## Order Requirements
 

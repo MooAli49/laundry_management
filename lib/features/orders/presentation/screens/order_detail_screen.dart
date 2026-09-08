@@ -36,13 +36,15 @@ class OrderDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider<OrderDetailCubit>(
       create: (context) => getIt<OrderDetailCubit>()..loadOrderDetail(orderId),
-      child: const _OrderDetailView(),
+      child: _OrderDetailView(orderId: orderId),
     );
   }
 }
 
 class _OrderDetailView extends StatelessWidget {
-  const _OrderDetailView();
+  final String orderId;
+
+  const _OrderDetailView({required this.orderId});
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +90,7 @@ class _OrderDetailView extends StatelessWidget {
             body: AppErrorState(
               title: 'تعذر تحميل بيانات الطلب',
               message: state.errorMessage!,
-              onRetry: () => cubit.loadOrderDetail(state.order?.id ?? ''),
+              onRetry: () => cubit.loadOrderDetail(orderId),
             ),
           );
         }
@@ -393,6 +395,15 @@ class _OrderDetailView extends StatelessWidget {
 
   Widget _buildCustomerCard(BuildContext context, OrderDetailState state) {
     final customer = state.customer;
+    final order = state.order;
+
+    final customerName = (order != null && order.customerNameSnapshot.isNotEmpty)
+        ? order.customerNameSnapshot
+        : (customer?.name ?? 'عميل غير مسجل');
+
+    final customerPhone = (order != null && order.customerPhoneSnapshot.isNotEmpty)
+        ? order.customerPhoneSnapshot
+        : customer?.phone;
 
     return AppCard(
       child: Column(
@@ -411,15 +422,15 @@ class _OrderDetailView extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      customer?.name ?? 'عميل غير مسجل',
+                      customerName,
                       style: AppTextStyles.titleMedium.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    if (customer?.phone != null) ...[
+                    if (customerPhone != null && customerPhone.isNotEmpty) ...[
                       AppSpacing.gapXs,
                       Text(
-                        customer!.phone,
+                        customerPhone,
                         style: AppTextStyles.bodyMedium.copyWith(
                           color: AppColors.textSecondary,
                         ),

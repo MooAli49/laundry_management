@@ -65,6 +65,8 @@ class OrderRepositoryImpl implements OrderRepository {
                 id: Value(order.id),
                 orderNumber: Value(finalOrderNumber),
                 customerId: Value(order.customerId),
+                customerNameSnapshot: Value(order.customerNameSnapshot),
+                customerPhoneSnapshot: Value(order.customerPhoneSnapshot),
                 status: Value(order.status.name),
                 expectedPickupDate: Value(order.expectedPickupDate.toDateTime()),
                 notes: Value(order.notes),
@@ -514,9 +516,15 @@ class OrderRepositoryImpl implements OrderRepository {
           }
         } else if (existing.status == OrderStatus.processing.name && newStatus == OrderStatus.ready) {
           if (reason == null || reason.trim().isEmpty) {
-            throw const ValidationFailure('Operational reason is required to manually override Processing order to Ready');
+            throw const BusinessRuleFailure('Operational reason is required to manually override Processing order to Ready');
           }
-          // Manual override MUST NOT create, delete, deactivate, or reactivate storage records.
+          final allStored = await _storageRecordsDao.areAllOrderItemsStored(orderId);
+          if (!allStored) {
+            throw const BusinessRuleFailure(
+              'لا يمكن تحويل الطلب إلى جاهز: لم يتم تخزين جميع القطع بعد',
+            );
+          }
+          // Manual correction with all items stored preserves storage records and sets status to Ready.
         } else if (existing.status == OrderStatus.completed.name && newStatus == OrderStatus.processing) {
           if (reason == null || reason.trim().isEmpty) {
             throw const ValidationFailure('Operational reason is required to correct Completed order back to Processing');
@@ -566,6 +574,8 @@ class OrderRepositoryImpl implements OrderRepository {
       id: row.id,
       orderNumber: row.orderNumber,
       customerId: row.customerId,
+      customerNameSnapshot: row.customerNameSnapshot,
+      customerPhoneSnapshot: row.customerPhoneSnapshot,
       status: OrderStatus.values.byName(row.status),
       expectedPickupDate: OrderDate.fromDate(row.expectedPickupDate),
       notes: row.notes,

@@ -114,6 +114,8 @@ void main() {
       id: orderId,
       orderNumber: orderNumber,
       customerId: customerId,
+      customerNameSnapshot: 'عميل القائمة',
+      customerPhoneSnapshot: '01012345678',
       status: status,
       expectedPickupDate: OrderDate(2026, 9, 20),
       subtotal: Money.fromPiastres(totalPiastres),

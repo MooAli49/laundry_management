@@ -885,11 +885,7 @@ Do not implement active Tax calculation.
 
 Order numbers follow:
 
-YY-XXX
-
-Do not implement:
-
-YYMMDD-XXX
+YY-XXX (e.g. 26-001)
 
 Do not change the approved format.
 

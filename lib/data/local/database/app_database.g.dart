@@ -448,6 +448,30 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
       'REFERENCES customers (id) ON DELETE RESTRICT',
     ),
   );
+  static const VerificationMeta _customerNameSnapshotMeta =
+      const VerificationMeta('customerNameSnapshot');
+  @override
+  late final GeneratedColumn<String> customerNameSnapshot =
+      GeneratedColumn<String>(
+        'customer_name_snapshot',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
+  static const VerificationMeta _customerPhoneSnapshotMeta =
+      const VerificationMeta('customerPhoneSnapshot');
+  @override
+  late final GeneratedColumn<String> customerPhoneSnapshot =
+      GeneratedColumn<String>(
+        'customer_phone_snapshot',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
   static const VerificationMeta _statusMeta = const VerificationMeta('status');
   @override
   late final GeneratedColumn<String> status = GeneratedColumn<String>(
@@ -633,6 +657,8 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
     id,
     orderNumber,
     customerId,
+    customerNameSnapshot,
+    customerPhoneSnapshot,
     status,
     expectedPickupDate,
     notes,
@@ -685,6 +711,24 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
       );
     } else if (isInserting) {
       context.missing(_customerIdMeta);
+    }
+    if (data.containsKey('customer_name_snapshot')) {
+      context.handle(
+        _customerNameSnapshotMeta,
+        customerNameSnapshot.isAcceptableOrUnknown(
+          data['customer_name_snapshot']!,
+          _customerNameSnapshotMeta,
+        ),
+      );
+    }
+    if (data.containsKey('customer_phone_snapshot')) {
+      context.handle(
+        _customerPhoneSnapshotMeta,
+        customerPhoneSnapshot.isAcceptableOrUnknown(
+          data['customer_phone_snapshot']!,
+          _customerPhoneSnapshotMeta,
+        ),
+      );
     }
     if (data.containsKey('status')) {
       context.handle(
@@ -837,6 +881,14 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
         DriftSqlType.string,
         data['${effectivePrefix}customer_id'],
       )!,
+      customerNameSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}customer_name_snapshot'],
+      )!,
+      customerPhoneSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}customer_phone_snapshot'],
+      )!,
       status: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}status'],
@@ -914,6 +966,8 @@ class Order extends DataClass implements Insertable<Order> {
   final String id;
   final String orderNumber;
   final String customerId;
+  final String customerNameSnapshot;
+  final String customerPhoneSnapshot;
   final String status;
   final DateTime expectedPickupDate;
   final String? notes;
@@ -934,6 +988,8 @@ class Order extends DataClass implements Insertable<Order> {
     required this.id,
     required this.orderNumber,
     required this.customerId,
+    required this.customerNameSnapshot,
+    required this.customerPhoneSnapshot,
     required this.status,
     required this.expectedPickupDate,
     this.notes,
@@ -957,6 +1013,8 @@ class Order extends DataClass implements Insertable<Order> {
     map['id'] = Variable<String>(id);
     map['order_number'] = Variable<String>(orderNumber);
     map['customer_id'] = Variable<String>(customerId);
+    map['customer_name_snapshot'] = Variable<String>(customerNameSnapshot);
+    map['customer_phone_snapshot'] = Variable<String>(customerPhoneSnapshot);
     map['status'] = Variable<String>(status);
     map['expected_pickup_date'] = Variable<DateTime>(expectedPickupDate);
     if (!nullToAbsent || notes != null) {
@@ -991,6 +1049,8 @@ class Order extends DataClass implements Insertable<Order> {
       id: Value(id),
       orderNumber: Value(orderNumber),
       customerId: Value(customerId),
+      customerNameSnapshot: Value(customerNameSnapshot),
+      customerPhoneSnapshot: Value(customerPhoneSnapshot),
       status: Value(status),
       expectedPickupDate: Value(expectedPickupDate),
       notes: notes == null && nullToAbsent
@@ -1027,6 +1087,12 @@ class Order extends DataClass implements Insertable<Order> {
       id: serializer.fromJson<String>(json['id']),
       orderNumber: serializer.fromJson<String>(json['orderNumber']),
       customerId: serializer.fromJson<String>(json['customerId']),
+      customerNameSnapshot: serializer.fromJson<String>(
+        json['customerNameSnapshot'],
+      ),
+      customerPhoneSnapshot: serializer.fromJson<String>(
+        json['customerPhoneSnapshot'],
+      ),
       status: serializer.fromJson<String>(json['status']),
       expectedPickupDate: serializer.fromJson<DateTime>(
         json['expectedPickupDate'],
@@ -1062,6 +1128,8 @@ class Order extends DataClass implements Insertable<Order> {
       'id': serializer.toJson<String>(id),
       'orderNumber': serializer.toJson<String>(orderNumber),
       'customerId': serializer.toJson<String>(customerId),
+      'customerNameSnapshot': serializer.toJson<String>(customerNameSnapshot),
+      'customerPhoneSnapshot': serializer.toJson<String>(customerPhoneSnapshot),
       'status': serializer.toJson<String>(status),
       'expectedPickupDate': serializer.toJson<DateTime>(expectedPickupDate),
       'notes': serializer.toJson<String?>(notes),
@@ -1089,6 +1157,8 @@ class Order extends DataClass implements Insertable<Order> {
     String? id,
     String? orderNumber,
     String? customerId,
+    String? customerNameSnapshot,
+    String? customerPhoneSnapshot,
     String? status,
     DateTime? expectedPickupDate,
     Value<String?> notes = const Value.absent(),
@@ -1109,6 +1179,8 @@ class Order extends DataClass implements Insertable<Order> {
     id: id ?? this.id,
     orderNumber: orderNumber ?? this.orderNumber,
     customerId: customerId ?? this.customerId,
+    customerNameSnapshot: customerNameSnapshot ?? this.customerNameSnapshot,
+    customerPhoneSnapshot: customerPhoneSnapshot ?? this.customerPhoneSnapshot,
     status: status ?? this.status,
     expectedPickupDate: expectedPickupDate ?? this.expectedPickupDate,
     notes: notes.present ? notes.value : this.notes,
@@ -1139,6 +1211,12 @@ class Order extends DataClass implements Insertable<Order> {
       customerId: data.customerId.present
           ? data.customerId.value
           : this.customerId,
+      customerNameSnapshot: data.customerNameSnapshot.present
+          ? data.customerNameSnapshot.value
+          : this.customerNameSnapshot,
+      customerPhoneSnapshot: data.customerPhoneSnapshot.present
+          ? data.customerPhoneSnapshot.value
+          : this.customerPhoneSnapshot,
       status: data.status.present ? data.status.value : this.status,
       expectedPickupDate: data.expectedPickupDate.present
           ? data.expectedPickupDate.value
@@ -1180,6 +1258,8 @@ class Order extends DataClass implements Insertable<Order> {
           ..write('id: $id, ')
           ..write('orderNumber: $orderNumber, ')
           ..write('customerId: $customerId, ')
+          ..write('customerNameSnapshot: $customerNameSnapshot, ')
+          ..write('customerPhoneSnapshot: $customerPhoneSnapshot, ')
           ..write('status: $status, ')
           ..write('expectedPickupDate: $expectedPickupDate, ')
           ..write('notes: $notes, ')
@@ -1201,10 +1281,12 @@ class Order extends DataClass implements Insertable<Order> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     orderNumber,
     customerId,
+    customerNameSnapshot,
+    customerPhoneSnapshot,
     status,
     expectedPickupDate,
     notes,
@@ -1221,7 +1303,7 @@ class Order extends DataClass implements Insertable<Order> {
     cancellationReason,
     createdAt,
     updatedAt,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1229,6 +1311,8 @@ class Order extends DataClass implements Insertable<Order> {
           other.id == this.id &&
           other.orderNumber == this.orderNumber &&
           other.customerId == this.customerId &&
+          other.customerNameSnapshot == this.customerNameSnapshot &&
+          other.customerPhoneSnapshot == this.customerPhoneSnapshot &&
           other.status == this.status &&
           other.expectedPickupDate == this.expectedPickupDate &&
           other.notes == this.notes &&
@@ -1251,6 +1335,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   final Value<String> id;
   final Value<String> orderNumber;
   final Value<String> customerId;
+  final Value<String> customerNameSnapshot;
+  final Value<String> customerPhoneSnapshot;
   final Value<String> status;
   final Value<DateTime> expectedPickupDate;
   final Value<String?> notes;
@@ -1272,6 +1358,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.id = const Value.absent(),
     this.orderNumber = const Value.absent(),
     this.customerId = const Value.absent(),
+    this.customerNameSnapshot = const Value.absent(),
+    this.customerPhoneSnapshot = const Value.absent(),
     this.status = const Value.absent(),
     this.expectedPickupDate = const Value.absent(),
     this.notes = const Value.absent(),
@@ -1294,6 +1382,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     required String id,
     required String orderNumber,
     required String customerId,
+    this.customerNameSnapshot = const Value.absent(),
+    this.customerPhoneSnapshot = const Value.absent(),
     this.status = const Value.absent(),
     required DateTime expectedPickupDate,
     this.notes = const Value.absent(),
@@ -1323,6 +1413,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Expression<String>? id,
     Expression<String>? orderNumber,
     Expression<String>? customerId,
+    Expression<String>? customerNameSnapshot,
+    Expression<String>? customerPhoneSnapshot,
     Expression<String>? status,
     Expression<DateTime>? expectedPickupDate,
     Expression<String>? notes,
@@ -1345,6 +1437,10 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       if (id != null) 'id': id,
       if (orderNumber != null) 'order_number': orderNumber,
       if (customerId != null) 'customer_id': customerId,
+      if (customerNameSnapshot != null)
+        'customer_name_snapshot': customerNameSnapshot,
+      if (customerPhoneSnapshot != null)
+        'customer_phone_snapshot': customerPhoneSnapshot,
       if (status != null) 'status': status,
       if (expectedPickupDate != null)
         'expected_pickup_date': expectedPickupDate,
@@ -1373,6 +1469,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Value<String>? id,
     Value<String>? orderNumber,
     Value<String>? customerId,
+    Value<String>? customerNameSnapshot,
+    Value<String>? customerPhoneSnapshot,
     Value<String>? status,
     Value<DateTime>? expectedPickupDate,
     Value<String?>? notes,
@@ -1395,6 +1493,9 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       id: id ?? this.id,
       orderNumber: orderNumber ?? this.orderNumber,
       customerId: customerId ?? this.customerId,
+      customerNameSnapshot: customerNameSnapshot ?? this.customerNameSnapshot,
+      customerPhoneSnapshot:
+          customerPhoneSnapshot ?? this.customerPhoneSnapshot,
       status: status ?? this.status,
       expectedPickupDate: expectedPickupDate ?? this.expectedPickupDate,
       notes: notes ?? this.notes,
@@ -1428,6 +1529,16 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     }
     if (customerId.present) {
       map['customer_id'] = Variable<String>(customerId.value);
+    }
+    if (customerNameSnapshot.present) {
+      map['customer_name_snapshot'] = Variable<String>(
+        customerNameSnapshot.value,
+      );
+    }
+    if (customerPhoneSnapshot.present) {
+      map['customer_phone_snapshot'] = Variable<String>(
+        customerPhoneSnapshot.value,
+      );
     }
     if (status.present) {
       map['status'] = Variable<String>(status.value);
@@ -1495,6 +1606,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
           ..write('id: $id, ')
           ..write('orderNumber: $orderNumber, ')
           ..write('customerId: $customerId, ')
+          ..write('customerNameSnapshot: $customerNameSnapshot, ')
+          ..write('customerPhoneSnapshot: $customerPhoneSnapshot, ')
           ..write('status: $status, ')
           ..write('expectedPickupDate: $expectedPickupDate, ')
           ..write('notes: $notes, ')
@@ -9290,6 +9403,8 @@ typedef $$OrdersTableCreateCompanionBuilder =
       required String id,
       required String orderNumber,
       required String customerId,
+      Value<String> customerNameSnapshot,
+      Value<String> customerPhoneSnapshot,
       Value<String> status,
       required DateTime expectedPickupDate,
       Value<String?> notes,
@@ -9313,6 +9428,8 @@ typedef $$OrdersTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> orderNumber,
       Value<String> customerId,
+      Value<String> customerNameSnapshot,
+      Value<String> customerPhoneSnapshot,
       Value<String> status,
       Value<DateTime> expectedPickupDate,
       Value<String?> notes,
@@ -9407,6 +9524,16 @@ class $$OrdersTableFilterComposer
 
   ColumnFilters<String> get orderNumber => $composableBuilder(
     column: $table.orderNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get customerNameSnapshot => $composableBuilder(
+    column: $table.customerNameSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get customerPhoneSnapshot => $composableBuilder(
+    column: $table.customerPhoneSnapshot,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9583,6 +9710,16 @@ class $$OrdersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get customerNameSnapshot => $composableBuilder(
+    column: $table.customerNameSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get customerPhoneSnapshot => $composableBuilder(
+    column: $table.customerPhoneSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get status => $composableBuilder(
     column: $table.status,
     builder: (column) => ColumnOrderings(column),
@@ -9701,6 +9838,16 @@ class $$OrdersTableAnnotationComposer
 
   GeneratedColumn<String> get orderNumber => $composableBuilder(
     column: $table.orderNumber,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get customerNameSnapshot => $composableBuilder(
+    column: $table.customerNameSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get customerPhoneSnapshot => $composableBuilder(
+    column: $table.customerPhoneSnapshot,
     builder: (column) => column,
   );
 
@@ -9877,6 +10024,8 @@ class $$OrdersTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> orderNumber = const Value.absent(),
                 Value<String> customerId = const Value.absent(),
+                Value<String> customerNameSnapshot = const Value.absent(),
+                Value<String> customerPhoneSnapshot = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<DateTime> expectedPickupDate = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
@@ -9898,6 +10047,8 @@ class $$OrdersTableTableManager
                 id: id,
                 orderNumber: orderNumber,
                 customerId: customerId,
+                customerNameSnapshot: customerNameSnapshot,
+                customerPhoneSnapshot: customerPhoneSnapshot,
                 status: status,
                 expectedPickupDate: expectedPickupDate,
                 notes: notes,
@@ -9921,6 +10072,8 @@ class $$OrdersTableTableManager
                 required String id,
                 required String orderNumber,
                 required String customerId,
+                Value<String> customerNameSnapshot = const Value.absent(),
+                Value<String> customerPhoneSnapshot = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 required DateTime expectedPickupDate,
                 Value<String?> notes = const Value.absent(),
@@ -9942,6 +10095,8 @@ class $$OrdersTableTableManager
                 id: id,
                 orderNumber: orderNumber,
                 customerId: customerId,
+                customerNameSnapshot: customerNameSnapshot,
+                customerPhoneSnapshot: customerPhoneSnapshot,
                 status: status,
                 expectedPickupDate: expectedPickupDate,
                 notes: notes,

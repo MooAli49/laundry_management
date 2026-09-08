@@ -18,6 +18,8 @@ void main() {
         id: 'ord-1',
         orderNumber: '26-001',
         customerId: 'cust-1',
+        customerNameSnapshot: 'عميل الفاتورة',
+        customerPhoneSnapshot: '01012345678',
         status: OrderStatus.ready,
         expectedPickupDate: OrderDate(2026, 9, 12),
         subtotal: const Money.fromPiastres(10000), // 100 EGP
@@ -85,6 +87,57 @@ void main() {
       expect(find.text('60.00 ج.م'), findsOneWidget);
       expect(find.text('40.00 ج.م'), findsOneWidget);
       expect(find.text('طباعة الفاتورة'), findsOneWidget);
+    });
+
+    testWidgets('displays historical snapshot even if current customer is mutated', (tester) async {
+      final now = DateTime(2026, 9, 5);
+      final historicalOrder = Order(
+        id: 'ord-hist',
+        orderNumber: '26-005',
+        customerId: 'cust-1',
+        customerNameSnapshot: 'العميل الأصلي (أ)',
+        customerPhoneSnapshot: '01011112222',
+        status: OrderStatus.processing,
+        expectedPickupDate: OrderDate(2026, 9, 12),
+        subtotal: const Money.fromPiastres(5000),
+        total: const Money.fromPiastres(5000),
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      // Mutated customer entity
+      final mutatedCustomer = Customer(
+        id: 'cust-1',
+        name: 'العميل الجديد (ب)',
+        phone: '01099998888',
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Scaffold(
+              body: InvoicePreviewDialog(
+                order: historicalOrder,
+                customer: mutatedCustomer,
+                items: const [],
+                totalPaid: Money.zero,
+                remainingAmount: const Money.fromPiastres(5000),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Must display historical snapshots
+      expect(find.text('العميل الأصلي (أ)'), findsOneWidget);
+      expect(find.text('01011112222'), findsOneWidget);
+
+      // Must NOT display mutated current customer info
+      expect(find.text('العميل الجديد (ب)'), findsNothing);
+      expect(find.text('01099998888'), findsNothing);
     });
   });
 }

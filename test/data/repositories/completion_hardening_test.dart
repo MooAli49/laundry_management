@@ -77,6 +77,8 @@ void main() {
       id: orderId,
       orderNumber: '26-100',
       customerId: 'cust-comp',
+      customerNameSnapshot: 'عميل التسليم',
+      customerPhoneSnapshot: '01011223344',
       status: initialStatus,
       expectedPickupDate: OrderDate(2026, 9, 15),
       subtotal: Money.fromPiastres(totalPiastres),

@@ -66,6 +66,8 @@ void main() {
       id: orderId,
       orderNumber: '26-200',
       customerId: 'cust-trans',
+      customerNameSnapshot: 'عميل الحالات',
+      customerPhoneSnapshot: '01011223344',
       status: initialStatus,
       expectedPickupDate: OrderDate(2026, 9, 15),
       subtotal: const Money.fromPiastres(3000),
@@ -169,14 +171,46 @@ void main() {
       expect(allRecords.first.isActive, isFalse);
     });
 
-    test('Processing -> Ready manual correction requires reason and does NOT alter storage', () async {
-      await setupOrder(orderId: 'ord-p2r', initialStatus: OrderStatus.processing, storeItem: false);
+    test('Processing -> Ready rejected when physical items are unstored', () async {
+      await setupOrder(orderId: 'ord-p2r-unstored', initialStatus: OrderStatus.processing, storeItem: false);
+
+      // Attempt with valid reason but items are not stored
+      expect(
+        () => changeOrderStatusUseCase.execute(
+          const ChangeOrderStatusInput(
+            orderId: 'ord-p2r-unstored',
+            newStatus: OrderStatus.ready,
+            reason: 'تجاوز يدوي مع عدم التخزين',
+          ),
+        ),
+        throwsA(
+          isA<BusinessRuleFailure>().having(
+            (e) => e.message,
+            'message',
+            contains('لم يتم تخزين جميع القطع بعد'),
+          ),
+        ),
+      );
+
+      // Order status remains processing
+      final orderAfter = await orderRepository.getOrderById('ord-p2r-unstored');
+      expect(orderAfter!.status, OrderStatus.processing);
+
+      // Storage remains untouched
+      final allRecords = await (db.select(db.storageRecords)
+            ..where((t) => t.orderItemId.equals('item-ord-p2r-unstored')))
+          .get();
+      expect(allRecords.isEmpty, isTrue);
+    });
+
+    test('Processing -> Ready succeeds when all items are stored and requires reason', () async {
+      await setupOrder(orderId: 'ord-p2r-stored', initialStatus: OrderStatus.processing, storeItem: true);
 
       // Empty reason rejected
       expect(
         () => changeOrderStatusUseCase.execute(
           const ChangeOrderStatusInput(
-            orderId: 'ord-p2r',
+            orderId: 'ord-p2r-stored',
             newStatus: OrderStatus.ready,
             reason: '',
           ),
@@ -184,22 +218,21 @@ void main() {
         throwsA(isA<ValidationFailure>()),
       );
 
-      // Valid reason succeeds
+      // Valid reason with stored items succeeds
       final updated = await changeOrderStatusUseCase.execute(
         const ChangeOrderStatusInput(
-          orderId: 'ord-p2r',
+          orderId: 'ord-p2r-stored',
           newStatus: OrderStatus.ready,
-          reason: 'تجاوز تشغيلي يدوي',
+          reason: 'تصحيح الحالة بعد التأكد من التخزين',
         ),
       );
 
       expect(updated.status, OrderStatus.ready);
 
-      // Storage MUST remain untouched (no records created)
-      final allRecords = await (db.select(db.storageRecords)
-            ..where((t) => t.orderItemId.equals('item-ord-p2r')))
-          .get();
-      expect(allRecords.isEmpty, isTrue);
+      // Active storage records remain active and untouched
+      final activeRecord = await storageRecordsDao.getActiveRecordForOrderItem('item-ord-p2r-stored');
+      expect(activeRecord, isNotNull);
+      expect(activeRecord!.isActive, isTrue);
     });
 
     test('Ready -> Completed rejected through generic status change', () async {

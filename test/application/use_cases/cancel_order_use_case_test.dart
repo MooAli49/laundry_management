@@ -47,6 +47,8 @@ void main() {
       id: id,
       orderNumber: '26-001',
       customerId: 'cust-1',
+      customerNameSnapshot: 'عميل تجريبي',
+      customerPhoneSnapshot: '01012345678',
       status: status,
       expectedPickupDate: OrderDate.today(),
       subtotal: const Money.fromPiastres(1000),
