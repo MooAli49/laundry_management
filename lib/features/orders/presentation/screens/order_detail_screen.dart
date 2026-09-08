@@ -7,6 +7,7 @@ import '../../../../core/routing/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_error_state.dart';
@@ -288,7 +289,7 @@ class _OrderDetailView extends StatelessWidget {
                   ),
                   AppSpacing.gapXs,
                   Text(
-                    pickupDate.toString(),
+                    DateFormatter.formatArabicDate(pickupDate.toDateTime()),
                     style: AppTextStyles.titleMedium.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -306,7 +307,7 @@ class _OrderDetailView extends StatelessWidget {
                   ),
                   AppSpacing.gapXs,
                   Text(
-                    '${createdDate.year}-${createdDate.month.toString().padLeft(2, '0')}-${createdDate.day.toString().padLeft(2, '0')}',
+                    DateFormatter.formatArabicDate(createdDate),
                     style: AppTextStyles.bodyMedium,
                   ),
                 ],
@@ -745,7 +746,7 @@ class _OrderDetailView extends StatelessWidget {
                 ),
                 AppSpacing.gapXs,
                 Text(
-                  '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}',
+                  DateFormatter.formatArabicDateTime(date),
                   style: AppTextStyles.labelSmall.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -805,11 +806,6 @@ class _OrderDetailView extends StatelessWidget {
               'الخصم',
               '- ${order.discount.toEgp.toStringAsFixed(2)} ج.م',
               isNegative: true,
-            ),
-          if (order.tax > Money.zero)
-            _buildSummaryRow(
-              'الضريبة',
-              '+ ${order.tax.toEgp.toStringAsFixed(2)} ج.م',
             ),
           const Divider(height: AppSpacing.lg, color: AppColors.divider),
           _buildSummaryRow(
@@ -1137,25 +1133,74 @@ class _OrderDetailView extends StatelessWidget {
   void _confirmAndCompleteOrder(BuildContext context, OrderDetailCubit cubit) {
     showDialog(
       context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('تأكيد تسليم وإكمال الطلب'),
-        content: const Text(
-          'هل تم تسليم جميع عناصر الطلب للعميل فعلياً؟\nسيؤدي هذا الإجراء إلى إكمال الطلب وإلغاء حجز أماكن التخزين للملابس.',
+      builder: (dialogCtx) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(),
-            child: const Text('إلغاء'),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'تأكيد تسليم وإكمال الطلب',
+                      style: AppTextStyles.titleLarge,
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(dialogCtx).pop(),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                AppSpacing.gapMd,
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLighter,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Text(
+                    'هل تم تسليم جميع عناصر الطلب للعميل فعلياً؟\nسيؤدي هذا الإجراء إلى إكمال الطلب وإلغاء حجز أماكن التخزين للملابس.',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textPrimary,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+                AppSpacing.gapXl,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    AppButton(
+                      label: 'إلغاء',
+                      variant: AppButtonVariant.secondary,
+                      onPressed: () => Navigator.of(dialogCtx).pop(),
+                    ),
+                    AppSpacing.gapHorizontalMd,
+                    AppButton(
+                      label: 'تأكيد التسليم والإكمال',
+                      variant: AppButtonVariant.primary,
+                      onPressed: () {
+                        Navigator.of(dialogCtx).pop();
+                        cubit.completeOrder(handoverConfirmed: true);
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          AppButton(
-            label: 'تأكيد التسليم والإكمال',
-            variant: AppButtonVariant.primary,
-            onPressed: () {
-              Navigator.of(dialogCtx).pop();
-              cubit.completeOrder(handoverConfirmed: true);
-            },
-          ),
-        ],
+        ),
       ),
     );
   }

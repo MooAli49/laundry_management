@@ -19,7 +19,9 @@ import 'package:laundry_management/features/storage/presentation/screens/storage
 void main() {
   setUp(() async {
     await getIt.reset();
-    getIt.registerLazySingleton<AppDatabase>(() => AppDatabase(NativeDatabase.memory()));
+    getIt.registerLazySingleton<AppDatabase>(
+      () => AppDatabase(NativeDatabase.memory()),
+    );
     await initDependencies();
   });
 
@@ -50,36 +52,54 @@ void main() {
     );
 
     testWidgets(
-      'renders all six primary navigation destinations in NavigationRail',
+      'renders all six primary navigation destinations in AppSidebar',
       (WidgetTester tester) async {
         await tester.pumpWidget(const LaundryManagementApp());
         await tester.pumpAndSettle();
 
-        final railFinder = find.byType(NavigationRail);
+        final navFinder = find.byType(AppSidebar);
 
-        // Verify the 6 primary destinations in Arabic inside NavigationRail
+        // Verify the 6 primary destinations in Arabic inside AppSidebar
         expect(
-          find.descendant(of: railFinder, matching: find.text(AppStrings.dashboard)),
+          find.descendant(
+            of: navFinder,
+            matching: find.text(AppStrings.dashboard),
+          ),
           findsOneWidget,
         );
         expect(
-          find.descendant(of: railFinder, matching: find.text(AppStrings.orders)),
+          find.descendant(
+            of: navFinder,
+            matching: find.text(AppStrings.orders),
+          ),
           findsOneWidget,
         );
         expect(
-          find.descendant(of: railFinder, matching: find.text(AppStrings.customers)),
+          find.descendant(
+            of: navFinder,
+            matching: find.text(AppStrings.customers),
+          ),
           findsOneWidget,
         );
         expect(
-          find.descendant(of: railFinder, matching: find.text(AppStrings.storage)),
+          find.descendant(
+            of: navFinder,
+            matching: find.text(AppStrings.storage),
+          ),
           findsOneWidget,
         );
         expect(
-          find.descendant(of: railFinder, matching: find.text(AppStrings.reports)),
+          find.descendant(
+            of: navFinder,
+            matching: find.text(AppStrings.reports),
+          ),
           findsOneWidget,
         );
         expect(
-          find.descendant(of: railFinder, matching: find.text(AppStrings.settings)),
+          find.descendant(
+            of: navFinder,
+            matching: find.text(AppStrings.settings),
+          ),
           findsOneWidget,
         );
       },
@@ -91,7 +111,7 @@ void main() {
       await tester.pumpWidget(const LaundryManagementApp());
       await tester.pumpAndSettle();
 
-      final railFinder = find.byType(NavigationRail);
+      final navFinder = find.byType(AppSidebar);
 
       // Helper to check GoRouter current path
       String currentPath() =>
@@ -103,7 +123,7 @@ void main() {
 
       // 1. Navigate to Orders
       await tester.tap(
-        find.descendant(of: railFinder, matching: find.text(AppStrings.orders)),
+        find.descendant(of: navFinder, matching: find.text(AppStrings.orders)),
       );
       await tester.pumpAndSettle();
       expect(currentPath(), equals(AppRoutes.orders));
@@ -111,7 +131,10 @@ void main() {
 
       // 2. Navigate to Customers
       await tester.tap(
-        find.descendant(of: railFinder, matching: find.text(AppStrings.customers)),
+        find.descendant(
+          of: navFinder,
+          matching: find.text(AppStrings.customers),
+        ),
       );
       await tester.pumpAndSettle();
       expect(currentPath(), equals(AppRoutes.customers));
@@ -119,7 +142,7 @@ void main() {
 
       // 3. Navigate to Storage
       await tester.tap(
-        find.descendant(of: railFinder, matching: find.text(AppStrings.storage)),
+        find.descendant(of: navFinder, matching: find.text(AppStrings.storage)),
       );
       await tester.pumpAndSettle();
       expect(currentPath(), equals(AppRoutes.storage));
@@ -127,7 +150,7 @@ void main() {
 
       // 4. Navigate to Reports
       await tester.tap(
-        find.descendant(of: railFinder, matching: find.text(AppStrings.reports)),
+        find.descendant(of: navFinder, matching: find.text(AppStrings.reports)),
       );
       await tester.pumpAndSettle();
       expect(currentPath(), equals(AppRoutes.reports));
@@ -135,7 +158,10 @@ void main() {
 
       // 5. Navigate to Settings
       await tester.tap(
-        find.descendant(of: railFinder, matching: find.text(AppStrings.settings)),
+        find.descendant(
+          of: navFinder,
+          matching: find.text(AppStrings.settings),
+        ),
       );
       await tester.pumpAndSettle();
       expect(currentPath(), equals(AppRoutes.settings));
@@ -143,7 +169,10 @@ void main() {
 
       // 6. Navigate back to Dashboard
       await tester.tap(
-        find.descendant(of: railFinder, matching: find.text(AppStrings.dashboard)),
+        find.descendant(
+          of: navFinder,
+          matching: find.text(AppStrings.dashboard),
+        ),
       );
       await tester.pumpAndSettle();
       expect(currentPath(), equals(AppRoutes.dashboard));

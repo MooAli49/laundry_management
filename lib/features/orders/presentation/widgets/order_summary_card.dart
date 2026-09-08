@@ -30,6 +30,7 @@ class OrderSummaryCard extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             'ملخص الطلب',
@@ -53,7 +54,7 @@ class OrderSummaryCard extends StatelessWidget {
           if (state.customerPickupRequested) ...[
             AppSpacing.gapSm,
             _buildRow(
-              'استلام من العميل',
+              'رسوم الاستلام',
               '+ ${state.customerPickupFee.toEgp.toStringAsFixed(2)} ج.م',
             ),
           ],
@@ -61,14 +62,9 @@ class OrderSummaryCard extends StatelessWidget {
           if (state.customerDeliveryRequested) ...[
             AppSpacing.gapSm,
             _buildRow(
-              'توصيل للعميل',
+              'رسوم التوصيل',
               '+ ${state.customerDeliveryFee.toEgp.toStringAsFixed(2)} ج.م',
             ),
-          ],
-
-          if (state.tax.isPositive) ...[
-            AppSpacing.gapSm,
-            _buildRow('الضريبة', '+ ${state.tax.toEgp.toStringAsFixed(2)} ج.م'),
           ],
 
           const Divider(height: AppSpacing.xl, color: AppColors.divider),

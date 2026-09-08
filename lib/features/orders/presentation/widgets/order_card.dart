@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../models/order_list_item_view_model.dart';
 import 'order_status_badge.dart';
@@ -95,7 +96,7 @@ class OrderCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  order.expectedPickupDate.toString(),
+                  DateFormatter.formatArabicDate(order.expectedPickupDate.toDateTime()),
                   style: AppTextStyles.bodySmall.copyWith(
                     color: item.isOverdue ? AppColors.error : AppColors.textPrimary,
                     fontWeight: FontWeight.w500,

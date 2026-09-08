@@ -7,6 +7,7 @@ import '../../../../core/routing/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/loading_indicator.dart';
@@ -222,7 +223,7 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                                       null) ...[
                                                     AppSpacing.gapXs,
                                                     Text(
-                                                      'التفصيل: ${item.itemDefinitionName}',
+                                                      'التعريف: ${item.itemDefinitionName}',
                                                       style: AppTextStyles
                                                           .labelSmall
                                                           .copyWith(
@@ -352,9 +353,12 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                                               .spaceBetween,
                                                       children: [
                                                         Text(
-                                                          state
-                                                              .expectedPickupDate
-                                                              .toString(),
+                                                          DateFormatter
+                                                              .formatArabicDate(
+                                                            state
+                                                                .expectedPickupDate
+                                                                .toDateTime(),
+                                                          ),
                                                           style: AppTextStyles
                                                               .bodyMedium,
                                                         ),
@@ -394,7 +398,7 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                       ),
                                       AppSpacing.gapLg,
 
-                                      // Delivery Checkboxes & Fees
+                                      // Delivery Options (Figma parity cards)
                                       Text(
                                         'التوصيل',
                                         style: AppTextStyles.labelLarge
@@ -411,94 +415,222 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                       ),
                                       AppSpacing.gapSm,
 
-                                      // Pickup Checkbox
-                                      Row(
-                                        children: [
-                                          Checkbox(
-                                            value:
-                                                state.customerPickupRequested,
-                                            onChanged: (val) =>
-                                                cubit.updateDelivery(
-                                                  pickupRequested: val ?? false,
-                                                ),
+                                      // Pickup Option Card ("استلام من العميل")
+                                      Container(
+                                        padding: const EdgeInsets.all(
+                                          AppSpacing.md,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: state.customerPickupRequested
+                                              ? AppColors.primaryLighter
+                                              : AppColors.surface,
+                                          borderRadius: BorderRadius.circular(
+                                            AppSpacing.radiusLg,
                                           ),
-                                          Text(
-                                            'استلام من العميل',
-                                            style: AppTextStyles.bodyMedium,
+                                          border: Border.all(
+                                            color: state.customerPickupRequested
+                                                ? AppColors.primary
+                                                : AppColors.border,
+                                            width: state.customerPickupRequested
+                                                ? 1.5
+                                                : 1.0,
                                           ),
-                                          if (state
-                                              .customerPickupRequested) ...[
-                                            AppSpacing.gapHorizontalMd,
-                                            SizedBox(
-                                              width: 140,
-                                              child: AppTextField(
-                                                controller:
-                                                    _pickupFeeController,
-                                                hintText: 'رسوم الاستلام',
-                                                keyboardType:
-                                                    const TextInputType.numberWithOptions(
-                                                      decimal: true,
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            InkWell(
+                                              onTap: () => cubit.updateDelivery(
+                                                pickupRequested:
+                                                    !state.customerPickupRequested,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                AppSpacing.radiusMd,
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Checkbox(
+                                                    value: state
+                                                        .customerPickupRequested,
+                                                    activeColor:
+                                                        AppColors.primary,
+                                                    onChanged: (val) =>
+                                                        cubit.updateDelivery(
+                                                      pickupRequested:
+                                                          val ?? false,
                                                     ),
-                                                onChanged: (val) {
-                                                  final fee =
-                                                      double.tryParse(val) ??
-                                                      0.0;
-                                                  cubit.updateDelivery(
-                                                    pickupFee: Money.fromEgp(
-                                                      fee,
-                                                    ),
-                                                  );
-                                                },
+                                                  ),
+                                                  const Icon(
+                                                    Icons.local_shipping,
+                                                    size: 20,
+                                                    color: AppColors
+                                                        .textTertiary,
+                                                  ),
+                                                  AppSpacing.gapHorizontalSm,
+                                                  Text(
+                                                    'استلام من العميل',
+                                                    style: AppTextStyles
+                                                        .bodyMedium
+                                                        .copyWith(
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                          color: AppColors
+                                                              .textPrimary,
+                                                        ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
+                                            if (state
+                                                .customerPickupRequested) ...[
+                                              AppSpacing.gapSm,
+                                              Padding(
+                                                padding:
+                                                    const EdgeInsetsDirectional
+                                                        .only(start: 40.0),
+                                                child: SizedBox(
+                                                  width: 180,
+                                                  child: AppTextField(
+                                                    controller:
+                                                        _pickupFeeController,
+                                                    label:
+                                                        'رسوم الاستلام (ج.م)',
+                                                    hintText: '0.00',
+                                                    keyboardType:
+                                                        const TextInputType
+                                                            .numberWithOptions(
+                                                          decimal: true,
+                                                        ),
+                                                    onChanged: (val) {
+                                                      final fee =
+                                                          double.tryParse(
+                                                            val,
+                                                          ) ??
+                                                          0.0;
+                                                      cubit.updateDelivery(
+                                                        pickupFee:
+                                                            Money.fromEgp(fee),
+                                                      );
+                                                    },
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ],
-                                        ],
+                                        ),
                                       ),
-                                      AppSpacing.gapXs,
+                                      AppSpacing.gapSm,
 
-                                      // Delivery Checkbox
-                                      Row(
-                                        children: [
-                                          Checkbox(
-                                            value:
-                                                state.customerDeliveryRequested,
-                                            onChanged: (val) =>
-                                                cubit.updateDelivery(
-                                                  deliveryRequested:
-                                                      val ?? false,
-                                                ),
+                                      // Delivery Option Card ("توصيل للعميل")
+                                      Container(
+                                        padding: const EdgeInsets.all(
+                                          AppSpacing.md,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: state
+                                                  .customerDeliveryRequested
+                                              ? AppColors.primaryLighter
+                                              : AppColors.surface,
+                                          borderRadius: BorderRadius.circular(
+                                            AppSpacing.radiusLg,
                                           ),
-                                          Text(
-                                            'توصيل للعميل',
-                                            style: AppTextStyles.bodyMedium,
+                                          border: Border.all(
+                                            color: state
+                                                    .customerDeliveryRequested
+                                                ? AppColors.primary
+                                                : AppColors.border,
+                                            width: state
+                                                    .customerDeliveryRequested
+                                                ? 1.5
+                                                : 1.0,
                                           ),
-                                          if (state
-                                              .customerDeliveryRequested) ...[
-                                            AppSpacing.gapHorizontalMd,
-                                            SizedBox(
-                                              width: 140,
-                                              child: AppTextField(
-                                                controller:
-                                                    _deliveryFeeController,
-                                                hintText: 'رسوم التوصيل',
-                                                keyboardType:
-                                                    const TextInputType.numberWithOptions(
-                                                      decimal: true,
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            InkWell(
+                                              onTap: () => cubit.updateDelivery(
+                                                deliveryRequested:
+                                                    !state.customerDeliveryRequested,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                AppSpacing.radiusMd,
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Checkbox(
+                                                    value: state
+                                                        .customerDeliveryRequested,
+                                                    activeColor:
+                                                        AppColors.primary,
+                                                    onChanged: (val) =>
+                                                        cubit.updateDelivery(
+                                                      deliveryRequested:
+                                                          val ?? false,
                                                     ),
-                                                onChanged: (val) {
-                                                  final fee =
-                                                      double.tryParse(val) ??
-                                                      0.0;
-                                                  cubit.updateDelivery(
-                                                    deliveryFee: Money.fromEgp(
-                                                      fee,
-                                                    ),
-                                                  );
-                                                },
+                                                  ),
+                                                  const Icon(
+                                                    Icons.local_shipping,
+                                                    size: 20,
+                                                    color: AppColors
+                                                        .textTertiary,
+                                                  ),
+                                                  AppSpacing.gapHorizontalSm,
+                                                  Text(
+                                                    'توصيل للعميل',
+                                                    style: AppTextStyles
+                                                        .bodyMedium
+                                                        .copyWith(
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                          color: AppColors
+                                                              .textPrimary,
+                                                        ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
+                                            if (state
+                                                .customerDeliveryRequested) ...[
+                                              AppSpacing.gapSm,
+                                              Padding(
+                                                padding:
+                                                    const EdgeInsetsDirectional
+                                                        .only(start: 40.0),
+                                                child: SizedBox(
+                                                  width: 180,
+                                                  child: AppTextField(
+                                                    controller:
+                                                        _deliveryFeeController,
+                                                    label:
+                                                        'رسوم التوصيل (ج.م)',
+                                                    hintText: '0.00',
+                                                    keyboardType:
+                                                        const TextInputType
+                                                            .numberWithOptions(
+                                                          decimal: true,
+                                                        ),
+                                                    onChanged: (val) {
+                                                      final fee =
+                                                          double.tryParse(
+                                                            val,
+                                                          ) ??
+                                                          0.0;
+                                                      cubit.updateDelivery(
+                                                        deliveryFee:
+                                                            Money.fromEgp(fee),
+                                                      );
+                                                    },
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ],
-                                        ],
+                                        ),
                                       ),
                                       AppSpacing.gapLg,
 
@@ -524,10 +656,12 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                         // Left Column (Sticky Order Summary Card)
                         Expanded(
                           flex: 3,
-                          child: OrderSummaryCard(
-                            state: state,
-                            onSubmit: cubit.submitOrder,
-                            onCancel: () => context.go(AppRoutes.orders),
+                          child: SingleChildScrollView(
+                            child: OrderSummaryCard(
+                              state: state,
+                              onSubmit: cubit.submitOrder,
+                              onCancel: () => context.go(AppRoutes.orders),
+                            ),
                           ),
                         ),
                       ],

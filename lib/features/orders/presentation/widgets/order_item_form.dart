@@ -36,6 +36,21 @@ class _OrderItemFormState extends State<OrderItemForm> {
   final TextEditingController _notesController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.state.draftUnitPrice != null) {
+      _priceController.text =
+          widget.state.draftUnitPrice!.toEgp.toStringAsFixed(2);
+    }
+    if (widget.state.draftCarpetLength > 0) {
+      _lengthController.text = widget.state.draftCarpetLength.toString();
+    }
+    if (widget.state.draftCarpetWidth > 0) {
+      _widthController.text = widget.state.draftCarpetWidth.toString();
+    }
+  }
+
+  @override
   void didUpdateWidget(covariant OrderItemForm oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.state.draftUnitPrice != oldWidget.state.draftUnitPrice) {
@@ -66,12 +81,25 @@ class _OrderItemFormState extends State<OrderItemForm> {
     super.dispose();
   }
 
+  String _pricingTypeLabel(PricingType type) {
+    return switch (type) {
+      PricingType.perPiece => 'بالقطعة',
+      PricingType.perKilogram => 'بالكيلوجرام',
+      PricingType.perSquareMeter => 'بالمتر المربع',
+      PricingType.fixedPrice => 'سعر ثابت',
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = widget.state;
     final cubit = widget.cubit;
 
     final isCarpetPricing = state.draftService?.pricingType == PricingType.perSquareMeter;
+    final hasDefinitions = state.itemDefinitions.isNotEmpty;
+    final isPriceOverridden = state.draftUnitPrice != null &&
+        state.draftService != null &&
+        state.draftUnitPrice != state.draftService!.price;
 
     return AppCard(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -84,7 +112,7 @@ class _OrderItemFormState extends State<OrderItemForm> {
           ),
           AppSpacing.gapMd,
 
-          // Row 1: Item Type & Service
+          // Row 1: Item Type * + Item Definition ("تعريف القطعة")
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -112,59 +140,20 @@ class _OrderItemFormState extends State<OrderItemForm> {
                   ],
                 ),
               ),
-              AppSpacing.gapHorizontalMd,
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('الخدمة *', style: AppTextStyles.labelLarge),
-                    AppSpacing.gapXs,
-                    DropdownButtonFormField<Service>(
-                      key: ValueKey('service_${state.draftService?.id}'),
-                      initialValue: state.draftService,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        hintText: state.draftItemType == null
-                            ? 'اختر نوع القطعة أولاً'
-                            : 'اختر الخدمة',
-                      ),
-                      items: state.compatibleServices.map((service) {
-                        return DropdownMenuItem<Service>(
-                          value: service,
-                          child: Text(
-                            '${service.name} (${service.price.toEgp.toStringAsFixed(2)} ج.م)',
-                            style: AppTextStyles.bodyMedium,
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: state.draftItemType == null
-                          ? null
-                          : (service) => cubit.selectService(service),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          AppSpacing.gapMd,
-
-          // Row 2: Item Definition (optional) & Quantity & Price Override
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (state.itemDefinitions.isNotEmpty) ...[
+              if (hasDefinitions) ...[
+                AppSpacing.gapHorizontalMd,
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('تفصيل القطعة', style: AppTextStyles.labelLarge),
+                      Text('تعريف القطعة', style: AppTextStyles.labelLarge),
                       AppSpacing.gapXs,
                       DropdownButtonFormField<ItemDefinition>(
                         key: ValueKey('itemDef_${state.draftItemDefinition?.id}'),
                         initialValue: state.draftItemDefinition,
                         isExpanded: true,
                         decoration: const InputDecoration(
-                          hintText: 'اختياري',
+                          hintText: 'اختر التعريف',
                         ),
                         items: state.itemDefinitions.map((def) {
                           return DropdownMenuItem<ItemDefinition>(
@@ -177,174 +166,310 @@ class _OrderItemFormState extends State<OrderItemForm> {
                     ],
                   ),
                 ),
-                AppSpacing.gapHorizontalMd,
               ],
+            ],
+          ),
+          AppSpacing.gapMd,
 
-              // Quantity Stepper
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('الكمية *', style: AppTextStyles.labelLarge),
-                    AppSpacing.gapXs,
-                    Row(
-                      children: [
-                        IconButton.filledTonal(
-                          onPressed: state.draftQuantity > 1
-                              ? () => cubit.updateQuantity(state.draftQuantity - 1)
-                              : null,
-                          icon: const Icon(Icons.remove, size: 18),
-                        ),
-                        Expanded(
-                          child: Center(
-                            child: Text(
-                              '${state.draftQuantity}',
-                              style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
-                        IconButton.filledTonal(
-                          onPressed: () => cubit.updateQuantity(state.draftQuantity + 1),
-                          icon: const Icon(Icons.add, size: 18),
-                        ),
-                      ],
+          // Row 2: Service * (full width)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('الخدمة *', style: AppTextStyles.labelLarge),
+              AppSpacing.gapXs,
+              DropdownButtonFormField<Service>(
+                key: ValueKey('service_${state.draftService?.id}'),
+                initialValue: state.draftService,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  hintText: state.draftItemType == null
+                      ? 'اختر نوع القطعة أولاً'
+                      : 'اختر الخدمة',
+                ),
+                items: state.compatibleServices.map((service) {
+                  return DropdownMenuItem<Service>(
+                    value: service,
+                    child: Text(
+                      '${service.name} (${service.price.toEgp.toStringAsFixed(2)} ج.م — ${_pricingTypeLabel(service.pricingType)})',
+                      style: AppTextStyles.bodyMedium,
                     ),
-                  ],
-                ),
-              ),
-              AppSpacing.gapHorizontalMd,
-
-              // Price override input
-              Expanded(
-                child: AppTextField(
-                  controller: _priceController,
-                  label: 'السعر (ج.م) *',
-                  hintText: '0.00',
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  onChanged: (val) {
-                    final numVal = double.tryParse(val);
-                    if (numVal != null && numVal > 0) {
-                      cubit.updateUnitPrice(Money.fromEgp(numVal));
-                    }
-                  },
-                ),
+                  );
+                }).toList(),
+                onChanged: state.draftItemType == null
+                    ? null
+                    : (service) => cubit.selectService(service),
               ),
             ],
           ),
+          AppSpacing.gapMd,
+
+          // Quantity (for Per Piece and Fixed Price items)
+          if (!isCarpetPricing) ...[
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('الكمية', style: AppTextStyles.labelLarge),
+                AppSpacing.gapXs,
+                Row(
+                  children: [
+                    // Quantity Stepper: Minus
+                    InkWell(
+                      onTap: state.draftQuantity > 1
+                          ? () => cubit.updateQuantity(state.draftQuantity - 1)
+                          : null,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Icon(
+                          Icons.remove,
+                          size: 18,
+                          color: state.draftQuantity > 1
+                              ? AppColors.textPrimary
+                              : AppColors.textDisabled,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      width: 48,
+                      alignment: Alignment.center,
+                      child: Text(
+                        '${state.draftQuantity}',
+                        style: AppTextStyles.titleMedium.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    // Quantity Stepper: Plus
+                    InkWell(
+                      onTap: () => cubit.updateQuantity(state.draftQuantity + 1),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: const Icon(
+                          Icons.add,
+                          size: 18,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    if (state.draftService != null) ...[
+                      AppSpacing.gapHorizontalMd,
+                      Text(
+                        '${(state.draftUnitPrice ?? state.draftService!.price).toEgp.toStringAsFixed(2)} ج.م / قطعة',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+            AppSpacing.gapMd,
+          ],
 
           // Carpet Specific Section (if perSquareMeter)
           if (isCarpetPricing) ...[
-            AppSpacing.gapMd,
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: AppColors.backgroundSecondary,
-                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'أبعاد السجاد',
-                    style: AppTextStyles.labelLarge.copyWith(fontWeight: FontWeight.bold),
+            // Predefined carpet size selector (standalone full-width field)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('مقاس السجادة', style: AppTextStyles.labelLarge),
+                AppSpacing.gapXs,
+                DropdownButtonFormField<CarpetSize?>(
+                  key: ValueKey('carpetSize_${state.draftCarpetSize?.id}'),
+                  initialValue: state.draftCarpetSize,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    hintText: 'اختر مقاساً جاهزاً أو أدخل أبعاداً مخصصة',
+                    helperText: 'اختر مقاساً جاهزاً أو أدخل أبعاداً مخصصة',
                   ),
-                  AppSpacing.gapSm,
-                  Row(
+                  items: [
+                    const DropdownMenuItem<CarpetSize?>(
+                      value: null,
+                      child: Text('مقاس مخصص'),
+                    ),
+                    ...state.carpetSizes.map((size) {
+                      return DropdownMenuItem<CarpetSize?>(
+                        value: size,
+                        child: Text(
+                          '${size.length} × ${size.width} م (${size.area} م²)',
+                          style: AppTextStyles.bodyMedium,
+                        ),
+                      );
+                    }),
+                  ],
+                  onChanged: (size) => cubit.selectCarpetSize(size),
+                ),
+              ],
+            ),
+            AppSpacing.gapMd,
+
+            // 3-column row: Length, Width, Readonly Area
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Length
+                Expanded(
+                  child: AppTextField(
+                    controller: _lengthController,
+                    label: 'الطول (م) *',
+                    hintText: '0',
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (val) {
+                      final l = double.tryParse(val) ?? 0.0;
+                      cubit.updateCarpetDimensions(length: l);
+                    },
+                  ),
+                ),
+                AppSpacing.gapHorizontalMd,
+
+                // Width
+                Expanded(
+                  child: AppTextField(
+                    controller: _widthController,
+                    label: 'العرض (م) *',
+                    hintText: '0',
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (val) {
+                      final w = double.tryParse(val) ?? 0.0;
+                      cubit.updateCarpetDimensions(width: w);
+                    },
+                  ),
+                ),
+                AppSpacing.gapHorizontalMd,
+
+                // Readonly Calculated Area
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Predefined size dropdown
-                      Expanded(
-                        child: DropdownButtonFormField<CarpetSize>(
-                          key: ValueKey('carpetSize_${state.draftCarpetSize?.id}'),
-                          initialValue: state.draftCarpetSize,
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'مقاس محدد مسبقاً',
-                            hintText: 'اختياري',
+                      Text('المساحة', style: AppTextStyles.labelLarge),
+                      AppSpacing.gapXs,
+                      Container(
+                        height: 48,
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.backgroundSecondary,
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Text(
+                          '${(state.draftCarpetLength * state.draftCarpetWidth).toStringAsFixed(2)} م²',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
-                          items: state.carpetSizes.map((size) {
-                            return DropdownMenuItem<CarpetSize>(
-                              value: size,
-                              child: Text('${size.length} × ${size.width} م (${size.area} م²)', style: AppTextStyles.bodyMedium),
-                            );
-                          }).toList(),
-                          onChanged: (size) => cubit.selectCarpetSize(size),
                         ),
                       ),
-                      AppSpacing.gapHorizontalMd,
-                      // Length
-                      Expanded(
-                        child: AppTextField(
-                          controller: _lengthController,
-                          label: 'الطول (متر) *',
-                          hintText: 'مثال: 3.0',
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          onChanged: (val) {
-                            final l = double.tryParse(val) ?? 0.0;
-                            cubit.updateCarpetDimensions(length: l);
-                          },
-                        ),
-                      ),
-                      AppSpacing.gapHorizontalMd,
-                      // Width
-                      Expanded(
-                        child: AppTextField(
-                          controller: _widthController,
-                          label: 'العرض (متر) *',
-                          hintText: 'مثال: 2.0',
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          onChanged: (val) {
-                            final w = double.tryParse(val) ?? 0.0;
-                            cubit.updateCarpetDimensions(width: w);
-                          },
-                        ),
-                      ),
-                      AppSpacing.gapHorizontalMd,
-                      // Calculated Area
-                      Padding(
-                        padding: const EdgeInsets.only(top: 24),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.md,
-                            vertical: AppSpacing.md,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                            border: Border.all(color: AppColors.border),
-                          ),
-                          child: Text(
-                            'المساحة: ${(state.draftCarpetLength * state.draftCarpetWidth).toStringAsFixed(2)} م²',
-                            style: AppTextStyles.labelMedium.copyWith(fontWeight: FontWeight.bold),
-                          ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'تُحسب تلقائياً',
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: AppColors.textTertiary,
+                          fontSize: 12,
                         ),
                       ),
                     ],
                   ),
+                ),
+              ],
+            ),
+            AppSpacing.gapMd,
+          ],
+
+          // Price Field + Helper Text + Reset Button
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('سعر العنصر (ج.م) *', style: AppTextStyles.labelLarge),
+                  if (isPriceOverridden)
+                    InkWell(
+                      onTap: () {
+                        cubit.updateUnitPrice(state.draftService!.price);
+                        _priceController.text =
+                            state.draftService!.price.toEgp.toStringAsFixed(2);
+                      },
+                      child: Text(
+                        'إعادة الافتراضي',
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                 ],
               ),
-            ),
-          ],
+              AppSpacing.gapXs,
+              AppTextField(
+                controller: _priceController,
+                hintText: '0.00',
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (val) {
+                  final numVal = double.tryParse(val);
+                  if (numVal != null && numVal > 0) {
+                    cubit.updateUnitPrice(Money.fromEgp(numVal));
+                  }
+                },
+              ),
+              if (state.draftService != null) ...[
+                AppSpacing.gapXs,
+                Text(
+                  isPriceOverridden
+                      ? 'السعر الافتراضي للخدمة ${state.draftService!.price.toEgp.toStringAsFixed(2)} ج.م — تم تعديله لهذا العنصر'
+                      : 'السعر الافتراضي للخدمة ${state.draftService!.price.toEgp.toStringAsFixed(2)} ج.م — يمكنك تعديله لهذا العنصر فقط',
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: isPriceOverridden ? AppColors.warning : AppColors.textTertiary,
+                  ),
+                ),
+              ],
+            ],
+          ),
           AppSpacing.gapMd,
 
-          // Notes input
+          // Item Notes
           AppTextField(
             controller: _notesController,
-            label: 'ملاحظات على القطعة',
-            hintText: 'أي بقع أو تعليمات غسيل خاصة بهذه القطعة',
+            label: 'ملاحظات القطعة',
+            hintText: 'مثال: بقعة على الياقة',
             onChanged: (val) => cubit.updateDraftNotes(val),
           ),
           AppSpacing.gapLg,
 
-          // Add item button
+          // Add Item Button
           Align(
             alignment: Alignment.centerLeft,
             child: AppButton(
-              label: '+ إضافة القطعة',
-              variant: AppButtonVariant.primary,
-              onPressed: () {
-                cubit.addItemDraftToOrder();
-                _notesController.clear();
-              },
+              label: 'إضافة القطعة',
+              icon: Icons.add,
+              variant: AppButtonVariant.secondary,
+              onPressed: state.draftItemType == null || state.draftService == null
+                  ? null
+                  : () {
+                      cubit.addItemDraftToOrder();
+                      _notesController.clear();
+                    },
             ),
           ),
         ],

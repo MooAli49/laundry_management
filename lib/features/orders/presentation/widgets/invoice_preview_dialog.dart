@@ -4,6 +4,7 @@ import '../../../../core/localization/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../domain/entities/business_settings.dart';
 import '../../../../domain/entities/customer.dart';
@@ -132,7 +133,7 @@ class InvoicePreviewDialog extends StatelessWidget {
                                 ),
                                 AppSpacing.gapXs,
                                 Text(
-                                  'التاريخ: ${order.createdAt.year}-${order.createdAt.month.toString().padLeft(2, '0')}-${order.createdAt.day.toString().padLeft(2, '0')}',
+                                  'التاريخ: ${DateFormatter.formatArabicDate(order.createdAt)}',
                                   style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
                                 ),
                               ],
@@ -177,7 +178,7 @@ class InvoicePreviewDialog extends StatelessWidget {
                                     style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
                                   ),
                                   Text(
-                                    order.expectedPickupDate.toString(),
+                                    DateFormatter.formatArabicDate(order.expectedPickupDate.toDateTime()),
                                     style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
                                   ),
                                 ],
@@ -273,8 +274,6 @@ class InvoicePreviewDialog extends StatelessWidget {
                                   _summaryRow('استلام من العميل:', '+ ${order.customerPickupFee.toEgp.toStringAsFixed(2)} ج.م'),
                                 if (order.customerDeliveryRequested)
                                   _summaryRow('توصيل للعميل:', '+ ${order.customerDeliveryFee.toEgp.toStringAsFixed(2)} ج.م'),
-                                if (order.tax.isPositive)
-                                  _summaryRow('الضريبة:', '+ ${order.tax.toEgp.toStringAsFixed(2)} ج.م'),
                                 const Divider(height: AppSpacing.md),
                                 _summaryRow('الإجمالي:', '${order.total.toEgp.toStringAsFixed(2)} ج.م', isBold: true),
                                 _summaryRow('المدفوع:', '${totalPaid.toEgp.toStringAsFixed(2)} ج.م'),

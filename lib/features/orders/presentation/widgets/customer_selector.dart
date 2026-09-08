@@ -127,13 +127,10 @@ class _CustomerSelectorState extends State<CustomerSelector> {
               ),
             ),
             AppSpacing.gapHorizontalSm,
-            Padding(
-              padding: const EdgeInsets.only(top: 24),
-              child: AppButton(
-                label: '+ عميل جديد',
-                variant: AppButtonVariant.secondary,
-                onPressed: _openAddCustomerDialog,
-              ),
+            AppButton(
+              label: '+ عميل جديد',
+              variant: AppButtonVariant.secondary,
+              onPressed: _openAddCustomerDialog,
             ),
           ],
         ),
