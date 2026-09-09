@@ -69,7 +69,7 @@ class MoveStoredItemUseCase {
     }
 
     if (activeRecord.storageLocationId == input.newStorageLocationId) {
-      return activeRecord;
+      throw const BusinessRuleFailure('لا يمكن نقل العنصر إلى نفس الموقع');
     }
 
     return await _storageRepository.moveItem(

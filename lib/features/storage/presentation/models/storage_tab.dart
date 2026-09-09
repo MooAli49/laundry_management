@@ -1,0 +1,4 @@
+enum StorageTab {
+  requiringStorage,
+  currentStorage,
+}

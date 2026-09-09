@@ -64,7 +64,10 @@ class AppRouter {
           ),
           GoRoute(
             path: AppRoutes.storage,
-            builder: (context, state) => const StorageScreen(),
+            builder: (context, state) => StorageScreen(
+              initialOrderId: state.uri.queryParameters['orderId'],
+              initialOrderNumber: state.uri.queryParameters['orderNumber'],
+            ),
           ),
           GoRoute(
             path: AppRoutes.reports,

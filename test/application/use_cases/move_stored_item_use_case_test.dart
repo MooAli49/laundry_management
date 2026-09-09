@@ -239,12 +239,19 @@ void main() {
       expect(storageRepo.moveItemCalled, false);
     });
 
-    test('Test E: returns existing record when moving to same location (no-op)', () async {
-      final result = await useCase.execute(
-        const MoveStoredItemInput(orderItemId: 'item-1', newStorageLocationId: 'loc-1'),
+    test('Test E: rejects moving to same location with BusinessRuleFailure', () async {
+      expect(
+        () => useCase.execute(
+          const MoveStoredItemInput(orderItemId: 'item-1', newStorageLocationId: 'loc-1'),
+        ),
+        throwsA(
+          isA<BusinessRuleFailure>().having(
+            (e) => e.message,
+            'message',
+            contains('لا يمكن نقل العنصر إلى نفس الموقع'),
+          ),
+        ),
       );
-
-      expect(result.id, 'rec-1');
       expect(storageRepo.moveItemCalled, false);
     });
 

@@ -92,4 +92,51 @@ class AppStrings {
   static String remainingAmount(String amount) => 'المتبقي: $amount ج.م';
   static const String loadMoreOrders = 'تحميل المزيد من الطلبات';
   static const String customerUpdatedSuccessfully = 'تم تحديث بيانات العميل بنجاح';
+
+  // Storage
+  static const String itemsRequiringStorage = 'تحتاج إلى تخزين';
+  static const String currentStorage = 'مخزنة حاليًا';
+  static const String searchStoragePlaceholder = 'بحث برقم الطلب، اسم العميل، أو رقم الهاتف...';
+  static const String storeAction = 'تخزين';
+  static const String storeItemsAction = 'تخزين العناصر';
+  static const String moveAction = 'نقل';
+  static const String unstoreAction = 'إزالة من التخزين';
+  static const String unstoreConfirmTitle = 'إزالة من التخزين؟';
+  static const String unstoreConfirmMessage =
+      'سيتم إلغاء التخزين الحالي لهذا العنصر وسيعود إلى قائمة العناصر التي تحتاج إلى تخزين، ويمكن تخزينه لاحقاً.';
+  static const String confirmUnstore = 'تأكيد الإزالة';
+  static const String storeItemsSuccess = 'تم تخزين العناصر بنجاح';
+  static const String storeItemSuccess = 'تم تخزين العنصر بنجاح';
+  static const String moveItemSuccess = 'تم نقل العنصر بنجاح';
+  static const String unstoreItemSuccess = 'تمت إزالة العنصر من التخزين بنجاح';
+  static String selectedItemsCount(int count) => 'تم تحديد $count عناصر';
+  static const String noItemsRequiringStorage = 'لا توجد عناصر تحتاج إلى تخزين';
+  static const String noCurrentStorageItems = 'لا توجد عناصر مخزنة حاليًا';
+  static const String noStorageResults = 'لا توجد نتائج مطابقة';
+  static const String noStorageResultsMessage =
+      'لم يتم العثور على أي عناصر مطابقة لمعايير البحث أو الفلتر.';
+  static const String failedToLoadStorage = 'تعذر تحميل بيانات التخزين';
+  static const String storageLocationLabel = 'مكان التخزين *';
+  static const String chooseStorageLocation = 'اختر موقع التخزين';
+  static const String currentLocationLabel = 'الموقع الحالي';
+  static const String newLocationLabel = 'الموقع الجديد *';
+  static const String confirmStore = 'تأكيد التخزين';
+  static const String confirmMove = 'تأكيد النقل';
+  static const String cannotMoveToSameLocation = 'لا يمكن نقل العنصر إلى نفس الموقع';
+  static const String incompatibleLocation = 'الموقع المحدد غير متوافق مع نوع العنصر';
+  static const String conflictingTypesWarning =
+      'القطع المحددة تتطلب أماكن تخزين مختلفة (أنواع مختلفة). يرجى تخزين كل نوع على حدة.';
+  static const String loadMoreStorageItems = 'تحميل المزيد';
+  static const String allItemTypes = 'جميع الأنواع';
+  static const String allServices = 'جميع الخدمات';
+  static const String allLocations = 'جميع المواقع';
+  static const String filterByItemType = 'نوع القطعة';
+  static const String filterByService = 'الخدمة';
+  static const String filterByLocation = 'الموقع';
+  static const String filterByExpectedPickup = 'تاريخ الاستلام المتوقع';
+  static const String filterByOrderReceived = 'تاريخ استلام الطلب';
+  static const String resetFilters = 'إعادة ضبط الفلاتر';
+  static const String selectAtLeastOneItem = 'يجب اختيار قطعة واحدة على الأقل';
+  static const String selectLocation = 'يجب اختيار مكان التخزين';
+  static const String orderNumberPrefix = 'طلب #';
 }
