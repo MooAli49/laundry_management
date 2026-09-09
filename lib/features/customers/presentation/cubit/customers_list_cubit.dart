@@ -18,6 +18,17 @@ class CustomersListCubit extends Cubit<CustomersListState> {
   final OrderRepository _orderRepository;
   Timer? _debounceTimer;
   int _searchRequestId = 0;
+  int _latestLoadMoreRequestId = 0;
+
+  bool _isStaleLoadMore(int requestId) {
+    if (requestId != _searchRequestId) {
+      if (requestId == _latestLoadMoreRequestId && state.isLoadingMore) {
+        emit(state.copyWith(isLoadingMore: false));
+      }
+      return true;
+    }
+    return false;
+  }
 
   CustomersListCubit({
     required CustomerRepository customerRepository,
@@ -57,17 +68,20 @@ class CustomersListCubit extends Cubit<CustomersListState> {
         totalCustomersCount: totalCount,
         hasMoreCustomers: hasMore,
         isLoading: false,
+        isLoadingMore: false,
       ));
     } on Failure catch (e) {
       if (isClosed || requestId != _searchRequestId) return;
       emit(state.copyWith(
         isLoading: false,
+        isLoadingMore: false,
         errorMessage: e.message,
       ));
     } catch (_) {
       if (isClosed || requestId != _searchRequestId) return;
       emit(state.copyWith(
         isLoading: false,
+        isLoadingMore: false,
         errorMessage: AppStrings.unexpectedError,
       ));
     }
@@ -78,6 +92,7 @@ class CustomersListCubit extends Cubit<CustomersListState> {
       return;
     }
     final requestId = ++_searchRequestId;
+    _latestLoadMoreRequestId = requestId;
     emit(state.copyWith(isLoadingMore: true, clearErrorMessage: true));
     try {
       final rawQuery = state.searchQuery.trim();
@@ -91,7 +106,8 @@ class CustomersListCubit extends Cubit<CustomersListState> {
       final nextCustomerIds = nextCustomers.map((c) => c.id).toList();
       final nextOrderCounts = await _orderRepository.getOrderCountsByCustomerIds(nextCustomerIds);
 
-      if (isClosed || requestId != _searchRequestId) return;
+      if (isClosed) return;
+      if (_isStaleLoadMore(requestId)) return;
 
       final nextViewModels = nextCustomers.map((customer) {
         return CustomerListItemViewModel(
@@ -109,13 +125,15 @@ class CustomersListCubit extends Cubit<CustomersListState> {
         hasMoreCustomers: hasMore,
       ));
     } on Failure catch (e) {
-      if (isClosed || requestId != _searchRequestId) return;
+      if (isClosed) return;
+      if (_isStaleLoadMore(requestId)) return;
       emit(state.copyWith(
         isLoadingMore: false,
         errorMessage: e.message,
       ));
     } catch (_) {
-      if (isClosed || requestId != _searchRequestId) return;
+      if (isClosed) return;
+      if (_isStaleLoadMore(requestId)) return;
       emit(state.copyWith(
         isLoadingMore: false,
         errorMessage: AppStrings.unexpectedError,
