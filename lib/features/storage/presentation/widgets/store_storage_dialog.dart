@@ -8,6 +8,15 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../domain/entities/storage_item.dart';
 import '../../../../domain/entities/storage_location.dart';
 
+/// StoreStorageDialog matching the approved Figma LocationDialog specification (`screens.tsx`).
+///
+/// Features:
+/// - Max width: 480px, 16px radius, 24px padding
+/// - Title: 18px font-semibold textPrimary
+/// - Summary banner: rounded 12px, secondary bg, 14px textSecondary
+/// - No locations warning: rounded 12px, warningLight bg, 14px warning text
+/// - Location selector: "موقع التخزين *" label, 44px container, hint below
+/// - Footer: Primary "تأكيد التخزين" with check icon, secondary "إلغاء"
 class StoreStorageDialog extends StatefulWidget {
   final List<StorageItem> itemsToStore;
   final List<StorageLocation> availableLocations;
@@ -56,7 +65,10 @@ class _StoreStorageDialogState extends State<StoreStorageDialog> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = e.toString().replaceFirst('BusinessRuleFailure: ', '').replaceFirst('Failure: ', '');
+        _errorMessage = e
+            .toString()
+            .replaceFirst('BusinessRuleFailure: ', '')
+            .replaceFirst('Failure: ', '');
       });
     }
   }
@@ -65,50 +77,68 @@ class _StoreStorageDialogState extends State<StoreStorageDialog> {
   Widget build(BuildContext context) {
     final isBulk = widget.itemsToStore.length > 1;
     final single = widget.itemsToStore.isNotEmpty ? widget.itemsToStore.first : null;
+    final hasLocations = widget.availableLocations.isNotEmpty;
+
+    final summaryText = isBulk
+        ? 'عدد العناصر: ${widget.itemsToStore.length}'
+        : (single != null
+            ? 'العنصر: ${single.orderItem.itemTypeNameSnapshot} — الطلب #${single.orderNumber}'
+            : '');
 
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
+      backgroundColor: AppColors.surfaceElevated,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.xl),
+          padding: const EdgeInsets.all(AppSpacing.xxl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
+              // Header: Title + Close Icon
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    isBulk ? AppStrings.storeItemsAction : AppStrings.storeAction,
-                    style: AppTextStyles.titleLarge,
+                    isBulk ? 'تخزين العناصر' : AppStrings.storeAction,
+                    style: AppTextStyles.headlineMedium.copyWith(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                   IconButton(
                     onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close, size: 20, color: AppColors.textTertiary),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
                 ],
               ),
-              AppSpacing.gapMd,
+              AppSpacing.gapLg,
 
+              // Error banner if any
               if (_errorMessage != null) ...[
                 Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: AppColors.errorLight,
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline, color: AppColors.error),
+                      const Icon(Icons.error_outline, color: AppColors.error, size: 18),
                       AppSpacing.gapHorizontalSm,
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.error,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ],
@@ -117,94 +147,132 @@ class _StoreStorageDialogState extends State<StoreStorageDialog> {
                 AppSpacing.gapMd,
               ],
 
-              // Summary of items
-              if (isBulk) ...[
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: AppColors.backgroundSecondary,
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.inventory_2_outlined, color: AppColors.primary),
-                      AppSpacing.gapHorizontalSm,
-                      Text(
-                        'عدد العناصر المحددة: ${widget.itemsToStore.length}',
-                        style: AppTextStyles.titleMedium,
-                      ),
-                    ],
+              // Summary Banner (Figma: rounded-xl bg-secondary px-4 py-3 text-[14px] text-text-secondary)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                ),
+                child: Text(
+                  summaryText,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
                   ),
                 ),
-                AppSpacing.gapMd,
-              ] else if (single != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    color: AppColors.secondary,
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '#${single.orderNumber} - ${single.customerName}',
-                        style: AppTextStyles.labelMedium.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      AppSpacing.gapXs,
-                      Text(
-                        '${single.orderItem.itemTypeNameSnapshot} - ${single.orderItem.serviceNameSnapshot}',
-                        style: AppTextStyles.titleMedium,
-                      ),
-                    ],
-                  ),
-                ),
-                AppSpacing.gapMd,
-              ],
-
-              // Storage Location Selector
-              Text(AppStrings.storageLocationLabel, style: AppTextStyles.labelLarge),
-              AppSpacing.gapXs,
-              DropdownButtonFormField<StorageLocation>(
-                initialValue: _selectedLocation,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  hintText: widget.availableLocations.isEmpty
-                      ? 'لا توجد أماكن تخزين متوافقة متاحة'
-                      : AppStrings.chooseStorageLocation,
-                ),
-                items: widget.availableLocations.map((loc) {
-                  return DropdownMenuItem<StorageLocation>(
-                    value: loc,
-                    child: Text(loc.name, style: AppTextStyles.bodyMedium),
-                  );
-                }).toList(),
-                onChanged: widget.availableLocations.isEmpty
-                    ? null
-                    : (loc) => setState(() => _selectedLocation = loc),
               ),
-              AppSpacing.gapXl,
+              AppSpacing.gapLg,
 
-              // Action Buttons
+              // Location Selector or No-Locations Warning
+              if (!hasLocations) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.warningLight,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                  ),
+                  child: Text(
+                    'لا توجد أماكن تخزين مناسبة لهذه القطعة.',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      fontSize: 14,
+                      color: AppColors.warning,
+                    ),
+                  ),
+                ),
+              ] else ...[
+                // Label with red asterisk
+                Row(
+                  children: [
+                    Text(
+                      AppStrings.storageLocationLabel,
+                      style: AppTextStyles.labelLarge.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      '*',
+                      style: TextStyle(color: AppColors.error, fontSize: 14),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+
+                // Dropdown selector
+                DropdownButtonFormField<StorageLocation>(
+                  initialValue: _selectedLocation,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                      borderSide: const BorderSide(color: AppColors.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                      borderSide: const BorderSide(color: AppColors.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                    ),
+                    filled: true,
+                    fillColor: AppColors.surface,
+                    hintText: AppStrings.chooseStorageLocation,
+                  ),
+                  items: widget.availableLocations.map((loc) {
+                    return DropdownMenuItem<StorageLocation>(
+                      value: loc,
+                      child: Text(
+                        loc.name,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontSize: 14,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (loc) => setState(() => _selectedLocation = loc),
+                ),
+                const SizedBox(height: 6),
+
+                // Hint
+                Text(
+                  'تظهر المواقع المناسبة لنوع القطعة فقط',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+              AppSpacing.gapXxl,
+
+              // Footer: Confirm + Cancel (in RTL, Confirm appears first on the right)
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  if (hasLocations) ...[
+                    AppButton(
+                      label: AppStrings.confirmStore,
+                      icon: Icons.check,
+                      isLoading: _isLoading,
+                      onPressed: (_isLoading || _selectedLocation == null)
+                          ? null
+                          : _handleSubmit,
+                    ),
+                    AppSpacing.gapHorizontalMd,
+                  ],
                   AppButton(
                     label: AppStrings.cancel,
                     variant: AppButtonVariant.secondary,
                     onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                  ),
-                  AppSpacing.gapHorizontalMd,
-                  AppButton(
-                    label: AppStrings.confirmStore,
-                    isLoading: _isLoading,
-                    onPressed: (_isLoading || _selectedLocation == null || widget.availableLocations.isEmpty)
-                        ? null
-                        : _handleSubmit,
                   ),
                 ],
               ),

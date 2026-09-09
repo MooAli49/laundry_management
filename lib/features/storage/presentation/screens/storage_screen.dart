@@ -6,10 +6,8 @@ import '../../../../core/localization/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/widgets/app_button.dart';
+import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_error_state.dart';
-import '../../../../core/widgets/app_text_field.dart';
-import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../core/widgets/page_header.dart';
 import '../../../../domain/entities/storage_item.dart';
@@ -41,13 +39,22 @@ class StorageScreen extends StatelessWidget {
           initialOrderId: initialOrderId,
           initialOrderNumber: initialOrderNumber,
         ),
-      child: const _StorageView(),
+      child: _StorageView(
+        initialOrderId: initialOrderId,
+        initialOrderNumber: initialOrderNumber,
+      ),
     );
   }
 }
 
 class _StorageView extends StatefulWidget {
-  const _StorageView();
+  final String? initialOrderId;
+  final String? initialOrderNumber;
+
+  const _StorageView({
+    this.initialOrderId,
+    this.initialOrderNumber,
+  });
 
   @override
   State<_StorageView> createState() => _StorageViewState();
@@ -162,210 +169,324 @@ class _StorageViewState extends State<_StorageView> {
       },
       builder: (context, state) {
         final isRequiring = state.activeTab == StorageTab.requiringStorage;
+        final hasOrderContext = widget.initialOrderId != null;
 
         return Scaffold(
-          bottomNavigationBar: (isRequiring && state.isAnyItemSelected)
-              ? BulkStorageBottomBar(
-                  selectedCount: state.selectedItemsCount,
-                  hasConflictingTypes: state.hasConflictingItemTypes,
-                  onClearSelection: cubit.clearSelection,
-                  onBulkStore: () => _openBulkStoreDialog(context),
-                )
-              : null,
-          body: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.page,
-              vertical: AppSpacing.lg,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                PageHeader(
-                  title: AppStrings.storage,
-                  subtitle: isRequiring
-                      ? '${AppStrings.itemsRequiringStorage} (${state.totalCount})'
-                      : '${AppStrings.currentStorage} (${state.totalCount})',
-                  actions: [
-                    if (isRequiring && state.items.isNotEmpty) ...[
-                      TextButton.icon(
-                        onPressed: () {
-                          final allSelected =
-                              state.selectedItemIds.length == state.items.length;
-                          cubit.toggleSelectAll(!allSelected);
-                        },
-                        icon: Icon(
-                          state.selectedItemIds.length == state.items.length
-                              ? Icons.deselect_outlined
-                              : Icons.select_all_outlined,
-                          size: 18,
-                        ),
-                        label: Text(
-                          state.selectedItemIds.length == state.items.length
-                              ? 'إلغاء تحديد الكل'
-                              : 'تحديد كل الصفحة',
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-
-                // Operational Tab Switcher
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.backgroundSecondary,
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  ),
-                  padding: const EdgeInsets.all(4),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _TabButton(
-                          label: AppStrings.itemsRequiringStorage,
-                          isSelected: isRequiring,
-                          onTap: () => cubit.switchTab(StorageTab.requiringStorage),
-                        ),
-                      ),
-                      Expanded(
-                        child: _TabButton(
-                          label: AppStrings.currentStorage,
-                          isSelected: !isRequiring,
-                          onTap: () => cubit.switchTab(StorageTab.currentStorage),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                AppSpacing.gapMd,
-
-                // Search Bar
-                AppTextField(
-                  controller: _searchController,
-                  hintText: AppStrings.searchStoragePlaceholder,
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear, size: 18),
-                          onPressed: () {
-                            _searchController.clear();
-                            cubit.search('');
-                            setState(() {});
-                          },
-                        )
-                      : null,
-                  onChanged: (val) {
-                    cubit.search(val);
-                    setState(() {});
-                  },
-                ),
-                AppSpacing.gapMd,
-
-                // Filters Bar
-                StorageFilterBar(
-                  activeTab: state.activeTab,
-                  filter: state.filter,
-                  itemTypes: state.itemTypes,
-                  services: state.services,
-                  locations: state.availableLocations,
-                  onFilterChanged: cubit.setFilter,
-                  onResetFilters: () {
-                    _searchController.clear();
-                    cubit.resetFilters();
-                  },
-                ),
-                AppSpacing.gapMd,
-
-                // List Body
-                Expanded(
-                  child: Builder(
-                    builder: (context) {
-                      if (state.isLoading && state.items.isEmpty) {
-                        return const Center(child: LoadingIndicator());
-                      }
-
-                      if (state.errorMessage != null && state.items.isEmpty) {
-                        return AppErrorState(
-                          title: AppStrings.failedToLoadStorage,
-                          message: state.errorMessage!,
-                          onRetry: () => cubit.loadStorageItems(refresh: true),
-                        );
-                      }
-
-                      if (state.items.isEmpty) {
-                        final hasSearchOrFilter =
-                            state.searchQuery.isNotEmpty || state.filter.isActive;
-                        if (hasSearchOrFilter) {
-                          return EmptyState(
-                            icon: Icons.search_off_outlined,
-                            title: AppStrings.noStorageResults,
-                            message: AppStrings.noStorageResultsMessage,
-                            actionButton: AppButton(
-                              label: AppStrings.resetFilters,
-                              variant: AppButtonVariant.secondary,
-                              onPressed: () {
-                                _searchController.clear();
-                                cubit.resetFilters();
-                              },
+          body: RefreshIndicator(
+            onRefresh: () => cubit.loadStorageItems(refresh: true),
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (scrollInfo) {
+                if (scrollInfo.metrics.pixels >=
+                    scrollInfo.metrics.maxScrollExtent - 200) {
+                  cubit.loadMoreStorageItems();
+                }
+                return false;
+              },
+              child: CustomScrollView(
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.page,
+                      AppSpacing.lg,
+                      AppSpacing.page,
+                      0,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // 1. Order Context Banner (ONLY when orderContextId / initialOrderId is present)
+                          if (hasOrderContext) ...[
+                            AppCard(
+                              backgroundColor: AppColors.primaryLighter,
+                              borderColor: Colors.transparent,
+                              borderRadius: AppSpacing.radiusLg,
+                              padding: const EdgeInsets.all(AppSpacing.lg),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.inventory_2_outlined,
+                                    size: 20,
+                                    color: AppColors.primary,
+                                  ),
+                                  AppSpacing.gapHorizontalMd,
+                                  Text.rich(
+                                    TextSpan(
+                                      text: 'تخزين الطلب ',
+                                      style: AppTextStyles.bodyMedium.copyWith(
+                                        fontSize: 14,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                      children: [
+                                        TextSpan(
+                                          text: '#${widget.initialOrderNumber ?? widget.initialOrderId}',
+                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          );
-                        }
+                            AppSpacing.gapLg,
+                          ],
 
-                        return EmptyState(
-                          icon: Icons.inventory_2_outlined,
-                          title: isRequiring
-                              ? AppStrings.noItemsRequiringStorage
-                              : AppStrings.noCurrentStorageItems,
-                          message: isRequiring
-                              ? 'جميع عناصر الطلبات الجارية مخزنة بالفعل.'
-                              : 'لا توجد عناصر مخزنة حالياً في المستودع.',
-                        );
-                      }
+                          // 2. Header Area (PageHeader)
+                          PageHeader(
+                            title: AppStrings.storage,
+                            subtitle: isRequiring
+                                ? '${AppStrings.itemsRequiringStorage} (${state.totalCount})'
+                                : '${AppStrings.currentStorage} (${state.totalCount})',
+                            actions: [
+                              if (isRequiring && state.items.isNotEmpty) ...[
+                                TextButton.icon(
+                                  onPressed: () {
+                                    final allSelected =
+                                        state.selectedItemIds.length == state.items.length;
+                                    cubit.toggleSelectAll(!allSelected);
+                                  },
+                                  icon: Icon(
+                                    state.selectedItemIds.length == state.items.length
+                                        ? Icons.deselect_outlined
+                                        : Icons.select_all_outlined,
+                                    size: 18,
+                                  ),
+                                  label: Text(
+                                    state.selectedItemIds.length == state.items.length
+                                        ? 'إلغاء تحديد الكل'
+                                        : 'تحديد كل الصفحة',
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
 
-                      return NotificationListener<ScrollNotification>(
-                        onNotification: (scrollInfo) {
-                          if (scrollInfo.metrics.pixels >=
-                              scrollInfo.metrics.maxScrollExtent - 200) {
-                            cubit.loadMoreStorageItems();
-                          }
-                          return false;
-                        },
-                        child: RefreshIndicator(
-                          onRefresh: () => cubit.loadStorageItems(refresh: true),
-                          child: ListView.builder(
-                            padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                            itemCount: state.items.length + (state.isLoadingMore ? 1 : 0),
-                            itemBuilder: (context, index) {
-                              if (index == state.items.length) {
-                                return const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
-                                  child: Center(child: LoadingIndicator()),
-                                );
-                              }
+                          // 3. Segmented Tab Switcher (Figma: natural width inline-flex)
+                          Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.secondary,
+                                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              padding: const EdgeInsets.all(4),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _FigmaSegmentedTab(
+                                    label: AppStrings.itemsRequiringStorage,
+                                    isSelected: isRequiring,
+                                    onTap: () =>
+                                        cubit.switchTab(StorageTab.requiringStorage),
+                                  ),
+                                  _FigmaSegmentedTab(
+                                    label: AppStrings.currentStorage,
+                                    isSelected: !isRequiring,
+                                    onTap: () =>
+                                        cubit.switchTab(StorageTab.currentStorage),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          AppSpacing.gapLg,
 
-                              final item = state.items[index];
-                              final isSelected = state.selectedItemIds.contains(item.orderItem.id);
-
-                              return StorageItemCard(
-                                item: item,
-                                isSelected: isSelected,
-                                onSelectionChanged: isRequiring
-                                    ? (selected) => cubit.toggleItemSelection(
-                                          item.orderItem.id,
-                                          selected,
-                                        )
+                          // 4. Search Field (Figma: h-11 rounded-xl bg-surface border-border)
+                          Container(
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: TextField(
+                              controller: _searchController,
+                              onChanged: (val) {
+                                cubit.search(val);
+                                setState(() {});
+                              },
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                fontSize: 14,
+                                color: AppColors.textPrimary,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: 'ابحث برقم الطلب أو اسم العميل',
+                                hintStyle: AppTextStyles.bodyMedium.copyWith(
+                                  fontSize: 14,
+                                  color: AppColors.textTertiary,
+                                ),
+                                prefixIcon: const Icon(
+                                  Icons.search,
+                                  size: 18,
+                                  color: AppColors.textTertiary,
+                                ),
+                                suffixIcon: _searchController.text.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(
+                                          Icons.close,
+                                          size: 16,
+                                          color: AppColors.textTertiary,
+                                        ),
+                                        onPressed: () {
+                                          _searchController.clear();
+                                          cubit.search('');
+                                          setState(() {});
+                                        },
+                                      )
                                     : null,
-                                onStore: () => _openStoreSingleDialog(context, item),
-                                onMove: () => _openMoveDialog(context, item),
-                                onUnstore: () => _openUnstoreDialog(context, item),
-                              );
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+                          AppSpacing.gapMd,
+
+                          // 5. Storage Filter Bar (Figma: structured responsive grid)
+                          StorageFilterBar(
+                            activeTab: state.activeTab,
+                            filter: state.filter,
+                            itemTypes: state.itemTypes,
+                            services: state.services,
+                            locations: state.availableLocations,
+                            isSearchActive: _searchController.text.trim().isNotEmpty,
+                            onFilterChanged: cubit.setFilter,
+                            onResetFilters: () {
+                              _searchController.clear();
+                              cubit.resetFilters();
+                              setState(() {});
                             },
                           ),
-                        ),
-                      );
-                    },
+
+                          // 6. Bulk Selection Floating Bar (Figma: sticky top-2 rounded-xl bg-surface-selected)
+                          if (isRequiring && state.isAnyItemSelected) ...[
+                            AppSpacing.gapLg,
+                            BulkStorageBottomBar(
+                              selectedCount: state.selectedItemsCount,
+                              hasConflictingTypes: state.hasConflictingItemTypes,
+                              onClearSelection: cubit.clearSelection,
+                              onBulkStore: () => _openBulkStoreDialog(context),
+                            ),
+                          ] else ...[
+                            AppSpacing.gapLg,
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ],
+
+                  // 7. Storage Items List Body or States
+                  if (state.isLoading && state.items.isEmpty)
+                    const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(child: LoadingIndicator()),
+                    )
+                  else if (state.errorMessage != null && state.items.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: AppErrorState(
+                        title: AppStrings.failedToLoadStorage,
+                        message: state.errorMessage!,
+                        onRetry: () => cubit.loadStorageItems(refresh: true),
+                      ),
+                    )
+                  else if (state.items.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.page,
+                          0,
+                          AppSpacing.page,
+                          AppSpacing.lg,
+                        ),
+                        child: (state.searchQuery.isNotEmpty || state.filter.isActive)
+                            ? _StorageEmptyContainer(
+                                icon: Icons.search_off_outlined,
+                                iconColor: AppColors.textSecondary,
+                                iconBgColor: AppColors.secondary,
+                                title: 'لا توجد نتائج مطابقة',
+                                description: 'جرّب تعديل البحث أو مسح الفلاتر.',
+                                action: TextButton(
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    cubit.resetFilters();
+                                    setState(() {});
+                                  },
+                                  child: Text(
+                                    'مسح البحث والفلاتر',
+                                    style: AppTextStyles.bodyMedium.copyWith(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : _StorageEmptyContainer(
+                                icon: Icons.inventory_2_outlined,
+                                iconColor: AppColors.primary,
+                                iconBgColor: AppColors.primaryLighter,
+                                title: isRequiring
+                                    ? 'لا توجد عناصر تحتاج إلى تخزين'
+                                    : 'لا توجد عناصر مخزنة',
+                                description: isRequiring
+                                    ? 'جميع العناصر الحالية تمت معالجتها. يمكنك العودة إلى الطلبات.'
+                                    : 'لم يتم تخزين أي عنصر بعد.',
+                              ),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.page,
+                        0,
+                        AppSpacing.page,
+                        AppSpacing.lg,
+                      ),
+                      sliver: SliverList.builder(
+                        itemCount: state.items.length +
+                            (state.isLoadingMore ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == state.items.length) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(
+                                vertical: AppSpacing.md,
+                              ),
+                              child: Center(child: LoadingIndicator()),
+                            );
+                          }
+
+                          final item = state.items[index];
+                          final isSelected = state.selectedItemIds
+                              .contains(item.orderItem.id);
+
+                          return StorageItemCard(
+                            item: item,
+                            isSelected: isSelected,
+                            onSelectionChanged: isRequiring
+                                ? (selected) =>
+                                    cubit.toggleItemSelection(
+                                      item.orderItem.id,
+                                      selected,
+                                    )
+                                : null,
+                            onStore: () =>
+                                _openStoreSingleDialog(context, item),
+                            onMove: () =>
+                                _openMoveDialog(context, item),
+                            onUnstore: () =>
+                                _openUnstoreDialog(context, item),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         );
@@ -374,12 +495,13 @@ class _StorageViewState extends State<_StorageView> {
   }
 }
 
-class _TabButton extends StatelessWidget {
+/// Natural-width Segmented Tab Item matching Figma SegmentedControl.
+class _FigmaSegmentedTab extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
 
-  const _TabButton({
+  const _FigmaSegmentedTab({
     required this.label,
     required this.isSelected,
     required this.onTap,
@@ -390,29 +512,111 @@ class _TabButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.surface : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 4,
+                    color: const Color(0x1417212E),
+                    blurRadius: 3,
                     offset: const Offset(0, 1),
                   ),
                 ]
               : null,
         ),
-        child: Center(
-          child: Text(
-            label,
-            style: AppTextStyles.labelLarge.copyWith(
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-              fontSize: 14,
+        child: Text(
+          label,
+          style: AppTextStyles.labelLarge.copyWith(
+            color: isSelected ? AppColors.primary : AppColors.textSecondary,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Dashed bordered empty state container matching Figma `EmptyState` / `NoResultsState`.
+class _StorageEmptyContainer extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBgColor;
+  final String title;
+  final String description;
+  final Widget? action;
+
+  const _StorageEmptyContainer({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBgColor,
+    required this.title,
+    required this.description,
+    this.action,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          decoration: BoxDecoration(
+            color: AppColors.surface.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+            border: Border.all(
+              color: AppColors.border,
+              width: 1,
+              style: BorderStyle.solid,
             ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // 56x56 icon box
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: iconBgColor,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+                ),
+                alignment: Alignment.center,
+                child: Icon(icon, size: 28, color: iconColor),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: AppTextStyles.headlineMedium.copyWith(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 360),
+                child: Text(
+                  description,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              if (action != null) ...[
+                const SizedBox(height: 16),
+                action!,
+              ],
+            ],
           ),
         ),
       ),

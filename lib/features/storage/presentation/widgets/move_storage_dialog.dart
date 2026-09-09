@@ -8,6 +8,15 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../domain/entities/storage_item.dart';
 import '../../../../domain/entities/storage_location.dart';
 
+/// MoveStorageDialog matching the approved Figma LocationDialog specification (`screens.tsx`).
+///
+/// Features:
+/// - Max width: 480px, 16px radius, 24px padding
+/// - Title: 18px font-semibold textPrimary ("نقل العنصر")
+/// - Summary banner: rounded 12px, secondary bg, item name and current location
+/// - Warning when no destination locations available
+/// - Destination location dropdown with label and hint
+/// - Footer: Primary "تأكيد النقل" with check icon, secondary "إلغاء"
 class MoveStorageDialog extends StatefulWidget {
   final StorageItem item;
   final List<StorageLocation> destinationLocations;
@@ -61,53 +70,73 @@ class _MoveStorageDialogState extends State<MoveStorageDialog> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = e.toString().replaceFirst('BusinessRuleFailure: ', '').replaceFirst('Failure: ', '');
+        _errorMessage = e
+            .toString()
+            .replaceFirst('BusinessRuleFailure: ', '')
+            .replaceFirst('Failure: ', '');
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final hasLocations = widget.destinationLocations.isNotEmpty;
+    final currentLocName = widget.item.storageLocation?.name ?? '-';
+
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
+      backgroundColor: AppColors.surfaceElevated,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.xl),
+          padding: const EdgeInsets.all(AppSpacing.xxl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
+              // Header: Title + Close Icon
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(AppStrings.moveAction, style: AppTextStyles.titleLarge),
+                  Text(
+                    'نقل العنصر',
+                    style: AppTextStyles.headlineMedium.copyWith(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                   IconButton(
                     onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close, size: 20, color: AppColors.textTertiary),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
                 ],
               ),
-              AppSpacing.gapMd,
+              AppSpacing.gapLg,
 
+              // Error banner if any
               if (_errorMessage != null) ...[
                 Container(
-                  padding: const EdgeInsets.all(AppSpacing.md),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: AppColors.errorLight,
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline, color: AppColors.error),
+                      const Icon(Icons.error_outline, color: AppColors.error, size: 18),
                       AppSpacing.gapHorizontalSm,
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.error,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ],
@@ -116,84 +145,132 @@ class _MoveStorageDialogState extends State<MoveStorageDialog> {
                 AppSpacing.gapMd,
               ],
 
-              // Item details
+              // Summary Banner (Figma: rounded-xl bg-secondary px-4 py-3 text-[14px] text-text-secondary)
               Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: AppColors.secondary,
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '#${widget.item.orderNumber} - ${widget.item.customerName}',
-                      style: AppTextStyles.labelMedium.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    AppSpacing.gapXs,
-                    Text(
-                      '${widget.item.orderItem.itemTypeNameSnapshot} - ${widget.item.orderItem.serviceNameSnapshot}',
-                      style: AppTextStyles.titleMedium,
-                    ),
-                    AppSpacing.gapSm,
-                    Row(
-                      children: [
-                        const Icon(Icons.inventory_2_outlined, size: 16, color: AppColors.textSecondary),
-                        AppSpacing.gapHorizontalXs,
-                        Text(
-                          '${AppStrings.currentLocationLabel}: ${widget.item.storageLocation?.name ?? "-"}',
-                          style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ],
+                child: Text(
+                  'العنصر: ${widget.item.orderItem.itemTypeNameSnapshot} — الموقع الحالي: $currentLocName',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
               AppSpacing.gapLg,
 
-              // Destination Location Selector (Excludes current location)
-              Text(AppStrings.newLocationLabel, style: AppTextStyles.labelLarge),
-              AppSpacing.gapXs,
-              DropdownButtonFormField<StorageLocation>(
-                initialValue: _selectedLocation,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  hintText: widget.destinationLocations.isEmpty
-                      ? 'لا توجد مواقع بديلة متوافقة'
-                      : AppStrings.chooseStorageLocation,
+              // Destination Location Selector or Warning
+              if (!hasLocations) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.warningLight,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                  ),
+                  child: Text(
+                    'لا توجد أماكن تخزين بديلة مناسبة لهذه القطعة.',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      fontSize: 14,
+                      color: AppColors.warning,
+                    ),
+                  ),
                 ),
-                items: widget.destinationLocations.map((loc) {
-                  return DropdownMenuItem<StorageLocation>(
-                    value: loc,
-                    child: Text(loc.name, style: AppTextStyles.bodyMedium),
-                  );
-                }).toList(),
-                onChanged: widget.destinationLocations.isEmpty
-                    ? null
-                    : (loc) => setState(() => _selectedLocation = loc),
-              ),
-              AppSpacing.gapXl,
+              ] else ...[
+                // Label with red asterisk
+                Row(
+                  children: [
+                    Text(
+                      AppStrings.newLocationLabel,
+                      style: AppTextStyles.labelLarge.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      '*',
+                      style: TextStyle(color: AppColors.error, fontSize: 14),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
 
-              // Actions
+                // Dropdown selector
+                DropdownButtonFormField<StorageLocation>(
+                  initialValue: _selectedLocation,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                      borderSide: const BorderSide(color: AppColors.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                      borderSide: const BorderSide(color: AppColors.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                    ),
+                    filled: true,
+                    fillColor: AppColors.surface,
+                    hintText: AppStrings.chooseStorageLocation,
+                  ),
+                  items: widget.destinationLocations.map((loc) {
+                    return DropdownMenuItem<StorageLocation>(
+                      value: loc,
+                      child: Text(
+                        loc.name,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontSize: 14,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (loc) => setState(() => _selectedLocation = loc),
+                ),
+                const SizedBox(height: 6),
+
+                // Hint
+                Text(
+                  'تظهر المواقع المناسبة لنوع القطعة فقط',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+              AppSpacing.gapXxl,
+
+              // Footer: Confirm + Cancel (in RTL, Confirm appears first on the right)
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  if (hasLocations) ...[
+                    AppButton(
+                      label: AppStrings.confirmMove,
+                      icon: Icons.check,
+                      isLoading: _isLoading,
+                      onPressed: (_isLoading || _selectedLocation == null)
+                          ? null
+                          : _handleSubmit,
+                    ),
+                    AppSpacing.gapHorizontalMd,
+                  ],
                   AppButton(
                     label: AppStrings.cancel,
                     variant: AppButtonVariant.secondary,
                     onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                  ),
-                  AppSpacing.gapHorizontalMd,
-                  AppButton(
-                    label: AppStrings.confirmMove,
-                    isLoading: _isLoading,
-                    onPressed: (_isLoading || _selectedLocation == null || widget.destinationLocations.isEmpty)
-                        ? null
-                        : _handleSubmit,
                   ),
                 ],
               ),

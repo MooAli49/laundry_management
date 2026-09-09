@@ -305,5 +305,55 @@ void main() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
     });
+
+    testWidgets('53. StorageScreen does not overflow with bulk selection bar on small viewport', (tester) async {
+      tester.view.physicalSize = const Size(1024, 550);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(createTestApp(const StorageScreen()));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+
+      // Select first item to display BulkStorageBottomBar
+      final firstCheckbox = find.byType(Checkbox).first;
+      await tester.tap(firstCheckbox);
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(BulkStorageBottomBar), findsOneWidget);
+    });
+
+    testWidgets('54. StorageScreen does not overflow with order context banner and empty state on small viewport', (tester) async {
+      tester.view.physicalSize = const Size(900, 500);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(createTestApp(const StorageScreen(
+        initialOrderId: 'non_existent_order_id',
+        initialOrderNumber: '1001',
+      )));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('#1001'), findsOneWidget);
+    });
+
+    testWidgets('55. StorageScreen does not overflow on Current Storage tab with 5 filters in small viewport', (tester) async {
+      tester.view.physicalSize = const Size(900, 550);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(createTestApp(const StorageScreen()));
+      await tester.pumpAndSettle();
+
+      // Switch to Current Storage tab (5 filters wrapping to multiple rows)
+      await tester.tap(find.text(AppStrings.currentStorage));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(StorageFilterBar), findsOneWidget);
+    });
   });
 }
