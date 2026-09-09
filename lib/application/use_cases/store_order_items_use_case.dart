@@ -1,17 +1,18 @@
 import '../../core/errors/failures.dart';
 import '../../domain/entities/order.dart';
+import '../../domain/entities/order_item.dart';
 import '../../domain/enums/order_status.dart';
 import '../../domain/repositories/order_repository.dart';
 import '../../domain/repositories/storage_location_repository.dart';
 import '../../domain/repositories/storage_repository.dart';
 
 class StoreOrderItemsInput {
-  final String orderId;
+  final String? orderId;
   final List<String> orderItemIds;
   final String storageLocationId;
 
   const StoreOrderItemsInput({
-    required this.orderId,
+    this.orderId,
     required this.orderItemIds,
     required this.storageLocationId,
   });
@@ -50,14 +51,6 @@ class StoreOrderItemsUseCase {
       throw const ValidationFailure('Duplicate item IDs are not allowed in storage request');
     }
 
-    final order = await _orderRepository.getOrderById(input.orderId);
-    if (order == null) {
-      throw const ValidationFailure('Order not found');
-    }
-    if (order.status != OrderStatus.processing) {
-      throw const BusinessRuleFailure('Only processing orders can store items');
-    }
-
     final location = await _storageLocationRepository.getStorageLocationById(input.storageLocationId);
     if (location == null) {
       throw const ValidationFailure('Storage location not found');
@@ -66,15 +59,53 @@ class StoreOrderItemsUseCase {
       throw const BusinessRuleFailure('Storage location is inactive');
     }
 
-    final orderItems = await _orderRepository.getOrderItems(input.orderId);
-    final orderItemMap = {for (final item in orderItems) item.id: item};
+    // Resolve and validate items and orders
+    final List<OrderItem> resolvedItems = [];
+    final Map<String, Order> ordersById = {};
 
-    for (final itemId in input.orderItemIds) {
-      final item = orderItemMap[itemId];
-      if (item == null) {
-        throw BusinessRuleFailure('Item $itemId does not belong to order ${input.orderId}');
+    if (input.orderId != null) {
+      final order = await _orderRepository.getOrderById(input.orderId!);
+      if (order == null) {
+        throw const ValidationFailure('Order not found');
       }
+      if (order.status != OrderStatus.processing) {
+        throw const BusinessRuleFailure('Only processing orders can store items');
+      }
+      ordersById[order.id] = order;
 
+      final orderItems = await _orderRepository.getOrderItems(input.orderId!);
+      final orderItemMap = {for (final item in orderItems) item.id: item};
+
+      for (final itemId in input.orderItemIds) {
+        final item = orderItemMap[itemId];
+        if (item == null) {
+          throw BusinessRuleFailure('Item $itemId does not belong to order ${input.orderId}');
+        }
+        resolvedItems.add(item);
+      }
+    } else {
+      for (final itemId in input.orderItemIds) {
+        final item = await _orderRepository.getOrderItemById(itemId);
+        if (item == null) {
+          throw ValidationFailure('Item $itemId not found');
+        }
+        resolvedItems.add(item);
+
+        if (!ordersById.containsKey(item.orderId)) {
+          final order = await _orderRepository.getOrderById(item.orderId);
+          if (order == null) {
+            throw ValidationFailure('Order ${item.orderId} not found');
+          }
+          if (order.status != OrderStatus.processing) {
+            throw const BusinessRuleFailure('Only processing orders can store items');
+          }
+          ordersById[order.id] = order;
+        }
+      }
+    }
+
+    // Validate location compatibility with EVERY selected item (Intersection)
+    for (final item in resolvedItems) {
       final compatibleLocations = await _storageLocationRepository.getCompatibleLocationsForItemType(
         item.itemTypeId,
       );
@@ -87,21 +118,29 @@ class StoreOrderItemsUseCase {
       }
     }
 
+    // Atomically bulk store items
     await _storageRepository.bulkStoreItems(
       orderItemIds: input.orderItemIds,
       storageLocationId: input.storageLocationId,
     );
 
-    final allStored = await _storageRepository.areAllOrderItemsStored(input.orderId);
-    Order finalOrder = order;
+    // Reuse existing Order readiness logic from Task #06
+    bool allOrdersStored = true;
+    Order? lastUpdatedOrder;
 
-    if (allStored) {
-      finalOrder = await _orderRepository.markOrderReady(input.orderId);
+    for (final orderId in ordersById.keys) {
+      final allStored = await _storageRepository.areAllOrderItemsStored(orderId);
+      if (allStored) {
+        lastUpdatedOrder = await _orderRepository.markOrderReady(orderId);
+      } else {
+        allOrdersStored = false;
+        lastUpdatedOrder = ordersById[orderId];
+      }
     }
 
     return StoreOrderItemsResult(
-      order: finalOrder,
-      allStored: allStored,
+      order: lastUpdatedOrder ?? ordersById.values.first,
+      allStored: allOrdersStored,
     );
   }
 }

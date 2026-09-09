@@ -13,4 +13,11 @@ class AppRoutes {
 
   static String orderDetailPath(String id) => '/orders/$id';
   static String customerDetailPath(String id) => '/customers/$id';
+  static String storagePath({String? orderId, String? orderNumber}) {
+    final params = <String, String>{};
+    if (orderId != null) params['orderId'] = orderId;
+    if (orderNumber != null) params['orderNumber'] = orderNumber;
+    if (params.isEmpty) return storage;
+    return Uri(path: storage, queryParameters: params).toString();
+  }
 }

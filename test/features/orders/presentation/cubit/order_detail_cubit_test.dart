@@ -90,6 +90,7 @@ void main() {
       storageRecordsDao: storageRecordsDao,
       storageLocationsDao: storageLocationsDao,
       syncOperationsDao: syncOperationsDao,
+      ordersDao: ordersDao,
       db: db,
     );
 

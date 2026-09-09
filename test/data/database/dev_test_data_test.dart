@@ -257,6 +257,7 @@ void main() {
         storageRecordsDao: storageRecordsDao,
         storageLocationsDao: storageLocationsDao,
         syncOperationsDao: syncDao,
+        ordersDao: OrdersDao(db),
         db: db,
       );
 
@@ -289,6 +290,7 @@ void main() {
         storageRecordsDao: storageRecordsDao,
         storageLocationsDao: storageLocationsDao,
         syncOperationsDao: syncDao,
+        ordersDao: OrdersDao(db),
         db: db,
       );
 

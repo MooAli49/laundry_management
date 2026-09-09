@@ -43,6 +43,7 @@ import '../../application/use_cases/complete_order_use_case.dart';
 import '../../application/use_cases/create_order_use_case.dart';
 import '../../application/use_cases/move_stored_item_use_case.dart';
 import '../../application/use_cases/store_order_items_use_case.dart';
+import '../../application/use_cases/unstore_item_use_case.dart';
 import '../../domain/repositories/storage_location_repository.dart';
 import '../../domain/repositories/storage_repository.dart';
 import '../../features/customers/presentation/cubit/customer_detail_cubit.dart';
@@ -50,6 +51,7 @@ import '../../features/customers/presentation/cubit/customers_list_cubit.dart';
 import '../../features/orders/presentation/cubit/create_order_cubit.dart';
 import '../../features/orders/presentation/cubit/order_detail_cubit.dart';
 import '../../features/orders/presentation/cubit/orders_list_cubit.dart';
+import '../../features/storage/presentation/cubit/storage_cubit.dart';
 
 final getIt = GetIt.instance;
 
@@ -136,6 +138,7 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
         storageRecordsDao: getIt<StorageRecordsDao>(),
         storageLocationsDao: getIt<StorageLocationsDao>(),
         syncOperationsDao: getIt<SyncOperationsDao>(),
+        ordersDao: getIt<OrdersDao>(),
         db: getIt<AppDatabase>(),
       ),
     );
@@ -262,6 +265,13 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
       () => CancelOrderUseCase(getIt<OrderRepository>()),
     );
   }
+  if (!getIt.isRegistered<UnstoreItemUseCase>()) {
+    getIt.registerLazySingleton<UnstoreItemUseCase>(
+      () => UnstoreItemUseCase(
+        storageRepository: getIt<StorageRepository>(),
+      ),
+    );
+  }
 
   // 5. Presentation Cubits
   if (!getIt.isRegistered<OrdersListCubit>()) {
@@ -316,6 +326,19 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
         customerRepository: getIt<CustomerRepository>(),
         orderRepository: getIt<OrderRepository>(),
         paymentRepository: getIt<PaymentRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<StorageCubit>()) {
+    getIt.registerFactory<StorageCubit>(
+      () => StorageCubit(
+        storageRepository: getIt<StorageRepository>(),
+        storageLocationRepository: getIt<StorageLocationRepository>(),
+        itemTypeRepository: getIt<ItemTypeRepository>(),
+        serviceRepository: getIt<ServiceRepository>(),
+        storeOrderItemsUseCase: getIt<StoreOrderItemsUseCase>(),
+        moveStoredItemUseCase: getIt<MoveStoredItemUseCase>(),
+        unstoreItemUseCase: getIt<UnstoreItemUseCase>(),
       ),
     );
   }
