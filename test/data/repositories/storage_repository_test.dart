@@ -1,18 +1,24 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/core/errors/failures.dart';
+import 'package:laundry_management/data/local/daos/orders_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_locations_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
 import 'package:laundry_management/data/local/database/app_database.dart' as app_db;
 import 'package:laundry_management/data/local/database/dev_test_data.dart';
+import 'package:laundry_management/data/repositories/order_repository_impl.dart';
+import 'package:laundry_management/data/repositories/storage_location_repository_impl.dart';
 import 'package:laundry_management/data/repositories/storage_repository_impl.dart';
+import 'package:laundry_management/domain/enums/order_status.dart';
+import 'package:laundry_management/application/use_cases/store_order_items_use_case.dart';
 
 void main() {
   late app_db.AppDatabase db;
   late StorageRecordsDao storageRecordsDao;
   late StorageLocationsDao storageLocationsDao;
   late SyncOperationsDao syncOperationsDao;
+  late OrdersDao ordersDao;
   late StorageRepositoryImpl repository;
 
   setUp(() async {
@@ -22,11 +28,13 @@ void main() {
     storageRecordsDao = StorageRecordsDao(db);
     storageLocationsDao = StorageLocationsDao(db);
     syncOperationsDao = SyncOperationsDao(db);
+    ordersDao = OrdersDao(db);
 
     repository = StorageRepositoryImpl(
       storageRecordsDao: storageRecordsDao,
       storageLocationsDao: storageLocationsDao,
       syncOperationsDao: syncOperationsDao,
+      ordersDao: ordersDao,
       db: db,
     );
   });
@@ -300,6 +308,139 @@ void main() {
             (e) => e.message,
             'message',
             contains('Item has no active storage record to unstore'),
+          ),
+        ),
+      );
+    });
+
+    test('Unstore from Ready order automatically reverts Order to Processing, and storing it again makes Order Ready', () async {
+      final orderRepo = OrderRepositoryImpl(
+        ordersDao: ordersDao,
+        syncOperationsDao: syncOperationsDao,
+        storageRecordsDao: storageRecordsDao,
+        db: db,
+      );
+      final storageLocationRepo = StorageLocationRepositoryImpl(
+        storageLocationsDao: storageLocationsDao,
+        storageRecordsDao: storageRecordsDao,
+        syncOperationsDao: syncOperationsDao,
+        db: db,
+      );
+      final storeUseCase = StoreOrderItemsUseCase(
+        orderRepository: orderRepo,
+        storageRepository: repository,
+        storageLocationRepository: storageLocationRepo,
+      );
+
+      // Find a Ready order with all items stored in DevTestData (e.g. 26-004)
+      final orders = await ordersDao.getOrders(status: OrderStatus.ready.name);
+      expect(orders, isNotEmpty);
+      final readyOrder = orders.first;
+      final orderItems = await ordersDao.getOrderItemsRaw(readyOrder.id);
+      expect(orderItems, isNotEmpty);
+
+      // Ensure all items are stored initially
+      final allInitiallyStored = await repository.areAllOrderItemsStored(readyOrder.id);
+      expect(allInitiallyStored, isTrue);
+
+      final firstItemId = orderItems.first.id;
+      final activeRecord = await repository.getActiveRecordForOrderItem(firstItemId);
+      expect(activeRecord, isNotNull);
+
+      // 1. Unstore one item from the Ready order
+      await repository.unstoreItem(firstItemId);
+
+      // 2. StorageRecord becomes inactive
+      final recordAfter = await repository.getActiveRecordForOrderItem(firstItemId);
+      expect(recordAfter, isNull);
+
+      // 3. Order status automatically transitions Ready -> Processing
+      final orderAfterUnstore = await ordersDao.getOrderById(readyOrder.id);
+      expect(orderAfterUnstore!.status, OrderStatus.processing.name);
+
+      // 4. Sync operations recorded
+      final syncOps = await syncOperationsDao.getPendingOperations();
+      expect(
+        syncOps.any((op) => op.entityId == activeRecord!.id && op.operationType == 'unstore'),
+        isTrue,
+      );
+      expect(
+        syncOps.any((op) => op.entityId == readyOrder.id && op.operationType == 'update' && op.payload == 'unstore'),
+        isTrue,
+      );
+
+      // 5. Item appears in "Items Requiring Storage"
+      final requiring = await repository.getItemsRequiringStorageWithDetails();
+      expect(requiring.any((i) => i.orderItem.id == firstItemId), isTrue);
+
+      // 6. Store the item again
+      final compatibleLocs = await storageLocationRepo.getCompatibleLocationsForItemType(orderItems.first.itemTypeId);
+      final storeResult = await storeUseCase.execute(StoreOrderItemsInput(
+        orderId: readyOrder.id,
+        orderItemIds: [firstItemId],
+        storageLocationId: compatibleLocs.first.id,
+      ));
+
+      // 7. Order becomes Ready again!
+      expect(storeResult.allStored, isTrue);
+      expect(storeResult.order.status, OrderStatus.ready);
+
+      final finalOrder = await ordersDao.getOrderById(readyOrder.id);
+      expect(finalOrder!.status, OrderStatus.ready.name);
+    });
+
+    test('Unstore from Processing order preserves Processing status', () async {
+      // Find a Processing order with at least one stored item
+      final currentStored = await repository.getCurrentStorageItems();
+      final processingItem = currentStored.firstWhere((i) => i.orderStatus == OrderStatus.processing);
+
+      await repository.unstoreItem(processingItem.orderItem.id);
+
+      // Record deactivated
+      final recordAfter = await repository.getActiveRecordForOrderItem(processingItem.orderItem.id);
+      expect(recordAfter, isNull);
+
+      // Order status remains Processing
+      final orderAfter = await ordersDao.getOrderById(processingItem.orderId);
+      expect(orderAfter!.status, OrderStatus.processing.name);
+    });
+
+    test('Unstore from Completed or Cancelled order throws BusinessRuleFailure', () async {
+      final currentStored = await repository.getCurrentStorageItems();
+      final targetItem = currentStored.first;
+
+      // Simulate order set to completed
+      await ordersDao.updateOrderStatus(
+        orderId: targetItem.orderId,
+        status: OrderStatus.completed.name,
+        updatedAt: DateTime.now(),
+      );
+
+      expect(
+        () => repository.unstoreItem(targetItem.orderItem.id),
+        throwsA(
+          isA<BusinessRuleFailure>().having(
+            (e) => e.message,
+            'message',
+            contains('Cannot unstore items from a completed order'),
+          ),
+        ),
+      );
+
+      // Simulate order set to cancelled
+      await ordersDao.updateOrderStatus(
+        orderId: targetItem.orderId,
+        status: OrderStatus.cancelled.name,
+        updatedAt: DateTime.now(),
+      );
+
+      expect(
+        () => repository.unstoreItem(targetItem.orderItem.id),
+        throwsA(
+          isA<BusinessRuleFailure>().having(
+            (e) => e.message,
+            'message',
+            contains('Cannot unstore items from a cancelled order'),
           ),
         ),
       );

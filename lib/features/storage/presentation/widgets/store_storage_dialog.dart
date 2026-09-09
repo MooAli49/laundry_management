@@ -141,15 +141,19 @@ class _StoreStorageDialogState extends State<StoreStorageDialog> {
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   decoration: BoxDecoration(
-                    color: AppColors.backgroundSecondary,
+                    color: AppColors.secondary,
                     borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${AppStrings.orderNumberPrefix}${single.orderNumber} - ${single.customerName}',
-                        style: AppTextStyles.labelMedium.copyWith(color: AppColors.primary),
+                        '#${single.orderNumber} - ${single.customerName}',
+                        style: AppTextStyles.labelMedium.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       AppSpacing.gapXs,
                       Text(

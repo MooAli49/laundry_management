@@ -138,6 +138,7 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
         storageRecordsDao: getIt<StorageRecordsDao>(),
         storageLocationsDao: getIt<StorageLocationsDao>(),
         syncOperationsDao: getIt<SyncOperationsDao>(),
+        ordersDao: getIt<OrdersDao>(),
         db: getIt<AppDatabase>(),
       ),
     );

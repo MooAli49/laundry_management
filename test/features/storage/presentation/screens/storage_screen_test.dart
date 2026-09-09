@@ -278,5 +278,32 @@ void main() {
 
       expect(find.text(AppStrings.noStorageResults), findsOneWidget);
     });
+
+    testWidgets('52. StorageScreen does not overflow on standard desktop viewports and fractional scaling', (tester) async {
+      final testSizes = [
+        const Size(1280, 720),
+        const Size(1024, 600),
+        const Size(1366, 768),
+        const Size(1920, 1080),
+      ];
+
+      final dprs = [1.0, 1.25, 1.5];
+
+      for (final size in testSizes) {
+        for (final dpr in dprs) {
+          tester.view.physicalSize = Size(size.width * dpr, size.height * dpr);
+          tester.view.devicePixelRatio = dpr;
+
+          await tester.pumpWidget(createTestApp(const StorageScreen()));
+          await tester.pumpAndSettle();
+
+          expect(tester.takeException(), isNull);
+          expect(find.text(AppStrings.storage), findsOneWidget);
+        }
+      }
+
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
   });
 }

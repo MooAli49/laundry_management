@@ -4,6 +4,7 @@ import '../../../../core/localization/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../domain/entities/storage_item.dart';
@@ -34,19 +35,20 @@ class StorageItemCard extends StatelessWidget {
     final isStored = item.isStored;
 
     return AppCard(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      borderColor: isSelected ? AppColors.primary : AppColors.border,
-      backgroundColor: isSelected ? AppColors.primaryLight.withValues(alpha: 0.15) : AppColors.surface,
+      borderColor: isSelected ? AppColors.selectionBorder : AppColors.border,
+      backgroundColor: isSelected ? AppColors.selectionBackground : AppColors.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top Row: Checkbox (if unstored), Order Number, Status, Pickup Date
+          // Top Row: Selection Checkbox (if unstored), Order Number, Status, Expected Pickup Date
           Row(
             children: [
               if (!isStored && onSelectionChanged != null) ...[
                 Checkbox(
                   value: isSelected,
+                  activeColor: AppColors.primary,
                   onChanged: (val) => onSelectionChanged!(val == true),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
@@ -54,36 +56,37 @@ class StorageItemCard extends StatelessWidget {
                 ),
                 AppSpacing.gapHorizontalXs,
               ],
-              // Order Number Chip
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                ),
-                child: Text(
-                  '${AppStrings.orderNumberPrefix}${item.orderNumber}',
-                  style: AppTextStyles.labelMedium.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
+              // Order Number
+              Text(
+                '#${item.orderNumber}',
+                style: AppTextStyles.titleMedium.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                  fontSize: 15,
                 ),
               ),
               AppSpacing.gapHorizontalSm,
               OrderStatusBadge(status: item.orderStatus),
               const Spacer(),
               // Expected Pickup Date
-              Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.textSecondary),
+              const Icon(
+                Icons.calendar_today_outlined,
+                size: 14,
+                color: AppColors.textSecondary,
+              ),
               AppSpacing.gapHorizontalXs,
               Text(
-                item.expectedPickupDate.toString(),
-                style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                'الاستلام: ${DateFormatter.formatArabicDate(item.expectedPickupDate.toDateTime())}',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                ),
               ),
             ],
           ),
-          AppSpacing.gapSm,
+          AppSpacing.gapMd,
 
-          // Middle Row: Item Info & Customer Info
+          // Middle Row: Physical Item Details & Customer Details
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -94,25 +97,46 @@ class StorageItemCard extends StatelessWidget {
                   children: [
                     Text(
                       '${orderItem.itemTypeNameSnapshot} - ${orderItem.serviceNameSnapshot}',
-                      style: AppTextStyles.titleMedium,
+                      style: AppTextStyles.titleMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                     if (carpet != null) ...[
                       AppSpacing.gapXs,
                       Text(
                         'الأبعاد: ${carpet.length} × ${carpet.width} م (${carpet.area} م²)',
-                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                     if (orderItem.notes != null && orderItem.notes!.trim().isNotEmpty) ...[
                       AppSpacing.gapXs,
-                      Text(
-                        'ملاحظة: ${orderItem.notes}',
-                        style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.sticky_note_2_outlined,
+                            size: 14,
+                            color: AppColors.textTertiary,
+                          ),
+                          AppSpacing.gapHorizontalXs,
+                          Expanded(
+                            child: Text(
+                              orderItem.notes!,
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textTertiary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ],
                 ),
               ),
+              AppSpacing.gapHorizontalMd,
               // Customer Details
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -122,7 +146,10 @@ class StorageItemCard extends StatelessWidget {
                     children: [
                       Text(
                         item.customerName,
-                        style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w500),
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                       AppSpacing.gapHorizontalXs,
                       const Icon(Icons.person_outline, size: 16, color: AppColors.textSecondary),
@@ -135,6 +162,7 @@ class StorageItemCard extends StatelessWidget {
                       Text(
                         item.customerPhone,
                         style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                        textDirection: TextDirection.ltr,
                       ),
                       AppSpacing.gapHorizontalXs,
                       const Icon(Icons.phone_outlined, size: 14, color: AppColors.textSecondary),
@@ -146,17 +174,19 @@ class StorageItemCard extends StatelessWidget {
           ),
           AppSpacing.gapMd,
 
-          // Bottom Row: Location Badge & Actions
+          // Bottom Row: Current Location Badge & Action Buttons
           Row(
             children: [
               if (isStored) ...[
-                // Current Location Badge
+                // Current Location Chip
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.successLight.withValues(alpha: 0.25),
+                    color: AppColors.successLight,
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                    border: Border.all(color: AppColors.successLight),
+                    border: Border.all(
+                      color: AppColors.success.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -184,7 +214,7 @@ class StorageItemCard extends StatelessWidget {
                 AppSpacing.gapHorizontalSm,
                 // More / Unstore Menu
                 PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert),
+                  icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
                   tooltip: 'خيارات إضافية',
                   onSelected: (value) {
                     if (value == 'unstore') {

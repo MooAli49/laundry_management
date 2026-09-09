@@ -24,7 +24,7 @@ class BulkStorageBottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
+        horizontal: AppSpacing.page,
         vertical: AppSpacing.md,
       ),
       decoration: BoxDecoration(

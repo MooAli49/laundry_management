@@ -4,6 +4,7 @@ import '../../../../core/localization/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../../../domain/entities/item_type.dart';
 import '../../../../domain/entities/service.dart';
 import '../../../../domain/entities/storage_location.dart';
@@ -69,24 +70,44 @@ class StorageFilterBar extends StatelessWidget {
         children: [
           // Filter by Item Type
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             decoration: BoxDecoration(
-              border: Border.all(color: AppColors.border),
+              border: Border.all(
+                color: filter.itemTypeId != null ? AppColors.primary : AppColors.border,
+              ),
               borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-              color: AppColors.surface,
+              color: filter.itemTypeId != null ? AppColors.primaryLighter : AppColors.surface,
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String?>(
                 value: filter.itemTypeId,
-                hint: Text(AppStrings.filterByItemType, style: AppTextStyles.bodySmall),
+                icon: Icon(
+                  Icons.keyboard_arrow_down,
+                  size: 18,
+                  color: filter.itemTypeId != null ? AppColors.primary : AppColors.textSecondary,
+                ),
+                hint: Text(
+                  AppStrings.filterByItemType,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
                 items: [
-                  const DropdownMenuItem<String?>(
+                  DropdownMenuItem<String?>(
                     value: null,
-                    child: Text(AppStrings.allItemTypes),
+                    child: Text(
+                      AppStrings.allItemTypes,
+                      style: AppTextStyles.bodySmall.copyWith(fontSize: 13),
+                    ),
                   ),
                   ...itemTypes.map((t) => DropdownMenuItem<String?>(
                         value: t.id,
-                        child: Text(t.name),
+                        child: Text(
+                          t.name,
+                          style: AppTextStyles.bodySmall.copyWith(fontSize: 13),
+                        ),
                       )),
                 ],
                 onChanged: (val) {
@@ -102,24 +123,44 @@ class StorageFilterBar extends StatelessWidget {
 
           // Filter by Service
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             decoration: BoxDecoration(
-              border: Border.all(color: AppColors.border),
+              border: Border.all(
+                color: filter.serviceId != null ? AppColors.primary : AppColors.border,
+              ),
               borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-              color: AppColors.surface,
+              color: filter.serviceId != null ? AppColors.primaryLighter : AppColors.surface,
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String?>(
                 value: filter.serviceId,
-                hint: Text(AppStrings.filterByService, style: AppTextStyles.bodySmall),
+                icon: Icon(
+                  Icons.keyboard_arrow_down,
+                  size: 18,
+                  color: filter.serviceId != null ? AppColors.primary : AppColors.textSecondary,
+                ),
+                hint: Text(
+                  AppStrings.filterByService,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
                 items: [
-                  const DropdownMenuItem<String?>(
+                  DropdownMenuItem<String?>(
                     value: null,
-                    child: Text(AppStrings.allServices),
+                    child: Text(
+                      AppStrings.allServices,
+                      style: AppTextStyles.bodySmall.copyWith(fontSize: 13),
+                    ),
                   ),
                   ...services.map((s) => DropdownMenuItem<String?>(
                         value: s.id,
-                        child: Text(s.name),
+                        child: Text(
+                          s.name,
+                          style: AppTextStyles.bodySmall.copyWith(fontSize: 13),
+                        ),
                       )),
                 ],
                 onChanged: (val) {
@@ -136,24 +177,44 @@ class StorageFilterBar extends StatelessWidget {
           // Filter by Location (Current Storage view only)
           if (activeTab == StorageTab.currentStorage) ...[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
               decoration: BoxDecoration(
-                border: Border.all(color: AppColors.border),
+                border: Border.all(
+                  color: filter.storageLocationId != null ? AppColors.primary : AppColors.border,
+                ),
                 borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                color: AppColors.surface,
+                color: filter.storageLocationId != null ? AppColors.primaryLighter : AppColors.surface,
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String?>(
                   value: filter.storageLocationId,
-                  hint: Text(AppStrings.filterByLocation, style: AppTextStyles.bodySmall),
+                  icon: Icon(
+                    Icons.keyboard_arrow_down,
+                    size: 18,
+                    color: filter.storageLocationId != null ? AppColors.primary : AppColors.textSecondary,
+                  ),
+                  hint: Text(
+                    AppStrings.filterByLocation,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
                   items: [
-                    const DropdownMenuItem<String?>(
+                    DropdownMenuItem<String?>(
                       value: null,
-                      child: Text(AppStrings.allLocations),
+                      child: Text(
+                        AppStrings.allLocations,
+                        style: AppTextStyles.bodySmall.copyWith(fontSize: 13),
+                      ),
                     ),
                     ...locations.map((loc) => DropdownMenuItem<String?>(
                           value: loc.id,
-                          child: Text(loc.name),
+                          child: Text(
+                            loc.name,
+                            style: AppTextStyles.bodySmall.copyWith(fontSize: 13),
+                          ),
                         )),
                   ],
                   onChanged: (val) {
@@ -169,51 +230,121 @@ class StorageFilterBar extends StatelessWidget {
           ],
 
           // Filter by Expected Pickup Date Chip
-          FilterChip(
-            label: Text(
-              filter.expectedPickupDate != null
-                  ? '${AppStrings.filterByExpectedPickup}: ${filter.expectedPickupDate}'
-                  : AppStrings.filterByExpectedPickup,
-              style: AppTextStyles.bodySmall.copyWith(
-                color: filter.expectedPickupDate != null ? AppColors.primary : AppColors.textSecondary,
+          InkWell(
+            onTap: () => _selectExpectedPickupDate(context),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            child: Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              decoration: BoxDecoration(
+                color: filter.expectedPickupDate != null ? AppColors.primaryLighter : AppColors.surface,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                border: Border.all(
+                  color: filter.expectedPickupDate != null ? AppColors.primary : AppColors.border,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.event_outlined,
+                    size: 16,
+                    color: filter.expectedPickupDate != null ? AppColors.primary : AppColors.textSecondary,
+                  ),
+                  AppSpacing.gapHorizontalXs,
+                  Text(
+                    filter.expectedPickupDate != null
+                        ? '${AppStrings.filterByExpectedPickup}: ${DateFormatter.formatArabicDate(filter.expectedPickupDate!.toDateTime())}'
+                        : AppStrings.filterByExpectedPickup,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: filter.expectedPickupDate != null ? AppColors.primary : AppColors.textSecondary,
+                      fontWeight: filter.expectedPickupDate != null ? FontWeight.w600 : FontWeight.normal,
+                      fontSize: 13,
+                    ),
+                  ),
+                  if (filter.expectedPickupDate != null) ...[
+                    AppSpacing.gapHorizontalXs,
+                    GestureDetector(
+                      onTap: () => onFilterChanged(filter.copyWith(clearExpectedPickupDate: true)),
+                      child: const Icon(Icons.close, size: 14, color: AppColors.primary),
+                    ),
+                  ],
+                ],
               ),
             ),
-            selected: filter.expectedPickupDate != null,
-            onSelected: (_) => _selectExpectedPickupDate(context),
-            avatar: const Icon(Icons.event, size: 16),
-            onDeleted: filter.expectedPickupDate != null
-                ? () => onFilterChanged(filter.copyWith(clearExpectedPickupDate: true))
-                : null,
           ),
           AppSpacing.gapHorizontalSm,
 
           // Filter by Order Received Date Chip
-          FilterChip(
-            label: Text(
-              filter.orderReceivedDate != null
-                  ? '${AppStrings.filterByOrderReceived}: ${filter.orderReceivedDate!.year}-${filter.orderReceivedDate!.month.toString().padLeft(2, '0')}-${filter.orderReceivedDate!.day.toString().padLeft(2, '0')}'
-                  : AppStrings.filterByOrderReceived,
-              style: AppTextStyles.bodySmall.copyWith(
-                color: filter.orderReceivedDate != null ? AppColors.primary : AppColors.textSecondary,
+          InkWell(
+            onTap: () => _selectOrderReceivedDate(context),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            child: Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              decoration: BoxDecoration(
+                color: filter.orderReceivedDate != null ? AppColors.primaryLighter : AppColors.surface,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                border: Border.all(
+                  color: filter.orderReceivedDate != null ? AppColors.primary : AppColors.border,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.history,
+                    size: 16,
+                    color: filter.orderReceivedDate != null ? AppColors.primary : AppColors.textSecondary,
+                  ),
+                  AppSpacing.gapHorizontalXs,
+                  Text(
+                    filter.orderReceivedDate != null
+                        ? '${AppStrings.filterByOrderReceived}: ${DateFormatter.formatArabicDate(filter.orderReceivedDate!)}'
+                        : AppStrings.filterByOrderReceived,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: filter.orderReceivedDate != null ? AppColors.primary : AppColors.textSecondary,
+                      fontWeight: filter.orderReceivedDate != null ? FontWeight.w600 : FontWeight.normal,
+                      fontSize: 13,
+                    ),
+                  ),
+                  if (filter.orderReceivedDate != null) ...[
+                    AppSpacing.gapHorizontalXs,
+                    GestureDetector(
+                      onTap: () => onFilterChanged(filter.copyWith(clearOrderReceivedDate: true)),
+                      child: const Icon(Icons.close, size: 14, color: AppColors.primary),
+                    ),
+                  ],
+                ],
               ),
             ),
-            selected: filter.orderReceivedDate != null,
-            onSelected: (_) => _selectOrderReceivedDate(context),
-            avatar: const Icon(Icons.history, size: 16),
-            onDeleted: filter.orderReceivedDate != null
-                ? () => onFilterChanged(filter.copyWith(clearOrderReceivedDate: true))
-                : null,
           ),
 
-          // Reset Filters Button
+          // Reset Filters Action Button
           if (filter.isActive) ...[
             AppSpacing.gapHorizontalSm,
-            TextButton.icon(
-              onPressed: onResetFilters,
-              icon: const Icon(Icons.clear_all, size: 16, color: AppColors.error),
-              label: Text(
-                AppStrings.resetFilters,
-                style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+            InkWell(
+              onTap: onResetFilters,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              child: Container(
+                height: 38,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.clear_all, size: 16, color: AppColors.error),
+                    AppSpacing.gapHorizontalXs,
+                    Text(
+                      AppStrings.resetFilters,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.error,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],

@@ -12,6 +12,7 @@ import '../../domain/enums/pricing_type.dart';
 import '../../domain/repositories/storage_repository.dart';
 import '../../domain/value_objects/money.dart';
 import '../../domain/value_objects/order_date.dart';
+import '../local/daos/orders_dao.dart';
 import '../local/daos/storage_locations_dao.dart';
 import '../local/daos/storage_records_dao.dart';
 import '../local/daos/sync_operations_dao.dart';
@@ -21,16 +22,19 @@ class StorageRepositoryImpl implements StorageRepository {
   final StorageRecordsDao _storageRecordsDao;
   final StorageLocationsDao _storageLocationsDao;
   final SyncOperationsDao _syncOperationsDao;
+  final OrdersDao _ordersDao;
   final app_db.AppDatabase _db;
 
   StorageRepositoryImpl({
     required StorageRecordsDao storageRecordsDao,
     required StorageLocationsDao storageLocationsDao,
     required SyncOperationsDao syncOperationsDao,
+    required OrdersDao ordersDao,
     required app_db.AppDatabase db,
   })  : _storageRecordsDao = storageRecordsDao,
         _storageLocationsDao = storageLocationsDao,
         _syncOperationsDao = syncOperationsDao,
+        _ordersDao = ordersDao,
         _db = db;
 
   @override
@@ -204,6 +208,19 @@ class StorageRepositoryImpl implements StorageRepository {
           throw const ValidationFailure('Order item not found');
         }
 
+        final order = await _ordersDao.getOrderById(item.orderId);
+        if (order == null) {
+          throw const ValidationFailure('Associated order not found');
+        }
+
+        // Preserve Task #06 lifecycle rules
+        if (order.status == OrderStatus.completed.name) {
+          throw const BusinessRuleFailure('Cannot unstore items from a completed order');
+        }
+        if (order.status == OrderStatus.cancelled.name) {
+          throw const BusinessRuleFailure('Cannot unstore items from a cancelled order');
+        }
+
         final activeRecord = await _storageRecordsDao.getActiveRecordForOrderItem(orderItemId);
         if (activeRecord == null) {
           throw const BusinessRuleFailure('Item has no active storage record to unstore');
@@ -217,6 +234,25 @@ class StorageRepositoryImpl implements StorageRepository {
           entityId: activeRecord.id,
           operationType: 'unstore',
         );
+
+        // Enforce the business invariant:
+        // Order is Ready iff all physical OrderItems have active StorageRecords.
+        // Because this physical item was unstored, a Ready order no longer satisfies readiness.
+        // It automatically transitions Ready -> Processing.
+        if (order.status == OrderStatus.ready.name) {
+          await _ordersDao.updateOrderStatus(
+            orderId: order.id,
+            status: OrderStatus.processing.name,
+            updatedAt: now,
+          );
+
+          await _syncOperationsDao.recordOperation(
+            entityType: 'order',
+            entityId: order.id,
+            operationType: 'update',
+            payload: 'unstore',
+          );
+        }
       });
     } catch (e) {
       if (e is Failure) rethrow;
