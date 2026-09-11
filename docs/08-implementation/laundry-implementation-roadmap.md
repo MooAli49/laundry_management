@@ -24,11 +24,11 @@ The implementation workflow remains:
 | Task #06 | Orders — End-to-End | Implement the core Order experience from creation through order management, using the existing business workflows. | Completed / Locked |
 | Task #07 | Customers | Implement customer management and its integration with Orders. | Completed / Locked |
 | Task #08 | Storage | Implement the operational storage workflow for physical OrderItems, including storing and moving items. | Completed / Locked |
-| **Task #09** | **Payments** | Implement the payment workflow and payment-related Order experience. | **Next** |
-| Task #10 | Expenses | Implement operational expense management. | Planned |
+| Task #09 | Payments | Implement the payment workflow and payment-related Order experience. | Completed / Locked |
+| **Task #10** | **Expenses & Reports** | Implement operational expense management and operational/financial reporting as a tightly coupled unified feature. | **In Progress** |
 | Task #11 | Services & Pricing / Settings | Implement management of services, pricing/master data, and approved Settings workflows. | Planned |
 | Task #12 | Dashboard | Implement the operational Dashboard using real data from the completed workflows. | Planned |
-| Task #13 | Reports | Implement operational and financial reporting using authoritative transaction data. | Planned |
+| Task #13 | Reports | *(Merged into Task #10 — Expenses & Reports)* | Merged into Task #10 |
 | Task #14 | Invoice / Receipt | Implement invoice/receipt viewing and printing using historical Order information. | Planned |
 | Task #15 | Offline / Sync Integration | Integrate and verify synchronization after the core local workflows are stable. | Planned |
 | Task #16 | Full Integration / QA / Hardening | Perform end-to-end verification, business-rule audit, offline testing, UI/RTL/responsive checks, and release hardening. | Planned |
@@ -157,11 +157,26 @@ The payment workflow should be implemented after the Order experience is establi
 
 ---
 
-## Task #10 — Expenses
+## Task #10 — Expenses & Reports
 
-Expenses represent the operational financial side outside Order payments.
+Task #10 combines operational Expenses management and Financial / Orders Reporting into one coherent feature because they are tightly coupled at both the data and UI levels.
 
-Expense Categories remain part of the approved Settings direction rather than becoming an unnecessary top-level navigation module.
+Expenses represent operational financial transactions outside of Order payments. Expense categories remain configurable master data, with historical category snapshots preserved on each expense.
+
+The Reports module provides operational and financial reporting derived from authoritative transaction data rather than duplicated reporting tables:
+
+```text
+Sales       ← Orders
+Payments    ← Payments
+Expenses    ← Expenses
+Remaining   ← Orders + Payments
+Net Profit  ← Orders (Sales) - Expenses
+```
+
+Key principles:
+- Net Profit = Total Sales - Total Operating Expenses. Payments and Outstanding balances do NOT reduce Net Profit.
+- Reporting adheres strictly to business dates: `expense_date` for Expenses, `paid_at` for Payments, `created_at` for Orders.
+- Offline-first architecture: All aggregations run locally on SQLite/Drift.
 
 ---
 
@@ -201,21 +216,9 @@ Approved Quick Actions:
 
 ---
 
-## Task #13 — Reports
+## Task #13 — Reports (Merged into Task #10)
 
-Reports should be implemented after the underlying transaction workflows are stable.
-
-Reporting values should be derived from authoritative transaction data rather than duplicated reporting tables.
-
-Examples include:
-
-```text
-Sales       ← Orders
-Payments    ← Payments
-Expenses    ← Expenses
-Remaining   ← Orders + Payments
-Net Profit  ← Orders - Expenses
-```
+Task #13 Reports was merged into Task #10 because Reports and Expenses are tightly coupled at both data and presentation layers. All reporting functionality (Orders Report, Financial Report, Period Filtering, Payment Methods, Expenses by Category, Outstanding Orders) is implemented as part of Task #10.
 
 ---
 

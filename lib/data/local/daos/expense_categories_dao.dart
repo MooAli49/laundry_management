@@ -20,14 +20,27 @@ class ExpenseCategoriesDao extends DatabaseAccessor<app_db.AppDatabase> {
   }
 
   Future<List<app_db.ExpenseCategory>> getActiveCategories() async {
-    return (select(db.expenseCategories)
-          ..where((t) => t.isActive.equals(true))
-          ..orderBy([(t) => OrderingTerm.asc(t.name)]))
+    final raw = await (select(db.expenseCategories)
+          ..where((t) => t.isActive.equals(true)))
         .get();
+    final list = List<app_db.ExpenseCategory>.from(raw);
+    list.sort((a, b) {
+      if (a.name == 'أخرى') return 1;
+      if (b.name == 'أخرى') return -1;
+      return a.name.compareTo(b.name);
+    });
+    return list;
   }
 
   Future<List<app_db.ExpenseCategory>> getAllCategories() async {
-    return (select(db.expenseCategories)..orderBy([(t) => OrderingTerm.asc(t.name)])).get();
+    final raw = await select(db.expenseCategories).get();
+    final list = List<app_db.ExpenseCategory>.from(raw);
+    list.sort((a, b) {
+      if (a.name == 'أخرى') return 1;
+      if (b.name == 'أخرى') return -1;
+      return a.name.compareTo(b.name);
+    });
+    return list;
   }
 
   Future<void> setActiveStatus(String id, bool isActive, DateTime updatedAt) async {
