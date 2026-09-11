@@ -5,6 +5,7 @@ import '../../../../core/routing/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/order_status_badge.dart';
@@ -132,7 +133,8 @@ class DashboardRecentOrdersSection extends StatelessWidget {
                           AppSpacing.gapXs,
                           Text(
                             'الإجمالي: ${item.order.total.toEgp.toStringAsFixed(2)} ج.م'
-                            '${hasRemaining ? ' • متبقي: ${item.remainingAmount.toEgp.toStringAsFixed(2)} ج.م' : ' • مدفوع بالكامل'}',
+                            '${hasRemaining ? ' • متبقي: ${item.remainingAmount.toEgp.toStringAsFixed(2)} ج.م' : ' • مدفوع بالكامل'}'
+                            ' • الاستلام: ${DateFormatter.formatArabicDate(item.order.expectedPickupDate.toDateTime())}',
                             style: AppTextStyles.bodySmall.copyWith(
                               color: hasRemaining ? AppColors.warning : AppColors.textTertiary,
                             ),

@@ -130,7 +130,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AddExpenseDialog), findsOneWidget);
-      expect(find.text('حفظ المصروف'), findsOneWidget);
+      expect(find.text('حفظ'), findsOneWidget);
+      expect(find.byKey(const ValueKey('save_expense_button')), findsOneWidget);
     });
 
     testWidgets('tapping إضافة عميل opens CustomerFormDialog', (tester) async {

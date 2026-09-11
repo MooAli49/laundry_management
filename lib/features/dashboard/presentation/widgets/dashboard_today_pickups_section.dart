@@ -5,6 +5,7 @@ import '../../../../core/routing/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/order_status_badge.dart';
 import '../../../../domain/entities/dashboard_order_item.dart';
@@ -115,7 +116,7 @@ class DashboardTodayPickupsSection extends StatelessWidget {
                           ),
                           AppSpacing.gapXs,
                           Text(
-                            'موعد الاستلام: ${item.order.expectedPickupDate}',
+                            'موعد الاستلام: ${DateFormatter.formatArabicDate(item.order.expectedPickupDate.toDateTime())}',
                             style: AppTextStyles.bodySmall.copyWith(
                               color: AppColors.textTertiary,
                             ),

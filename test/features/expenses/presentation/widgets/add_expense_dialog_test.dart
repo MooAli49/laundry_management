@@ -47,10 +47,10 @@ void main() {
 
       expect(find.text('إضافة مصروف'), findsOneWidget);
       expect(find.text('المبلغ (ج.م) *'), findsOneWidget);
-      expect(find.text('التصنيف *'), findsOneWidget);
+      expect(find.text('فئة المصروف *'), findsOneWidget);
       expect(find.text('التاريخ *'), findsOneWidget);
       expect(find.text('ملاحظات'), findsOneWidget);
-      expect(find.text('حفظ المصروف'), findsOneWidget);
+      expect(find.text('حفظ'), findsOneWidget);
       expect(find.text('إلغاء'), findsOneWidget);
     });
 

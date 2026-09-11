@@ -19,10 +19,7 @@ import '../../../../domain/value_objects/order_date.dart';
 class AddExpenseDialog extends StatefulWidget {
   final Future<void> Function(Expense expense)? onExpenseCreated;
 
-  const AddExpenseDialog({
-    super.key,
-    this.onExpenseCreated,
-  });
+  const AddExpenseDialog({super.key, this.onExpenseCreated});
 
   @override
   State<AddExpenseDialog> createState() => _AddExpenseDialogState();
@@ -83,7 +80,8 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
 
   bool get _isOtherCategory =>
       _selectedCategory != null &&
-      (_selectedCategory!.name == 'أخرى' || _selectedCategory!.name.contains('أخرى'));
+      (_selectedCategory!.name == 'أخرى' ||
+          _selectedCategory!.name.contains('أخرى'));
 
   Future<void> _selectDate() async {
     final picked = await showDatePicker(
@@ -114,7 +112,9 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
 
     final nameText = _nameController.text.trim();
     if (_isOtherCategory && nameText.isEmpty) {
-      setState(() => _errorMessage = 'يرجى إدخال اسم المصروف عند اختيار تصنيف أخرى');
+      setState(
+        () => _errorMessage = 'يرجى إدخال اسم المصروف عند اختيار تصنيف أخرى',
+      );
       return;
     }
 
@@ -131,7 +131,9 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
         amount: Money.fromEgp(amountVal),
         expenseName: nameText.isNotEmpty ? nameText : null,
         expenseDate: OrderDate.fromDate(_selectedDate),
-        notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
+        notes: _notesController.text.trim().isNotEmpty
+            ? _notesController.text.trim()
+            : null,
         categoryNameSnapshot: _selectedCategory!.name,
         createdAt: now,
         updatedAt: now,
@@ -173,7 +175,7 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: SingleChildScrollView(
-          padding: AppSpacing.paddingLg,
+          padding: const EdgeInsets.all(AppSpacing.xl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,10 +184,7 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'إضافة مصروف',
-                    style: AppTextStyles.titleLarge.copyWith(fontWeight: FontWeight.bold),
-                  ),
+                  Text('إضافة مصروف', style: AppTextStyles.titleLarge),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close),
@@ -209,7 +208,9 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.error,
+                          ),
                         ),
                       ),
                     ],
@@ -225,10 +226,10 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
                 hintText: '0.00',
                 keyboardType: TextInputType.number,
               ),
-              AppSpacing.gapMd,
+              AppSpacing.gapLg,
 
               // Category Dropdown
-              Text('التصنيف *', style: AppTextStyles.labelLarge),
+              Text('فئة المصروف *', style: AppTextStyles.labelLarge),
               AppSpacing.gapXs,
               if (_isLoadingCategories)
                 const Padding(
@@ -255,7 +256,10 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                      borderSide: const BorderSide(color: AppColors.borderFocused, width: 1.5),
+                      borderSide: const BorderSide(
+                        color: AppColors.borderFocused,
+                        width: 1.5,
+                      ),
                     ),
                   ),
                   items: _categories.map((cat) {
@@ -273,7 +277,8 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
                     }
                   },
                 ),
-              AppSpacing.gapMd,
+              // Category spacing
+              AppSpacing.gapLg,
 
               // Expense Name (Conditional when category is "أخرى")
               if (_isOtherCategory) ...[
@@ -283,7 +288,7 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
                   label: 'اسم المصروف *',
                   hintText: 'مثال: قهوة للعاملين، صيانة كهربائية',
                 ),
-                AppSpacing.gapMd,
+                AppSpacing.gapLg,
               ],
 
               // Date Picker Field
@@ -305,8 +310,11 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.calendar_today_outlined,
-                          size: 20, color: AppColors.textSecondary),
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 20,
+                        color: AppColors.textSecondary,
+                      ),
                       AppSpacing.gapHorizontalSm,
                       Expanded(
                         child: Text(
@@ -316,13 +324,16 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
                       ),
                       Text(
                         'تغيير',
-                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary),
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
-              AppSpacing.gapMd,
+              AppSpacing.gapLg,
 
               // Notes Field
               AppTextField(
@@ -340,12 +351,14 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
                   AppButton(
                     label: 'إلغاء',
                     variant: AppButtonVariant.secondary,
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: _isLoading
+                        ? null
+                        : () => Navigator.of(context).pop(),
                   ),
-                  AppSpacing.gapHorizontalSm,
+                  AppSpacing.gapHorizontalMd,
                   AppButton(
                     key: const ValueKey('save_expense_button'),
-                    label: 'حفظ المصروف',
+                    label: 'حفظ',
                     isLoading: _isLoading,
                     onPressed: _handleSave,
                   ),
