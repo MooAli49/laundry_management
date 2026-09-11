@@ -268,4 +268,99 @@ void main() {
     // Draft notes remains null
     expect(cubit.state.draftNotes, isNull);
   });
+
+  testWidgets('Carpet quantity regression test: Quantity and dimension controls remain visible for perSquareMeter service', (tester) async {
+    await cubit.initialize();
+    final carpetType = cubit.state.itemTypes.firstWhere(
+      (t) => t.name.contains('سجاد'),
+    );
+
+    final carpetService = Service(
+      id: 'srv-carpet-regression-test',
+      name: 'غسيل سجاد',
+      pricingType: PricingType.perSquareMeter,
+      price: const Money.fromPiastres(6000), // 60 EGP / m2
+      isActive: true,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    await serviceRepository.createService(carpetService, supportedItemTypeIds: [carpetType.id]);
+
+    // 1. Select item type "سجاد"
+    await cubit.selectItemType(carpetType);
+    // 2. Select a perSquareMeter service
+    cubit.selectService(cubit.state.compatibleServices.firstWhere((s) => s.id == carpetService.id));
+
+    await tester.pumpWidget(testBoilerplate(
+      OrderItemForm(state: cubit.state, cubit: cubit),
+    ));
+    await tester.pumpAndSettle();
+
+    // 3. Verify the Quantity control is still visible
+    expect(find.text('الكمية'), findsOneWidget);
+    expect(find.byKey(const ValueKey('quantity_stepper_value')), findsOneWidget);
+    expect(find.text('1'), findsOneWidget); // Initial quantity
+    final plusButton = find.byKey(const ValueKey('quantity_stepper_plus'));
+    final minusButton = find.byKey(const ValueKey('quantity_stepper_minus'));
+    expect(plusButton, findsOneWidget);
+    expect(minusButton, findsOneWidget);
+
+    // 4. Verify user can increment/decrement quantity
+    await tester.tap(plusButton);
+    await tester.pumpAndSettle();
+    expect(cubit.state.draftQuantity, 2);
+
+    // Re-pump with updated state
+    await tester.pumpWidget(testBoilerplate(
+      OrderItemForm(state: cubit.state, cubit: cubit),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('2'), findsOneWidget);
+
+    await tester.tap(plusButton);
+    await tester.pumpAndSettle();
+    expect(cubit.state.draftQuantity, 3);
+
+    await tester.pumpWidget(testBoilerplate(
+      OrderItemForm(state: cubit.state, cubit: cubit),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('3'), findsOneWidget);
+
+    // Decrement
+    await tester.tap(minusButton);
+    await tester.pumpAndSettle();
+    expect(cubit.state.draftQuantity, 2);
+
+    // 5. Verify the carpet dimension controls are also still present
+    expect(find.text('مقاس السجادة'), findsOneWidget);
+    expect(find.widgetWithText(AppTextField, 'الطول (م) *'), findsOneWidget);
+    expect(find.widgetWithText(AppTextField, 'العرض (م) *'), findsOneWidget);
+    expect(find.text('المساحة'), findsOneWidget);
+
+    // Also verify adding the item calculates total = area * price * quantity
+    cubit.updateCarpetDimensions(length: 3.0, width: 2.0); // 6 m²
+    cubit.updateQuantity(3); // 3 carpets
+
+    // Re-pump
+    await tester.pumpWidget(testBoilerplate(
+      OrderItemForm(state: cubit.state, cubit: cubit),
+    ));
+    await tester.pumpAndSettle();
+
+    // Tap 'إضافة القطعة'
+    final addButton = find.text('إضافة القطعة');
+    await tester.ensureVisible(addButton);
+    await tester.tap(addButton);
+    await tester.pumpAndSettle();
+
+    expect(cubit.state.items.length, 1);
+    final addedItem = cubit.state.items.first;
+    expect(addedItem.physicalQuantity, 3);
+    expect(addedItem.length, 3.0);
+    expect(addedItem.width, 2.0);
+    expect(addedItem.carpetArea, 6.0);
+    // 6 m² * 60 EGP (6000 piastres) * 3 = 1080 EGP (108000 piastres)
+    expect(addedItem.calculatedTotal, const Money.fromPiastres(108000));
+  });
 }

@@ -11,6 +11,7 @@ import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/loading_indicator.dart';
+import '../../../../domain/enums/pricing_type.dart';
 import '../../../../domain/value_objects/money.dart';
 import '../../../../domain/value_objects/order_date.dart';
 import '../cubit/create_order_cubit.dart';
@@ -263,7 +264,9 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                               ),
                                             ),
                                             Text(
-                                              '${item.physicalQuantity} × ${item.unitPrice.toEgp.toStringAsFixed(2)} ج.م',
+                                              item.pricingType == PricingType.perSquareMeter
+                                                  ? '${item.physicalQuantity} × ${(item.unitPrice.toEgp * item.carpetArea).toStringAsFixed(2)} ج.م'
+                                                  : '${item.physicalQuantity} × ${item.unitPrice.toEgp.toStringAsFixed(2)} ج.م',
                                               style: AppTextStyles.bodyMedium
                                                   .copyWith(
                                                     color:

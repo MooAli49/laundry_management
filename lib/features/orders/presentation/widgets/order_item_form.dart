@@ -212,86 +212,87 @@ class _OrderItemFormState extends State<OrderItemForm> {
           ),
           AppSpacing.gapMd,
 
-          // Quantity (for Per Piece and Fixed Price items)
-          if (!isCarpetPricing) ...[
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('الكمية', style: AppTextStyles.labelLarge),
-                AppSpacing.gapXs,
-                Row(
-                  children: [
-                    // Quantity Stepper: Minus
-                    InkWell(
-                      onTap: state.draftQuantity > 1
-                          ? () => cubit.updateQuantity(state.draftQuantity - 1)
-                          : null,
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Icon(
-                          Icons.remove,
-                          size: 18,
-                          color: state.draftQuantity > 1
-                              ? AppColors.textPrimary
-                              : AppColors.textDisabled,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      width: 48,
+          // Quantity (always visible for all pricing types)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('الكمية', style: AppTextStyles.labelLarge),
+              AppSpacing.gapXs,
+              Row(
+                children: [
+                  // Quantity Stepper: Minus
+                  InkWell(
+                    key: const ValueKey('quantity_stepper_minus'),
+                    onTap: state.draftQuantity > 1
+                        ? () => cubit.updateQuantity(state.draftQuantity - 1)
+                        : null,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    child: Container(
+                      width: 44,
+                      height: 44,
                       alignment: Alignment.center,
-                      child: Text(
-                        '${state.draftQuantity}',
-                        style: AppTextStyles.titleMedium.copyWith(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Icon(
+                        Icons.remove,
+                        size: 18,
+                        color: state.draftQuantity > 1
+                            ? AppColors.textPrimary
+                            : AppColors.textDisabled,
                       ),
                     ),
-                    // Quantity Stepper: Plus
-                    InkWell(
-                      onTap: () => cubit.updateQuantity(state.draftQuantity + 1),
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: const Icon(
-                          Icons.add,
-                          size: 18,
-                          color: AppColors.textPrimary,
-                        ),
+                  ),
+                  Container(
+                    key: const ValueKey('quantity_stepper_value'),
+                    width: 48,
+                    alignment: Alignment.center,
+                    child: Text(
+                      '${state.draftQuantity}',
+                      style: AppTextStyles.titleMedium.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
                       ),
                     ),
-                    if (state.draftService != null) ...[
-                      AppSpacing.gapHorizontalMd,
-                      Text(
-                        '${(state.draftUnitPrice ?? state.draftService!.price).toEgp.toStringAsFixed(2)} ج.م / قطعة',
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
-                          fontSize: 13,
-                        ),
+                  ),
+                  // Quantity Stepper: Plus
+                  InkWell(
+                    key: const ValueKey('quantity_stepper_plus'),
+                    onTap: () => cubit.updateQuantity(state.draftQuantity + 1),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                        border: Border.all(color: AppColors.border),
                       ),
-                    ],
+                      child: const Icon(
+                        Icons.add,
+                        size: 18,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  if (state.draftService != null) ...[
+                    AppSpacing.gapHorizontalMd,
+                    Text(
+                      '${(state.draftUnitPrice ?? state.draftService!.price).toEgp.toStringAsFixed(2)} ج.م / ${isCarpetPricing ? 'م²' : 'قطعة'}',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
                   ],
-                ),
-              ],
-            ),
-            AppSpacing.gapMd,
-          ],
+                ],
+              ),
+            ],
+          ),
+          AppSpacing.gapMd,
 
           // Carpet Specific Section (if perSquareMeter)
           if (isCarpetPricing) ...[
