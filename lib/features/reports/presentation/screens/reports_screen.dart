@@ -53,7 +53,7 @@ class _ReportsView extends StatelessWidget {
 
             BlocBuilder<ReportsCubit, ReportsState>(
               builder: (context, state) {
-                if (state is ReportsLoading) {
+                if (state.isLoading && state.startDate == null) {
                   return const Padding(
                     padding: EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
                     child: Center(
@@ -62,18 +62,18 @@ class _ReportsView extends StatelessWidget {
                   );
                 }
 
-                if (state is ReportsError) {
+                if (state.errorMessage != null && state.startDate == null) {
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
                     child: AppErrorState(
                       title: 'تعذر تحميل التقرير',
-                      message: state.message,
+                      message: state.errorMessage!,
                       onRetry: () => context.read<ReportsCubit>().refresh(),
                     ),
                   );
                 }
 
-                if (state is ReportsLoaded) {
+                if (state.startDate != null) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -87,8 +87,8 @@ class _ReportsView extends StatelessWidget {
                       // Period Selector
                       ReportPeriodSelector(
                         selectedPeriod: state.selectedPeriod,
-                        startDate: state.startDate,
-                        endDate: state.endDate,
+                        startDate: state.startDate!,
+                        endDate: state.endDate!,
                         onPeriodChanged: (period, {customStart, customEnd}) {
                           context.read<ReportsCubit>().selectPeriod(
                                 period,

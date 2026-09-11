@@ -14,7 +14,7 @@ import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_error_state.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/loading_indicator.dart';
-import '../../../orders/presentation/widgets/order_status_badge.dart';
+import '../../../../core/widgets/order_status_badge.dart';
 import '../../../../domain/value_objects/money.dart';
 import '../cubit/customer_detail_cubit.dart';
 import '../cubit/customer_detail_state.dart';

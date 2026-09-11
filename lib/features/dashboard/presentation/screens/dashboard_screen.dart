@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../core/localization/app_strings.dart';
@@ -9,97 +9,64 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/app_button.dart';
+import '../../../../core/widgets/app_error_state.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../core/widgets/page_header.dart';
-import '../../../../domain/entities/customer.dart';
-import '../../../../domain/entities/financial_report_data.dart';
-import '../../../../domain/entities/orders_report_data.dart';
-import '../../../../domain/enums/report_period.dart';
-import '../../../../domain/repositories/customer_repository.dart';
-import '../../../../domain/repositories/reports_repository.dart';
+import '../../../customers/presentation/cubit/customers_list_cubit.dart';
 import '../../../customers/presentation/widgets/customer_form_dialog.dart';
 import '../../../expenses/presentation/widgets/add_expense_dialog.dart';
-import '../../../reports/presentation/widgets/report_metric_card.dart';
+import '../cubit/dashboard_cubit.dart';
+import '../cubit/dashboard_state.dart';
+import '../widgets/dashboard_attention_section.dart';
+import '../widgets/dashboard_metric_card.dart';
+import '../widgets/dashboard_recent_orders_section.dart';
+import '../widgets/dashboard_today_pickups_section.dart';
 
-class DashboardScreen extends StatefulWidget {
+class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => getIt<DashboardCubit>()..loadDashboard(),
+      child: const _DashboardView(),
+    );
+  }
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
-  bool _isLoading = true;
-  OrdersReportData _ordersData = OrdersReportData.empty;
-  FinancialReportData _financialData = FinancialReportData.empty;
+class _DashboardView extends StatelessWidget {
+  const _DashboardView();
 
-  @override
-  void initState() {
-    super.initState();
-    _loadDashboardData();
-  }
-
-  Future<void> _loadDashboardData() async {
-    try {
-      final range = ReportPeriod.today.resolveDateRange();
-      final reportsRepo = getIt<ReportsRepository>();
-
-      final orders = await reportsRepo.getOrdersReport(
-        startDate: range.start,
-        endDate: range.end,
-      );
-
-      final financial = await reportsRepo.getFinancialReport(
-        startDate: range.start,
-        endDate: range.end,
-      );
-
-      if (mounted) {
-        setState(() {
-          _ordersData = orders;
-          _financialData = financial;
-          _isLoading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  void _openAddCustomerDialog() {
+  void _openAddCustomerDialog(BuildContext context) {
+    final cubit = getIt<CustomersListCubit>();
     showDialog(
       context: context,
       builder: (ctx) => CustomerFormDialog(
         onSave: ({required name, required phone, notes}) async {
-          final repo = getIt<CustomerRepository>();
-          final now = DateTime.now();
-          final newCustomer = Customer(
-            id: const Uuid().v4(),
+          await cubit.createCustomer(
             name: name,
             phone: phone,
             notes: notes,
-            createdAt: now,
-            updatedAt: now,
           );
-          await repo.createCustomer(newCustomer);
-          if (mounted) {
+          if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('تمت إضافة العميل بنجاح')),
             );
           }
         },
+        onFindDuplicate: cubit.getCustomerByPhone,
       ),
     );
   }
 
-  void _openAddExpenseDialog() {
+  void _openAddExpenseDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (ctx) => AddExpenseDialog(
         onExpenseCreated: (_) async {
-          _loadDashboardData();
+          if (context.mounted) {
+            context.read<DashboardCubit>().refresh();
+          }
         },
       ),
     );
@@ -116,12 +83,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // Page Header
             PageHeader(
               title: AppStrings.dashboard,
-              subtitle: 'نظرة عامة على العمليات التشغيلية والإجراءات السريعة',
+              subtitle: 'نظرة عامة على العمليات التشغيلية والإجراءات اليومية',
               actions: [
                 IconButton(
                   tooltip: 'تحديث',
                   icon: const Icon(Icons.refresh),
-                  onPressed: _loadDashboardData,
+                  onPressed: () => context.read<DashboardCubit>().refresh(),
                 ),
               ],
             ),
@@ -145,7 +112,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   label: 'إضافة عميل',
                   icon: Icons.person_add_outlined,
                   variant: AppButtonVariant.secondary,
-                  onPressed: _openAddCustomerDialog,
+                  onPressed: () => _openAddCustomerDialog(context),
                 ),
                 AppButton(
                   key: const ValueKey('dashboard_record_payment_button'),
@@ -159,107 +126,172 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   label: 'إضافة مصروف',
                   icon: Icons.shopping_bag_outlined,
                   variant: AppButtonVariant.secondary,
-                  onPressed: _openAddExpenseDialog,
+                  onPressed: () => _openAddExpenseDialog(context),
                 ),
               ],
             ),
             AppSpacing.gapXxl,
 
-            // Operational & Financial Summary
-            Text('ملخص اليوم', style: AppTextStyles.titleLarge),
-            AppSpacing.gapMd,
-
-            if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
-                child: Center(child: LoadingIndicator(message: 'جاري تحميل ملخص اليوم...')),
-              )
-            else
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final isSmall = constraints.maxWidth < 650;
-                  final cardWidth = isSmall
-                      ? constraints.maxWidth
-                      : (constraints.maxWidth - (AppSpacing.md * 2)) / 3;
-
-                  return Wrap(
-                    spacing: AppSpacing.md,
-                    runSpacing: AppSpacing.md,
-                    children: [
-                      SizedBox(
-                        width: cardWidth,
-                        child: ReportMetricCard(
-                          title: 'طلبات اليوم',
-                          value: '${_ordersData.totalOrders}',
-                          icon: Icons.receipt_long,
-                          subtitle: 'إجمالي الطلبات المستلمة اليوم',
-                        ),
-                      ),
-                      SizedBox(
-                        width: cardWidth,
-                        child: ReportMetricCard(
-                          title: 'قيد التنفيذ',
-                          value: '${_ordersData.processingOrdersCount}',
-                          icon: Icons.sync,
-                          iconColor: AppColors.info,
-                          iconBackground: AppColors.infoLight,
-                          subtitle: 'طلبات جاري العمل عليها',
-                        ),
-                      ),
-                      SizedBox(
-                        width: cardWidth,
-                        child: ReportMetricCard(
-                          title: 'جاهزة للتسليم',
-                          value: '${_ordersData.readyOrdersCount}',
-                          icon: Icons.inventory_2_outlined,
-                          iconColor: AppColors.warning,
-                          iconBackground: AppColors.warningLight,
-                          subtitle: 'طلبات جاهزة لتسليم العملاء',
-                        ),
-                      ),
-                      SizedBox(
-                        width: cardWidth,
-                        child: ReportMetricCard(
-                          title: 'مبيعات اليوم',
-                          value: '${_financialData.totalSales.toEgp.toStringAsFixed(2)} ج.م',
-                          icon: Icons.point_of_sale,
-                          subtitle: 'إجمالي قيمة طلبات اليوم',
-                        ),
-                      ),
-                      SizedBox(
-                        width: cardWidth,
-                        child: ReportMetricCard(
-                          title: 'مصروفات اليوم',
-                          value: '${_financialData.totalOperatingExpenses.toEgp.toStringAsFixed(2)} ج.م',
-                          icon: Icons.shopping_bag_outlined,
-                          iconColor: AppColors.error,
-                          iconBackground: AppColors.errorLight,
-                          valueColor: AppColors.error,
-                          subtitle: 'مصروفات التشغيل المسجلة اليوم',
-                        ),
-                      ),
-                      SizedBox(
-                        width: cardWidth,
-                        child: ReportMetricCard(
-                          title: 'مبالغ متبقية',
-                          value: '${_financialData.outstandingAmount.toEgp.toStringAsFixed(2)} ج.م',
-                          icon: Icons.hourglass_bottom,
-                          iconColor: _financialData.outstandingAmount.isPositive
-                              ? AppColors.warning
-                              : AppColors.textSecondary,
-                          iconBackground: _financialData.outstandingAmount.isPositive
-                              ? AppColors.warningLight
-                              : AppColors.backgroundSecondary,
-                          valueColor: _financialData.outstandingAmount.isPositive
-                              ? AppColors.warning
-                              : null,
-                          subtitle: 'متبقي على طلبات اليوم',
-                        ),
-                      ),
-                    ],
+            BlocBuilder<DashboardCubit, DashboardState>(
+              builder: (context, state) {
+                if (state.isLoading && state.data.todayOrdersCount == 0 && state.data.recentOrders.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
+                    child: Center(
+                      child: LoadingIndicator(message: 'جاري تحميل بيانات الرئيسية...'),
+                    ),
                   );
-                },
-              ),
+                }
+
+                if (state.errorMessage != null && state.data.todayOrdersCount == 0 && state.data.recentOrders.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
+                    child: AppErrorState(
+                      title: 'تعذر تحميل بيانات الرئيسية',
+                      message: state.errorMessage!,
+                      onRetry: () => context.read<DashboardCubit>().loadDashboard(),
+                    ),
+                  );
+                }
+
+                final data = state.data;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Operational Summary Header
+                    Text('ملخص اليوم', style: AppTextStyles.titleLarge),
+                    AppSpacing.gapMd,
+
+                    // Operational Summary — Exactly 4 cards
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isSmall = constraints.maxWidth < 650;
+                        final isMedium = constraints.maxWidth < 1100;
+                        final cardWidth = isSmall
+                            ? constraints.maxWidth
+                            : isMedium
+                                ? (constraints.maxWidth - AppSpacing.md) / 2
+                                : (constraints.maxWidth - (AppSpacing.md * 3)) / 4;
+
+                        return Wrap(
+                          spacing: AppSpacing.md,
+                          runSpacing: AppSpacing.md,
+                          children: [
+                            SizedBox(
+                              width: cardWidth,
+                              child: DashboardMetricCard(
+                                title: 'طلبات اليوم',
+                                value: '${data.todayOrdersCount}',
+                                icon: Icons.receipt_long_outlined,
+                                subtitle: 'إجمالي الطلبات المستلمة اليوم',
+                                onTap: () => context.push(AppRoutes.orders),
+                              ),
+                            ),
+                            SizedBox(
+                              width: cardWidth,
+                              child: DashboardMetricCard(
+                                title: 'قيد التنفيذ',
+                                value: '${data.processingOrdersCount}',
+                                icon: Icons.sync,
+                                iconColor: AppColors.info,
+                                iconBackground: AppColors.infoLight,
+                                subtitle: 'طلبات جاري العمل عليها',
+                                onTap: () => context.push(AppRoutes.orders),
+                              ),
+                            ),
+                            SizedBox(
+                              width: cardWidth,
+                              child: DashboardMetricCard(
+                                title: 'جاهزة للتسليم',
+                                value: '${data.readyOrdersCount}',
+                                icon: Icons.inventory_2_outlined,
+                                iconColor: AppColors.warning,
+                                iconBackground: AppColors.warningLight,
+                                subtitle: 'طلبات جاهزة لتسليم العملاء',
+                                onTap: () => context.push(AppRoutes.orders),
+                              ),
+                            ),
+                            SizedBox(
+                              width: cardWidth,
+                              child: DashboardMetricCard(
+                                title: 'مبالغ متبقية',
+                                value: '${data.totalRemainingAmount.toEgp.toStringAsFixed(2)} ج.م',
+                                icon: Icons.payments_outlined,
+                                iconColor: data.totalRemainingAmount.isPositive
+                                    ? AppColors.warning
+                                    : AppColors.textSecondary,
+                                iconBackground: data.totalRemainingAmount.isPositive
+                                    ? AppColors.warningLight
+                                    : AppColors.backgroundSecondary,
+                                valueColor: data.totalRemainingAmount.isPositive
+                                    ? AppColors.warning
+                                    : null,
+                                subtitle: 'متبقي على طلبات العملاء',
+                                onTap: () => context.push(AppRoutes.orders),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                    AppSpacing.gapXxl,
+
+                    // Main Operational Content — Responsive RTL Tablet Layout
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isTablet = constraints.maxWidth >= 850;
+
+                        if (isTablet) {
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Right / Start in RTL: Attention Required
+                              Expanded(
+                                flex: 5,
+                                child: DashboardAttentionSection(data: data),
+                              ),
+                              AppSpacing.gapHorizontalXl,
+                              // Left / End in RTL: Today's Pickups & Recent Orders
+                              Expanded(
+                                flex: 6,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    DashboardTodayPickupsSection(
+                                      orders: data.todayPickupOrders,
+                                    ),
+                                    AppSpacing.gapXxl,
+                                    DashboardRecentOrdersSection(
+                                      orders: data.recentOrders,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        } else {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              DashboardAttentionSection(data: data),
+                              AppSpacing.gapXxl,
+                              DashboardTodayPickupsSection(
+                                orders: data.todayPickupOrders,
+                              ),
+                              AppSpacing.gapXxl,
+                              DashboardRecentOrdersSection(
+                                orders: data.recentOrders,
+                              ),
+                            ],
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                );
+              },
+            ),
           ],
         ),
       ),

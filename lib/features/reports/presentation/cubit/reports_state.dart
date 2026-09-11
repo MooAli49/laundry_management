@@ -7,40 +7,32 @@ enum ReportsTab {
   financial,
 }
 
-abstract class ReportsState {
-  const ReportsState();
-}
-
-class ReportsInitial extends ReportsState {
-  const ReportsInitial();
-}
-
-class ReportsLoading extends ReportsState {
-  const ReportsLoading();
-}
-
-class ReportsLoaded extends ReportsState {
+class ReportsState {
   final ReportsTab selectedTab;
   final ReportPeriod selectedPeriod;
-  final DateTime startDate;
-  final DateTime endDate;
+  final DateTime? startDate;
+  final DateTime? endDate;
   final DateTime? customStartDate;
   final DateTime? customEndDate;
   final OrdersReportData ordersReport;
   final FinancialReportData financialReport;
+  final bool isLoading;
+  final String? errorMessage;
 
-  const ReportsLoaded({
-    required this.selectedTab,
-    required this.selectedPeriod,
-    required this.startDate,
-    required this.endDate,
+  const ReportsState({
+    this.selectedTab = ReportsTab.orders,
+    this.selectedPeriod = ReportPeriod.thisMonth,
+    this.startDate,
+    this.endDate,
     this.customStartDate,
     this.customEndDate,
-    required this.ordersReport,
-    required this.financialReport,
+    this.ordersReport = OrdersReportData.empty,
+    this.financialReport = FinancialReportData.empty,
+    this.isLoading = false,
+    this.errorMessage,
   });
 
-  ReportsLoaded copyWith({
+  ReportsState copyWith({
     ReportsTab? selectedTab,
     ReportPeriod? selectedPeriod,
     DateTime? startDate,
@@ -49,8 +41,11 @@ class ReportsLoaded extends ReportsState {
     DateTime? customEndDate,
     OrdersReportData? ordersReport,
     FinancialReportData? financialReport,
+    bool? isLoading,
+    String? errorMessage,
+    bool clearErrorMessage = false,
   }) {
-    return ReportsLoaded(
+    return ReportsState(
       selectedTab: selectedTab ?? this.selectedTab,
       selectedPeriod: selectedPeriod ?? this.selectedPeriod,
       startDate: startDate ?? this.startDate,
@@ -59,12 +54,8 @@ class ReportsLoaded extends ReportsState {
       customEndDate: customEndDate ?? this.customEndDate,
       ordersReport: ordersReport ?? this.ordersReport,
       financialReport: financialReport ?? this.financialReport,
+      isLoading: isLoading ?? this.isLoading,
+      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
     );
   }
-}
-
-class ReportsError extends ReportsState {
-  final String message;
-
-  const ReportsError(this.message);
 }

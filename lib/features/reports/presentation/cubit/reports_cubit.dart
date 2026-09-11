@@ -11,7 +11,7 @@ class ReportsCubit extends Cubit<ReportsState> {
   ReportsCubit({
     required ReportsRepository reportsRepository,
   })  : _reportsRepository = reportsRepository,
-        super(const ReportsInitial());
+        super(const ReportsState());
 
   Future<void> loadReports({
     ReportsTab tab = ReportsTab.orders,
@@ -19,7 +19,7 @@ class ReportsCubit extends Cubit<ReportsState> {
     DateTime? customStart,
     DateTime? customEnd,
   }) async {
-    emit(const ReportsLoading());
+    emit(state.copyWith(isLoading: true, clearErrorMessage: true));
 
     try {
       final range = period.resolveDateRange(
@@ -38,7 +38,7 @@ class ReportsCubit extends Cubit<ReportsState> {
       );
 
       emit(
-        ReportsLoaded(
+        state.copyWith(
           selectedTab: tab,
           selectedPeriod: period,
           startDate: range.start,
@@ -47,20 +47,22 @@ class ReportsCubit extends Cubit<ReportsState> {
           customEndDate: customEnd,
           ordersReport: ordersReport,
           financialReport: financialReport,
+          isLoading: false,
+          clearErrorMessage: true,
         ),
       );
     } on Failure catch (e) {
-      emit(ReportsError(e.message));
+      emit(state.copyWith(isLoading: false, errorMessage: e.message));
     } catch (_) {
-      emit(const ReportsError('تعذر تحميل التقارير، يرجى المحاولة مرة أخرى'));
+      emit(state.copyWith(
+        isLoading: false,
+        errorMessage: 'تعذر تحميل التقارير، يرجى المحاولة مرة أخرى',
+      ));
     }
   }
 
   void selectTab(ReportsTab tab) {
-    final currentState = state;
-    if (currentState is ReportsLoaded) {
-      emit(currentState.copyWith(selectedTab: tab));
-    }
+    emit(state.copyWith(selectedTab: tab));
   }
 
   Future<void> selectPeriod(
@@ -68,13 +70,8 @@ class ReportsCubit extends Cubit<ReportsState> {
     DateTime? customStart,
     DateTime? customEnd,
   }) async {
-    final currentState = state;
-    final currentTab = currentState is ReportsLoaded
-        ? currentState.selectedTab
-        : ReportsTab.orders;
-
     await loadReports(
-      tab: currentTab,
+      tab: state.selectedTab,
       period: period,
       customStart: customStart,
       customEnd: customEnd,
@@ -82,16 +79,11 @@ class ReportsCubit extends Cubit<ReportsState> {
   }
 
   Future<void> refresh() async {
-    final currentState = state;
-    if (currentState is ReportsLoaded) {
-      await loadReports(
-        tab: currentState.selectedTab,
-        period: currentState.selectedPeriod,
-        customStart: currentState.customStartDate,
-        customEnd: currentState.customEndDate,
-      );
-    } else {
-      await loadReports();
-    }
+    await loadReports(
+      tab: state.selectedTab,
+      period: state.selectedPeriod,
+      customStart: state.customStartDate,
+      customEnd: state.customEndDate,
+    );
   }
 }

@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import '../database/app_database.dart' as app_db;
 import '../queries/customer_order_aggregate_query_result.dart';
+import '../queries/dashboard_operational_stats_query_result.dart';
 import '../queries/orders_report_aggregate_query_result.dart';
 import '../queries/outstanding_order_query_result.dart';
 
@@ -403,5 +404,52 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
         remainingPiastres: row.read<int>('remaining_piastres'),
       );
     }).toList();
+  }
+
+  Future<DashboardOperationalStatsQueryResult> getDashboardOperationalStats({
+    required DateTime todayStart,
+    required DateTime todayEnd,
+    required DateTime todayDate,
+  }) async {
+    final query = db.customSelect(
+      '''
+      SELECT 
+        COALESCE(SUM(CASE WHEN o.created_at >= ? AND o.created_at <= ? THEN 1 ELSE 0 END), 0) AS today_orders_count,
+        COALESCE(SUM(CASE WHEN o.status = 'processing' THEN 1 ELSE 0 END), 0) AS processing_orders_count,
+        COALESCE(SUM(CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END), 0) AS ready_orders_count,
+        COALESCE(SUM(CASE WHEN o.status != 'cancelled' AND (o.total - COALESCE(p.paid_amount, 0)) > 0 THEN (o.total - COALESCE(p.paid_amount, 0)) ELSE 0 END), 0) AS total_remaining_piastres,
+        COALESCE(SUM(CASE WHEN o.status != 'cancelled' AND (o.total - COALESCE(p.paid_amount, 0)) > 0 THEN 1 ELSE 0 END), 0) AS unpaid_orders_count,
+        COALESCE(SUM(CASE WHEN o.expected_pickup_date < ? AND o.status != 'completed' AND o.status != 'cancelled' THEN 1 ELSE 0 END), 0) AS overdue_orders_count,
+        COALESCE(SUM(CASE WHEN o.expected_pickup_date = ? AND o.status != 'completed' AND o.status != 'cancelled' THEN 1 ELSE 0 END), 0) AS today_pickup_orders_count
+      FROM orders o
+      LEFT JOIN (
+        SELECT order_id, SUM(amount) AS paid_amount
+        FROM payments
+        GROUP BY order_id
+      ) p ON p.order_id = o.id
+      ''',
+      variables: [
+        Variable.withDateTime(todayStart),
+        Variable.withDateTime(todayEnd),
+        Variable.withDateTime(todayDate),
+        Variable.withDateTime(todayDate),
+      ],
+      readsFrom: {db.orders, db.payments},
+    );
+
+    final row = await query.getSingleOrNull();
+    if (row == null) {
+      return DashboardOperationalStatsQueryResult.empty;
+    }
+
+    return DashboardOperationalStatsQueryResult(
+      todayOrdersCount: row.read<int>('today_orders_count'),
+      processingOrdersCount: row.read<int>('processing_orders_count'),
+      readyOrdersCount: row.read<int>('ready_orders_count'),
+      totalRemainingPiastres: row.read<int>('total_remaining_piastres'),
+      unpaidOrdersCount: row.read<int>('unpaid_orders_count'),
+      overdueOrdersCount: row.read<int>('overdue_orders_count'),
+      todayPickupOrdersCount: row.read<int>('today_pickup_orders_count'),
+    );
   }
 }

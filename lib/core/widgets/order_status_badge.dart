@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../domain/enums/order_status.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_text_styles.dart';
+import '../../domain/enums/order_status.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_text_styles.dart';
 
 class OrderStatusBadge extends StatelessWidget {
   final OrderStatus status;

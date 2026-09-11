@@ -66,44 +66,43 @@ void main() {
   });
 
   group('ReportsCubit Tests', () {
-    test('initial state is ReportsInitial', () {
-      expect(cubit.state, isA<ReportsInitial>());
+    test('initial state has default values and not loading', () {
+      expect(cubit.state.isLoading, isFalse);
+      expect(cubit.state.errorMessage, isNull);
+      expect(cubit.state.selectedTab, ReportsTab.orders);
     });
 
-    test('loadReports successfully emits ReportsLoading and ReportsLoaded', () async {
+    test('loadReports successfully updates state with report data', () async {
       await cubit.loadReports();
 
-      expect(cubit.state, isA<ReportsLoaded>());
-      final loaded = cubit.state as ReportsLoaded;
-      expect(loaded.ordersReport.totalOrders, 10);
-      expect(loaded.financialReport.netProfit, const Money.fromPiastres(38000));
-      expect(loaded.selectedTab, ReportsTab.orders);
+      expect(cubit.state.isLoading, isFalse);
+      expect(cubit.state.errorMessage, isNull);
+      expect(cubit.state.ordersReport.totalOrders, 10);
+      expect(cubit.state.financialReport.netProfit, const Money.fromPiastres(38000));
+      expect(cubit.state.selectedTab, ReportsTab.orders);
     });
 
-    test('selectTab switches tab in loaded state without reloading', () async {
+    test('selectTab switches tab without reloading', () async {
       await cubit.loadReports();
       cubit.selectTab(ReportsTab.financial);
 
-      expect(cubit.state, isA<ReportsLoaded>());
-      final loaded = cubit.state as ReportsLoaded;
-      expect(loaded.selectedTab, ReportsTab.financial);
+      expect(cubit.state.selectedTab, ReportsTab.financial);
     });
 
     test('selectPeriod reloads data for new period', () async {
       await cubit.loadReports();
       await cubit.selectPeriod(ReportPeriod.last7Days);
 
-      expect(cubit.state, isA<ReportsLoaded>());
-      final loaded = cubit.state as ReportsLoaded;
-      expect(loaded.selectedPeriod, ReportPeriod.last7Days);
+      expect(cubit.state.selectedPeriod, ReportPeriod.last7Days);
+      expect(cubit.state.ordersReport.totalOrders, 10);
     });
 
-    test('emits ReportsError on repository failure', () async {
+    test('sets errorMessage on repository failure', () async {
       repository.shouldThrow = true;
       await cubit.loadReports();
 
-      expect(cubit.state, isA<ReportsError>());
-      expect((cubit.state as ReportsError).message, 'DB error');
+      expect(cubit.state.isLoading, isFalse);
+      expect(cubit.state.errorMessage, 'DB error');
     });
   });
 }
