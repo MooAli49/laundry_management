@@ -7,6 +7,28 @@ class Money implements Comparable<Money> {
     return Money.fromPiastres((egp * 100).round());
   }
 
+  static Money? tryParseEgp(String text) {
+    final clean = text.trim();
+    if (clean.isEmpty) return null;
+    final parts = clean.split('.');
+    if (parts.length > 2) return null;
+    final pounds = int.tryParse(parts[0]);
+    if (pounds == null || pounds < 0) return null;
+    int piastres = pounds * 100;
+    if (parts.length == 2) {
+      var fraction = parts[1];
+      if (fraction.length > 2) {
+        fraction = fraction.substring(0, 2);
+      } else if (fraction.length == 1) {
+        fraction = '${fraction}0';
+      }
+      final fractionVal = int.tryParse(fraction);
+      if (fractionVal == null || fractionVal < 0) return null;
+      piastres += fractionVal;
+    }
+    return Money.fromPiastres(piastres);
+  }
+
   static const Money zero = Money.fromPiastres(0);
 
   int get piastres => minorUnits;

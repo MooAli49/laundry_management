@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -51,17 +52,28 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
   final TextEditingController _amountController = TextEditingController();
   PaymentMethod _selectedMethod = PaymentMethod.cash;
   String? _localValidationError;
+  Timer? _debounceTimer;
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     _amountController.dispose();
     super.dispose();
   }
 
+  void _onSearchChanged(String query) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 250), () {
+      if (mounted) {
+        context.read<RecordPaymentCubit>().searchOrders(query);
+      }
+    });
+  }
+
   void _onOrderSelected(DashboardOrderItem order) {
     setState(() {
-      _amountController.text = order.remainingAmount.toEgp.toStringAsFixed(2);
+      _amountController.text = '0.00';
       _localValidationError = null;
     });
     context.read<RecordPaymentCubit>().selectOrder(order);
@@ -79,14 +91,13 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
     if (selected == null) return;
 
     final text = _amountController.text.trim();
-    final parsed = double.tryParse(text);
+    final enteredMoney = Money.tryParseEgp(text);
 
-    if (parsed == null || parsed <= 0) {
+    if (enteredMoney == null || enteredMoney.isZero || enteredMoney.isNegative) {
       setState(() => _localValidationError = 'يرجى إدخال مبلغ أكبر من الصفر');
       return;
     }
 
-    final enteredMoney = Money.fromEgp(parsed);
     if (enteredMoney > selected.remainingAmount) {
       setState(() => _localValidationError = 'المبلغ المدخل يتجاوز المبلغ المتبقي على الطلب');
       return;
@@ -117,9 +128,9 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
             borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520, maxHeight: 680),
+            constraints: const BoxConstraints(minWidth: 360, maxWidth: 380, maxHeight: 620),
             child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.xl),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               child: state.step == RecordPaymentStep.selectOrder
                   ? _buildOrderSelectionStep(context, state)
                   : _buildPaymentEntryStep(context, state),
@@ -136,28 +147,17 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('تسجيل دفعة', style: AppTextStyles.titleLarge),
-            IconButton(
-              onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.close),
-            ),
-          ],
-        ),
+        // Header without X close icon
+        Text('تسجيل دفعة', style: AppTextStyles.titleLarge),
         AppSpacing.gapMd,
 
         // Search Field (Order number, customer name, phone number)
         AppTextField(
           key: const ValueKey('payment_order_search_field'),
           controller: _searchController,
-          hintText: 'ابحث برقم الطلب أو اسم العميل',
+          hintText: 'ابحث برقم الطلب أو اسم العميل أو رقم الهاتف',
           prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
-          onChanged: (query) {
-            context.read<RecordPaymentCubit>().searchOrders(query);
-          },
+          onChanged: _onSearchChanged,
         ),
         AppSpacing.gapMd,
 
@@ -203,62 +203,87 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
                       separatorBuilder: (_, __) => AppSpacing.gapSm,
                       itemBuilder: (context, index) {
                         final item = state.orders[index];
+                        final rawNumber = item.order.orderNumber.replaceFirst('#', '');
+                        final displayNumber = '#$rawNumber';
+
                         return AppCard(
                           key: ValueKey('payment_order_item_${item.order.id}'),
                           onTap: () => _onOrderSelected(item),
                           padding: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.md,
-                            vertical: AppSpacing.md,
+                            vertical: AppSpacing.sm,
                           ),
                           child: Row(
                             children: [
+                              // Right side: receipt icon in light square
                               Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
+                                width: 36,
+                                height: 36,
                                 decoration: BoxDecoration(
                                   color: AppColors.backgroundSecondary,
                                   borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                                 ),
-                                child: Text(
-                                  '#${item.order.orderNumber}',
-                                  style: AppTextStyles.labelMedium.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.textPrimary,
-                                  ),
+                                child: const Icon(
+                                  Icons.receipt_outlined,
+                                  size: 20,
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
-                              AppSpacing.gapHorizontalMd,
+                              AppSpacing.gapHorizontalSm,
+                              // Order number, status badge, customer name
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(
-                                      item.order.customerNameSnapshot,
-                                      style: AppTextStyles.bodyMedium.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.textPrimary,
-                                      ),
+                                    Wrap(
+                                      crossAxisAlignment: WrapCrossAlignment.center,
+                                      spacing: AppSpacing.xs,
+                                      runSpacing: AppSpacing.xs,
+                                      children: [
+                                        Text(
+                                          displayNumber,
+                                          style: AppTextStyles.labelMedium.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                        ),
+                                        OrderStatusBadge(status: item.order.status),
+                                      ],
                                     ),
                                     AppSpacing.gapXs,
                                     Text(
-                                      'المتبقي: ${item.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
+                                      item.order.customerNameSnapshot,
                                       style: AppTextStyles.bodySmall.copyWith(
-                                        color: AppColors.warning,
-                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textSecondary,
                                       ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ],
                                 ),
                               ),
                               AppSpacing.gapHorizontalSm,
-                              OrderStatusBadge(status: item.order.status),
-                              AppSpacing.gapHorizontalSm,
-                              const Icon(
-                                Icons.chevron_left,
-                                color: AppColors.textTertiary,
-                                size: 20,
+                              // Left side: remaining label and amount in warning color (no chevron)
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'المتبقي',
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: AppColors.textTertiary,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${item.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
+                                    style: AppTextStyles.bodyMedium.copyWith(
+                                      color: AppColors.warning,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -266,18 +291,21 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
                       },
                     ),
         ),
-        AppSpacing.gapMd,
+        AppSpacing.gapSm,
 
-        // Actions
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            AppButton(
-              label: 'إلغاء',
-              variant: AppButtonVariant.secondary,
-              onPressed: () => Navigator.of(context).pop(),
+        // Bottom text-style action: إلغاء
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'إلغاء',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ],
+          ),
         ),
       ],
     );
@@ -286,6 +314,8 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
   // STEP 2: Payment Entry
   Widget _buildPaymentEntryStep(BuildContext context, RecordPaymentState state) {
     final selected = state.selectedOrder!;
+    final rawNumber = selected.order.orderNumber.replaceFirst('#', '');
+    final displayNumber = '#$rawNumber';
     final error = _localValidationError ?? state.errorMessage;
 
     return SingleChildScrollView(
@@ -293,119 +323,122 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('تسجيل دفعة', style: AppTextStyles.titleLarge),
-              IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close),
-              ),
-            ],
-          ),
-          AppSpacing.gapLg,
+          // Header without X close icon
+          Text('تسجيل دفعة', style: AppTextStyles.titleLarge),
+          AppSpacing.gapMd,
 
-          // Selected Order Card (Matching SCREENSHOT 2)
+          // Selected Order Card (SCREENSHOT 2: Primary border, light primary background)
           Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
             decoration: BoxDecoration(
-              color: AppColors.backgroundSecondary,
+              color: AppColors.primaryLighter,
               borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: AppColors.primary, width: 1.5),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          '#${selected.order.orderNumber}',
-                          style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: AppSpacing.xs,
+                        runSpacing: AppSpacing.xs,
+                        children: [
+                          Text(
+                            displayNumber,
+                            style: AppTextStyles.titleSmall.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryDark,
+                            ),
+                          ),
+                          OrderStatusBadge(status: selected.order.status),
+                        ],
+                      ),
+                      AppSpacing.gapXs,
+                      Text(
+                        selected.order.customerNameSnapshot,
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
                         ),
-                        AppSpacing.gapHorizontalSm,
-                        OrderStatusBadge(status: selected.order.status),
-                      ],
-                    ),
-                    AppSpacing.gapXs,
-                    Text(
-                      selected.order.customerNameSnapshot,
-                      style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
-                    ),
-                  ],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
-                TextButton.icon(
+                // "فتح الطلب" text action without icon
+                TextButton(
                   onPressed: () {
                     Navigator.of(context).pop();
                     context.push(AppRoutes.orderDetailPath(selected.order.id));
                   },
-                  icon: const Icon(Icons.open_in_new_outlined, size: 18),
-                  label: const Text('فتح الطلب'),
+                  child: Text(
+                    'فتح الطلب',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-          AppSpacing.gapLg,
+          AppSpacing.gapMd,
 
-          // Remaining Banner
+          // Remaining Banner (Semantic warning styling)
           Container(
+            width: double.infinity,
             padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg,
-              vertical: AppSpacing.md,
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
             ),
             decoration: BoxDecoration(
               color: AppColors.warningLight,
-              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'المبلغ المتبقي',
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.warning,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  '${selected.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
-                  style: AppTextStyles.titleMedium.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.warning,
-                  ),
-                ),
-              ],
+            child: Text(
+              'المتبقي: ${selected.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.titleSmall.copyWith(
+                fontWeight: FontWeight.bold,
+                color: AppColors.warning,
+              ),
             ),
           ),
-          AppSpacing.gapLg,
+          AppSpacing.gapMd,
 
           if (error != null) ...[
             Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
+              padding: const EdgeInsets.all(AppSpacing.sm),
               decoration: BoxDecoration(
                 color: AppColors.errorLight,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline, color: AppColors.error),
-                  AppSpacing.gapHorizontalSm,
+                  const Icon(Icons.error_outline, color: AppColors.error, size: 18),
+                  AppSpacing.gapHorizontalXs,
                   Expanded(
                     child: Text(
                       error,
-                      style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error),
+                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
                     ),
                   ),
                 ],
               ),
             ),
-            AppSpacing.gapMd,
+            AppSpacing.gapSm,
           ],
 
-          // Amount Field with "المبلغ كامل" shortcut
+          // Amount Field with "المبلغ كامل" shortcut button
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -415,7 +448,7 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
                   controller: _amountController,
                   label: 'المبلغ (ج.م) *',
                   hintText: '0.00',
-                  keyboardType: TextInputType.number,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 ),
               ),
               AppSpacing.gapHorizontalSm,
@@ -430,9 +463,9 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
               ),
             ],
           ),
-          AppSpacing.gapLg,
+          AppSpacing.gapMd,
 
-          // Payment Method Selector
+          // Payment Method Selector — exactly 3 horizontal buttons without icons
           Text('طريقة الدفع *', style: AppTextStyles.labelLarge),
           AppSpacing.gapSm,
           Row(
@@ -441,44 +474,56 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
                 child: _buildMethodButton(
                   PaymentMethod.cash,
                   'كاش',
-                  Icons.payments_outlined,
                 ),
               ),
-              AppSpacing.gapHorizontalSm,
+              AppSpacing.gapHorizontalXs,
               Expanded(
                 child: _buildMethodButton(
                   PaymentMethod.instapay,
                   'InstaPay',
-                  Icons.flash_on,
                 ),
               ),
-              AppSpacing.gapHorizontalSm,
+              AppSpacing.gapHorizontalXs,
               Expanded(
                 child: _buildMethodButton(
                   PaymentMethod.ewallet,
                   'محفظة إلكترونية',
-                  Icons.account_balance_wallet_outlined,
                 ),
               ),
             ],
           ),
-          AppSpacing.gapXl,
+          AppSpacing.gapLg,
 
-          // Actions
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Bottom Actions: "اختيار طلب آخر" (text action) + "تأكيد الدفع" (primary button with card icon)
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
             children: [
-              AppButton(
+              TextButton(
                 key: const ValueKey('record_payment_back_button'),
-                label: 'اختيار طلب آخر',
-                variant: AppButtonVariant.secondary,
                 onPressed: state.isRecordingPayment
                     ? null
-                    : () => context.read<RecordPaymentCubit>().backToOrderSelection(),
+                    : () {
+                        setState(() {
+                          _amountController.text = '0.00';
+                          _localValidationError = null;
+                        });
+                        context.read<RecordPaymentCubit>().backToOrderSelection();
+                      },
+                child: Text(
+                  'اختيار طلب آخر',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
               AppButton(
                 key: const ValueKey('record_payment_confirm_button'),
                 label: 'تأكيد الدفع',
+                icon: Icons.payments_outlined,
                 isLoading: state.isRecordingPayment,
                 onPressed: () => _handleConfirmPayment(state),
               ),
@@ -489,14 +534,15 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
     );
   }
 
-  Widget _buildMethodButton(PaymentMethod method, String label, IconData icon) {
+  Widget _buildMethodButton(PaymentMethod method, String label) {
     final isSelected = _selectedMethod == method;
     return InkWell(
       key: ValueKey('payment_method_${method.name}'),
       onTap: () => setState(() => _selectedMethod = method),
       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primaryLighter : AppColors.surface,
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
@@ -505,22 +551,12 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-              size: 24,
-            ),
-            AppSpacing.gapXs,
-            Text(
-              label,
-              style: AppTextStyles.labelSmall.copyWith(
-                color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          ],
+        child: Text(
+          label,
+          style: AppTextStyles.labelSmall.copyWith(
+            color: isSelected ? AppColors.primary : AppColors.textSecondary,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
         ),
       ),
     );

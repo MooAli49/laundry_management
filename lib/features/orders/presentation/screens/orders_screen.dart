@@ -19,12 +19,22 @@ import '../widgets/order_card.dart';
 import '../widgets/orders_filter_bar.dart';
 
 class OrdersScreen extends StatelessWidget {
-  const OrdersScreen({super.key});
+  final String? initialFilter;
+
+  const OrdersScreen({super.key, this.initialFilter});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => getIt<OrdersListCubit>()..loadOrders(),
+      create: (_) {
+        final cubit = getIt<OrdersListCubit>();
+        if (initialFilter != null && initialFilter!.isNotEmpty) {
+          cubit.setFilterByName(initialFilter!);
+        } else {
+          cubit.loadOrders();
+        }
+        return cubit;
+      },
       child: const _OrdersView(),
     );
   }

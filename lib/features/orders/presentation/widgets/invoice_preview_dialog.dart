@@ -6,12 +6,12 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/app_button.dart';
-import '../../../../core/widgets/order_status_badge.dart';
 import '../../../../domain/entities/business_settings.dart';
 import '../../../../domain/entities/customer.dart';
 import '../../../../domain/entities/order.dart';
 import '../../../../domain/entities/order_item.dart';
 import '../../../../domain/value_objects/money.dart';
+import 'order_status_badge.dart';
 
 class InvoicePreviewDialog extends StatelessWidget {
   final Order order;
@@ -33,9 +33,7 @@ class InvoicePreviewDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final businessName =
-        (settings?.businessName != null &&
-            settings!.businessName.trim().isNotEmpty)
+    final businessName = (settings?.businessName != null && settings!.businessName.trim().isNotEmpty)
         ? settings!.businessName
         : AppStrings.defaultBusinessName;
     final address = settings?.address;
@@ -87,9 +85,7 @@ class InvoicePreviewDialog extends StatelessWidget {
                                 height: 48,
                                 decoration: BoxDecoration(
                                   color: AppColors.primaryLighter,
-                                  borderRadius: BorderRadius.circular(
-                                    AppSpacing.radiusMd,
-                                  ),
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                                 ),
                                 child: const Icon(
                                   Icons.local_laundry_service_outlined,
@@ -105,32 +101,24 @@ class InvoicePreviewDialog extends StatelessWidget {
                                   color: AppColors.primary,
                                 ),
                               ),
-                              if (address != null &&
-                                  address.trim().isNotEmpty) ...[
+                              if (address != null && address.trim().isNotEmpty) ...[
                                 const SizedBox(height: 2),
                                 Text(
                                   address,
-                                  style: AppTextStyles.labelSmall.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
+                                  style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
                                 ),
                               ],
                               if (phone != null && phone.trim().isNotEmpty) ...[
                                 const SizedBox(height: 2),
                                 Text(
                                   'هاتف: $phone',
-                                  style: AppTextStyles.labelSmall.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
+                                  style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
                                 ),
                               ],
                             ],
                           ),
                         ),
-                        const Divider(
-                          height: AppSpacing.xxl,
-                          color: AppColors.divider,
-                        ),
+                        const Divider(height: AppSpacing.xxl, color: AppColors.divider),
 
                         // Order & Customer Meta
                         Row(
@@ -141,16 +129,12 @@ class InvoicePreviewDialog extends StatelessWidget {
                               children: [
                                 Text(
                                   'فاتورة #${order.orderNumber}',
-                                  style: AppTextStyles.titleLarge.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  style: AppTextStyles.titleLarge.copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 AppSpacing.gapXs,
                                 Text(
                                   'التاريخ: ${DateFormatter.formatArabicDate(order.createdAt)}',
-                                  style: AppTextStyles.labelSmall.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
+                                  style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
                                 ),
                               ],
                             ),
@@ -163,9 +147,7 @@ class InvoicePreviewDialog extends StatelessWidget {
                           padding: const EdgeInsets.all(AppSpacing.md),
                           decoration: BoxDecoration(
                             color: AppColors.backgroundSecondary,
-                            borderRadius: BorderRadius.circular(
-                              AppSpacing.radiusMd,
-                            ),
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -175,27 +157,20 @@ class InvoicePreviewDialog extends StatelessWidget {
                                 children: [
                                   Text(
                                     'بيانات العميل',
-                                    style: AppTextStyles.labelSmall.copyWith(
-                                      color: AppColors.textTertiary,
-                                    ),
+                                    style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
                                   ),
                                   Text(
                                     order.customerNameSnapshot.isNotEmpty
                                         ? order.customerNameSnapshot
                                         : (customer?.name ?? 'عميل غير مسجل'),
-                                    style: AppTextStyles.bodyMedium.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                    style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
                                   ),
-                                  if (order.customerPhoneSnapshot.isNotEmpty ||
-                                      customer?.phone != null)
+                                  if (order.customerPhoneSnapshot.isNotEmpty || customer?.phone != null)
                                     Text(
                                       order.customerPhoneSnapshot.isNotEmpty
                                           ? order.customerPhoneSnapshot
                                           : customer!.phone,
-                                      style: AppTextStyles.labelSmall.copyWith(
-                                        color: AppColors.textSecondary,
-                                      ),
+                                      style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
                                     ),
                                 ],
                               ),
@@ -204,17 +179,11 @@ class InvoicePreviewDialog extends StatelessWidget {
                                 children: [
                                   Text(
                                     'موعد الاستلام',
-                                    style: AppTextStyles.labelSmall.copyWith(
-                                      color: AppColors.textTertiary,
-                                    ),
+                                    style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
                                   ),
                                   Text(
-                                    DateFormatter.formatArabicDate(
-                                      order.expectedPickupDate.toDateTime(),
-                                    ),
-                                    style: AppTextStyles.bodyMedium.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                    DateFormatter.formatArabicDate(order.expectedPickupDate.toDateTime()),
+                                    style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
                                   ),
                                 ],
                               ),
@@ -239,48 +208,33 @@ class InvoicePreviewDialog extends StatelessWidget {
                               children: [
                                 _tableHeader('الصنف / الخدمة'),
                                 _tableHeader('الكمية', align: TextAlign.center),
-                                _tableHeader(
-                                  'سعر الوحدة',
-                                  align: TextAlign.end,
-                                ),
+                                _tableHeader('سعر الوحدة', align: TextAlign.end),
                                 _tableHeader('الإجمالي', align: TextAlign.end),
                               ],
                             ),
                             ...items.map((item) {
-                              final itemTitle =
-                                  item.itemDefinitionNameSnapshot != null
+                              final itemTitle = item.itemDefinitionNameSnapshot != null
                                   ? '${item.itemTypeNameSnapshot} (${item.itemDefinitionNameSnapshot}) - ${item.serviceNameSnapshot}'
                                   : '${item.itemTypeNameSnapshot} - ${item.serviceNameSnapshot}';
 
                               return TableRow(
                                 children: [
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: AppSpacing.sm,
-                                    ),
+                                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                                     child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          itemTitle,
-                                          style: AppTextStyles.bodyMedium,
-                                        ),
+                                        Text(itemTitle, style: AppTextStyles.bodyMedium),
                                         if (item.carpetData != null)
                                           Text(
                                             'سجاد (${item.carpetData!.length} × ${item.carpetData!.width} م)',
-                                            style: AppTextStyles.labelSmall
-                                                .copyWith(
-                                                  color: AppColors.textTertiary,
-                                                ),
+                                            style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
                                           ),
                                       ],
                                     ),
                                   ),
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: AppSpacing.sm,
-                                    ),
+                                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                                     child: Text(
                                       '1',
                                       style: AppTextStyles.bodyMedium,
@@ -288,9 +242,7 @@ class InvoicePreviewDialog extends StatelessWidget {
                                     ),
                                   ),
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: AppSpacing.sm,
-                                    ),
+                                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                                     child: Text(
                                       '${item.unitPrice.toEgp.toStringAsFixed(2)} ج.م',
                                       style: AppTextStyles.bodyMedium,
@@ -298,14 +250,10 @@ class InvoicePreviewDialog extends StatelessWidget {
                                     ),
                                   ),
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: AppSpacing.sm,
-                                    ),
+                                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                                     child: Text(
                                       '${item.calculatedTotal.toEgp.toStringAsFixed(2)} ج.م',
-                                      style: AppTextStyles.bodyMedium.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                      style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
                                       textAlign: TextAlign.end,
                                     ),
                                   ),
@@ -314,10 +262,7 @@ class InvoicePreviewDialog extends StatelessWidget {
                             }),
                           ],
                         ),
-                        const Divider(
-                          height: AppSpacing.xl,
-                          color: AppColors.divider,
-                        ),
+                        const Divider(height: AppSpacing.xl, color: AppColors.divider),
 
                         // Financial Summary
                         Align(
@@ -326,43 +271,21 @@ class InvoicePreviewDialog extends StatelessWidget {
                             width: 280,
                             child: Column(
                               children: [
-                                _summaryRow(
-                                  'المجموع الفرعي:',
-                                  '${order.subtotal.toEgp.toStringAsFixed(2)} ج.م',
-                                ),
+                                _summaryRow('المجموع الفرعي:', '${order.subtotal.toEgp.toStringAsFixed(2)} ج.م'),
                                 if (order.discount.isPositive)
-                                  _summaryRow(
-                                    'الخصم:',
-                                    '- ${order.discount.toEgp.toStringAsFixed(2)} ج.م',
-                                    isNegative: true,
-                                  ),
+                                  _summaryRow('الخصم:', '- ${order.discount.toEgp.toStringAsFixed(2)} ج.م', isNegative: true),
                                 if (order.customerPickupRequested)
-                                  _summaryRow(
-                                    'استلام من العميل:',
-                                    '+ ${order.customerPickupFee.toEgp.toStringAsFixed(2)} ج.م',
-                                  ),
+                                  _summaryRow('استلام من العميل:', '+ ${order.customerPickupFee.toEgp.toStringAsFixed(2)} ج.م'),
                                 if (order.customerDeliveryRequested)
-                                  _summaryRow(
-                                    'توصيل للعميل:',
-                                    '+ ${order.customerDeliveryFee.toEgp.toStringAsFixed(2)} ج.م',
-                                  ),
+                                  _summaryRow('توصيل للعميل:', '+ ${order.customerDeliveryFee.toEgp.toStringAsFixed(2)} ج.م'),
                                 const Divider(height: AppSpacing.md),
-                                _summaryRow(
-                                  'الإجمالي:',
-                                  '${order.total.toEgp.toStringAsFixed(2)} ج.م',
-                                  isBold: true,
-                                ),
-                                _summaryRow(
-                                  'المدفوع:',
-                                  '${totalPaid.toEgp.toStringAsFixed(2)} ج.م',
-                                ),
+                                _summaryRow('الإجمالي:', '${order.total.toEgp.toStringAsFixed(2)} ج.م', isBold: true),
+                                _summaryRow('المدفوع:', '${totalPaid.toEgp.toStringAsFixed(2)} ج.م'),
                                 _summaryRow(
                                   'المتبقي:',
                                   '${remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
                                   isBold: true,
-                                  color: remainingAmount.isZero
-                                      ? AppColors.success
-                                      : AppColors.warning,
+                                  color: remainingAmount.isZero ? AppColors.success : AppColors.warning,
                                 ),
                               ],
                             ),
@@ -404,9 +327,7 @@ class InvoicePreviewDialog extends StatelessWidget {
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text(
-                            'ميزة الطباعة غير مفعلة حالياً - جاري إعداد خدمة الطباعة',
-                          ),
+                          content: Text('ميزة الطباعة غير مفعلة حالياً - جاري إعداد خدمة الطباعة'),
                           backgroundColor: AppColors.info,
                         ),
                       );
@@ -424,10 +345,7 @@ class InvoicePreviewDialog extends StatelessWidget {
 
   Widget _tableHeader(String text, {TextAlign align = TextAlign.start}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xs,
-        vertical: AppSpacing.sm,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.sm),
       child: Text(
         text,
         style: AppTextStyles.labelMedium.copyWith(fontWeight: FontWeight.bold),
@@ -436,13 +354,7 @@ class InvoicePreviewDialog extends StatelessWidget {
     );
   }
 
-  Widget _summaryRow(
-    String label,
-    String value, {
-    bool isBold = false,
-    bool isNegative = false,
-    Color? color,
-  }) {
+  Widget _summaryRow(String label, String value, {bool isBold = false, bool isNegative = false, Color? color}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.0),
       child: Row(
@@ -452,26 +364,17 @@ class InvoicePreviewDialog extends StatelessWidget {
             child: Text(
               label,
               style: isBold
-                  ? AppTextStyles.bodyMedium.copyWith(
-                      fontWeight: FontWeight.bold,
-                    )
-                  : AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                  ? AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold)
+                  : AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
             ),
           ),
           Text(
             value,
             style: isBold
-                ? AppTextStyles.bodyMedium.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: color ?? AppColors.primary,
-                  )
+                ? AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold, color: color ?? AppColors.primary)
                 : AppTextStyles.bodySmall.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: isNegative
-                        ? AppColors.error
-                        : color ?? AppColors.textPrimary,
+                    color: isNegative ? AppColors.error : color ?? AppColors.textPrimary,
                   ),
           ),
         ],

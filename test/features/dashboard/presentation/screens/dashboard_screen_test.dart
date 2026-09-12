@@ -97,7 +97,7 @@ void main() {
       expect(find.text('إضافة مصروف'), findsOneWidget);
 
       // 3. Exactly 4 Approved Operational Summary Cards
-      expect(find.text('ملخص اليوم'), findsOneWidget);
+      expect(find.text('الملخص التشغيلي'), findsOneWidget);
       expect(find.text('طلبات اليوم'), findsOneWidget);
       expect(find.text('قيد التنفيذ'), findsOneWidget);
       expect(find.text('جاهزة للتسليم'), findsOneWidget);
@@ -193,7 +193,7 @@ void main() {
       await tester.pumpWidget(buildTestableWidget(const DashboardScreen()));
       await tester.pumpAndSettle();
 
-      expect(find.text('26-101'), findsWidgets);
+      expect(find.text('#26-101'), findsWidgets);
       expect(find.text('محمود خليل'), findsWidgets);
       expect(find.text('قيد التجهيز'), findsWidgets);
     });
@@ -204,7 +204,7 @@ void main() {
       await tester.pumpWidget(buildTestableWidget(const DashboardScreen()));
       await tester.pumpAndSettle();
 
-      expect(find.text('لا توجد طلبات تحتاج تخزين'), findsOneWidget);
+      expect(find.text('لا توجد عناصر تحتاج إلى تخزين'), findsOneWidget);
       expect(find.text('لا توجد مبالغ متبقية'), findsOneWidget);
       expect(find.text('لا توجد طلبات متأخرة'), findsOneWidget);
       expect(find.text('لا توجد طلبات مستحقة اليوم'), findsOneWidget);

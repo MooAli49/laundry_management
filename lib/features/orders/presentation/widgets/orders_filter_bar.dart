@@ -19,8 +19,11 @@ class OrdersFilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusFilters = [
       OrderListFilter.all,
+      OrderListFilter.today,
       OrderListFilter.processing,
       OrderListFilter.ready,
+      OrderListFilter.todayPickup,
+      OrderListFilter.overdue,
       OrderListFilter.completed,
       OrderListFilter.cancelled,
     ];

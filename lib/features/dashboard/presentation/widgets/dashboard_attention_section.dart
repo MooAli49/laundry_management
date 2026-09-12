@@ -42,7 +42,7 @@ class DashboardAttentionSection extends StatelessWidget {
           title: 'عناصر تحتاج تخزين',
           subtitle: data.storageAttentionCount > 0
               ? '${data.storageAttentionCount} عنصر بانتظار التسكين في التخزين'
-              : 'لا توجد طلبات تحتاج تخزين',
+              : 'لا توجد عناصر تحتاج إلى تخزين',
           count: data.storageAttentionCount,
           icon: Icons.inventory_2_outlined,
           badgeColor: data.storageAttentionCount > 0 ? AppColors.warning : AppColors.success,
@@ -61,7 +61,7 @@ class DashboardAttentionSection extends StatelessWidget {
           icon: Icons.payments_outlined,
           badgeColor: data.unpaidOrdersCount > 0 ? AppColors.info : AppColors.success,
           badgeBg: data.unpaidOrdersCount > 0 ? AppColors.infoLight : AppColors.successLight,
-          onTap: () => context.push(AppRoutes.orders),
+          onTap: () => context.push('${AppRoutes.orders}?filter=hasRemaining'),
         ),
         AppSpacing.gapSm,
         _buildAttentionItem(
@@ -75,7 +75,7 @@ class DashboardAttentionSection extends StatelessWidget {
           icon: Icons.access_time_filled,
           badgeColor: data.overdueOrdersCount > 0 ? AppColors.error : AppColors.success,
           badgeBg: data.overdueOrdersCount > 0 ? AppColors.errorLight : AppColors.successLight,
-          onTap: () => context.push(AppRoutes.orders),
+          onTap: () => context.push('${AppRoutes.orders}?filter=overdue'),
         ),
         AppSpacing.gapSm,
         _buildAttentionItem(
@@ -89,7 +89,7 @@ class DashboardAttentionSection extends StatelessWidget {
           icon: Icons.calendar_today_outlined,
           badgeColor: data.todayPickupOrdersCount > 0 ? AppColors.primary : AppColors.textSecondary,
           badgeBg: data.todayPickupOrdersCount > 0 ? AppColors.primaryLighter : AppColors.backgroundSecondary,
-          onTap: () => context.push(AppRoutes.orders),
+          onTap: () => context.push('${AppRoutes.orders}?filter=todayPickup'),
         ),
       ],
     );

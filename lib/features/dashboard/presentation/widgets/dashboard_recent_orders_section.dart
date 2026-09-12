@@ -93,6 +93,8 @@ class DashboardRecentOrdersSection extends StatelessWidget {
             separatorBuilder: (_, __) => AppSpacing.gapSm,
             itemBuilder: (context, index) {
               final item = orders[index];
+              final rawNumber = item.order.orderNumber.replaceFirst('#', '');
+              final displayNumber = '#$rawNumber';
               final hasRemaining = item.remainingAmount.isPositive;
 
               return AppCard(
@@ -104,47 +106,98 @@ class DashboardRecentOrdersSection extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
+                    // Receipt / order icon
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
-                        color: AppColors.backgroundSecondary,
+                        color: AppColors.primaryLighter,
                         borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                       ),
-                      child: Text(
-                        item.order.orderNumber,
-                        style: AppTextStyles.labelMedium.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
+                      child: const Icon(
+                        Icons.receipt_outlined,
+                        color: AppColors.primary,
+                        size: 22,
                       ),
                     ),
                     AppSpacing.gapHorizontalMd,
+
+                    // #Order Number, Status Badge, Customer Name, Expected Pickup
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                displayNumber,
+                                style: AppTextStyles.labelLarge.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              AppSpacing.gapHorizontalSm,
+                              OrderStatusBadge(status: item.order.status),
+                            ],
+                          ),
+                          AppSpacing.gapXs,
                           Text(
                             item.order.customerNameSnapshot,
                             style: AppTextStyles.bodyMedium.copyWith(
                               fontWeight: FontWeight.w600,
                               color: AppColors.textPrimary,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           AppSpacing.gapXs,
                           Text(
-                            'الإجمالي: ${item.order.total.toEgp.toStringAsFixed(2)} ج.م'
-                            '${hasRemaining ? ' • متبقي: ${item.remainingAmount.toEgp.toStringAsFixed(2)} ج.م' : ' • مدفوع بالكامل'}'
-                            ' • الاستلام: ${DateFormatter.formatArabicDate(item.order.expectedPickupDate.toDateTime())}',
+                            'الاستلام: ${DateFormatter.formatArabicDate(item.order.expectedPickupDate.toDateTime())}',
                             style: AppTextStyles.bodySmall.copyWith(
-                              color: hasRemaining ? AppColors.warning : AppColors.textTertiary,
+                              color: AppColors.textTertiary,
                             ),
                           ),
                         ],
                       ),
                     ),
+                    AppSpacing.gapHorizontalMd,
+
+                    // Financial Summary: Total & Remaining / Paid
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${item.order.total.toEgp.toStringAsFixed(2)} ج.م',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        AppSpacing.gapXs,
+                        if (hasRemaining)
+                          Text(
+                            'متبقي: ${item.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.warning,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          )
+                        else
+                          Text(
+                            'مدفوع بالكامل',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.success,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                      ],
+                    ),
                     AppSpacing.gapHorizontalSm,
-                    OrderStatusBadge(status: item.order.status),
-                    AppSpacing.gapHorizontalXs,
+
+                    // Navigation Affordance
                     const Icon(
                       Icons.chevron_left,
                       color: AppColors.textTertiary,

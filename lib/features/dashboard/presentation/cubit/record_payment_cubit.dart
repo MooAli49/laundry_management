@@ -25,7 +25,10 @@ class RecordPaymentCubit extends Cubit<RecordPaymentState> {
         _uuid = uuid,
         super(const RecordPaymentState());
 
+  int _searchToken = 0;
+
   Future<void> searchOrders([String? query]) async {
+    final currentToken = ++_searchToken;
     emit(state.copyWith(isLoadingOrders: true, clearErrorMessage: true));
     try {
       final ordersRaw = await _orderRepository.getOrders(
@@ -33,18 +36,21 @@ class RecordPaymentCubit extends Cubit<RecordPaymentState> {
         query: query?.trim().isNotEmpty == true ? query!.trim() : null,
         limit: 30,
       );
+      if (currentToken != _searchToken) return;
 
       final nonCancelled = ordersRaw
           .where((o) => o.status != OrderStatus.cancelled)
           .toList();
 
       if (nonCancelled.isEmpty) {
+        if (currentToken != _searchToken) return;
         emit(state.copyWith(isLoadingOrders: false, orders: []));
         return;
       }
 
       final orderIds = nonCancelled.map((o) => o.id).toList();
       final summaries = await _paymentRepository.getPaymentSummariesForOrders(orderIds);
+      if (currentToken != _searchToken) return;
 
       final items = nonCancelled.map((order) {
         final summary = summaries[order.id];
@@ -55,8 +61,10 @@ class RecordPaymentCubit extends Cubit<RecordPaymentState> {
         );
       }).where((item) => item.remainingAmount.isPositive).toList();
 
+      if (currentToken != _searchToken) return;
       emit(state.copyWith(isLoadingOrders: false, orders: items));
     } catch (_) {
+      if (currentToken != _searchToken) return;
       emit(state.copyWith(
         isLoadingOrders: false,
         errorMessage: 'تعذر البحث عن الطلبات، يرجى المحاولة مرة أخرى',

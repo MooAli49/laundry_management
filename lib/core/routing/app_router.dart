@@ -36,7 +36,9 @@ class AppRouter {
           ),
           GoRoute(
             path: AppRoutes.orders,
-            builder: (context, state) => const OrdersScreen(),
+            builder: (context, state) => OrdersScreen(
+              initialFilter: state.uri.queryParameters['filter'],
+            ),
           ),
           GoRoute(
             path: AppRoutes.ordersNew,

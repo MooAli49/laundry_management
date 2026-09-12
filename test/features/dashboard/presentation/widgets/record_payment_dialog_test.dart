@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:laundry_management/domain/entities/customer_order_aggregate.dart';
 import 'package:laundry_management/domain/entities/order.dart';
-import 'package:laundry_management/domain/entities/order_item.dart';
 import 'package:laundry_management/domain/entities/order_payment_summary.dart';
 import 'package:laundry_management/domain/entities/payment.dart';
 import 'package:laundry_management/domain/enums/order_status.dart';
@@ -16,6 +14,10 @@ import 'package:laundry_management/features/dashboard/presentation/widgets/recor
 
 class MockOrderRepository implements OrderRepository {
   List<Order> ordersToReturn = [];
+  String? lastQuery;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
   @override
   Future<List<Order>> getOrders({
@@ -27,48 +29,25 @@ class MockOrderRepository implements OrderRepository {
     int limit = 20,
     int offset = 0,
   }) async {
+    lastQuery = query;
+    if (query != null && query.trim().isNotEmpty) {
+      final q = query.trim();
+      return ordersToReturn.where((o) =>
+        o.orderNumber.contains(q) ||
+        o.customerNameSnapshot.contains(q) ||
+        o.customerPhoneSnapshot.contains(q)
+      ).toList();
+    }
     return ordersToReturn;
   }
-
-  @override
-  Future<Order> cancelOrder({required String orderId, required String cancellationReason}) => throw UnimplementedError();
-  @override
-  Future<Order> completeOrder({required String orderId, required bool handoverConfirmed}) => throw UnimplementedError();
-  @override
-  Future<Order> correctOrderStatus({required String orderId, required OrderStatus newStatus, String? reason}) => throw UnimplementedError();
-  @override
-  Future<Order> createOrder({required Order order, required List<OrderItem> items}) => throw UnimplementedError();
-  @override
-  Future<CustomerOrderAggregate> getCustomerOrderAggregate(String customerId) => throw UnimplementedError();
-  @override
-  Future<Order?> getOrderById(String id) => throw UnimplementedError();
-  @override
-  Future<Order?> getOrderByNumber(String orderNumber) => throw UnimplementedError();
-  @override
-  Future<int> getOrderCountByCustomerId(String customerId) => throw UnimplementedError();
-  @override
-  Future<Map<String, int>> getOrderCountsByCustomer() => throw UnimplementedError();
-  @override
-  Future<Map<String, int>> getOrderCountsByCustomerIds(List<String> customerIds) => throw UnimplementedError();
-  @override
-  Future<OrderItem?> getOrderItemById(String id) => throw UnimplementedError();
-  @override
-  Future<List<OrderItem>> getOrderItems(String orderId) => throw UnimplementedError();
-  @override
-  Future<Order> markOrderReady(String orderId) => throw UnimplementedError();
-  @override
-  Future<List<Order>> searchOrders({required String query, int limit = 20, int offset = 0}) => throw UnimplementedError();
-  @override
-  Future<Order> updateOrder(Order order) => throw UnimplementedError();
-  @override
-  Stream<Order?> watchOrderById(String id) => throw UnimplementedError();
-  @override
-  Stream<List<Order>> watchRecentOrders({int limit = 20}) => throw UnimplementedError();
 }
 
 class MockPaymentRepository implements PaymentRepository {
   Payment? recordedPayment;
   Map<String, OrderPaymentSummary> summariesToReturn = {};
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
   @override
   Future<Payment> recordPayment(Payment payment) async {
@@ -80,15 +59,6 @@ class MockPaymentRepository implements PaymentRepository {
   Future<Map<String, OrderPaymentSummary>> getPaymentSummariesForOrders(List<String> orderIds) async {
     return summariesToReturn;
   }
-
-  @override
-  Future<List<Payment>> getPaymentsForOrder(String orderId) async => [];
-  @override
-  Future<Money> getRemainingAmountForOrder(String orderId) async => Money.zero;
-  @override
-  Future<Money> getTotalPaidForOrder(String orderId) async => Money.zero;
-  @override
-  Stream<List<Payment>> watchPaymentsForOrder(String orderId) => throw UnimplementedError();
 }
 
 void main() {
@@ -148,14 +118,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Step 1 title & search field
+    // Step 1 title & search field with phone support placeholder
     expect(find.text('تسجيل دفعة'), findsOneWidget);
+    expect(find.text('ابحث برقم الطلب أو اسم العميل أو رقم الهاتف'), findsOneWidget);
     expect(find.byKey(const ValueKey('payment_order_search_field')), findsOneWidget);
 
-    // Order item is visible
+    // Order item is visible with # prefix, customer name, and remaining balance
     expect(find.text('#26-001'), findsOneWidget);
     expect(find.text('أحمد محمود'), findsOneWidget);
-    expect(find.text('المتبقي: 60.00 ج.م'), findsOneWidget);
+    expect(find.text('المتبقي'), findsOneWidget);
+    expect(find.text('60.00 ج.م'), findsOneWidget);
+
+    // Cancel text button exists
+    expect(find.text('إلغاء'), findsOneWidget);
 
     // Tap order to proceed to Step 2
     await tester.tap(find.byKey(const ValueKey('payment_order_item_ord-1')));
@@ -163,10 +138,18 @@ void main() {
 
     // Step 2 elements
     expect(find.text('فتح الطلب'), findsOneWidget);
-    expect(find.text('المبلغ المتبقي'), findsOneWidget);
-    expect(find.text('60.00 ج.م'), findsOneWidget);
+    expect(find.text('المتبقي: 60.00 ج.م'), findsOneWidget);
+    // Amount starts at 0.00
+    final amountField = tester.widget<TextField>(find.descendant(
+      of: find.byKey(const ValueKey('record_payment_amount_field')),
+      matching: find.byType(TextField),
+    ));
+    expect(amountField.controller?.text, '0.00');
     expect(find.text('المبلغ كامل'), findsOneWidget);
     expect(find.text('طريقة الدفع *'), findsOneWidget);
+    expect(find.text('كاش'), findsOneWidget);
+    expect(find.text('InstaPay'), findsOneWidget);
+    expect(find.text('محفظة إلكترونية'), findsOneWidget);
     expect(find.text('اختيار طلب آخر'), findsOneWidget);
     expect(find.text('تأكيد الدفع'), findsOneWidget);
   });
@@ -194,7 +177,7 @@ void main() {
     expect(find.byKey(const ValueKey('payment_order_item_ord-1')), findsOneWidget);
   });
 
-  testWidgets('Step 2: "المبلغ كامل" fills remaining balance and confirms payment', (tester) async {
+  testWidgets('Step 2: "المبلغ كامل" fills remaining balance, switches method, and confirms payment', (tester) async {
     bool paymentSuccessCalled = false;
 
     await tester.pumpWidget(
@@ -215,10 +198,14 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('record_payment_full_amount_button')));
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(TextField, '60.00'), findsOneWidget);
+    final filledAmountField = tester.widget<TextField>(find.descendant(
+      of: find.byKey(const ValueKey('record_payment_amount_field')),
+      matching: find.byType(TextField),
+    ));
+    expect(filledAmountField.controller?.text, '60.00');
 
-    // Select InstaPay
-    await tester.tap(find.byKey(const ValueKey('payment_method_instapay')));
+    // Select E-wallet method
+    await tester.tap(find.byKey(const ValueKey('payment_method_ewallet')));
     await tester.pumpAndSettle();
 
     // Confirm Payment
@@ -228,6 +215,24 @@ void main() {
     expect(paymentSuccessCalled, isTrue);
     expect(paymentRepo.recordedPayment, isNotNull);
     expect(paymentRepo.recordedPayment?.amount, const Money.fromPiastres(6000));
-    expect(paymentRepo.recordedPayment?.paymentMethod, PaymentMethod.instapay);
+    expect(paymentRepo.recordedPayment?.paymentMethod, PaymentMethod.ewallet);
+  });
+
+  testWidgets('Step 1: debounced live search filters orders or shows empty state', (tester) async {
+    await tester.pumpWidget(
+      buildTestableWidget(
+        RecordPaymentDialog(cubit: cubit),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Enter search that does not match
+    await tester.enterText(find.byKey(const ValueKey('payment_order_search_field')), 'غير موجود');
+    // Wait for 250ms debounce
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    expect(find.text('لا توجد طلبات مطابقة للبحث'), findsOneWidget);
+    expect(find.byKey(const ValueKey('payment_order_item_ord-1')), findsNothing);
   });
 }

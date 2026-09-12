@@ -177,7 +177,7 @@ class _DashboardView extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Operational Summary Header
-                    Text('ملخص اليوم', style: AppTextStyles.titleLarge),
+                    Text('الملخص التشغيلي', style: AppTextStyles.titleLarge),
                     AppSpacing.gapMd,
 
                     // Operational Summary — Exactly 4 cards
@@ -202,7 +202,7 @@ class _DashboardView extends StatelessWidget {
                                 value: '${data.todayOrdersCount}',
                                 icon: Icons.receipt_long_outlined,
                                 subtitle: 'إجمالي الطلبات المستلمة اليوم',
-                                onTap: () => context.push(AppRoutes.orders),
+                                onTap: () => context.push('${AppRoutes.orders}?filter=today'),
                               ),
                             ),
                             SizedBox(
@@ -214,7 +214,7 @@ class _DashboardView extends StatelessWidget {
                                 iconColor: AppColors.info,
                                 iconBackground: AppColors.infoLight,
                                 subtitle: 'طلبات جاري العمل عليها',
-                                onTap: () => context.push(AppRoutes.orders),
+                                onTap: () => context.push('${AppRoutes.orders}?filter=processing'),
                               ),
                             ),
                             SizedBox(
@@ -226,7 +226,7 @@ class _DashboardView extends StatelessWidget {
                                 iconColor: AppColors.warning,
                                 iconBackground: AppColors.warningLight,
                                 subtitle: 'طلبات جاهزة لتسليم العملاء',
-                                onTap: () => context.push(AppRoutes.orders),
+                                onTap: () => context.push('${AppRoutes.orders}?filter=ready'),
                               ),
                             ),
                             SizedBox(
@@ -245,7 +245,7 @@ class _DashboardView extends StatelessWidget {
                                     ? AppColors.warning
                                     : null,
                                 subtitle: 'متبقي على طلبات العملاء',
-                                onTap: () => context.push(AppRoutes.orders),
+                                onTap: () => context.push('${AppRoutes.orders}?filter=hasRemaining'),
                               ),
                             ),
                           ],
@@ -277,6 +277,7 @@ class _DashboardView extends StatelessWidget {
                                   children: [
                                     DashboardTodayPickupsSection(
                                       orders: data.todayPickupOrders,
+                                      totalCount: data.todayPickupOrdersCount,
                                     ),
                                     AppSpacing.gapXxl,
                                     DashboardRecentOrdersSection(
@@ -295,6 +296,7 @@ class _DashboardView extends StatelessWidget {
                               AppSpacing.gapXxl,
                               DashboardTodayPickupsSection(
                                 orders: data.todayPickupOrders,
+                                totalCount: data.todayPickupOrdersCount,
                               ),
                               AppSpacing.gapXxl,
                               DashboardRecentOrdersSection(

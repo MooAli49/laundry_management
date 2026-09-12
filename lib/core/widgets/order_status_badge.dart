@@ -60,12 +60,16 @@ class OrderStatusBadge extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 6.0),
-          Text(
-            label,
-            style: AppTextStyles.bodySmall.copyWith(
-              color: fg,
-              fontWeight: FontWeight.w500,
-              fontSize: 12.0,
+          Flexible(
+            child: Text(
+              label,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: fg,
+                fontWeight: FontWeight.w500,
+                fontSize: 12.0,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

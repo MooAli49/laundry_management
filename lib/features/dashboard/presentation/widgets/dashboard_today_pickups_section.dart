@@ -12,14 +12,19 @@ import '../../../../domain/entities/dashboard_order_item.dart';
 
 class DashboardTodayPickupsSection extends StatelessWidget {
   final List<DashboardOrderItem> orders;
+  final int? totalCount;
 
   const DashboardTodayPickupsSection({
     super.key,
     required this.orders,
+    this.totalCount,
   });
 
   @override
   Widget build(BuildContext context) {
+    final effectiveTotal = totalCount ?? orders.length;
+    final hasMore = effectiveTotal > orders.length;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -41,11 +46,34 @@ class DashboardTodayPickupsSection extends StatelessWidget {
               ],
             ),
             if (orders.isNotEmpty)
-              Text(
-                '${orders.length} طلبات',
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+              Row(
+                children: [
+                  Text(
+                    hasMore
+                        ? 'عرض ${orders.length} من $effectiveTotal'
+                        : '$effectiveTotal طلبات',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  if (hasMore) ...[
+                    AppSpacing.gapHorizontalSm,
+                    InkWell(
+                      onTap: () => context.push('${AppRoutes.orders}?filter=todayPickup'),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        child: Text(
+                          'عرض الكل',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
           ],
         ),
@@ -79,6 +107,9 @@ class DashboardTodayPickupsSection extends StatelessWidget {
             separatorBuilder: (_, __) => AppSpacing.gapSm,
             itemBuilder: (context, index) {
               final item = orders[index];
+              final rawNumber = item.order.orderNumber.replaceFirst('#', '');
+              final displayNumber = '#$rawNumber';
+
               return AppCard(
                 key: ValueKey('today_pickup_order_${item.order.id}'),
                 onTap: () => context.push(AppRoutes.orderDetailPath(item.order.id)),
@@ -95,7 +126,7 @@ class DashboardTodayPickupsSection extends StatelessWidget {
                         borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                       ),
                       child: Text(
-                        item.order.orderNumber,
+                        displayNumber,
                         style: AppTextStyles.labelMedium.copyWith(
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,

@@ -77,9 +77,9 @@ class _AddExpenseDialogViewState extends State<_AddExpenseDialogView> {
 
   Future<void> _handleSave(AddExpenseState state) async {
     final amountText = _amountController.text.trim();
-    final amountVal = double.tryParse(amountText);
+    final parsedMoney = Money.tryParseEgp(amountText);
 
-    if (amountVal == null || amountVal <= 0) {
+    if (parsedMoney == null || parsedMoney.isZero || parsedMoney.isNegative) {
       setState(() => _validationError = 'يرجى إدخال مبلغ صحيح أكبر من الصفر');
       return;
     }
@@ -99,7 +99,7 @@ class _AddExpenseDialogViewState extends State<_AddExpenseDialogView> {
 
     final cubit = context.read<AddExpenseCubit>();
     final expense = await cubit.createExpense(
-      amount: Money.fromEgp(amountVal),
+      amount: parsedMoney,
       category: state.selectedCategory!,
       expenseName: nameText.isNotEmpty ? nameText : null,
       expenseDate: OrderDate.fromDate(_selectedDate),
