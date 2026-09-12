@@ -111,6 +111,62 @@ void main() {
     expect(expenseRepo.createdExpense?.notes, 'ملاحظة');
   });
 
+  test('createExpense rejects invalid amount string', () async {
+    final result = await cubit.createExpense(
+      amountText: 'invalid',
+      category: cat1,
+      expenseDate: OrderDate(2026, 9, 12),
+    );
+
+    expect(result, isNull);
+    expect(cubit.state.errorMessage, 'يرجى إدخال مبلغ صحيح');
+  });
+
+  test('createExpense rejects zero amount', () async {
+    final result = await cubit.createExpense(
+      amount: Money.zero,
+      category: cat1,
+      expenseDate: OrderDate(2026, 9, 12),
+    );
+
+    expect(result, isNull);
+    expect(cubit.state.errorMessage, 'يرجى إدخال مبلغ صحيح أكبر من الصفر');
+  });
+
+  test('createExpense rejects missing category', () async {
+    final result = await cubit.createExpense(
+      amount: const Money.fromPiastres(1000),
+      category: null,
+      expenseDate: OrderDate(2026, 9, 12),
+    );
+
+    expect(result, isNull);
+    expect(cubit.state.errorMessage, 'يرجى اختيار تصنيف المصروف');
+  });
+
+  test('createExpense rejects category أخرى when expense name is missing', () async {
+    final result = await cubit.createExpense(
+      amount: const Money.fromPiastres(1000),
+      category: catOther,
+      expenseName: '   ',
+      expenseDate: OrderDate(2026, 9, 12),
+    );
+
+    expect(result, isNull);
+    expect(cubit.state.errorMessage, 'يرجى إدخال اسم المصروف عند اختيار تصنيف أخرى');
+  });
+
+  test('createExpense rejects invalid precision (> 2 decimal places)', () async {
+    final result = await cubit.createExpense(
+      amountText: '10.999',
+      category: cat1,
+      expenseDate: OrderDate(2026, 9, 12),
+    );
+
+    expect(result, isNull);
+    expect(cubit.state.errorMessage, 'يرجى إدخال مبلغ صحيح');
+  });
+
   test('createExpense handles failure properly', () async {
     expenseRepo.shouldThrow = true;
 

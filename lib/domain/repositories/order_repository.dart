@@ -22,7 +22,11 @@ abstract class OrderRepository {
 
   Future<List<Order>> getOrders({
     OrderStatus? status,
+    List<OrderStatus>? excludedStatuses,
     OrderDate? expectedPickupDate,
+    bool? isOverdue,
+    DateTime? createdFrom,
+    DateTime? createdTo,
     String? customerId,
     bool? hasRemaining,
     String? query,

@@ -156,7 +156,7 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
           key: const ValueKey('payment_order_search_field'),
           controller: _searchController,
           hintText: 'ابحث برقم الطلب أو اسم العميل أو رقم الهاتف',
-          prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+          suffixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
           onChanged: _onSearchChanged,
         ),
         AppSpacing.gapMd,
@@ -184,21 +184,28 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
           AppSpacing.gapMd,
         ],
 
-        // Results List
-        Expanded(
+        // Results List (Flexible with shrinkWrap for compact dialog)
+        Flexible(
           child: state.isLoadingOrders
-              ? const Center(child: LoadingIndicator(message: 'جاري البحث عن الطلبات...'))
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                  child: Center(child: LoadingIndicator(message: 'جاري البحث عن الطلبات...')),
+                )
               : state.orders.isEmpty
-                  ? Center(
-                      child: Text(
-                        _searchController.text.trim().isNotEmpty
-                            ? 'لا توجد طلبات مطابقة للبحث'
-                            : 'لا توجد طلبات بمبالغ متبقية',
-                        style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                      child: Center(
+                        child: Text(
+                          _searchController.text.trim().isNotEmpty
+                              ? 'لا توجد طلبات مطابقة للبحث'
+                              : 'لا توجد طلبات بمبالغ متبقية',
+                          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+                        ),
                       ),
                     )
                   : ListView.separated(
                       key: const ValueKey('payment_order_selection_list'),
+                      shrinkWrap: true,
                       itemCount: state.orders.length,
                       separatorBuilder: (_, __) => AppSpacing.gapSm,
                       itemBuilder: (context, index) {
@@ -454,11 +461,28 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
               AppSpacing.gapHorizontalSm,
               Padding(
                 padding: const EdgeInsets.only(bottom: 2),
-                child: AppButton(
+                child: OutlinedButton(
                   key: const ValueKey('record_payment_full_amount_button'),
-                  label: 'المبلغ كامل',
-                  variant: AppButtonVariant.secondary,
                   onPressed: () => _fillFullAmount(selected.remainingAmount),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textPrimary,
+                    side: const BorderSide(color: AppColors.border, width: 1.0),
+                    backgroundColor: AppColors.surface,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm + 4,
+                    ),
+                  ),
+                  child: Text(
+                    'المبلغ كامل',
+                    style: AppTextStyles.labelMedium.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -494,13 +518,20 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
           ),
           AppSpacing.gapLg,
 
-          // Bottom Actions: "اختيار طلب آخر" (text action) + "تأكيد الدفع" (primary button with card icon)
+          // Bottom Actions: RIGHT = "تأكيد الدفع" (primary), LEFT = "اختيار طلب آخر" (text action)
           Wrap(
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.sm,
             children: [
+              AppButton(
+                key: const ValueKey('record_payment_confirm_button'),
+                label: 'تأكيد الدفع',
+                icon: Icons.payments_outlined,
+                isLoading: state.isRecordingPayment,
+                onPressed: () => _handleConfirmPayment(state),
+              ),
               TextButton(
                 key: const ValueKey('record_payment_back_button'),
                 onPressed: state.isRecordingPayment
@@ -519,13 +550,6 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-              AppButton(
-                key: const ValueKey('record_payment_confirm_button'),
-                label: 'تأكيد الدفع',
-                icon: Icons.payments_outlined,
-                isLoading: state.isRecordingPayment,
-                onPressed: () => _handleConfirmPayment(state),
               ),
             ],
           ),

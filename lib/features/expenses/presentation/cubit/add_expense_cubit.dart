@@ -53,20 +53,62 @@ class AddExpenseCubit extends Cubit<AddExpenseState> {
   }
 
   Future<Expense?> createExpense({
-    required Money amount,
-    required ExpenseCategory category,
+    Money? amount,
+    String? amountText,
+    ExpenseCategory? category,
     String? expenseName,
-    required OrderDate expenseDate,
+    OrderDate? expenseDate,
     String? notes,
   }) async {
+    Money? resolvedAmount = amount;
+    if (amountText != null) {
+      final trimmedText = amountText.trim();
+      if (trimmedText.isEmpty) {
+        emit(state.copyWith(errorMessage: 'يرجى إدخال مبلغ صحيح أكبر من الصفر'));
+        return null;
+      }
+      resolvedAmount = Money.tryParseEgp(trimmedText);
+      if (resolvedAmount == null) {
+        emit(state.copyWith(errorMessage: 'يرجى إدخال مبلغ صحيح'));
+        return null;
+      }
+    }
+
+    if (resolvedAmount == null || resolvedAmount.isZero || resolvedAmount.isNegative) {
+      emit(state.copyWith(errorMessage: 'يرجى إدخال مبلغ صحيح أكبر من الصفر'));
+      return null;
+    }
+
+    if (category == null) {
+      emit(state.copyWith(errorMessage: 'يرجى اختيار تصنيف المصروف'));
+      return null;
+    }
+
+    if (!category.isActive) {
+      emit(state.copyWith(errorMessage: 'تصنيف المصروف غير مفعل'));
+      return null;
+    }
+
+    final isOther = category.name == 'أخرى' || category.name.contains('أخرى');
+    final trimmedName = expenseName?.trim();
+    if (isOther && (trimmedName == null || trimmedName.isEmpty)) {
+      emit(state.copyWith(errorMessage: 'يرجى إدخال اسم المصروف عند اختيار تصنيف أخرى'));
+      return null;
+    }
+
+    if (expenseDate == null) {
+      emit(state.copyWith(errorMessage: 'يرجى تحديد تاريخ المصروف'));
+      return null;
+    }
+
     emit(state.copyWith(isSaving: true, clearErrorMessage: true));
     try {
       final now = DateTime.now();
       final expense = Expense(
         id: _uuid.v4(),
         expenseCategoryId: category.id,
-        amount: amount,
-        expenseName: expenseName?.trim().isNotEmpty == true ? expenseName!.trim() : null,
+        amount: resolvedAmount,
+        expenseName: trimmedName?.isNotEmpty == true ? trimmedName : null,
         expenseDate: expenseDate,
         notes: notes?.trim().isNotEmpty == true ? notes!.trim() : null,
         categoryNameSnapshot: category.name,

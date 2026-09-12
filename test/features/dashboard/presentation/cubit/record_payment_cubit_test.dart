@@ -24,7 +24,11 @@ class MockOrderRepository implements OrderRepository {
   @override
   Future<List<Order>> getOrders({
     OrderStatus? status,
+    List<OrderStatus>? excludedStatuses,
     OrderDate? expectedPickupDate,
+    bool? isOverdue,
+    DateTime? createdFrom,
+    DateTime? createdTo,
     String? customerId,
     bool? hasRemaining,
     String? query,
@@ -208,6 +212,60 @@ void main() {
     expect(orderRepo.lastQuery, '01012345678');
     expect(cubit.state.orders.length, 1);
     expect(cubit.state.orders.first.order.customerPhoneSnapshot, '01012345678');
+  });
+
+  test('search by # order number normalizes query by stripping #', () async {
+    orderRepo.ordersToReturn = [order1, order2];
+    paymentRepo.summariesToReturn = {
+      'ord-1': const OrderPaymentSummary(
+        totalPaid: Money.fromPiastres(4000),
+        remaining: Money.fromPiastres(6000),
+      ),
+    };
+
+    await cubit.searchOrders('#26-001');
+
+    expect(orderRepo.lastQuery, '26-001');
+    expect(cubit.state.orders.length, 1);
+    expect(cubit.state.orders.first.order.id, 'ord-1');
+  });
+
+  test('search using Arabic numerals normalizes Eastern Arabic digits', () async {
+    orderRepo.ordersToReturn = [order1, order2];
+    paymentRepo.summariesToReturn = {
+      'ord-1': const OrderPaymentSummary(
+        totalPaid: Money.fromPiastres(4000),
+        remaining: Money.fromPiastres(6000),
+      ),
+    };
+
+    // Phone with Eastern Arabic digits
+    await cubit.searchOrders('٠١٠١٢٣٤٥٦٧٨');
+    expect(orderRepo.lastQuery, '01012345678');
+    expect(cubit.state.orders.length, 1);
+
+    // Order number with Eastern Arabic digits
+    await cubit.searchOrders('#٢٦-٠٠١');
+    expect(orderRepo.lastQuery, '26-001');
+    expect(cubit.state.orders.length, 1);
+  });
+
+  test('stale async search result is ignored when a newer search occurs', () async {
+    orderRepo.ordersToReturn = [order1];
+    paymentRepo.summariesToReturn = {
+      'ord-1': const OrderPaymentSummary(
+        totalPaid: Money.fromPiastres(4000),
+        remaining: Money.fromPiastres(6000),
+      ),
+    };
+
+    // First search triggers and a second search is triggered immediately
+    final future1 = cubit.searchOrders('first');
+    final future2 = cubit.searchOrders('second');
+
+    await Future.wait([future1, future2]);
+
+    expect(orderRepo.lastQuery, 'second');
   });
 
   test('orders with zero remaining are excluded from results', () async {

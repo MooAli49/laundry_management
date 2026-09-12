@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/errors/failures.dart';
+import '../../../../core/utils/phone_utils.dart';
 import '../../../../domain/entities/dashboard_order_item.dart';
 import '../../../../domain/entities/payment.dart';
 import '../../../../domain/enums/order_status.dart';
@@ -31,11 +32,22 @@ class RecordPaymentCubit extends Cubit<RecordPaymentState> {
     final currentToken = ++_searchToken;
     emit(state.copyWith(isLoadingOrders: true, clearErrorMessage: true));
     try {
+      String? normalizedQuery;
+      if (query != null && query.trim().isNotEmpty) {
+        var q = query.trim();
+        q = PhoneUtils.normalizePhoneNumber(q);
+        if (q.startsWith('#')) {
+          q = q.substring(1).trim();
+        }
+        normalizedQuery = q.isNotEmpty ? q : null;
+      }
+
       final ordersRaw = await _orderRepository.getOrders(
         hasRemaining: true,
-        query: query?.trim().isNotEmpty == true ? query!.trim() : null,
+        excludedStatuses: const [OrderStatus.cancelled],
+        query: normalizedQuery,
         limit: 30,
-      );
+      ); 
       if (currentToken != _searchToken) return;
 
       final nonCancelled = ordersRaw

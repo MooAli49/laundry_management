@@ -10,7 +10,6 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../domain/entities/expense.dart';
 import '../../../../domain/entities/expense_category.dart';
-import '../../../../domain/value_objects/money.dart';
 import '../../../../domain/value_objects/order_date.dart';
 import '../cubit/add_expense_cubit.dart';
 import '../cubit/add_expense_state.dart';
@@ -19,11 +18,7 @@ class AddExpenseDialog extends StatelessWidget {
   final Future<void> Function(Expense expense)? onExpenseCreated;
   final AddExpenseCubit? cubit;
 
-  const AddExpenseDialog({
-    super.key,
-    this.onExpenseCreated,
-    this.cubit,
-  });
+  const AddExpenseDialog({super.key, this.onExpenseCreated, this.cubit});
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +44,6 @@ class _AddExpenseDialogViewState extends State<_AddExpenseDialogView> {
   final TextEditingController _notesController = TextEditingController();
 
   DateTime _selectedDate = DateTime.now();
-  String? _validationError;
 
   @override
   void dispose() {
@@ -60,7 +54,8 @@ class _AddExpenseDialogViewState extends State<_AddExpenseDialogView> {
   }
 
   bool _isOtherCategory(ExpenseCategory? category) =>
-      category != null && (category.name == 'أخرى' || category.name.contains('أخرى'));
+      category != null &&
+      (category.name == 'أخرى' || category.name.contains('أخرى'));
 
   Future<void> _selectDate() async {
     final picked = await showDatePicker(
@@ -76,34 +71,15 @@ class _AddExpenseDialogViewState extends State<_AddExpenseDialogView> {
   }
 
   Future<void> _handleSave(AddExpenseState state) async {
-    final amountText = _amountController.text.trim();
-    final parsedMoney = Money.tryParseEgp(amountText);
-
-    if (parsedMoney == null || parsedMoney.isZero || parsedMoney.isNegative) {
-      setState(() => _validationError = 'يرجى إدخال مبلغ صحيح أكبر من الصفر');
-      return;
-    }
-
-    if (state.selectedCategory == null) {
-      setState(() => _validationError = 'يرجى اختيار تصنيف المصروف');
-      return;
-    }
-
-    final nameText = _nameController.text.trim();
-    if (_isOtherCategory(state.selectedCategory) && nameText.isEmpty) {
-      setState(() => _validationError = 'يرجى إدخال اسم المصروف عند اختيار تصنيف أخرى');
-      return;
-    }
-
-    setState(() => _validationError = null);
-
     final cubit = context.read<AddExpenseCubit>();
     final expense = await cubit.createExpense(
-      amount: parsedMoney,
-      category: state.selectedCategory!,
-      expenseName: nameText.isNotEmpty ? nameText : null,
+      amountText: _amountController.text.trim(),
+      category: state.selectedCategory,
+      expenseName: _nameController.text.trim(),
       expenseDate: OrderDate.fromDate(_selectedDate),
-      notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
+      notes: _notesController.text.trim().isNotEmpty
+          ? _notesController.text.trim()
+          : null,
     );
 
     if (expense != null) {
@@ -120,7 +96,7 @@ class _AddExpenseDialogViewState extends State<_AddExpenseDialogView> {
   Widget build(BuildContext context) {
     return BlocBuilder<AddExpenseCubit, AddExpenseState>(
       builder: (context, state) {
-        final errorMessage = _validationError ?? state.errorMessage;
+        final errorMessage = state.errorMessage;
         final isOther = _isOtherCategory(state.selectedCategory);
 
         return Dialog(
@@ -154,16 +130,23 @@ class _AddExpenseDialogViewState extends State<_AddExpenseDialogView> {
                       padding: const EdgeInsets.all(AppSpacing.md),
                       decoration: BoxDecoration(
                         color: AppColors.errorLight,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMd,
+                        ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline, color: AppColors.error),
+                          const Icon(
+                            Icons.error_outline,
+                            color: AppColors.error,
+                          ),
                           AppSpacing.gapHorizontalSm,
                           Expanded(
                             child: Text(
                               errorMessage,
-                              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error),
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.error,
+                              ),
                             ),
                           ),
                         ],
@@ -200,15 +183,21 @@ class _AddExpenseDialogViewState extends State<_AddExpenseDialogView> {
                           vertical: AppSpacing.sm,
                         ),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
                           borderSide: const BorderSide(color: AppColors.border),
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
                           borderSide: const BorderSide(color: AppColors.border),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
                           borderSide: const BorderSide(
                             color: AppColors.borderFocused,
                             width: 1.5,
@@ -218,12 +207,14 @@ class _AddExpenseDialogViewState extends State<_AddExpenseDialogView> {
                       items: state.categories.map((cat) {
                         return DropdownMenuItem<ExpenseCategory>(
                           value: cat,
-                          child: Text(cat.name, style: AppTextStyles.bodyMedium),
+                          child: Text(
+                            cat.name,
+                            style: AppTextStyles.bodyMedium,
+                          ),
                         );
                       }).toList(),
                       onChanged: (cat) {
                         if (cat != null) {
-                          setState(() => _validationError = null);
                           context.read<AddExpenseCubit>().selectCategory(cat);
                         }
                       },
@@ -255,7 +246,9 @@ class _AddExpenseDialogViewState extends State<_AddExpenseDialogView> {
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMd,
+                        ),
                         border: Border.all(color: AppColors.border),
                       ),
                       child: Row(
@@ -301,7 +294,9 @@ class _AddExpenseDialogViewState extends State<_AddExpenseDialogView> {
                       AppButton(
                         label: 'إلغاء',
                         variant: AppButtonVariant.secondary,
-                        onPressed: state.isSaving ? null : () => Navigator.of(context).pop(),
+                        onPressed: state.isSaving
+                            ? null
+                            : () => Navigator.of(context).pop(),
                       ),
                       AppSpacing.gapHorizontalMd,
                       AppButton(

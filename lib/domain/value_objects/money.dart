@@ -8,23 +8,30 @@ class Money implements Comparable<Money> {
   }
 
   static Money? tryParseEgp(String text) {
-    final clean = text.trim();
+    var clean = text.trim();
     if (clean.isEmpty) return null;
+    const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    const westernDigits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+    for (var i = 0; i < arabicDigits.length; i++) {
+      clean = clean.replaceAll(arabicDigits[i], westernDigits[i]);
+    }
     final parts = clean.split('.');
     if (parts.length > 2) return null;
     final pounds = int.tryParse(parts[0]);
     if (pounds == null || pounds < 0) return null;
     int piastres = pounds * 100;
     if (parts.length == 2) {
-      var fraction = parts[1];
-      if (fraction.length > 2) {
-        fraction = fraction.substring(0, 2);
+      final fraction = parts[1];
+      if (fraction.length > 2) return null;
+      if (fraction.length == 2) {
+        final fractionVal = int.tryParse(fraction);
+        if (fractionVal == null || fractionVal < 0) return null;
+        piastres += fractionVal;
       } else if (fraction.length == 1) {
-        fraction = '${fraction}0';
+        final fractionVal = int.tryParse(fraction);
+        if (fractionVal == null || fractionVal < 0) return null;
+        piastres += fractionVal * 10;
       }
-      final fractionVal = int.tryParse(fraction);
-      if (fractionVal == null || fractionVal < 0) return null;
-      piastres += fractionVal;
     }
     return Money.fromPiastres(piastres);
   }

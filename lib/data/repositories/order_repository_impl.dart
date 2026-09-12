@@ -255,7 +255,11 @@ class OrderRepositoryImpl implements OrderRepository {
   @override
   Future<List<Order>> getOrders({
     OrderStatus? status,
+    List<OrderStatus>? excludedStatuses,
     OrderDate? expectedPickupDate,
+    bool? isOverdue,
+    DateTime? createdFrom,
+    DateTime? createdTo,
     String? customerId,
     bool? hasRemaining,
     String? query,
@@ -265,7 +269,11 @@ class OrderRepositoryImpl implements OrderRepository {
     try {
       final rows = await _ordersDao.getOrders(
         status: status?.name,
+        excludedStatuses: excludedStatuses?.map((s) => s.name).toList(),
         expectedPickupDate: expectedPickupDate?.toDateTime(),
+        isOverdue: isOverdue,
+        createdFrom: createdFrom,
+        createdTo: createdTo,
         customerId: customerId,
         hasRemaining: hasRemaining,
         query: query,

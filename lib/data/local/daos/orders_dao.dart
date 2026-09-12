@@ -105,7 +105,11 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
 
   Future<List<app_db.Order>> getOrders({
     String? status,
+    List<String>? excludedStatuses,
     DateTime? expectedPickupDate,
+    bool? isOverdue,
+    DateTime? createdFrom,
+    DateTime? createdTo,
     String? customerId,
     bool? hasRemaining,
     String? query,
@@ -120,8 +124,12 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
         innerJoin(db.customers, db.customers.id.equalsExp(db.orders.customerId)),
       ]);
 
+      final orderNumberQuery = sanitizedQuery.startsWith('#')
+          ? sanitizedQuery.substring(1).trim()
+          : sanitizedQuery;
+
       selectQuery.where(
-        db.orders.orderNumber.like('%$sanitizedQuery%') |
+        db.orders.orderNumber.like('%$orderNumberQuery%') |
             db.customers.name.like('%$sanitizedQuery%') |
             db.customers.phone.like('%$sanitizedQuery%'),
       );
@@ -129,8 +137,25 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
       if (status != null) {
         selectQuery.where(db.orders.status.equals(status));
       }
+      if (excludedStatuses != null && excludedStatuses.isNotEmpty) {
+        selectQuery.where(db.orders.status.isNotIn(excludedStatuses));
+      }
       if (expectedPickupDate != null) {
         selectQuery.where(db.orders.expectedPickupDate.equals(expectedPickupDate));
+      }
+      if (isOverdue == true) {
+        final now = DateTime.now();
+        final todayDate = DateTime.utc(now.year, now.month, now.day);
+        selectQuery.where(
+          db.orders.expectedPickupDate.isSmallerThanValue(todayDate) &
+              db.orders.status.isNotIn(const ['completed', 'cancelled']),
+        );
+      }
+      if (createdFrom != null) {
+        selectQuery.where(db.orders.createdAt.isBiggerOrEqualValue(createdFrom));
+      }
+      if (createdTo != null) {
+        selectQuery.where(db.orders.createdAt.isSmallerOrEqualValue(createdTo));
       }
       if (customerId != null) {
         selectQuery.where(db.orders.customerId.equals(customerId));
@@ -161,8 +186,24 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
       if (status != null) {
         selectQuery.where((t) => t.status.equals(status));
       }
+      if (excludedStatuses != null && excludedStatuses.isNotEmpty) {
+        selectQuery.where((t) => t.status.isNotIn(excludedStatuses));
+      }
       if (expectedPickupDate != null) {
         selectQuery.where((t) => t.expectedPickupDate.equals(expectedPickupDate));
+      }
+      if (isOverdue == true) {
+        final now = DateTime.now();
+        final todayDate = DateTime.utc(now.year, now.month, now.day);
+        selectQuery.where((t) =>
+            t.expectedPickupDate.isSmallerThanValue(todayDate) &
+            t.status.isNotIn(const ['completed', 'cancelled']));
+      }
+      if (createdFrom != null) {
+        selectQuery.where((t) => t.createdAt.isBiggerOrEqualValue(createdFrom));
+      }
+      if (createdTo != null) {
+        selectQuery.where((t) => t.createdAt.isSmallerOrEqualValue(createdTo));
       }
       if (customerId != null) {
         selectQuery.where((t) => t.customerId.equals(customerId));

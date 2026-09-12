@@ -14,6 +14,7 @@ import 'package:laundry_management/data/repositories/order_repository_impl.dart'
 import 'package:laundry_management/data/repositories/payment_repository_impl.dart';
 import 'package:laundry_management/data/repositories/storage_repository_impl.dart';
 import 'package:laundry_management/domain/entities/customer.dart';
+import 'package:laundry_management/domain/enums/order_status.dart';
 import 'package:laundry_management/domain/enums/payment_method.dart';
 import 'package:laundry_management/domain/value_objects/money.dart';
 import 'package:laundry_management/domain/value_objects/order_date.dart';
@@ -223,4 +224,84 @@ void main() {
     // Recent Orders Section
     expect(data.recentOrders.length, 2);
   });
+
+  test('todayPickupOrdersCount reflects true database count while todayPickupOrders is capped at 5', () async {
+    final now = DateTime.now();
+    final today = OrderDate.today();
+
+    final customer = Customer(
+      id: 'cust-pickups',
+      name: 'عميل الاستلام',
+      phone: '01099999999',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await customersDao.insertCustomer(CustomersCompanion.insert(
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      createdAt: customer.createdAt,
+      updatedAt: customer.updatedAt,
+    ));
+
+    // Seed 7 active orders due today
+    for (var i = 1; i <= 7; i++) {
+      await ordersDao.insertOrder(OrdersCompanion.insert(
+        id: 'order-pickup-$i',
+        orderNumber: '26-10$i',
+        customerId: customer.id,
+        customerNameSnapshot: const Value('عميل الاستلام'),
+        customerPhoneSnapshot: const Value('01099999999'),
+        status: const Value('processing'),
+        expectedPickupDate: today.toDateTime(),
+        subtotal: 5000,
+        total: 5000,
+        createdAt: now,
+        updatedAt: now,
+      ));
+    }
+
+    // Seed 1 completed order due today (should NOT be counted or listed)
+    await ordersDao.insertOrder(OrdersCompanion.insert(
+      id: 'order-pickup-completed',
+      orderNumber: '26-200',
+      customerId: customer.id,
+      customerNameSnapshot: const Value('عميل الاستلام'),
+      customerPhoneSnapshot: const Value('01099999999'),
+      status: const Value('completed'),
+      expectedPickupDate: today.toDateTime(),
+      completedAt: Value(now),
+      subtotal: 5000,
+      total: 5000,
+      createdAt: now,
+      updatedAt: now,
+    ));
+
+    // Seed 1 cancelled order due today (should NOT be counted or listed)
+    await ordersDao.insertOrder(OrdersCompanion.insert(
+      id: 'order-pickup-cancelled',
+      orderNumber: '26-201',
+      customerId: customer.id,
+      customerNameSnapshot: const Value('عميل الاستلام'),
+      customerPhoneSnapshot: const Value('01099999999'),
+      status: const Value('cancelled'),
+      expectedPickupDate: today.toDateTime(),
+      cancelledAt: Value(now),
+      cancellationReason: const Value('ملغي'),
+      subtotal: 5000,
+      total: 5000,
+      createdAt: now,
+      updatedAt: now,
+    ));
+
+    final data = await dashboardRepository.getDashboardData();
+
+    expect(data.todayPickupOrdersCount, 7, reason: 'True database count of active orders due today');
+    expect(data.todayPickupOrders.length, 5, reason: 'Displayed list is capped at 5');
+    // None of the displayed items should be completed or cancelled
+    for (final item in data.todayPickupOrders) {
+      expect(item.order.status, isNot(anyOf(OrderStatus.completed, OrderStatus.cancelled)));
+    }
+  });
 }
+

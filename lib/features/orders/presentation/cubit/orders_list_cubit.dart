@@ -32,31 +32,19 @@ class OrdersListCubit extends Cubit<OrdersListState> {
     emit(state.copyWith(isLoading: true, clearErrorMessage: true));
 
     try {
-      final isTodayPickup = state.activeFilter.requiresTodayPickupOnly;
-      final rawOrders = await _orderRepository.getOrders(
-        status: state.activeFilter.status,
-        hasRemaining: state.activeFilter.requiresRemainingOnly ? true : null,
-        expectedPickupDate: isTodayPickup ? OrderDate.today() : null,
+      final params = _resolveQueryParams();
+      final orders = await _orderRepository.getOrders(
+        status: params.status,
+        excludedStatuses: params.excludedStatuses,
+        expectedPickupDate: params.expectedPickupDate,
+        isOverdue: params.isOverdue,
+        createdFrom: params.createdFrom,
+        createdTo: params.createdTo,
+        hasRemaining: params.hasRemaining,
         query: state.searchQuery.isNotEmpty ? state.searchQuery : null,
-        limit: state.activeFilter.requiresTodayOnly || state.activeFilter.requiresOverdueOnly ? 100 : _pageSize,
+        limit: _pageSize,
         offset: 0,
       );
-
-      var orders = rawOrders;
-      if (state.activeFilter.requiresTodayOnly) {
-        final now = DateTime.now();
-        orders = orders.where((o) =>
-          o.createdAt.year == now.year &&
-          o.createdAt.month == now.month &&
-          o.createdAt.day == now.day
-        ).toList();
-      } else if (state.activeFilter.requiresOverdueOnly) {
-        orders = orders.where((o) =>
-          o.expectedPickupDate.isBeforeToday &&
-          o.status != OrderStatus.completed &&
-          o.status != OrderStatus.cancelled
-        ).toList();
-      }
 
       final viewModels = await _enrichOrders(orders);
 
@@ -84,11 +72,15 @@ class OrdersListCubit extends Cubit<OrdersListState> {
     emit(state.copyWith(isLoadingMore: true, clearErrorMessage: true));
 
     try {
-      final isTodayPickup = state.activeFilter.requiresTodayPickupOnly;
+      final params = _resolveQueryParams();
       final nextOrders = await _orderRepository.getOrders(
-        status: state.activeFilter.status,
-        hasRemaining: state.activeFilter.requiresRemainingOnly ? true : null,
-        expectedPickupDate: isTodayPickup ? OrderDate.today() : null,
+        status: params.status,
+        excludedStatuses: params.excludedStatuses,
+        expectedPickupDate: params.expectedPickupDate,
+        isOverdue: params.isOverdue,
+        createdFrom: params.createdFrom,
+        createdTo: params.createdTo,
+        hasRemaining: params.hasRemaining,
         query: state.searchQuery.isNotEmpty ? state.searchQuery : null,
         limit: _pageSize,
         offset: state.orders.length,
@@ -149,5 +141,45 @@ class OrdersListCubit extends Cubit<OrdersListState> {
       );
     }
     return viewModels;
+  }
+
+  ({
+    OrderStatus? status,
+    List<OrderStatus>? excludedStatuses,
+    OrderDate? expectedPickupDate,
+    bool? isOverdue,
+    DateTime? createdFrom,
+    DateTime? createdTo,
+    bool? hasRemaining,
+  }) _resolveQueryParams() {
+    final filter = state.activeFilter;
+    OrderStatus? status = filter.status;
+    List<OrderStatus>? excludedStatuses;
+    OrderDate? expectedPickupDate;
+    bool? isOverdue;
+    DateTime? createdFrom;
+    DateTime? createdTo;
+    final hasRemaining = filter.requiresRemainingOnly ? true : null;
+
+    if (filter.requiresTodayOnly) {
+      final now = DateTime.now();
+      createdFrom = DateTime(now.year, now.month, now.day, 0, 0, 0);
+      createdTo = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+    } else if (filter.requiresOverdueOnly) {
+      isOverdue = true;
+    } else if (filter.requiresTodayPickupOnly) {
+      expectedPickupDate = OrderDate.today();
+      excludedStatuses = const [OrderStatus.completed, OrderStatus.cancelled];
+    }
+
+    return (
+      status: status,
+      excludedStatuses: excludedStatuses,
+      expectedPickupDate: expectedPickupDate,
+      isOverdue: isOverdue,
+      createdFrom: createdFrom,
+      createdTo: createdTo,
+      hasRemaining: hasRemaining,
+    );
   }
 }

@@ -9,6 +9,7 @@ import 'package:laundry_management/domain/repositories/order_repository.dart';
 import 'package:laundry_management/domain/repositories/payment_repository.dart';
 import 'package:laundry_management/domain/value_objects/money.dart';
 import 'package:laundry_management/domain/value_objects/order_date.dart';
+import 'package:laundry_management/core/widgets/app_text_field.dart';
 import 'package:laundry_management/features/dashboard/presentation/cubit/record_payment_cubit.dart';
 import 'package:laundry_management/features/dashboard/presentation/widgets/record_payment_dialog.dart';
 
@@ -22,7 +23,11 @@ class MockOrderRepository implements OrderRepository {
   @override
   Future<List<Order>> getOrders({
     OrderStatus? status,
+    List<OrderStatus>? excludedStatuses,
     OrderDate? expectedPickupDate,
+    bool? isOverdue,
+    DateTime? createdFrom,
+    DateTime? createdTo,
     String? customerId,
     bool? hasRemaining,
     String? query,
@@ -83,9 +88,11 @@ void main() {
 
   Widget buildTestableWidget(Widget child) {
     return MaterialApp(
-      locale: const Locale('ar'),
-      home: Scaffold(
-        body: child,
+      home: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          body: child,
+        ),
       ),
     );
   }
@@ -118,10 +125,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Step 1 title & search field with phone support placeholder
+    // Step 1 title & search field with phone support placeholder and suffix search icon (on the left in RTL)
     expect(find.text('تسجيل دفعة'), findsOneWidget);
     expect(find.text('ابحث برقم الطلب أو اسم العميل أو رقم الهاتف'), findsOneWidget);
-    expect(find.byKey(const ValueKey('payment_order_search_field')), findsOneWidget);
+    final searchField = tester.widget<AppTextField>(find.byKey(const ValueKey('payment_order_search_field')));
+    expect(searchField.suffixIcon, isNotNull);
 
     // Order item is visible with # prefix, customer name, and remaining balance
     expect(find.text('#26-001'), findsOneWidget);
@@ -145,13 +153,19 @@ void main() {
       matching: find.byType(TextField),
     ));
     expect(amountField.controller?.text, '0.00');
-    expect(find.text('المبلغ كامل'), findsOneWidget);
+    // "المبلغ كامل" uses compact neutral OutlinedButton
+    expect(find.widgetWithText(OutlinedButton, 'المبلغ كامل'), findsOneWidget);
     expect(find.text('طريقة الدفع *'), findsOneWidget);
     expect(find.text('كاش'), findsOneWidget);
     expect(find.text('InstaPay'), findsOneWidget);
     expect(find.text('محفظة إلكترونية'), findsOneWidget);
     expect(find.text('اختيار طلب آخر'), findsOneWidget);
     expect(find.text('تأكيد الدفع'), findsOneWidget);
+
+    // RTL Action layout: Right = تأكيد الدفع, Left = اختيار طلب آخر
+    final confirmDx = tester.getTopLeft(find.byKey(const ValueKey('record_payment_confirm_button'))).dx;
+    final backDx = tester.getTopLeft(find.byKey(const ValueKey('record_payment_back_button'))).dx;
+    expect(confirmDx > backDx, isTrue, reason: 'تأكيد الدفع should be on the right and اختيار طلب آخر on the left in RTL');
   });
 
   testWidgets('Step 2: "اختيار طلب آخر" navigates back to Step 1', (tester) async {
@@ -234,5 +248,21 @@ void main() {
 
     expect(find.text('لا توجد طلبات مطابقة للبحث'), findsOneWidget);
     expect(find.byKey(const ValueKey('payment_order_item_ord-1')), findsNothing);
+  });
+
+  testWidgets('Step 1: searching with # prefix filters and shows matching order', (tester) async {
+    await tester.pumpWidget(
+      buildTestableWidget(
+        RecordPaymentDialog(cubit: cubit),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Enter search with # prefix
+    await tester.enterText(find.byKey(const ValueKey('payment_order_search_field')), '#26-001');
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('payment_order_item_ord-1')), findsOneWidget);
   });
 }

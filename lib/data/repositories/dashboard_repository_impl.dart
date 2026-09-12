@@ -40,15 +40,12 @@ class DashboardRepositoryImpl implements DashboardRepository {
 
     final storageAttentionCount = await _storageRepository.countItemsRequiringStorage();
 
-    // Fetch Today's pickups (Date-only)
-    final todayPickupOrdersRaw = await _orderRepository.getOrders(
+    // Fetch Today's pickups (Date-only active orders capped at 5)
+    final activeTodayPickups = await _orderRepository.getOrders(
       expectedPickupDate: OrderDate.today(),
-      limit: 10,
+      excludedStatuses: const [OrderStatus.completed, OrderStatus.cancelled],
+      limit: 5,
     );
-    final activeTodayPickups = todayPickupOrdersRaw
-        .where((o) => o.status != OrderStatus.completed && o.status != OrderStatus.cancelled)
-        .take(5)
-        .toList();
 
     // Fetch Recent orders
     final recentOrdersRaw = await _orderRepository.getOrders(limit: 5);
