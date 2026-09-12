@@ -86,8 +86,10 @@ void main() {
     required OrderStatus status,
     required int totalPiastres,
     int paidPiastres = 0,
+    OrderDate? expectedPickupDate,
+    DateTime? createdAt,
   }) async {
-    final now = DateTime.now();
+    final now = createdAt ?? DateTime.now();
     await customerRepository.createCustomer(
       Customer(
         id: customerId,
@@ -117,9 +119,12 @@ void main() {
       customerNameSnapshot: 'عميل القائمة',
       customerPhoneSnapshot: '01012345678',
       status: status,
-      expectedPickupDate: OrderDate(2026, 9, 20),
+      expectedPickupDate: expectedPickupDate ?? OrderDate(2026, 9, 20),
       subtotal: Money.fromPiastres(totalPiastres),
       total: Money.fromPiastres(totalPiastres),
+      completedAt: status == OrderStatus.completed ? now : null,
+      cancelledAt: status == OrderStatus.cancelled ? now : null,
+      cancellationReason: status == OrderStatus.cancelled ? 'سبب الإلغاء' : null,
       createdAt: now,
       updatedAt: now,
     );
@@ -233,6 +238,198 @@ void main() {
       expect(cubit.state.searchQuery, 'خاص');
       expect(cubit.state.orders.length, 1);
       expect(cubit.state.orders.first.customer?.name, 'عميل خاص');
+    });
+
+    test('todayPickup filter returns active orders due today and excludes completed/cancelled or other dates', () async {
+      final today = OrderDate.today();
+      final tomorrow = OrderDate.fromDate(DateTime.now().add(const Duration(days: 1)));
+
+      // Active due today -> should be included
+      await seedOrder(
+        orderId: 'ord-today-active',
+        orderNumber: '26-101',
+        customerId: 'cust-101',
+        customerName: 'عميل اليوم نشط',
+        phone: '01010000001',
+        status: OrderStatus.processing,
+        expectedPickupDate: today,
+        totalPiastres: 5000,
+      );
+
+      // Completed due today -> should be excluded
+      await seedOrder(
+        orderId: 'ord-today-completed',
+        orderNumber: '26-102',
+        customerId: 'cust-102',
+        customerName: 'عميل اليوم مكتمل',
+        phone: '01010000002',
+        status: OrderStatus.completed,
+        expectedPickupDate: today,
+        totalPiastres: 4000,
+      );
+
+      // Cancelled due today -> should be excluded
+      await seedOrder(
+        orderId: 'ord-today-cancelled',
+        orderNumber: '26-103',
+        customerId: 'cust-103',
+        customerName: 'عميل اليوم ملغي',
+        phone: '01010000003',
+        status: OrderStatus.cancelled,
+        expectedPickupDate: today,
+        totalPiastres: 3000,
+      );
+
+      // Active due tomorrow -> should be excluded
+      await seedOrder(
+        orderId: 'ord-tomorrow-active',
+        orderNumber: '26-104',
+        customerId: 'cust-104',
+        customerName: 'عميل الغد',
+        phone: '01010000004',
+        status: OrderStatus.processing,
+        expectedPickupDate: tomorrow,
+        totalPiastres: 6000,
+      );
+
+      cubit.setFilter(OrderListFilter.todayPickup);
+      await pumpEventQueue();
+
+      expect(cubit.state.orders.length, 1);
+      expect(cubit.state.orders.first.order.id, 'ord-today-active');
+    });
+
+    test('overdue filter returns active overdue orders and excludes completed or due today', () async {
+      final yesterday = OrderDate.fromDate(DateTime.now().subtract(const Duration(days: 1)));
+      final today = OrderDate.today();
+
+      // Active due yesterday -> should be included
+      await seedOrder(
+        orderId: 'ord-overdue-active',
+        orderNumber: '26-201',
+        customerId: 'cust-201',
+        customerName: 'عميل متأخر نشط',
+        phone: '01020000001',
+        status: OrderStatus.processing,
+        expectedPickupDate: yesterday,
+        totalPiastres: 5000,
+      );
+
+      // Completed due yesterday -> should be excluded
+      await seedOrder(
+        orderId: 'ord-overdue-completed',
+        orderNumber: '26-202',
+        customerId: 'cust-202',
+        customerName: 'عميل متأخر مكتمل',
+        phone: '01020000002',
+        status: OrderStatus.completed,
+        expectedPickupDate: yesterday,
+        totalPiastres: 5000,
+      );
+
+      // Active due today -> should be excluded from overdue
+      await seedOrder(
+        orderId: 'ord-due-today',
+        orderNumber: '26-203',
+        customerId: 'cust-203',
+        customerName: 'عميل مستحق اليوم',
+        phone: '01020000003',
+        status: OrderStatus.processing,
+        expectedPickupDate: today,
+        totalPiastres: 5000,
+      );
+
+      cubit.setFilter(OrderListFilter.overdue);
+      await pumpEventQueue();
+
+      expect(cubit.state.orders.length, 1);
+      expect(cubit.state.orders.first.order.id, 'ord-overdue-active');
+    });
+
+    test('remaining filter returns only orders with unpaid balance at query level', () async {
+      // Unpaid order -> included
+      await seedOrder(
+        orderId: 'ord-unpaid',
+        orderNumber: '26-301',
+        customerId: 'cust-301',
+        customerName: 'عميل غير مسدد',
+        phone: '01030000001',
+        status: OrderStatus.processing,
+        totalPiastres: 5000,
+        paidPiastres: 2000,
+      );
+
+      // Fully paid order -> excluded
+      await seedOrder(
+        orderId: 'ord-paid',
+        orderNumber: '26-302',
+        customerId: 'cust-302',
+        customerName: 'عميل مسدد بالكامل',
+        phone: '01030000002',
+        status: OrderStatus.processing,
+        totalPiastres: 5000,
+        paidPiastres: 5000,
+      );
+
+      cubit.setFilter(OrderListFilter.hasRemaining);
+      await pumpEventQueue();
+
+      expect(cubit.state.orders.length, 1);
+      expect(cubit.state.orders.first.order.id, 'ord-unpaid');
+    });
+
+    test('pagination loadMore loads subsequent pages and updates hasMore flag', () async {
+      for (var i = 1; i <= 25; i++) {
+        await seedOrder(
+          orderId: 'ord-page-$i',
+          orderNumber: '26-${i.toString().padLeft(3, '0')}',
+          customerId: 'cust-page-$i',
+          customerName: 'عميل $i',
+          phone: '0104000${i.toString().padLeft(4, '0')}',
+          status: OrderStatus.processing,
+          totalPiastres: 1000 * i,
+        );
+      }
+
+      await cubit.loadOrders();
+      expect(cubit.state.orders.length, 20);
+      expect(cubit.state.hasMore, isTrue);
+
+      await cubit.loadMore();
+      expect(cubit.state.orders.length, 25);
+      expect(cubit.state.hasMore, isFalse);
+    });
+
+    test('search combined with active filter applies both SQLite predicates', () async {
+      await seedOrder(
+        orderId: 'ord-match-both',
+        orderNumber: '26-501',
+        customerId: 'cust-501',
+        customerName: 'محمود طارق',
+        phone: '01050000001',
+        status: OrderStatus.processing,
+        totalPiastres: 5000,
+      );
+
+      await seedOrder(
+        orderId: 'ord-match-name-only',
+        orderNumber: '26-502',
+        customerId: 'cust-502',
+        customerName: 'محمود سامي',
+        phone: '01050000002',
+        status: OrderStatus.ready,
+        totalPiastres: 5000,
+      );
+
+      cubit.setFilter(OrderListFilter.processing);
+      await pumpEventQueue();
+      expect(cubit.state.orders.length, 1);
+
+      cubit.search('محمود');
+      await pumpEventQueue();
+
+      expect(cubit.state.orders.length, 1);
+      expect(cubit.state.orders.first.order.id, 'ord-match-both');
     });
   });
 }

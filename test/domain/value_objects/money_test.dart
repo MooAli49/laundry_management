@@ -16,6 +16,20 @@ void main() {
       expect(money.toEgp, 15.75);
     });
 
+    test('tryParseEgp converts string deterministically to integer minorUnits without floating point loss', () {
+      expect(Money.tryParseEgp('15.75'), const Money.fromPiastres(1575));
+      expect(Money.tryParseEgp('15.7'), const Money.fromPiastres(1570));
+      expect(Money.tryParseEgp('15'), const Money.fromPiastres(1500));
+      expect(Money.tryParseEgp('0.05'), const Money.fromPiastres(5));
+      expect(Money.tryParseEgp('0.00'), Money.zero);
+      expect(Money.tryParseEgp('10.999'), isNull);
+      expect(Money.tryParseEgp('١٥.٥٠'), const Money.fromPiastres(1550));
+      expect(Money.tryParseEgp('invalid'), isNull);
+      expect(Money.tryParseEgp('-5'), isNull);
+      expect(Money.tryParseEgp('12.34.56'), isNull);
+      expect(Money.tryParseEgp(''), isNull);
+    });
+
     test('supports arithmetic operators (+, -, *)', () {
       const m1 = Money.fromPiastres(500);
       const m2 = Money.fromPiastres(300);

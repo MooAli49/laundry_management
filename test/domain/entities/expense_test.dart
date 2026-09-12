@@ -77,6 +77,82 @@ void main() {
         ),
         throwsArgumentError,
       );
+
+      expect(
+        () => Expense(
+          id: 'exp-6',
+          expenseCategoryId: 'cat-1',
+          amount: const Money.fromPiastres(-500),
+          expenseDate: OrderDate(2026, 9, 4),
+          categoryNameSnapshot: 'كهرباء',
+          createdAt: now,
+          updatedAt: now,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('throws ArgumentError on empty required fields', () {
+      expect(
+        () => Expense(
+          id: '   ',
+          expenseCategoryId: 'cat-1',
+          amount: const Money.fromPiastres(100),
+          expenseDate: OrderDate(2026, 9, 4),
+          categoryNameSnapshot: 'كهرباء',
+          createdAt: now,
+          updatedAt: now,
+        ),
+        throwsArgumentError,
+      );
+
+      expect(
+        () => Expense(
+          id: 'exp-1',
+          expenseCategoryId: '   ',
+          amount: const Money.fromPiastres(100),
+          expenseDate: OrderDate(2026, 9, 4),
+          categoryNameSnapshot: 'كهرباء',
+          createdAt: now,
+          updatedAt: now,
+        ),
+        throwsArgumentError,
+      );
+
+      expect(
+        () => Expense(
+          id: 'exp-1',
+          expenseCategoryId: 'cat-1',
+          amount: const Money.fromPiastres(100),
+          expenseDate: OrderDate(2026, 9, 4),
+          categoryNameSnapshot: '   ',
+          createdAt: now,
+          updatedAt: now,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('supports copyWith, value equality, and preserve category snapshot', () {
+      final exp1 = Expense(
+        id: 'exp-1',
+        expenseCategoryId: 'cat-1',
+        amount: const Money.fromPiastres(500),
+        expenseDate: OrderDate(2026, 9, 4),
+        categoryNameSnapshot: 'صيانة',
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final exp2 = exp1.copyWith(amount: const Money.fromPiastres(800));
+      expect(exp2.amount, const Money.fromPiastres(800));
+      expect(exp2.categoryNameSnapshot, 'صيانة');
+      expect(exp1 == exp2, isFalse);
+
+      final exp1Clone = exp1.copyWith();
+      expect(exp1 == exp1Clone, isTrue);
+      expect(exp1.hashCode, exp1Clone.hashCode);
     });
   });
 }
+

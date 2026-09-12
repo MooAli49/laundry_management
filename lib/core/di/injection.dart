@@ -17,24 +17,28 @@ import '../../data/local/database/app_database.dart';
 import '../../data/local/database/dev_test_data.dart';
 import '../../data/repositories/carpet_size_repository_impl.dart';
 import '../../data/repositories/customer_repository_impl.dart';
+import '../../data/repositories/dashboard_repository_impl.dart';
 import '../../data/repositories/expense_category_repository_impl.dart';
 import '../../data/repositories/expense_repository_impl.dart';
 import '../../data/repositories/item_definition_repository_impl.dart';
 import '../../data/repositories/item_type_repository_impl.dart';
 import '../../data/repositories/order_repository_impl.dart';
 import '../../data/repositories/payment_repository_impl.dart';
+import '../../data/repositories/reports_repository_impl.dart';
 import '../../data/repositories/service_repository_impl.dart';
 import '../../data/repositories/settings_repository_impl.dart';
 import '../../data/repositories/storage_location_repository_impl.dart';
 import '../../data/repositories/storage_repository_impl.dart';
 import '../../domain/repositories/carpet_size_repository.dart';
 import '../../domain/repositories/customer_repository.dart';
+import '../../domain/repositories/dashboard_repository.dart';
 import '../../domain/repositories/expense_category_repository.dart';
 import '../../domain/repositories/expense_repository.dart';
 import '../../domain/repositories/item_definition_repository.dart';
 import '../../domain/repositories/item_type_repository.dart';
 import '../../domain/repositories/order_repository.dart';
 import '../../domain/repositories/payment_repository.dart';
+import '../../domain/repositories/reports_repository.dart';
 import '../../domain/repositories/service_repository.dart';
 import '../../domain/repositories/settings_repository.dart';
 import '../../application/use_cases/cancel_order_use_case.dart';
@@ -48,9 +52,13 @@ import '../../domain/repositories/storage_location_repository.dart';
 import '../../domain/repositories/storage_repository.dart';
 import '../../features/customers/presentation/cubit/customer_detail_cubit.dart';
 import '../../features/customers/presentation/cubit/customers_list_cubit.dart';
+import '../../features/dashboard/presentation/cubit/dashboard_cubit.dart';
+import '../../features/dashboard/presentation/cubit/record_payment_cubit.dart';
+import '../../features/expenses/presentation/cubit/add_expense_cubit.dart';
 import '../../features/orders/presentation/cubit/create_order_cubit.dart';
 import '../../features/orders/presentation/cubit/order_detail_cubit.dart';
 import '../../features/orders/presentation/cubit/orders_list_cubit.dart';
+import '../../features/reports/presentation/cubit/reports_cubit.dart';
 import '../../features/storage/presentation/cubit/storage_cubit.dart';
 
 final getIt = GetIt.instance;
@@ -207,6 +215,26 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
       ),
     );
   }
+  if (!getIt.isRegistered<ReportsRepository>()) {
+    getIt.registerLazySingleton<ReportsRepository>(
+      () => ReportsRepositoryImpl(
+        ordersDao: getIt<OrdersDao>(),
+        paymentsDao: getIt<PaymentsDao>(),
+        expensesDao: getIt<ExpensesDao>(),
+        expenseRepository: getIt<ExpenseRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<DashboardRepository>()) {
+    getIt.registerLazySingleton<DashboardRepository>(
+      () => DashboardRepositoryImpl(
+        ordersDao: getIt<OrdersDao>(),
+        orderRepository: getIt<OrderRepository>(),
+        paymentRepository: getIt<PaymentRepository>(),
+        storageRepository: getIt<StorageRepository>(),
+      ),
+    );
+  }
   if (!getIt.isRegistered<SettingsRepository>()) {
     getIt.registerLazySingleton<SettingsRepository>(
       () => SettingsRepositoryImpl(
@@ -339,6 +367,36 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
         storeOrderItemsUseCase: getIt<StoreOrderItemsUseCase>(),
         moveStoredItemUseCase: getIt<MoveStoredItemUseCase>(),
         unstoreItemUseCase: getIt<UnstoreItemUseCase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<ReportsCubit>()) {
+    getIt.registerFactory<ReportsCubit>(
+      () => ReportsCubit(
+        reportsRepository: getIt<ReportsRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<DashboardCubit>()) {
+    getIt.registerFactory<DashboardCubit>(
+      () => DashboardCubit(
+        dashboardRepository: getIt<DashboardRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<AddExpenseCubit>()) {
+    getIt.registerFactory<AddExpenseCubit>(
+      () => AddExpenseCubit(
+        categoryRepository: getIt<ExpenseCategoryRepository>(),
+        expenseRepository: getIt<ExpenseRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<RecordPaymentCubit>()) {
+    getIt.registerFactory<RecordPaymentCubit>(
+      () => RecordPaymentCubit(
+        orderRepository: getIt<OrderRepository>(),
+        paymentRepository: getIt<PaymentRepository>(),
       ),
     );
   }

@@ -12,6 +12,7 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_error_state.dart';
 import '../../../../core/widgets/loading_indicator.dart';
+import '../../../../core/widgets/order_status_badge.dart';
 import '../../../../domain/entities/order_item.dart';
 import '../../../../domain/entities/payment.dart';
 import '../../../../domain/enums/order_status.dart';
@@ -23,7 +24,6 @@ import '../cubit/order_detail_state.dart';
 import '../widgets/add_payment_dialog.dart';
 import '../widgets/cancel_order_dialog.dart';
 import '../widgets/invoice_preview_dialog.dart';
-import '../widgets/order_status_badge.dart';
 import '../widgets/status_change_dialog.dart';
 import '../widgets/store_items_dialog.dart';
 
@@ -397,11 +397,13 @@ class _OrderDetailView extends StatelessWidget {
     final customer = state.customer;
     final order = state.order;
 
-    final customerName = (order != null && order.customerNameSnapshot.isNotEmpty)
+    final customerName =
+        (order != null && order.customerNameSnapshot.isNotEmpty)
         ? order.customerNameSnapshot
         : (customer?.name ?? 'عميل غير مسجل');
 
-    final customerPhone = (order != null && order.customerPhoneSnapshot.isNotEmpty)
+    final customerPhone =
+        (order != null && order.customerPhoneSnapshot.isNotEmpty)
         ? order.customerPhoneSnapshot
         : customer?.phone;
 

@@ -90,4 +90,32 @@ class ExpensesDao extends DatabaseAccessor<app_db.AppDatabase> {
     }
     return map;
   }
+
+  Future<Map<String, ({int total, int count})>> getExpensesGroupedByCategorySnapshot({
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final sumExp = db.expenses.amount.sum();
+    final countExp = db.expenses.id.count();
+    final query = selectOnly(db.expenses)
+      ..where(
+        db.expenses.expenseDate.isBiggerOrEqualValue(startDate) &
+            db.expenses.expenseDate.isSmallerOrEqualValue(endDate),
+      )
+      ..groupBy([db.expenses.categoryNameSnapshot])
+      ..addColumns([db.expenses.categoryNameSnapshot, sumExp, countExp]);
+
+    final rows = await query.get();
+    final map = <String, ({int total, int count})>{};
+    for (final row in rows) {
+      final categoryName = row.read(db.expenses.categoryNameSnapshot);
+      if (categoryName != null) {
+        map[categoryName] = (
+          total: row.read(sumExp) ?? 0,
+          count: row.read(countExp) ?? 0,
+        );
+      }
+    }
+    return map;
+  }
 }

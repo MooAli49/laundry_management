@@ -19,11 +19,7 @@ class OrderItemForm extends StatefulWidget {
   final CreateOrderState state;
   final CreateOrderCubit cubit;
 
-  const OrderItemForm({
-    super.key,
-    required this.state,
-    required this.cubit,
-  });
+  const OrderItemForm({super.key, required this.state, required this.cubit});
 
   @override
   State<OrderItemForm> createState() => _OrderItemFormState();
@@ -39,8 +35,8 @@ class _OrderItemFormState extends State<OrderItemForm> {
   void initState() {
     super.initState();
     if (widget.state.draftUnitPrice != null) {
-      _priceController.text =
-          widget.state.draftUnitPrice!.toEgp.toStringAsFixed(2);
+      _priceController.text = widget.state.draftUnitPrice!.toEgp
+          .toStringAsFixed(2);
     }
     if (widget.state.draftCarpetLength > 0) {
       _lengthController.text = widget.state.draftCarpetLength.toString();
@@ -58,7 +54,8 @@ class _OrderItemFormState extends State<OrderItemForm> {
     super.didUpdateWidget(oldWidget);
     if (widget.state.draftUnitPrice != oldWidget.state.draftUnitPrice) {
       if (widget.state.draftUnitPrice != null) {
-        _priceController.text = widget.state.draftUnitPrice!.toEgp.toStringAsFixed(2);
+        _priceController.text = widget.state.draftUnitPrice!.toEgp
+            .toStringAsFixed(2);
       } else {
         _priceController.clear();
       }
@@ -104,9 +101,11 @@ class _OrderItemFormState extends State<OrderItemForm> {
     final state = widget.state;
     final cubit = widget.cubit;
 
-    final isCarpetPricing = state.draftService?.pricingType == PricingType.perSquareMeter;
+    final isCarpetPricing =
+        state.draftService?.pricingType == PricingType.perSquareMeter;
     final hasDefinitions = state.itemDefinitions.isNotEmpty;
-    final isPriceOverridden = state.draftUnitPrice != null &&
+    final isPriceOverridden =
+        state.draftUnitPrice != null &&
         state.draftService != null &&
         state.draftUnitPrice != state.draftService!.price;
 
@@ -117,7 +116,9 @@ class _OrderItemFormState extends State<OrderItemForm> {
         children: [
           Text(
             'إضافة قطعة للطلب',
-            style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
+            style: AppTextStyles.titleMedium.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           AppSpacing.gapMd,
 
@@ -141,7 +142,10 @@ class _OrderItemFormState extends State<OrderItemForm> {
                       items: state.itemTypes.map((type) {
                         return DropdownMenuItem<ItemType>(
                           value: type,
-                          child: Text(type.name, style: AppTextStyles.bodyMedium),
+                          child: Text(
+                            type.name,
+                            style: AppTextStyles.bodyMedium,
+                          ),
                         );
                       }).toList(),
                       onChanged: (type) => cubit.selectItemType(type),
@@ -158,7 +162,9 @@ class _OrderItemFormState extends State<OrderItemForm> {
                       Text('تعريف القطعة', style: AppTextStyles.labelLarge),
                       AppSpacing.gapXs,
                       DropdownButtonFormField<ItemDefinition>(
-                        key: ValueKey('itemDef_${state.draftItemDefinition?.id}'),
+                        key: ValueKey(
+                          'itemDef_${state.draftItemDefinition?.id}',
+                        ),
                         initialValue: state.draftItemDefinition,
                         isExpanded: true,
                         decoration: const InputDecoration(
@@ -167,7 +173,10 @@ class _OrderItemFormState extends State<OrderItemForm> {
                         items: state.itemDefinitions.map((def) {
                           return DropdownMenuItem<ItemDefinition>(
                             value: def,
-                            child: Text(def.name, style: AppTextStyles.bodyMedium),
+                            child: Text(
+                              def.name,
+                              style: AppTextStyles.bodyMedium,
+                            ),
                           );
                         }).toList(),
                         onChanged: (def) => cubit.selectItemDefinition(def),
@@ -212,86 +221,91 @@ class _OrderItemFormState extends State<OrderItemForm> {
           ),
           AppSpacing.gapMd,
 
-          // Quantity (for Per Piece and Fixed Price items)
-          if (!isCarpetPricing) ...[
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('الكمية', style: AppTextStyles.labelLarge),
-                AppSpacing.gapXs,
-                Row(
-                  children: [
-                    // Quantity Stepper: Minus
-                    InkWell(
-                      onTap: state.draftQuantity > 1
-                          ? () => cubit.updateQuantity(state.draftQuantity - 1)
-                          : null,
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Icon(
-                          Icons.remove,
-                          size: 18,
-                          color: state.draftQuantity > 1
-                              ? AppColors.textPrimary
-                              : AppColors.textDisabled,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      width: 48,
+          // Quantity (always visible for all pricing types)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('الكمية', style: AppTextStyles.labelLarge),
+              AppSpacing.gapXs,
+              Row(
+                children: [
+                  // Quantity Stepper: Minus
+                  InkWell(
+                    key: const ValueKey('quantity_stepper_minus'),
+                    onTap: state.draftQuantity > 1
+                        ? () => cubit.updateQuantity(state.draftQuantity - 1)
+                        : null,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    child: Container(
+                      width: 44,
+                      height: 44,
                       alignment: Alignment.center,
-                      child: Text(
-                        '${state.draftQuantity}',
-                        style: AppTextStyles.titleMedium.copyWith(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMd,
                         ),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Icon(
+                        Icons.remove,
+                        size: 18,
+                        color: state.draftQuantity > 1
+                            ? AppColors.textPrimary
+                            : AppColors.textDisabled,
                       ),
                     ),
-                    // Quantity Stepper: Plus
-                    InkWell(
-                      onTap: () => cubit.updateQuantity(state.draftQuantity + 1),
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: const Icon(
-                          Icons.add,
-                          size: 18,
-                          color: AppColors.textPrimary,
-                        ),
+                  ),
+                  Container(
+                    key: const ValueKey('quantity_stepper_value'),
+                    width: 48,
+                    alignment: Alignment.center,
+                    child: Text(
+                      '${state.draftQuantity}',
+                      style: AppTextStyles.titleMedium.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
                       ),
                     ),
-                    if (state.draftService != null) ...[
-                      AppSpacing.gapHorizontalMd,
-                      Text(
-                        '${(state.draftUnitPrice ?? state.draftService!.price).toEgp.toStringAsFixed(2)} ج.م / قطعة',
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
-                          fontSize: 13,
+                  ),
+                  // Quantity Stepper: Plus
+                  InkWell(
+                    key: const ValueKey('quantity_stepper_plus'),
+                    onTap: () => cubit.updateQuantity(state.draftQuantity + 1),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMd,
                         ),
+                        border: Border.all(color: AppColors.border),
                       ),
-                    ],
+                      child: const Icon(
+                        Icons.add,
+                        size: 18,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  if (state.draftService != null) ...[
+                    AppSpacing.gapHorizontalMd,
+                    Text(
+                      '${(state.draftUnitPrice ?? state.draftService!.price).toEgp.toStringAsFixed(2)} ج.م / ${isCarpetPricing ? 'م²' : 'قطعة'}',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
                   ],
-                ),
-              ],
-            ),
-            AppSpacing.gapMd,
-          ],
+                ],
+              ),
+            ],
+          ),
+          AppSpacing.gapMd,
 
           // Carpet Specific Section (if perSquareMeter)
           if (isCarpetPricing) ...[
@@ -340,7 +354,7 @@ class _OrderItemFormState extends State<OrderItemForm> {
                     controller: _lengthController,
                     label: 'الطول (م) *',
                     hintText: '0',
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: TextInputType.number,
                     onChanged: (val) {
                       final l = double.tryParse(val) ?? 0.0;
                       cubit.updateCarpetDimensions(length: l);
@@ -355,7 +369,7 @@ class _OrderItemFormState extends State<OrderItemForm> {
                     controller: _widthController,
                     label: 'العرض (م) *',
                     hintText: '0',
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: TextInputType.number,
                     onChanged: (val) {
                       final w = double.tryParse(val) ?? 0.0;
                       cubit.updateCarpetDimensions(width: w);
@@ -379,7 +393,9 @@ class _OrderItemFormState extends State<OrderItemForm> {
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.backgroundSecondary,
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
                           border: Border.all(color: AppColors.border),
                         ),
                         child: Text(
@@ -417,8 +433,8 @@ class _OrderItemFormState extends State<OrderItemForm> {
                     InkWell(
                       onTap: () {
                         cubit.updateUnitPrice(state.draftService!.price);
-                        _priceController.text =
-                            state.draftService!.price.toEgp.toStringAsFixed(2);
+                        _priceController.text = state.draftService!.price.toEgp
+                            .toStringAsFixed(2);
                       },
                       child: Text(
                         'إعادة الافتراضي',
@@ -434,7 +450,7 @@ class _OrderItemFormState extends State<OrderItemForm> {
               AppTextField(
                 controller: _priceController,
                 hintText: '0.00',
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: TextInputType.number,
                 onChanged: (val) {
                   final numVal = double.tryParse(val);
                   if (numVal != null && numVal > 0) {
@@ -449,7 +465,9 @@ class _OrderItemFormState extends State<OrderItemForm> {
                       ? 'السعر الافتراضي للخدمة ${state.draftService!.price.toEgp.toStringAsFixed(2)} ج.م — تم تعديله لهذا العنصر'
                       : 'السعر الافتراضي للخدمة ${state.draftService!.price.toEgp.toStringAsFixed(2)} ج.م — يمكنك تعديله لهذا العنصر فقط',
                   style: AppTextStyles.labelSmall.copyWith(
-                    color: isPriceOverridden ? AppColors.warning : AppColors.textTertiary,
+                    color: isPriceOverridden
+                        ? AppColors.warning
+                        : AppColors.textTertiary,
                   ),
                 ),
               ],
@@ -473,7 +491,8 @@ class _OrderItemFormState extends State<OrderItemForm> {
               label: 'إضافة القطعة',
               icon: Icons.add,
               variant: AppButtonVariant.secondary,
-              onPressed: state.draftItemType == null || state.draftService == null
+              onPressed:
+                  state.draftItemType == null || state.draftService == null
                   ? null
                   : () {
                       cubit.addItemDraftToOrder();

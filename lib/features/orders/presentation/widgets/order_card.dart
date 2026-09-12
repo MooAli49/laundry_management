@@ -5,18 +5,14 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/order_status_badge.dart';
 import '../models/order_list_item_view_model.dart';
-import 'order_status_badge.dart';
 
 class OrderCard extends StatelessWidget {
   final OrderListItemViewModel item;
   final VoidCallback onTap;
 
-  const OrderCard({
-    super.key,
-    required this.item,
-    required this.onTap,
-  });
+  const OrderCard({super.key, required this.item, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -96,9 +92,13 @@ class OrderCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  DateFormatter.formatArabicDate(order.expectedPickupDate.toDateTime()),
+                  DateFormatter.formatArabicDate(
+                    order.expectedPickupDate.toDateTime(),
+                  ),
                   style: AppTextStyles.bodySmall.copyWith(
-                    color: item.isOverdue ? AppColors.error : AppColors.textPrimary,
+                    color: item.isOverdue
+                        ? AppColors.error
+                        : AppColors.textPrimary,
                     fontWeight: FontWeight.w500,
                     fontSize: 13,
                   ),

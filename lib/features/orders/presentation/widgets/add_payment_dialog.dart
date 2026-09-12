@@ -13,7 +13,8 @@ class AddPaymentDialog extends StatefulWidget {
   final Future<void> Function({
     required Money amount,
     required PaymentMethod method,
-  }) onConfirm;
+  })
+  onConfirm;
 
   const AddPaymentDialog({
     super.key,
@@ -55,7 +56,9 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
 
     final enteredMoney = Money.fromEgp(parsed);
     if (enteredMoney > widget.remainingAmount) {
-      setState(() => _errorMessage = 'المبلغ المدخل يتجاوز المبلغ المتبقي على الطلب');
+      setState(
+        () => _errorMessage = 'المبلغ المدخل يتجاوز المبلغ المتبقي على الطلب',
+      );
       return;
     }
 
@@ -65,10 +68,7 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
     });
 
     try {
-      await widget.onConfirm(
-        amount: enteredMoney,
-        method: _selectedMethod,
-      );
+      await widget.onConfirm(amount: enteredMoney, method: _selectedMethod);
       if (mounted) {
         Navigator.of(context).pop();
       }
@@ -108,7 +108,10 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
 
               // Remaining Banner (Figma: warning-light background with warning text)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg,
+                  vertical: AppSpacing.md,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.warningLight,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
@@ -149,7 +152,9 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.error,
+                          ),
                         ),
                       ),
                     ],
@@ -167,7 +172,7 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
                       controller: _amountController,
                       label: 'المبلغ (ج.م) *',
                       hintText: '0.00',
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: TextInputType.number,
                     ),
                   ),
                   AppSpacing.gapHorizontalSm,
@@ -189,15 +194,27 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
               Row(
                 children: [
                   Expanded(
-                    child: _buildMethodButton(PaymentMethod.cash, 'كاش', Icons.payments_outlined),
+                    child: _buildMethodButton(
+                      PaymentMethod.cash,
+                      'كاش',
+                      Icons.payments_outlined,
+                    ),
                   ),
                   AppSpacing.gapHorizontalSm,
                   Expanded(
-                    child: _buildMethodButton(PaymentMethod.instapay, 'إنستاباي', Icons.flash_on),
+                    child: _buildMethodButton(
+                      PaymentMethod.instapay,
+                      'إنستاباي',
+                      Icons.flash_on,
+                    ),
                   ),
                   AppSpacing.gapHorizontalSm,
                   Expanded(
-                    child: _buildMethodButton(PaymentMethod.ewallet, 'محفظة إلكترونية', Icons.account_balance_wallet_outlined),
+                    child: _buildMethodButton(
+                      PaymentMethod.ewallet,
+                      'محفظة إلكترونية',
+                      Icons.account_balance_wallet_outlined,
+                    ),
                   ),
                 ],
               ),
@@ -210,7 +227,9 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
                   AppButton(
                     label: 'إلغاء',
                     variant: AppButtonVariant.secondary,
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isLoading
+                        ? null
+                        : () => Navigator.of(context).pop(),
                   ),
                   AppSpacing.gapHorizontalMd,
                   AppButton(
@@ -247,7 +266,9 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
           children: [
             Icon(
               icon,
-              color: isSelected ? AppColors.primaryDark : AppColors.textSecondary,
+              color: isSelected
+                  ? AppColors.primaryDark
+                  : AppColors.textSecondary,
               size: 20,
             ),
             const SizedBox(height: 6),
@@ -255,7 +276,9 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
               label,
               style: AppTextStyles.bodySmall.copyWith(
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected ? AppColors.primaryDark : AppColors.textSecondary,
+                color: isSelected
+                    ? AppColors.primaryDark
+                    : AppColors.textSecondary,
                 fontSize: 13.0,
               ),
               textAlign: TextAlign.center,
