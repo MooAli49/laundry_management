@@ -11,9 +11,10 @@ import '../../../../domain/entities/customer.dart';
 import '../../../../domain/entities/order.dart';
 import '../../../../domain/entities/order_item.dart';
 import '../../../../domain/value_objects/money.dart';
+import '../services/invoice_printer.dart';
 import 'order_status_badge.dart';
 
-class InvoicePreviewDialog extends StatelessWidget {
+class InvoicePreviewDialog extends StatefulWidget {
   final Order order;
   final Customer? customer;
   final List<OrderItem> items;
@@ -32,13 +33,54 @@ class InvoicePreviewDialog extends StatelessWidget {
   });
 
   @override
+  State<InvoicePreviewDialog> createState() => _InvoicePreviewDialogState();
+}
+
+class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
+  bool _isPrinting = false;
+
+  Future<void> _handlePrint() async {
+    if (_isPrinting) return;
+
+    setState(() {
+      _isPrinting = true;
+    });
+
+    try {
+      await InvoicePrinter.printInvoice(
+        order: widget.order,
+        items: widget.items,
+        totalPaid: widget.totalPaid,
+        remainingAmount: widget.remainingAmount,
+        customer: widget.customer,
+        settings: widget.settings,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تعذر بدء عملية الطباعة. حاول مرة أخرى.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPrinting = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final businessName = (settings?.businessName != null && settings!.businessName.trim().isNotEmpty)
-        ? settings!.businessName
+    final businessName = (widget.settings?.businessName != null && widget.settings!.businessName.trim().isNotEmpty)
+        ? widget.settings!.businessName
         : AppStrings.defaultBusinessName;
-    final address = settings?.address;
-    final phone = settings?.phone;
-    final footer = settings?.invoiceFooterText ?? 'شكراً لتعاملكم معنا!';
+    final address = widget.settings?.address;
+    final phone = widget.settings?.phone;
+    final footer = widget.settings?.invoiceFooterText ?? 'شكراً لتعاملكم معنا!';
 
     return Dialog(
       shape: RoundedRectangleBorder(
@@ -56,7 +98,7 @@ class InvoicePreviewDialog extends StatelessWidget {
                 children: [
                   Text('معاينة الفاتورة', style: AppTextStyles.titleLarge),
                   IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: _isPrinting ? null : () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close),
                   ),
                 ],
@@ -128,17 +170,17 @@ class InvoicePreviewDialog extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'فاتورة #${order.orderNumber}',
+                                  'فاتورة #${widget.order.orderNumber}',
                                   style: AppTextStyles.titleLarge.copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 AppSpacing.gapXs,
                                 Text(
-                                  'التاريخ: ${DateFormatter.formatArabicDate(order.createdAt)}',
+                                  'التاريخ: ${DateFormatter.formatArabicDate(widget.order.createdAt)}',
                                   style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
                                 ),
                               ],
                             ),
-                            OrderStatusBadge(status: order.status),
+                            OrderStatusBadge(status: widget.order.status),
                           ],
                         ),
                         AppSpacing.gapMd,
@@ -160,16 +202,16 @@ class InvoicePreviewDialog extends StatelessWidget {
                                     style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
                                   ),
                                   Text(
-                                    order.customerNameSnapshot.isNotEmpty
-                                        ? order.customerNameSnapshot
-                                        : (customer?.name ?? 'عميل غير مسجل'),
+                                    widget.order.customerNameSnapshot.isNotEmpty
+                                        ? widget.order.customerNameSnapshot
+                                        : (widget.customer?.name ?? 'عميل غير مسجل'),
                                     style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
                                   ),
-                                  if (order.customerPhoneSnapshot.isNotEmpty || customer?.phone != null)
+                                  if (widget.order.customerPhoneSnapshot.isNotEmpty || widget.customer?.phone != null)
                                     Text(
-                                      order.customerPhoneSnapshot.isNotEmpty
-                                          ? order.customerPhoneSnapshot
-                                          : customer!.phone,
+                                      widget.order.customerPhoneSnapshot.isNotEmpty
+                                          ? widget.order.customerPhoneSnapshot
+                                          : widget.customer!.phone,
                                       style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
                                     ),
                                 ],
@@ -182,7 +224,7 @@ class InvoicePreviewDialog extends StatelessWidget {
                                     style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
                                   ),
                                   Text(
-                                    DateFormatter.formatArabicDate(order.expectedPickupDate.toDateTime()),
+                                    DateFormatter.formatArabicDate(widget.order.expectedPickupDate.toDateTime()),
                                     style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
                                   ),
                                 ],
@@ -203,16 +245,16 @@ class InvoicePreviewDialog extends StatelessWidget {
                           children: [
                             TableRow(
                               decoration: const BoxDecoration(
-                                color: AppColors.backgroundSecondary,
+                                border: Border(bottom: BorderSide(color: AppColors.border, width: 1.5)),
                               ),
                               children: [
-                                _tableHeader('الصنف / الخدمة'),
+                                _tableHeader('البند والخدمة'),
                                 _tableHeader('الكمية', align: TextAlign.center),
                                 _tableHeader('سعر الوحدة', align: TextAlign.end),
                                 _tableHeader('الإجمالي', align: TextAlign.end),
                               ],
                             ),
-                            ...items.map((item) {
+                            ...widget.items.map((item) {
                               final itemTitle = item.itemDefinitionNameSnapshot != null
                                   ? '${item.itemTypeNameSnapshot} (${item.itemDefinitionNameSnapshot}) - ${item.serviceNameSnapshot}'
                                   : '${item.itemTypeNameSnapshot} - ${item.serviceNameSnapshot}';
@@ -227,7 +269,12 @@ class InvoicePreviewDialog extends StatelessWidget {
                                         Text(itemTitle, style: AppTextStyles.bodyMedium),
                                         if (item.carpetData != null)
                                           Text(
-                                            'سجاد (${item.carpetData!.length} × ${item.carpetData!.width} م)',
+                                            '(${InvoicePrinter.formatNumber(item.carpetData!.length)} × ${InvoicePrinter.formatNumber(item.carpetData!.width)} م)',
+                                            style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
+                                          ),
+                                        if (item.notes != null && item.notes!.trim().isNotEmpty)
+                                          Text(
+                                            'ملاحظة: ${item.notes!.trim()}',
                                             style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
                                           ),
                                       ],
@@ -236,7 +283,7 @@ class InvoicePreviewDialog extends StatelessWidget {
                                   Padding(
                                     padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                                     child: Text(
-                                      '1',
+                                      InvoicePrinter.formatQuantity(item),
                                       style: AppTextStyles.bodyMedium,
                                       textAlign: TextAlign.center,
                                     ),
@@ -271,21 +318,23 @@ class InvoicePreviewDialog extends StatelessWidget {
                             width: 280,
                             child: Column(
                               children: [
-                                _summaryRow('المجموع الفرعي:', '${order.subtotal.toEgp.toStringAsFixed(2)} ج.م'),
-                                if (order.discount.isPositive)
-                                  _summaryRow('الخصم:', '- ${order.discount.toEgp.toStringAsFixed(2)} ج.م', isNegative: true),
-                                if (order.customerPickupRequested)
-                                  _summaryRow('استلام من العميل:', '+ ${order.customerPickupFee.toEgp.toStringAsFixed(2)} ج.م'),
-                                if (order.customerDeliveryRequested)
-                                  _summaryRow('توصيل للعميل:', '+ ${order.customerDeliveryFee.toEgp.toStringAsFixed(2)} ج.م'),
+                                _summaryRow('المجموع الفرعي:', '${widget.order.subtotal.toEgp.toStringAsFixed(2)} ج.م'),
+                                if (widget.order.discount.isPositive)
+                                  _summaryRow('الخصم:', '- ${widget.order.discount.toEgp.toStringAsFixed(2)} ج.م', isNegative: true),
+                                if (widget.order.customerPickupRequested && widget.order.customerPickupFee.isPositive)
+                                  _summaryRow('استلام من العميل:', '+ ${widget.order.customerPickupFee.toEgp.toStringAsFixed(2)} ج.م'),
+                                if (widget.order.customerDeliveryRequested && widget.order.customerDeliveryFee.isPositive)
+                                  _summaryRow('توصيل للعميل:', '+ ${widget.order.customerDeliveryFee.toEgp.toStringAsFixed(2)} ج.م'),
+                                if (widget.order.tax.isPositive)
+                                  _summaryRow('الضريبة:', '+ ${widget.order.tax.toEgp.toStringAsFixed(2)} ج.م'),
                                 const Divider(height: AppSpacing.md),
-                                _summaryRow('الإجمالي:', '${order.total.toEgp.toStringAsFixed(2)} ج.م', isBold: true),
-                                _summaryRow('المدفوع:', '${totalPaid.toEgp.toStringAsFixed(2)} ج.م'),
+                                _summaryRow('الإجمالي:', '${widget.order.total.toEgp.toStringAsFixed(2)} ج.م', isBold: true),
+                                _summaryRow('المدفوع:', '${widget.totalPaid.toEgp.toStringAsFixed(2)} ج.م'),
                                 _summaryRow(
                                   'المتبقي:',
-                                  '${remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
+                                  '${widget.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
                                   isBold: true,
-                                  color: remainingAmount.isZero ? AppColors.success : AppColors.warning,
+                                  color: widget.remainingAmount.isZero ? AppColors.success : AppColors.warning,
                                 ),
                               ],
                             ),
@@ -318,21 +367,14 @@ class InvoicePreviewDialog extends StatelessWidget {
                   AppButton(
                     label: 'إغلاق',
                     variant: AppButtonVariant.secondary,
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: _isPrinting ? null : () => Navigator.of(context).pop(),
                   ),
                   AppSpacing.gapHorizontalMd,
                   AppButton(
                     label: 'طباعة الفاتورة',
                     icon: Icons.print,
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('ميزة الطباعة غير مفعلة حالياً - جاري إعداد خدمة الطباعة'),
-                          backgroundColor: AppColors.info,
-                        ),
-                      );
-                      Navigator.of(context).pop();
-                    },
+                    isLoading: _isPrinting,
+                    onPressed: _isPrinting ? null : _handlePrint,
                   ),
                 ],
               ),
