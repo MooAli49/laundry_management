@@ -47,7 +47,7 @@ class RecordPaymentCubit extends Cubit<RecordPaymentState> {
         excludedStatuses: const [OrderStatus.cancelled],
         query: normalizedQuery,
         limit: 30,
-      ); 
+      );
       if (currentToken != _searchToken) return;
 
       final nonCancelled = ordersRaw
