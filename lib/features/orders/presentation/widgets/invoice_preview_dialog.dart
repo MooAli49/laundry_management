@@ -237,79 +237,80 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         AppSpacing.gapLg,
 
                         // Itemized Table
-                        Table(
-                          columnWidths: const {
-                            0: FlexColumnWidth(4),
-                            1: FlexColumnWidth(1.5),
-                            2: FlexColumnWidth(2),
-                            3: FlexColumnWidth(2),
-                          },
-                          children: [
-                            TableRow(
-                              decoration: const BoxDecoration(
-                                border: Border(bottom: BorderSide(color: AppColors.border, width: 1.5)),
-                              ),
+                        Builder(
+                          builder: (context) {
+                            final lines = InvoicePrinter.groupItems(widget.items);
+                            return Table(
+                              columnWidths: const {
+                                0: FlexColumnWidth(4),
+                                1: FlexColumnWidth(1.5),
+                                2: FlexColumnWidth(2),
+                                3: FlexColumnWidth(2),
+                              },
                               children: [
-                                _tableHeader('البند والخدمة'),
-                                _tableHeader('الكمية', align: TextAlign.center),
-                                _tableHeader('سعر الوحدة', align: TextAlign.end),
-                                _tableHeader('الإجمالي', align: TextAlign.end),
+                                TableRow(
+                                  decoration: const BoxDecoration(
+                                    border: Border(bottom: BorderSide(color: AppColors.border, width: 1.5)),
+                                  ),
+                                  children: [
+                                    _tableHeader('البند والخدمة'),
+                                    _tableHeader('الكمية', align: TextAlign.center),
+                                    _tableHeader('سعر الوحدة', align: TextAlign.end),
+                                    _tableHeader('الإجمالي', align: TextAlign.end),
+                                  ],
+                                ),
+                                ...lines.map((line) {
+                                  return TableRow(
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(line.title, style: AppTextStyles.bodyMedium),
+                                            if (line.dimensionsSubtext != null)
+                                              Text(
+                                                line.dimensionsSubtext!,
+                                                style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
+                                              ),
+                                            if (line.notes != null)
+                                              Text(
+                                                'ملاحظة: ${line.notes!}',
+                                                style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                                        child: Text(
+                                          line.quantityDisplay,
+                                          style: AppTextStyles.bodyMedium,
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                                        child: Text(
+                                          '${line.unitPrice.toEgp.toStringAsFixed(2)} ج.م',
+                                          style: AppTextStyles.bodyMedium,
+                                          textAlign: TextAlign.end,
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                                        child: Text(
+                                          '${line.calculatedTotal.toEgp.toStringAsFixed(2)} ج.م',
+                                          style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+                                          textAlign: TextAlign.end,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }),
                               ],
-                            ),
-                            ...widget.items.map((item) {
-                              final itemTitle = item.itemDefinitionNameSnapshot != null
-                                  ? '${item.itemTypeNameSnapshot} (${item.itemDefinitionNameSnapshot}) - ${item.serviceNameSnapshot}'
-                                  : '${item.itemTypeNameSnapshot} - ${item.serviceNameSnapshot}';
-
-                              return TableRow(
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(itemTitle, style: AppTextStyles.bodyMedium),
-                                        if (item.carpetData != null)
-                                          Text(
-                                            '(${InvoicePrinter.formatNumber(item.carpetData!.length)} × ${InvoicePrinter.formatNumber(item.carpetData!.width)} م)',
-                                            style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
-                                          ),
-                                        if (item.notes != null && item.notes!.trim().isNotEmpty)
-                                          Text(
-                                            'ملاحظة: ${item.notes!.trim()}',
-                                            style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                                    child: Text(
-                                      InvoicePrinter.formatQuantity(item),
-                                      style: AppTextStyles.bodyMedium,
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                                    child: Text(
-                                      '${item.unitPrice.toEgp.toStringAsFixed(2)} ج.م',
-                                      style: AppTextStyles.bodyMedium,
-                                      textAlign: TextAlign.end,
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                                    child: Text(
-                                      '${item.calculatedTotal.toEgp.toStringAsFixed(2)} ج.م',
-                                      style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
-                                      textAlign: TextAlign.end,
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }),
-                          ],
+                            );
+                          },
                         ),
                         const Divider(height: AppSpacing.xl, color: AppColors.divider),
 

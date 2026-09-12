@@ -11,28 +11,147 @@ import '../../../../domain/entities/order_item.dart';
 import '../../../../domain/enums/pricing_type.dart';
 import '../../../../domain/value_objects/money.dart';
 
+/// Represents an aggregated/grouped invoice line item for presentation & printing.
+class InvoiceLineItem {
+  final String title;
+  final String quantityDisplay;
+  final Money unitPrice;
+  final Money calculatedTotal;
+  final String? dimensionsSubtext;
+  final String? notes;
+
+  const InvoiceLineItem({
+    required this.title,
+    required this.quantityDisplay,
+    required this.unitPrice,
+    required this.calculatedTotal,
+    this.dimensionsSubtext,
+    this.notes,
+  });
+}
+
 /// Concrete presentation/output utility responsible for building 80mm thermal
 /// receipt PDF documents and dispatching them to the operating system's print subsystem.
 class InvoicePrinter {
   InvoicePrinter._();
 
-  /// Formats item quantity according to historical pricing semantics.
-  ///
-  /// - [PricingType.perSquareMeter]: Displays `${area} م²` where area is `carpetData?.area ?? item.quantity`.
-  /// - [PricingType.perPiece] or [PricingType.fixedPrice]:
-  ///   - Integer counts render as whole numbers (`1`, `2`, `3`).
-  ///   - Fractional quantities preserve exact decimal precision without truncation (`2.75`).
-  static String formatQuantity(OrderItem item) {
-    if (item.pricingType == PricingType.perSquareMeter) {
-      final area = item.carpetData?.area ?? item.quantity;
-      return '${formatNumber(area)} م²';
+  /// Formats a quantity using natural Arabic wording:
+  /// - 1 -> "1 قطعة"
+  /// - 2 -> "2 قطع"
+  /// - 3..10 -> "$count قطع"
+  /// - >10 -> "$count قطعة"
+  /// - decimal (e.g. 2.75) -> "2.75 قطعة"
+  static String formatPieceCount(double quantity) {
+    if (quantity % 1 == 0) {
+      final count = quantity.toInt();
+      if (count == 1) return '1 قطعة';
+      if (count >= 2 && count <= 10) return '$count قطع';
+      return '$count قطعة';
     } else {
-      if (item.quantity % 1 == 0) {
-        return item.quantity.toInt().toString();
-      } else {
-        return formatNumber(item.quantity);
-      }
+      return '${formatNumber(quantity)} قطعة';
     }
+  }
+
+  /// Formats item quantity for display.
+  static String formatQuantity(OrderItem item) {
+    return groupItems([item]).first.quantityDisplay;
+  }
+
+  /// Internal grouping key for aggregating semantically identical invoice lines.
+  static String _groupingKey(OrderItem item) {
+    final def = '${item.itemDefinitionId ?? ''}_${item.itemDefinitionNameSnapshot ?? ''}';
+    final notes = (item.notes ?? '').trim();
+    final carpetKey = item.carpetData != null
+        ? '${formatNumber(item.carpetData!.length)}x${formatNumber(item.carpetData!.width)}'
+        : 'none';
+    return '${item.itemTypeId}|${item.itemTypeNameSnapshot}|$def|${item.serviceId}|${item.serviceNameSnapshot}|${item.pricingType.name}|${item.unitPrice.piastres}|$carpetKey|$notes';
+  }
+
+  /// Aggregates semantically identical order items into presentation-level invoice lines.
+  ///
+  /// Grouping criteria (all must match):
+  /// - Same item type and definition snapshot
+  /// - Same service
+  /// - Same pricing type
+  /// - Same unit price
+  /// - Same carpet dimensions (length × width) when applicable
+  /// - Same notes / special instructions
+  ///
+  /// Semantics:
+  /// - For carpet items:
+  ///   - Quantity displays the total piece count (e.g. "3 قطع").
+  ///   - Unit price displays the price for ONE carpet piece.
+  ///   - Line total displays total for all pieces in the group.
+  ///   - Supporting detail displays dimensions and unit area: "(2 × 3 م) — 6 م²/قطعة".
+  /// - For normal items:
+  ///   - Quantity displays the total piece count (e.g. "3 قطع", "1 قطعة").
+  ///   - Unit price displays the standard unit price.
+  ///   - Line total displays total for all pieces in the group.
+  static List<InvoiceLineItem> groupItems(List<OrderItem> items) {
+    final map = <String, List<OrderItem>>{};
+    for (final item in items) {
+      final key = _groupingKey(item);
+      map.putIfAbsent(key, () => []).add(item);
+    }
+
+    return map.values.map((group) {
+      final first = group.first;
+      final isCarpet = first.pricingType == PricingType.perSquareMeter;
+
+      final itemTitle = first.itemDefinitionNameSnapshot != null
+          ? '${first.itemTypeNameSnapshot} (${first.itemDefinitionNameSnapshot}) - ${first.serviceNameSnapshot}'
+          : '${first.itemTypeNameSnapshot} - ${first.serviceNameSnapshot}';
+
+      final notes = first.notes?.trim().isNotEmpty == true ? first.notes!.trim() : null;
+
+      if (isCarpet) {
+        final totalPieces = group.fold<double>(0.0, (sum, item) => sum + item.quantity);
+        final pieceCount = totalPieces > 0 ? totalPieces : group.length.toDouble();
+        final quantityDisplay = formatPieceCount(pieceCount);
+
+        // Price for ONE carpet piece
+        final unitPrice = first.carpetData != null
+            ? Money.fromPiastres((first.unitPrice.piastres * first.carpetData!.area).round())
+            : first.calculatedTotal;
+
+        // Sum of calculated totals across all carpet pieces in this group
+        final totalPiastres = group.fold<int>(0, (sum, item) => sum + item.calculatedTotal.piastres);
+        final calculatedTotal = Money.fromPiastres(totalPiastres);
+
+        String? dimensionsSubtext;
+        if (first.carpetData != null) {
+          final length = formatNumber(first.carpetData!.length);
+          final width = formatNumber(first.carpetData!.width);
+          final area = formatNumber(first.carpetData!.area);
+          dimensionsSubtext = '($length × $width م) — $area م²/قطعة';
+        }
+
+        return InvoiceLineItem(
+          title: itemTitle,
+          quantityDisplay: quantityDisplay,
+          unitPrice: unitPrice,
+          calculatedTotal: calculatedTotal,
+          dimensionsSubtext: dimensionsSubtext,
+          notes: notes,
+        );
+      } else {
+        final totalQuantity = group.fold<double>(0.0, (sum, item) => sum + item.quantity);
+        final quantityDisplay = formatPieceCount(totalQuantity);
+        final unitPrice = first.unitPrice;
+
+        final totalPiastres = group.fold<int>(0, (sum, item) => sum + item.calculatedTotal.piastres);
+        final calculatedTotal = Money.fromPiastres(totalPiastres);
+
+        return InvoiceLineItem(
+          title: itemTitle,
+          quantityDisplay: quantityDisplay,
+          unitPrice: unitPrice,
+          calculatedTotal: calculatedTotal,
+          dimensionsSubtext: null,
+          notes: notes,
+        );
+      }
+    }).toList();
   }
 
   /// Formats a double preserving decimal precision without trailing zeroes.
@@ -117,6 +236,8 @@ class InvoicePrinter {
     final customerPhone = order.customerPhoneSnapshot.isNotEmpty
         ? order.customerPhoneSnapshot
         : (customer?.phone ?? '');
+
+    final lines = groupItems(items);
 
     doc.addPage(
       pw.Page(
@@ -252,11 +373,7 @@ class InvoicePrinter {
                     ],
                   ),
                   // Items
-                  ...items.map((item) {
-                    final itemTitle = item.itemDefinitionNameSnapshot != null
-                        ? '${item.itemTypeNameSnapshot} (${item.itemDefinitionNameSnapshot}) - ${item.serviceNameSnapshot}'
-                        : '${item.itemTypeNameSnapshot} - ${item.serviceNameSnapshot}';
-
+                  ...lines.map((line) {
                     return pw.TableRow(
                       children: [
                         pw.Padding(
@@ -264,15 +381,15 @@ class InvoicePrinter {
                           child: pw.Column(
                             crossAxisAlignment: pw.CrossAxisAlignment.start,
                             children: [
-                              pw.Text(itemTitle, style: const pw.TextStyle(fontSize: 8.5)),
-                              if (item.carpetData != null)
+                              pw.Text(line.title, style: const pw.TextStyle(fontSize: 8.5)),
+                              if (line.dimensionsSubtext != null)
                                 pw.Text(
-                                  '(${formatNumber(item.carpetData!.length)} × ${formatNumber(item.carpetData!.width)} م)',
+                                  line.dimensionsSubtext!,
                                   style: const pw.TextStyle(fontSize: 7.5),
                                 ),
-                              if (item.notes != null && item.notes!.trim().isNotEmpty)
+                              if (line.notes != null)
                                 pw.Text(
-                                  'ملاحظة: ${item.notes!.trim()}',
+                                  'ملاحظة: ${line.notes!}',
                                   style: const pw.TextStyle(fontSize: 7.5),
                                 ),
                             ],
@@ -281,7 +398,7 @@ class InvoicePrinter {
                         pw.Padding(
                           padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
                           child: pw.Text(
-                            formatQuantity(item),
+                            line.quantityDisplay,
                             style: const pw.TextStyle(fontSize: 8.5),
                             textAlign: pw.TextAlign.center,
                           ),
@@ -289,7 +406,7 @@ class InvoicePrinter {
                         pw.Padding(
                           padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
                           child: pw.Text(
-                            item.unitPrice.toEgp.toStringAsFixed(2),
+                            line.unitPrice.toEgp.toStringAsFixed(2),
                             style: const pw.TextStyle(fontSize: 8.5),
                             textAlign: pw.TextAlign.left,
                             textDirection: pw.TextDirection.ltr,
@@ -298,7 +415,7 @@ class InvoicePrinter {
                         pw.Padding(
                           padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
                           child: pw.Text(
-                            item.calculatedTotal.toEgp.toStringAsFixed(2),
+                            line.calculatedTotal.toEgp.toStringAsFixed(2),
                             style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
                             textAlign: pw.TextAlign.left,
                             textDirection: pw.TextDirection.ltr,

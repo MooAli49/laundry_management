@@ -142,22 +142,22 @@ void main() {
   );
 
   group('InvoicePrinter Quantity Formatting Tests', () {
-    test('Piece quantity formatting: integer count 1 -> "1"', () {
+    test('Piece quantity formatting: integer count 1 -> "1 قطعة"', () {
       final item = createTestItem(quantity: 1.0, pricingType: PricingType.perPiece);
-      expect(InvoicePrinter.formatQuantity(item), '1');
+      expect(InvoicePrinter.formatQuantity(item), '1 قطعة');
     });
 
-    test('Piece quantity formatting: integer count 3 -> "3"', () {
+    test('Piece quantity formatting: integer count 3 -> "3 قطع"', () {
       final item = createTestItem(quantity: 3.0, pricingType: PricingType.perPiece);
-      expect(InvoicePrinter.formatQuantity(item), '3');
+      expect(InvoicePrinter.formatQuantity(item), '3 قطع');
     });
 
-    test('Piece quantity formatting: decimal 2.75 -> "2.75" (never truncated to 2)', () {
+    test('Piece quantity formatting: decimal 2.75 -> "2.75 قطعة" (never truncated to 2)', () {
       final item = createTestItem(quantity: 2.75, pricingType: PricingType.perPiece);
-      expect(InvoicePrinter.formatQuantity(item), '2.75');
+      expect(InvoicePrinter.formatQuantity(item), '2.75 قطعة');
     });
 
-    test('Carpet quantity formatting: area 2.75 -> "2.75 م²"', () {
+    test('Carpet quantity formatting: area 2.75 -> "1 قطعة" (piece count, not area)', () {
       final carpet = CarpetItemData(
         id: 'carpet-1',
         orderItemId: 'item-test-1',
@@ -172,7 +172,7 @@ void main() {
         quantity: 1.0,
         carpetData: carpet,
       );
-      expect(InvoicePrinter.formatQuantity(item), '2.75 م²');
+      expect(InvoicePrinter.formatQuantity(item), '1 قطعة');
     });
 
     test('Carpet quantity formatting fallback to item.quantity when carpetData is null', () {
@@ -181,7 +181,7 @@ void main() {
         quantity: 4.5,
         carpetData: null,
       );
-      expect(InvoicePrinter.formatQuantity(item), '4.5 م²');
+      expect(InvoicePrinter.formatQuantity(item), '4.5 قطعة');
     });
 
     test('formatNumber preserves exact precision and trims trailing zeroes', () {
@@ -189,6 +189,194 @@ void main() {
       expect(InvoicePrinter.formatNumber(2.5), '2.5');
       expect(InvoicePrinter.formatNumber(2.75), '2.75');
       expect(InvoicePrinter.formatNumber(3.00), '3');
+    });
+  });
+
+  group('Invoice Line-Item Aggregation / Grouping Tests', () {
+    test('1. Three identical normal items become one grouped line with quantity 3 and sum total', () {
+      final items = [
+        createTestItem(itemTypeName: 'قميص', serviceName: 'غسيل', unitPrice: const Money.fromPiastres(2000), calculatedTotal: const Money.fromPiastres(2000)),
+        createTestItem(itemTypeName: 'قميص', serviceName: 'غسيل', unitPrice: const Money.fromPiastres(2000), calculatedTotal: const Money.fromPiastres(2000)),
+        createTestItem(itemTypeName: 'قميص', serviceName: 'غسيل', unitPrice: const Money.fromPiastres(2000), calculatedTotal: const Money.fromPiastres(2000)),
+      ];
+
+      final lines = InvoicePrinter.groupItems(items);
+
+      expect(lines.length, 1);
+      expect(lines.first.quantityDisplay, '3 قطع');
+      expect(lines.first.unitPrice, const Money.fromPiastres(2000));
+      expect(lines.first.calculatedTotal, const Money.fromPiastres(6000));
+      expect(lines.first.dimensionsSubtext, isNull);
+    });
+
+    test('2-5. Three identical carpets become one grouped line with quantity 3 pieces, piece unit price, and dimensions', () {
+      CarpetItemData makeCarpet(String id) => CarpetItemData(
+            id: id,
+            orderItemId: 'item-$id',
+            length: 2.0,
+            width: 3.0,
+            area: 6.0,
+            createdAt: testDate,
+            updatedAt: testDate,
+          );
+
+      final items = [
+        createTestItem(
+          itemTypeName: 'سجاد',
+          itemDefinitionName: 'سجادة صوف',
+          serviceName: 'غسيل سجاد',
+          pricingType: PricingType.perSquareMeter,
+          unitPrice: const Money.fromPiastres(2000), // 20 EGP/m²
+          calculatedTotal: const Money.fromPiastres(12000), // 120 EGP for 1 piece (6m² * 20 EGP)
+          carpetData: makeCarpet('c1'),
+        ),
+        createTestItem(
+          itemTypeName: 'سجاد',
+          itemDefinitionName: 'سجادة صوف',
+          serviceName: 'غسيل سجاد',
+          pricingType: PricingType.perSquareMeter,
+          unitPrice: const Money.fromPiastres(2000),
+          calculatedTotal: const Money.fromPiastres(12000),
+          carpetData: makeCarpet('c2'),
+        ),
+        createTestItem(
+          itemTypeName: 'سجاد',
+          itemDefinitionName: 'سجادة صوف',
+          serviceName: 'غسيل سجاد',
+          pricingType: PricingType.perSquareMeter,
+          unitPrice: const Money.fromPiastres(2000),
+          calculatedTotal: const Money.fromPiastres(12000),
+          carpetData: makeCarpet('c3'),
+        ),
+      ];
+
+      final lines = InvoicePrinter.groupItems(items);
+
+      expect(lines.length, 1);
+      // 2. Quantity displays piece count: 3 قطع
+      expect(lines.first.quantityDisplay, '3 قطع');
+      // 3. Dimensions sub-text with area/piece: (2 × 3 م) — 6 م²/قطعة
+      expect(lines.first.dimensionsSubtext, '(2 × 3 م) — 6 م²/قطعة');
+      // 4. Unit price represents one piece: 120.00 EGP
+      expect(lines.first.unitPrice, const Money.fromPiastres(12000));
+      // 5. Grouped total is quantity * unit price = 360.00 EGP
+      expect(lines.first.calculatedTotal, const Money.fromPiastres(36000));
+    });
+
+    test('6. Different carpet dimensions do NOT group', () {
+      final carpet1 = CarpetItemData(
+        id: 'c1',
+        orderItemId: 'i1',
+        length: 2.0,
+        width: 3.0,
+        area: 6.0,
+        createdAt: testDate,
+        updatedAt: testDate,
+      );
+      final carpet2 = CarpetItemData(
+        id: 'c2',
+        orderItemId: 'i2',
+        length: 3.0,
+        width: 4.0,
+        area: 12.0,
+        createdAt: testDate,
+        updatedAt: testDate,
+      );
+
+      final items = [
+        createTestItem(
+          pricingType: PricingType.perSquareMeter,
+          unitPrice: const Money.fromPiastres(2000),
+          calculatedTotal: const Money.fromPiastres(12000),
+          carpetData: carpet1,
+        ),
+        createTestItem(
+          pricingType: PricingType.perSquareMeter,
+          unitPrice: const Money.fromPiastres(2000),
+          calculatedTotal: const Money.fromPiastres(24000),
+          carpetData: carpet2,
+        ),
+      ];
+
+      final lines = InvoicePrinter.groupItems(items);
+      expect(lines.length, 2);
+    });
+
+    test('7. Different services do NOT group', () {
+      final items = [
+        createTestItem(itemTypeName: 'قميص', serviceName: 'غسيل'),
+        createTestItem(itemTypeName: 'قميص', serviceName: 'تعقيم'),
+      ];
+
+      final lines = InvoicePrinter.groupItems(items);
+      expect(lines.length, 2);
+    });
+
+    test('8. Different unit prices do NOT group', () {
+      final items = [
+        createTestItem(itemTypeName: 'قميص', unitPrice: const Money.fromPiastres(2000)),
+        createTestItem(itemTypeName: 'قميص', unitPrice: const Money.fromPiastres(2500)),
+      ];
+
+      final lines = InvoicePrinter.groupItems(items);
+      expect(lines.length, 2);
+    });
+
+    test('9. Different relevant item details/notes do NOT group', () {
+      final items = [
+        createTestItem(itemTypeName: 'قميص', notes: 'بقعة حبر'),
+        createTestItem(itemTypeName: 'قميص', notes: 'بدون بقع'),
+      ];
+
+      final lines = InvoicePrinter.groupItems(items);
+      expect(lines.length, 2);
+    });
+
+    test('10. Decimal quantity behavior continues to work in grouping', () {
+      final items = [
+        createTestItem(itemTypeName: 'قماش', quantity: 2.75, unitPrice: const Money.fromPiastres(1000), calculatedTotal: const Money.fromPiastres(2750)),
+      ];
+
+      final lines = InvoicePrinter.groupItems(items);
+      expect(lines.length, 1);
+      expect(lines.first.quantityDisplay, '2.75 قطعة');
+    });
+
+    test('11. Authoritative order.total remains unchanged when generating PDF with grouped lines', () async {
+      final order = createTestOrder(
+        subtotal: const Money.fromPiastres(36000),
+        total: const Money.fromPiastres(36000),
+      );
+
+      CarpetItemData makeCarpet(String id) => CarpetItemData(
+            id: id,
+            orderItemId: 'item-$id',
+            length: 2.0,
+            width: 3.0,
+            area: 6.0,
+            createdAt: testDate,
+            updatedAt: testDate,
+          );
+
+      final items = [
+        createTestItem(pricingType: PricingType.perSquareMeter, carpetData: makeCarpet('1'), calculatedTotal: const Money.fromPiastres(12000)),
+        createTestItem(pricingType: PricingType.perSquareMeter, carpetData: makeCarpet('2'), calculatedTotal: const Money.fromPiastres(12000)),
+        createTestItem(pricingType: PricingType.perSquareMeter, carpetData: makeCarpet('3'), calculatedTotal: const Money.fromPiastres(12000)),
+      ];
+
+      final doc = await InvoicePrinter.generatePdfDocument(
+        order: order,
+        items: items,
+        totalPaid: const Money.fromPiastres(10000),
+        remainingAmount: const Money.fromPiastres(26000),
+        settings: defaultSettings,
+        regularFont: regularFont,
+        boldFont: boldFont,
+      );
+
+      final bytes = await doc.save();
+      expect(bytes.isNotEmpty, isTrue);
+      expect(order.total, const Money.fromPiastres(36000));
     });
   });
 

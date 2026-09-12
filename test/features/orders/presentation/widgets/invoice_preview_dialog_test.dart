@@ -239,12 +239,12 @@ void main() {
         ),
       );
 
-      // Quantity column must show '2'
-      expect(find.text('2'), findsOneWidget);
+      // Quantity column must show '2 قطع'
+      expect(find.text('2 قطع'), findsOneWidget);
       expect(find.text('1'), findsNothing);
     });
 
-    testWidgets('displays carpet quantity with square meter area and dimensions', (tester) async {
+    testWidgets('displays carpet quantity with piece count and dimensions sub-detail', (tester) async {
       final order = Order(
         id: 'ord-carpet',
         orderNumber: '26-020',
@@ -301,10 +301,10 @@ void main() {
         ),
       );
 
-      // Area in quantity column
-      expect(find.text('2.75 م²'), findsOneWidget);
-      // Dimensions sub-text
-      expect(find.text('(2 × 1.375 م)'), findsOneWidget);
+      // Primary quantity shows piece count: 1 قطعة
+      expect(find.text('1 قطعة'), findsOneWidget);
+      // Dimensions sub-text includes area per piece: (2 × 1.375 م) — 2.75 م²/قطعة
+      expect(find.text('(2 × 1.375 م) — 2.75 م²/قطعة'), findsOneWidget);
     });
 
     testWidgets('displays decimal quantity preserving precision (e.g. 2.75 is never truncated to 2)', (tester) async {
@@ -353,8 +353,196 @@ void main() {
         ),
       );
 
-      expect(find.text('2.75'), findsOneWidget);
+      expect(find.text('2.75 قطعة'), findsOneWidget);
       expect(find.text('2'), findsNothing);
+    });
+
+    testWidgets('groups 3 identical normal items into a single preview row with quantity 3 قطع and sum total', (tester) async {
+      final order = Order(
+        id: 'ord-group-normal',
+        orderNumber: '26-031',
+        customerId: 'cust-1',
+        customerNameSnapshot: 'خالد',
+        customerPhoneSnapshot: '01033333333',
+        status: OrderStatus.processing,
+        expectedPickupDate: orderDate,
+        subtotal: const Money.fromPiastres(6000),
+        total: const Money.fromPiastres(6000),
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final items = [
+        OrderItem(
+          id: 'item-1',
+          orderId: 'ord-group-normal',
+          itemTypeId: 't-1',
+          serviceId: 's-1',
+          itemTypeNameSnapshot: 'قميص',
+          serviceNameSnapshot: 'غسيل',
+          pricingType: PricingType.perPiece,
+          quantity: 1.0,
+          unitPrice: const Money.fromPiastres(2000),
+          calculatedTotal: const Money.fromPiastres(2000),
+          createdAt: now,
+          updatedAt: now,
+        ),
+        OrderItem(
+          id: 'item-2',
+          orderId: 'ord-group-normal',
+          itemTypeId: 't-1',
+          serviceId: 's-1',
+          itemTypeNameSnapshot: 'قميص',
+          serviceNameSnapshot: 'غسيل',
+          pricingType: PricingType.perPiece,
+          quantity: 1.0,
+          unitPrice: const Money.fromPiastres(2000),
+          calculatedTotal: const Money.fromPiastres(2000),
+          createdAt: now,
+          updatedAt: now,
+        ),
+        OrderItem(
+          id: 'item-3',
+          orderId: 'ord-group-normal',
+          itemTypeId: 't-1',
+          serviceId: 's-1',
+          itemTypeNameSnapshot: 'قميص',
+          serviceNameSnapshot: 'غسيل',
+          pricingType: PricingType.perPiece,
+          quantity: 1.0,
+          unitPrice: const Money.fromPiastres(2000),
+          calculatedTotal: const Money.fromPiastres(2000),
+          createdAt: now,
+          updatedAt: now,
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Scaffold(
+              body: InvoicePreviewDialog(
+                order: order,
+                items: items,
+                totalPaid: Money.zero,
+                remainingAmount: const Money.fromPiastres(6000),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Should show '3 قطع'
+      expect(find.descendant(of: find.byType(Table), matching: find.text('3 قطع')), findsOneWidget);
+      // Unit price: 20.00 ج.م
+      expect(find.descendant(of: find.byType(Table), matching: find.text('20.00 ج.م')), findsOneWidget);
+      // Line total: 60.00 ج.م inside the table
+      expect(find.descendant(of: find.byType(Table), matching: find.text('60.00 ج.م')), findsOneWidget);
+      // Item name appears once in table
+      expect(find.descendant(of: find.byType(Table), matching: find.text('قميص - غسيل')), findsOneWidget);
+    });
+
+    testWidgets('groups 3 identical carpets into a single preview row with 3 قطع, piece unit price, and dimensions', (tester) async {
+      final order = Order(
+        id: 'ord-group-carpet',
+        orderNumber: '26-032',
+        customerId: 'cust-1',
+        customerNameSnapshot: 'خالد',
+        customerPhoneSnapshot: '01033333333',
+        status: OrderStatus.processing,
+        expectedPickupDate: orderDate,
+        subtotal: const Money.fromPiastres(36000),
+        total: const Money.fromPiastres(36000),
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      CarpetItemData makeCarpet(String id) => CarpetItemData(
+            id: id,
+            orderItemId: 'item-$id',
+            length: 2.0,
+            width: 3.0,
+            area: 6.0,
+            createdAt: now,
+            updatedAt: now,
+          );
+
+      final items = [
+        OrderItem(
+          id: 'c-item-1',
+          orderId: 'ord-group-carpet',
+          itemTypeId: 't-carpet',
+          itemDefinitionNameSnapshot: 'سجادة صوف',
+          serviceId: 's-carpet',
+          itemTypeNameSnapshot: 'سجاد',
+          serviceNameSnapshot: 'غسيل سجاد',
+          pricingType: PricingType.perSquareMeter,
+          quantity: 1.0,
+          unitPrice: const Money.fromPiastres(2000), // 20 EGP/m²
+          calculatedTotal: const Money.fromPiastres(12000), // 120 EGP / piece
+          carpetData: makeCarpet('1'),
+          createdAt: now,
+          updatedAt: now,
+        ),
+        OrderItem(
+          id: 'c-item-2',
+          orderId: 'ord-group-carpet',
+          itemTypeId: 't-carpet',
+          itemDefinitionNameSnapshot: 'سجادة صوف',
+          serviceId: 's-carpet',
+          itemTypeNameSnapshot: 'سجاد',
+          serviceNameSnapshot: 'غسيل سجاد',
+          pricingType: PricingType.perSquareMeter,
+          quantity: 1.0,
+          unitPrice: const Money.fromPiastres(2000),
+          calculatedTotal: const Money.fromPiastres(12000),
+          carpetData: makeCarpet('2'),
+          createdAt: now,
+          updatedAt: now,
+        ),
+        OrderItem(
+          id: 'c-item-3',
+          orderId: 'ord-group-carpet',
+          itemTypeId: 't-carpet',
+          itemDefinitionNameSnapshot: 'سجادة صوف',
+          serviceId: 's-carpet',
+          itemTypeNameSnapshot: 'سجاد',
+          serviceNameSnapshot: 'غسيل سجاد',
+          pricingType: PricingType.perSquareMeter,
+          quantity: 1.0,
+          unitPrice: const Money.fromPiastres(2000),
+          calculatedTotal: const Money.fromPiastres(12000),
+          carpetData: makeCarpet('3'),
+          createdAt: now,
+          updatedAt: now,
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Scaffold(
+              body: InvoicePreviewDialog(
+                order: order,
+                items: items,
+                totalPaid: Money.zero,
+                remainingAmount: const Money.fromPiastres(36000),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Primary quantity displays '3 قطع'
+      expect(find.descendant(of: find.byType(Table), matching: find.text('3 قطع')), findsOneWidget);
+      // Unit price displays price for 1 piece: 120.00 ج.م
+      expect(find.descendant(of: find.byType(Table), matching: find.text('120.00 ج.م')), findsOneWidget);
+      // Total displays: 360.00 ج.م inside the table
+      expect(find.descendant(of: find.byType(Table), matching: find.text('360.00 ج.م')), findsOneWidget);
+      // Dimensions sub-detail: (2 × 3 م) — 6 م²/قطعة
+      expect(find.descendant(of: find.byType(Table), matching: find.text('(2 × 3 م) — 6 م²/قطعة')), findsOneWidget);
     });
 
     testWidgets('tax row is hidden when tax is zero', (tester) async {
