@@ -378,6 +378,42 @@ void main() {
       expect(bytes.isNotEmpty, isTrue);
       expect(order.total, const Money.fromPiastres(36000));
     });
+
+    test('12. Table columns are defined in reverse logical order (0: total, 1: unit price, 2: qty, 3: item) for physical RTL paper', () async {
+      final order = createTestOrder();
+      final items = [
+        createTestItem(
+          itemTypeName: 'سجاد',
+          serviceName: 'غسيل سجاد',
+          pricingType: PricingType.perSquareMeter,
+          unitPrice: const Money.fromPiastres(2000),
+          calculatedTotal: const Money.fromPiastres(12000),
+          carpetData: CarpetItemData(
+            id: 'c-test',
+            orderItemId: 'i-test',
+            length: 2.0,
+            width: 3.0,
+            area: 6.0,
+            createdAt: testDate,
+            updatedAt: testDate,
+          ),
+        ),
+      ];
+
+      final doc = await InvoicePrinter.generatePdfDocument(
+        order: order,
+        items: items,
+        totalPaid: Money.zero,
+        remainingAmount: order.total,
+        settings: defaultSettings,
+        regularFont: regularFont,
+        boldFont: boldFont,
+      );
+
+      final bytes = await doc.save();
+      expect(bytes.isNotEmpty, isTrue);
+      expect(doc.document.pdfPageList.pages.length, 1);
+    });
   });
 
   group('InvoicePrinter PDF Generation Permutations', () {

@@ -324,13 +324,13 @@ class InvoicePrinter {
               pw.Divider(thickness: 0.5),
               pw.SizedBox(height: 4),
 
-              // Itemized Table
+              // Itemized Table (columns ordered 0..3 as Total, Unit Price, Qty, Item to render RTL on physical paper)
               pw.Table(
                 columnWidths: const {
-                  0: pw.FlexColumnWidth(5.0),
-                  1: pw.FlexColumnWidth(1.8),
-                  2: pw.FlexColumnWidth(1.6),
-                  3: pw.FlexColumnWidth(1.6),
+                  0: pw.FlexColumnWidth(1.6), // الإجمالي
+                  1: pw.FlexColumnWidth(1.6), // سعر الوحدة
+                  2: pw.FlexColumnWidth(1.8), // الكمية
+                  3: pw.FlexColumnWidth(5.0), // البند / الخدمة
                 },
                 children: [
                   // Table Header
@@ -342,8 +342,17 @@ class InvoicePrinter {
                       pw.Padding(
                         padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
                         child: pw.Text(
-                          'البند / الخدمة',
+                          'الإجمالي',
                           style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                          textAlign: pw.TextAlign.left,
+                        ),
+                      ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
+                        child: pw.Text(
+                          'سعر الوحدة',
+                          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                          textAlign: pw.TextAlign.left,
                         ),
                       ),
                       pw.Padding(
@@ -357,17 +366,9 @@ class InvoicePrinter {
                       pw.Padding(
                         padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
                         child: pw.Text(
-                          'السعر',
+                          'البند / الخدمة',
                           style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
-                          textAlign: pw.TextAlign.left,
-                        ),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
-                        child: pw.Text(
-                          'الإجمالي',
-                          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
-                          textAlign: pw.TextAlign.left,
+                          textAlign: pw.TextAlign.right,
                         ),
                       ),
                     ],
@@ -378,29 +379,11 @@ class InvoicePrinter {
                       children: [
                         pw.Padding(
                           padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
-                          child: pw.Column(
-                            crossAxisAlignment: pw.CrossAxisAlignment.start,
-                            children: [
-                              pw.Text(line.title, style: const pw.TextStyle(fontSize: 8.5)),
-                              if (line.dimensionsSubtext != null)
-                                pw.Text(
-                                  line.dimensionsSubtext!,
-                                  style: const pw.TextStyle(fontSize: 7.5),
-                                ),
-                              if (line.notes != null)
-                                pw.Text(
-                                  'ملاحظة: ${line.notes!}',
-                                  style: const pw.TextStyle(fontSize: 7.5),
-                                ),
-                            ],
-                          ),
-                        ),
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
                           child: pw.Text(
-                            line.quantityDisplay,
-                            style: const pw.TextStyle(fontSize: 8.5),
-                            textAlign: pw.TextAlign.center,
+                            line.calculatedTotal.toEgp.toStringAsFixed(2),
+                            style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                            textAlign: pw.TextAlign.left,
+                            textDirection: pw.TextDirection.ltr,
                           ),
                         ),
                         pw.Padding(
@@ -415,10 +398,34 @@ class InvoicePrinter {
                         pw.Padding(
                           padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
                           child: pw.Text(
-                            line.calculatedTotal.toEgp.toStringAsFixed(2),
-                            style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
-                            textAlign: pw.TextAlign.left,
-                            textDirection: pw.TextDirection.ltr,
+                            line.quantityDisplay,
+                            style: const pw.TextStyle(fontSize: 8.5),
+                            textAlign: pw.TextAlign.center,
+                          ),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                            children: [
+                              pw.Text(
+                                line.title,
+                                style: const pw.TextStyle(fontSize: 8.5),
+                                textAlign: pw.TextAlign.right,
+                              ),
+                              if (line.dimensionsSubtext != null)
+                                pw.Text(
+                                  line.dimensionsSubtext!,
+                                  style: const pw.TextStyle(fontSize: 7.5),
+                                  textAlign: pw.TextAlign.right,
+                                ),
+                              if (line.notes != null)
+                                pw.Text(
+                                  'ملاحظة: ${line.notes!}',
+                                  style: const pw.TextStyle(fontSize: 7.5),
+                                  textAlign: pw.TextAlign.right,
+                                ),
+                            ],
                           ),
                         ),
                       ],
