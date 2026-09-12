@@ -429,6 +429,8 @@ class InvoicePrinter {
 
     return await Printing.layoutPdf(
       name: 'invoice_${order.orderNumber}.pdf',
+      format: PdfPageFormat.roll80,
+      dynamicLayout: false,
       onLayout: (format) async => doc.save(),
     );
   }

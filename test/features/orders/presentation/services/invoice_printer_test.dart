@@ -11,7 +11,42 @@ import 'package:laundry_management/domain/enums/pricing_type.dart';
 import 'package:laundry_management/domain/value_objects/money.dart';
 import 'package:laundry_management/domain/value_objects/order_date.dart';
 import 'package:laundry_management/features/orders/presentation/services/invoice_printer.dart';
+import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:printing/src/interface.dart';
+
+class MockPrintingPlatform extends PrintingPlatform {
+  bool shouldThrow = false;
+  int callCount = 0;
+  PdfPageFormat? receivedFormat;
+  bool? receivedDynamicLayout;
+  String? receivedName;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
+  @override
+  Future<bool> layoutPdf(
+    Printer? printer,
+    LayoutCallback onLayout,
+    String name,
+    PdfPageFormat format,
+    bool dynamicLayout,
+    bool usePrinterSettings,
+    OutputType outputType,
+    bool forceCustomPrintPaper,
+  ) async {
+    callCount++;
+    receivedFormat = format;
+    receivedDynamicLayout = dynamicLayout;
+    receivedName = name;
+    if (shouldThrow) {
+      throw Exception('OS Print Spooler unavailable');
+    }
+    return true;
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -558,6 +593,63 @@ void main() {
 
       final bytes = await doc.save();
       expect(bytes.isNotEmpty, isTrue);
+    });
+
+    test('Uses fallback footer when invoiceFooterText is empty or whitespace', () async {
+      final order = createTestOrder();
+      final settings = BusinessSettings(
+        id: 'settings-ws',
+        businessName: 'مغسلة النقاء',
+        invoiceFooterText: '   ',
+        createdAt: testDate,
+        updatedAt: testDate,
+      );
+
+      final doc = await InvoicePrinter.generatePdfDocument(
+        order: order,
+        items: [createTestItem()],
+        totalPaid: Money.zero,
+        remainingAmount: order.total,
+        settings: settings,
+        regularFont: regularFont,
+        boldFont: boldFont,
+      );
+
+      final bytes = await doc.save();
+      expect(bytes.isNotEmpty, isTrue);
+    });
+  });
+
+  group('InvoicePrinter.printInvoice Native OS Workflow', () {
+    late MockPrintingPlatform mockPlatform;
+    late PrintingPlatform originalPlatform;
+
+    setUp(() {
+      originalPlatform = PrintingPlatform.instance;
+      mockPlatform = MockPrintingPlatform();
+      PrintingPlatform.instance = mockPlatform;
+    });
+
+    tearDown(() {
+      PrintingPlatform.instance = originalPlatform;
+    });
+
+    test('forces 80mm roll format (PdfPageFormat.roll80) and dynamicLayout: false', () async {
+      final order = createTestOrder(orderNumber: '26-099');
+
+      final result = await InvoicePrinter.printInvoice(
+        order: order,
+        items: [createTestItem()],
+        totalPaid: Money.zero,
+        remainingAmount: order.total,
+        settings: defaultSettings,
+      );
+
+      expect(result, isTrue);
+      expect(mockPlatform.callCount, 1);
+      expect(mockPlatform.receivedFormat, PdfPageFormat.roll80);
+      expect(mockPlatform.receivedDynamicLayout, isFalse);
+      expect(mockPlatform.receivedName, 'invoice_26-099.pdf');
     });
   });
 }

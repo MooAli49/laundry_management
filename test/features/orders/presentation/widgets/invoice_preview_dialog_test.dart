@@ -18,6 +18,9 @@ class MockPrintingPlatform extends PrintingPlatform {
   bool shouldThrow = false;
   int callCount = 0;
   Duration delay = Duration.zero;
+  PdfPageFormat? receivedFormat;
+  bool? receivedDynamicLayout;
+  String? receivedName;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -34,6 +37,9 @@ class MockPrintingPlatform extends PrintingPlatform {
     bool forceCustomPrintPaper,
   ) async {
     callCount++;
+    receivedFormat = format;
+    receivedDynamicLayout = dynamicLayout;
+    receivedName = name;
     if (delay > Duration.zero) {
       await Future.delayed(delay);
     }
@@ -517,6 +523,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(mockPlatform.callCount, 1);
+      expect(mockPlatform.receivedFormat, PdfPageFormat.roll80);
+      expect(mockPlatform.receivedDynamicLayout, isFalse);
 
       // Dialog must remain open
       expect(find.byType(InvoicePreviewDialog), findsOneWidget);
@@ -616,6 +624,50 @@ void main() {
       // Dialog must remain open
       expect(find.byType(InvoicePreviewDialog), findsOneWidget);
       expect(find.text('طباعة الفاتورة'), findsOneWidget);
+    });
+
+    testWidgets('uses fallback footer when invoiceFooterText is empty or whitespace', (tester) async {
+      final order = Order(
+        id: 'ord-footer',
+        orderNumber: '26-080',
+        customerId: 'cust-1',
+        customerNameSnapshot: 'عميل',
+        customerPhoneSnapshot: '01055555555',
+        status: OrderStatus.processing,
+        expectedPickupDate: orderDate,
+        subtotal: const Money.fromPiastres(5000),
+        total: const Money.fromPiastres(5000),
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final settingsWithWhitespaceFooter = BusinessSettings(
+        id: 'settings-2',
+        businessName: 'مغسلة النقاء',
+        invoiceFooterText: '   ',
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Scaffold(
+              body: InvoicePreviewDialog(
+                order: order,
+                items: const [],
+                totalPaid: Money.zero,
+                remainingAmount: const Money.fromPiastres(5000),
+                settings: settingsWithWhitespaceFooter,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Must fall back to default footer
+      expect(find.text('شكراً لتعاملكم معنا!'), findsOneWidget);
     });
   });
 }

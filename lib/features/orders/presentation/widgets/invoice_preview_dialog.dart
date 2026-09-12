@@ -80,7 +80,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
         : AppStrings.defaultBusinessName;
     final address = widget.settings?.address;
     final phone = widget.settings?.phone;
-    final footer = widget.settings?.invoiceFooterText ?? 'شكراً لتعاملكم معنا!';
+    final footer = widget.settings?.invoiceFooterText?.trim().isNotEmpty == true
+        ? widget.settings!.invoiceFooterText!
+        : 'شكراً لتعاملكم معنا!';
 
     return Dialog(
       shape: RoundedRectangleBorder(
