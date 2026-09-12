@@ -327,10 +327,10 @@ class InvoicePrinter {
               // Itemized Table (columns ordered 0..3 as Total, Unit Price, Qty, Item to render RTL on physical paper)
               pw.Table(
                 columnWidths: const {
-                  0: pw.FlexColumnWidth(1.6), // الإجمالي
-                  1: pw.FlexColumnWidth(1.6), // سعر الوحدة
-                  2: pw.FlexColumnWidth(1.8), // الكمية
-                  3: pw.FlexColumnWidth(5.0), // البند / الخدمة
+                  0: pw.FlexColumnWidth(1.8), // الإجمالي
+                  1: pw.FlexColumnWidth(2.1), // سعر الوحدة
+                  2: pw.FlexColumnWidth(1.4), // الكمية
+                  3: pw.FlexColumnWidth(4.7), // البند / الخدمة
                 },
                 children: [
                   // Table Header
