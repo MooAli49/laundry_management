@@ -53,6 +53,8 @@ import '../../domain/repositories/storage_repository.dart';
 import '../../features/customers/presentation/cubit/customer_detail_cubit.dart';
 import '../../features/customers/presentation/cubit/customers_list_cubit.dart';
 import '../../features/dashboard/presentation/cubit/dashboard_cubit.dart';
+import '../../features/dashboard/presentation/cubit/record_payment_cubit.dart';
+import '../../features/expenses/presentation/cubit/add_expense_cubit.dart';
 import '../../features/orders/presentation/cubit/create_order_cubit.dart';
 import '../../features/orders/presentation/cubit/order_detail_cubit.dart';
 import '../../features/orders/presentation/cubit/orders_list_cubit.dart';
@@ -379,6 +381,22 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
     getIt.registerFactory<DashboardCubit>(
       () => DashboardCubit(
         dashboardRepository: getIt<DashboardRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<AddExpenseCubit>()) {
+    getIt.registerFactory<AddExpenseCubit>(
+      () => AddExpenseCubit(
+        categoryRepository: getIt<ExpenseCategoryRepository>(),
+        expenseRepository: getIt<ExpenseRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<RecordPaymentCubit>()) {
+    getIt.registerFactory<RecordPaymentCubit>(
+      () => RecordPaymentCubit(
+        orderRepository: getIt<OrderRepository>(),
+        paymentRepository: getIt<PaymentRepository>(),
       ),
     );
   }

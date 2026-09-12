@@ -13,6 +13,7 @@ import 'package:laundry_management/domain/value_objects/order_date.dart';
 import 'package:laundry_management/features/customers/presentation/widgets/customer_form_dialog.dart';
 import 'package:laundry_management/features/dashboard/presentation/cubit/dashboard_cubit.dart';
 import 'package:laundry_management/features/dashboard/presentation/screens/dashboard_screen.dart';
+import 'package:laundry_management/features/dashboard/presentation/widgets/record_payment_dialog.dart';
 import 'package:laundry_management/features/expenses/presentation/widgets/add_expense_dialog.dart';
 
 class FakeDashboardRepository implements DashboardRepository {
@@ -143,6 +144,17 @@ void main() {
 
       expect(find.byType(CustomerFormDialog), findsOneWidget);
       expect(find.text('إضافة عميل جديد'), findsOneWidget);
+    });
+
+    testWidgets('tapping تسجيل دفعة opens RecordPaymentDialog', (tester) async {
+      await tester.pumpWidget(buildTestableWidget(const DashboardScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('dashboard_record_payment_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(RecordPaymentDialog), findsOneWidget);
+      expect(find.text('تسجيل دفعة'), findsWidgets);
     });
 
     testWidgets('displays orders in today pickups and recent orders when populated', (tester) async {

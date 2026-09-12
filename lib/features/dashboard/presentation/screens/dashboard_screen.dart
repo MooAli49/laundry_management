@@ -21,6 +21,7 @@ import '../widgets/dashboard_attention_section.dart';
 import '../widgets/dashboard_metric_card.dart';
 import '../widgets/dashboard_recent_orders_section.dart';
 import '../widgets/dashboard_today_pickups_section.dart';
+import '../widgets/record_payment_dialog.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -55,6 +56,22 @@ class _DashboardView extends StatelessWidget {
           }
         },
         onFindDuplicate: cubit.getCustomerByPhone,
+      ),
+    );
+  }
+
+  void _openRecordPaymentDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => RecordPaymentDialog(
+        onPaymentSuccess: () {
+          if (context.mounted) {
+            context.read<DashboardCubit>().refresh();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('تم تسجيل الدفعة بنجاح')),
+            );
+          }
+        },
       ),
     );
   }
@@ -119,7 +136,7 @@ class _DashboardView extends StatelessWidget {
                   label: 'تسجيل دفعة',
                   icon: Icons.payment_outlined,
                   variant: AppButtonVariant.secondary,
-                  onPressed: () => context.push(AppRoutes.orders),
+                  onPressed: () => _openRecordPaymentDialog(context),
                 ),
                 AppButton(
                   key: const ValueKey('dashboard_add_expense_button'),
