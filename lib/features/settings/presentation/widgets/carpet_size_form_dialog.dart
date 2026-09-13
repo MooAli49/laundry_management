@@ -149,22 +149,14 @@ class _CarpetSizeFormDialogState extends State<CarpetSizeFormDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      isEditing ? AppStrings.editCarpetSize : AppStrings.addCarpetSize,
-                      style: AppTextStyles.titleLarge.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () => Navigator.of(context).pop(false),
-                    ),
-                  ],
+                // Header matching Figma (no X button, no divider)
+                Text(
+                  isEditing ? AppStrings.editCarpetSize : AppStrings.addCarpetSize,
+                  style: AppTextStyles.titleLarge.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                const Divider(height: AppSpacing.lg, color: AppColors.divider),
+                AppSpacing.gapLg,
                 AppSpacing.gapMd,
                 if (_inlineError != null) ...[
                   Container(
@@ -257,25 +249,20 @@ class _CarpetSizeFormDialogState extends State<CarpetSizeFormDialog> {
                   controller: _areaController,
                   label: '${AppStrings.carpetAreaLabel} (يُحسب تلقائياً)',
                   enabled: false,
-                  prefixIcon: const Icon(
-                    Icons.square_foot_outlined,
-                    size: 20,
-                    color: AppColors.primary,
-                  ),
                 ),
                 AppSpacing.gapXxl,
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    AppButton(
-                      label: AppStrings.cancel,
-                      variant: AppButtonVariant.secondary,
-                      onPressed: () => Navigator.of(context).pop(false),
-                    ),
-                    AppSpacing.gapHorizontalMd,
                     AppButton(
                       label: AppStrings.save,
                       onPressed: _handleSubmit,
+                    ),
+                    AppSpacing.gapHorizontalMd,
+                    AppButton(
+                      label: AppStrings.cancel,
+                      variant: AppButtonVariant.text,
+                      onPressed: () => Navigator.of(context).pop(false),
                     ),
                   ],
                 ),

@@ -12,6 +12,7 @@ import '../../../../domain/entities/service.dart';
 import '../../../../domain/enums/pricing_type.dart';
 import '../../../../domain/value_objects/money.dart';
 import '../cubit/services_management_cubit.dart';
+import 'settings_table_components.dart';
 
 class ServiceFormDialog extends StatefulWidget {
   final Service? service;
@@ -204,23 +205,14 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      isEditing ? AppStrings.editService : AppStrings.addService,
-                      style: AppTextStyles.titleLarge.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () => Navigator.of(context).pop(false),
-                    ),
-                  ],
+                // Header matching Figma (no X button, no divider)
+                Text(
+                  isEditing ? AppStrings.editService : AppStrings.addService,
+                  style: AppTextStyles.titleLarge.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                const Divider(height: AppSpacing.lg, color: AppColors.divider),
+                AppSpacing.gapLg,
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
@@ -338,38 +330,11 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                             return null;
                           },
                         ),
-                        // Service Price Change Notice (when editing price)
+                        // Service Price Change Notice (matching Figma banner)
                         if (isEditing && _priceChanged) ...[
                           AppSpacing.gapSm,
-                          Container(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            decoration: BoxDecoration(
-                              color: AppColors.warningLight,
-                              borderRadius:
-                                  BorderRadius.circular(AppSpacing.radiusMd),
-                              border: Border.all(
-                                color: AppColors.warning.withValues(alpha: 0.4),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.info_outline,
-                                  color: AppColors.warning,
-                                  size: 20,
-                                ),
-                                AppSpacing.gapHorizontalSm,
-                                Expanded(
-                                  child: Text(
-                                    AppStrings.servicePriceChangeNotice,
-                                    style: AppTextStyles.bodySmall.copyWith(
-                                      color: AppColors.warningDark,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                          const SettingsInfoBanner(
+                            message: AppStrings.servicePriceChangeNotice,
                           ),
                         ],
                         AppSpacing.gapLg,
@@ -433,21 +398,20 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                     ),
                   ),
                 ),
-                const Divider(height: AppSpacing.lg, color: AppColors.divider),
-                AppSpacing.gapSm,
-                // Actions
+                AppSpacing.gapLg,
+                // Actions matching Figma (Save on right, Cancel text button on left)
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    AppButton(
-                      label: AppStrings.cancel,
-                      variant: AppButtonVariant.secondary,
-                      onPressed: () => Navigator.of(context).pop(false),
-                    ),
-                    AppSpacing.gapHorizontalMd,
                     AppButton(
                       label: AppStrings.save,
                       onPressed: _handleSubmit,
+                    ),
+                    AppSpacing.gapHorizontalMd,
+                    AppButton(
+                      label: AppStrings.cancel,
+                      variant: AppButtonVariant.text,
+                      onPressed: () => Navigator.of(context).pop(false),
                     ),
                   ],
                 ),

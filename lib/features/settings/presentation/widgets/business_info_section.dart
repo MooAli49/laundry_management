@@ -62,8 +62,12 @@ class _BusinessInfoSectionState extends State<BusinessInfoSection> {
     final cubit = context.read<SettingsCubit>();
     final success = await cubit.updateBusinessInfo(
       businessName: _nameController.text.trim(),
-      phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
-      address: _addressController.text.trim().isEmpty ? null : _addressController.text.trim(),
+      phone: _phoneController.text.trim().isEmpty
+          ? null
+          : _phoneController.text.trim(),
+      address: _addressController.text.trim().isEmpty
+          ? null
+          : _addressController.text.trim(),
       invoiceFooterText: _invoiceFooterController.text.trim().isEmpty
           ? null
           : _invoiceFooterController.text.trim(),
@@ -124,18 +128,14 @@ class _BusinessInfoSectionState extends State<BusinessInfoSection> {
                     ),
                     AppSpacing.gapMd,
                     const SettingsInfoBanner(
-                      message: 'هذه البيانات هي المصدر الوحيد لهوية النشاط، وتُستخدم تلقائياً في الفاتورة عند الطباعة.',
+                      message:
+                          'هذه البيانات هي المصدر الوحيد لهوية النشاط، وتُستخدم تلقائياً في الفاتورة عند الطباعة.',
                     ),
                     AppSpacing.gapMd,
                     AppTextField(
                       controller: _nameController,
                       label: AppStrings.businessNameLabel,
-                      hintText: 'مثال: مغسلة الأمل الحديثة',
-                      prefixIcon: const Icon(
-                        Icons.store_outlined,
-                        size: 20,
-                        color: AppColors.textSecondary,
-                      ),
+                      hintText: 'مثال: مغسلةالحديثة',
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return AppStrings.businessNameRequired;
@@ -149,22 +149,12 @@ class _BusinessInfoSectionState extends State<BusinessInfoSection> {
                       label: AppStrings.businessPhoneLabel,
                       hintText: 'مثال: 01012345678',
                       keyboardType: TextInputType.phone,
-                      prefixIcon: const Icon(
-                        Icons.phone_outlined,
-                        size: 20,
-                        color: AppColors.textSecondary,
-                      ),
                     ),
                     AppSpacing.gapLg,
                     AppTextField(
                       controller: _addressController,
                       label: AppStrings.businessAddressLabel,
                       hintText: 'مثال: شارع الجمهورية، المعادي، القاهرة',
-                      prefixIcon: const Icon(
-                        Icons.location_on_outlined,
-                        size: 20,
-                        color: AppColors.textSecondary,
-                      ),
                     ),
                     AppSpacing.gapLg,
                     Column(
@@ -175,11 +165,6 @@ class _BusinessInfoSectionState extends State<BusinessInfoSection> {
                           enabled: false,
                           label: 'الشعار (رابط صورة)',
                           hintText: '...//:https',
-                          prefixIcon: const Icon(
-                            Icons.image_outlined,
-                            size: 20,
-                            color: AppColors.textSecondary,
-                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -197,8 +182,9 @@ class _BusinessInfoSectionState extends State<BusinessInfoSection> {
                       children: [
                         AppTextField(
                           controller: _invoiceFooterController,
-                          label: 'نص ذيل الفاتورة',
-                          hintText: 'مثال: شكراً لتعاملكم معنا، نسعد بخدمتكم دائماً',
+                          label: AppStrings.invoiceFooterLabel,
+                          hintText:
+                              'مثال: شكراً لتعاملكم معنا، نسعد بخدمتكم دائماً',
                           maxLines: 3,
                         ),
                         const SizedBox(height: 4),
@@ -213,24 +199,28 @@ class _BusinessInfoSectionState extends State<BusinessInfoSection> {
                     ),
                     AppSpacing.gapXxl,
                     Align(
-                      alignment: AlignmentDirectional.centerEnd,
-                      child: ElevatedButton.icon(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: ElevatedButton(
                         onPressed: state.isSaving ? null : _handleSave,
-                        icon: const Icon(Icons.check, size: 18, color: Colors.white),
-                        label: Text(
-                          state.isSaving ? 'جاري الحفظ...' : 'حفظ التغييرات',
-                          style: AppTextStyles.labelLarge.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusMd,
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          state.isSaving ? 'جاري الحفظ...' : 'حفظ التغييرات',
+                          style: AppTextStyles.labelLarge.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),

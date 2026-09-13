@@ -159,7 +159,7 @@ class AppStrings {
   static const String businessPhoneHint = 'مثال: 01012345678';
   static const String businessAddressLabel = 'العنوان';
   static const String businessAddressHint = 'مثال: شارع الجمهورية، المعادي، القاهرة';
-  static const String invoiceFooterLabel = 'نص ذيل الفاتورة';
+  static const String invoiceFooterLabel = 'نص تذييل الفاتورة';
   static const String invoiceFooterHint = 'مثال: شكراً لتعاملكم معنا، نسعد بخدمتكم دائماً';
   static const String saveBusinessSettingsSuccess = 'تم حفظ بيانات النشاط بنجاح';
 
@@ -195,7 +195,7 @@ class AppStrings {
   static const String servicePriceRequired = 'السعر مطلوب';
   static const String servicePriceMustBePositive = 'السعر يجب أن يكون أكبر من صفر';
   static const String servicePriceChangeNotice =
-      'سيتم تطبيق السعر الجديد على الطلبات الجديدة فقط.';
+      'سيتم تطبيق السعر الجديد على الطلبات الجديدة فقط. الطلبات الحالية لن تتأثر.';
   static const String duplicateNameError = 'هذا الاسم مستخدم بالفعل';
   static const String deactivateServiceConfirmMessage =
       'سيتم تعطيل الخدمة ولن تظهر للطلبات الجديدة.\nالطلبات الحالية لن تتأثر.';

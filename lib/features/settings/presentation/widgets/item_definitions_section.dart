@@ -130,13 +130,6 @@ class ItemDefinitionsSection extends StatelessWidget {
                               color: AppColors.textPrimary,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '(${entry.value.length})',
-                            style: AppTextStyles.bodySmall.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
                         ],
                       ),
                     ),

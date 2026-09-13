@@ -85,32 +85,22 @@ class SettingsInfoBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       decoration: BoxDecoration(
-        color: const Color(0xFFE0F2FE), // Light sky blue
+        color: const Color(0xFFEFF6FF), // Soft light sky blue
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        border: Border.all(color: const Color(0xFFBAE6FD), width: 0.8),
       ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.info_outline,
-            size: 20,
-            color: Color(0xFF0284C7),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              message,
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: const Color(0xFF0369A1),
-                fontWeight: FontWeight.w500,
-                fontSize: 13.5,
-              ),
-            ),
-          ),
-        ],
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: AppTextStyles.bodyMedium.copyWith(
+          color: const Color(0xFF1D4ED8), // Refined blue matching Figma
+          fontWeight: FontWeight.w500,
+          fontSize: 13.5,
+          height: 1.4,
+        ),
       ),
     );
   }

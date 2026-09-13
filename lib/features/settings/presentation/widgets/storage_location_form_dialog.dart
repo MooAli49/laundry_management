@@ -122,24 +122,16 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      isEditing
-                          ? AppStrings.editStorageLocation
-                          : AppStrings.addStorageLocation,
-                      style: AppTextStyles.titleLarge.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () => Navigator.of(context).pop(false),
-                    ),
-                  ],
+                // Header matching Figma (no X button, no divider)
+                Text(
+                  isEditing
+                      ? AppStrings.editStorageLocation
+                      : AppStrings.addStorageLocation,
+                  style: AppTextStyles.titleLarge.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                const Divider(height: AppSpacing.lg, color: AppColors.divider),
+                AppSpacing.gapLg,
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
@@ -183,11 +175,6 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
                           controller: _nameController,
                           label: AppStrings.storageLocationNameLabel,
                           hintText: AppStrings.storageLocationNameHint,
-                          prefixIcon: const Icon(
-                            Icons.inventory_2_outlined,
-                            size: 20,
-                            color: AppColors.textSecondary,
-                          ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
                               return AppStrings.storageLocationNameRequired;
@@ -256,20 +243,19 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
                     ),
                   ),
                 ),
-                const Divider(height: AppSpacing.lg, color: AppColors.divider),
-                AppSpacing.gapSm,
+                AppSpacing.gapLg,
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    AppButton(
-                      label: AppStrings.cancel,
-                      variant: AppButtonVariant.secondary,
-                      onPressed: () => Navigator.of(context).pop(false),
-                    ),
-                    AppSpacing.gapHorizontalMd,
                     AppButton(
                       label: AppStrings.save,
                       onPressed: _handleSubmit,
+                    ),
+                    AppSpacing.gapHorizontalMd,
+                    AppButton(
+                      label: AppStrings.cancel,
+                      variant: AppButtonVariant.text,
+                      onPressed: () => Navigator.of(context).pop(false),
                     ),
                   ],
                 ),
