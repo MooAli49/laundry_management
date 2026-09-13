@@ -5,7 +5,6 @@ import '../../../../core/localization/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/loading_indicator.dart';
@@ -105,132 +104,140 @@ class _BusinessInfoSectionState extends State<BusinessInfoSection> {
           _populateFields(state);
         }
 
-        return AppCard(
-          padding: const EdgeInsets.all(AppSpacing.xxl),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SettingsSectionHeader(
-                  title: AppStrings.tabBusinessInfo,
-                  subtitle: AppStrings.settingsSubtitle,
-                  actions: [
-                    AppButton(
-                      label: AppStrings.save,
-                      icon: Icons.save_outlined,
-                      isLoading: state.isSaving,
-                      onPressed: state.isSaving ? null : _handleSave,
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: AppCard(
+              padding: const EdgeInsets.all(AppSpacing.xxl),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppStrings.tabBusinessInfo,
+                      style: AppTextStyles.titleLarge.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                        fontSize: 20,
+                      ),
+                    ),
+                    AppSpacing.gapMd,
+                    const SettingsInfoBanner(
+                      message: 'هذه البيانات هي المصدر الوحيد لهوية النشاط، وتُستخدم تلقائياً في الفاتورة عند الطباعة.',
+                    ),
+                    AppSpacing.gapMd,
+                    AppTextField(
+                      controller: _nameController,
+                      label: AppStrings.businessNameLabel,
+                      hintText: 'مثال: مغسلة الأمل الحديثة',
+                      prefixIcon: const Icon(
+                        Icons.store_outlined,
+                        size: 20,
+                        color: AppColors.textSecondary,
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return AppStrings.businessNameRequired;
+                        }
+                        return null;
+                      },
+                    ),
+                    AppSpacing.gapLg,
+                    AppTextField(
+                      controller: _phoneController,
+                      label: AppStrings.businessPhoneLabel,
+                      hintText: 'مثال: 01012345678',
+                      keyboardType: TextInputType.phone,
+                      prefixIcon: const Icon(
+                        Icons.phone_outlined,
+                        size: 20,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    AppSpacing.gapLg,
+                    AppTextField(
+                      controller: _addressController,
+                      label: AppStrings.businessAddressLabel,
+                      hintText: 'مثال: شارع الجمهورية، المعادي، القاهرة',
+                      prefixIcon: const Icon(
+                        Icons.location_on_outlined,
+                        size: 20,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    AppSpacing.gapLg,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppTextField(
+                          controller: TextEditingController(),
+                          enabled: false,
+                          label: 'الشعار (رابط صورة)',
+                          hintText: '...//:https',
+                          prefixIcon: const Icon(
+                            Icons.image_outlined,
+                            size: 20,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'اختياري — يظهر بجانب اسم النشاط في الفاتورة',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    AppSpacing.gapLg,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppTextField(
+                          controller: _invoiceFooterController,
+                          label: 'نص ذيل الفاتورة',
+                          hintText: 'مثال: شكراً لتعاملكم معنا، نسعد بخدمتكم دائماً',
+                          maxLines: 3,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'اختياري — يظهر أسفل الفاتورة',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    AppSpacing.gapXxl,
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: ElevatedButton.icon(
+                        onPressed: state.isSaving ? null : _handleSave,
+                        icon: const Icon(Icons.check, size: 18, color: Colors.white),
+                        label: Text(
+                          state.isSaving ? 'جاري الحفظ...' : 'حفظ التغييرات',
+                          style: AppTextStyles.labelLarge.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                const Divider(height: AppSpacing.xxl, color: AppColors.divider),
-                AppSpacing.gapMd,
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 880),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: AppTextField(
-                              controller: _nameController,
-                              label: AppStrings.businessNameLabel,
-                              hintText: AppStrings.businessNameHint,
-                              prefixIcon: const Icon(
-                                Icons.store_outlined,
-                                size: 20,
-                                color: AppColors.textSecondary,
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return AppStrings.businessNameRequired;
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                          AppSpacing.gapHorizontalLg,
-                          Expanded(
-                            child: AppTextField(
-                              controller: _phoneController,
-                              label: AppStrings.businessPhoneLabel,
-                              hintText: AppStrings.businessPhoneHint,
-                              keyboardType: TextInputType.phone,
-                              prefixIcon: const Icon(
-                                Icons.phone_outlined,
-                                size: 20,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      AppSpacing.gapLg,
-                      AppTextField(
-                        controller: _addressController,
-                        label: AppStrings.businessAddressLabel,
-                        hintText: AppStrings.businessAddressHint,
-                        prefixIcon: const Icon(
-                          Icons.location_on_outlined,
-                          size: 20,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      AppSpacing.gapLg,
-                      AppTextField(
-                        controller: _invoiceFooterController,
-                        label: AppStrings.invoiceFooterLabel,
-                        hintText: AppStrings.invoiceFooterHint,
-                        maxLines: 3,
-                      ),
-                      AppSpacing.gapXxl,
-                      // Notice info callout
-                      Container(
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        decoration: BoxDecoration(
-                          color: AppColors.infoLight,
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                          border: Border.all(
-                            color: AppColors.info.withValues(alpha: 0.25),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.info_outline,
-                              color: AppColors.info,
-                              size: 20,
-                            ),
-                            AppSpacing.gapHorizontalSm,
-                            Expanded(
-                              child: Text(
-                                'تنبيه: التعديلات على بيانات النشاط ستظهر تلقائياً في ترويسة وتذييل فواتير الاستلام للطلبات الجديدة.',
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.infoDark,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      AppSpacing.gapXxl,
-                      Align(
-                        alignment: AlignmentDirectional.centerEnd,
-                        child: AppButton(
-                          label: AppStrings.save,
-                          icon: Icons.save_outlined,
-                          isLoading: state.isSaving,
-                          onPressed: state.isSaving ? null : _handleSave,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         );

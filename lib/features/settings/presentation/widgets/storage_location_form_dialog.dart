@@ -113,7 +113,7 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
       backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 680),
+        constraints: const BoxConstraints(maxWidth: 480, maxHeight: 680),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.xl),
           child: Form(

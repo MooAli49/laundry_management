@@ -3,16 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../domain/entities/carpet_size.dart';
 import '../cubit/carpet_sizes_management_cubit.dart';
 import '../cubit/carpet_sizes_management_state.dart';
-import 'active_status_badge.dart';
 import 'carpet_size_form_dialog.dart';
 import 'deactivation_confirm_dialog.dart';
 import 'settings_table_components.dart';
@@ -68,89 +64,38 @@ class CarpetSizesSection extends StatelessWidget {
           return const Center(child: LoadingIndicator());
         }
 
-        return AppCard(
-          padding: const EdgeInsets.all(AppSpacing.xxl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SettingsSectionHeader(
-                title: AppStrings.tabCarpetSizes,
-                subtitle: 'إدارة مقاسات السجاد القياسية وحساب المساحات بالمتر المربع',
-                actions: [
-                  AppButton(
-                    label: AppStrings.addCarpetSize,
-                    icon: Icons.add,
-                    onPressed: () => _handleAdd(context),
-                  ),
-                ],
-              ),
-              const Divider(height: AppSpacing.xxl, color: AppColors.divider),
-              if (state.carpetSizes.isEmpty)
-                EmptyState(
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SettingsTopHeader(
+              title: AppStrings.tabCarpetSizes,
+              count: state.carpetSizes.length,
+              countLabel: 'مقاسات',
+              actionLabel: AppStrings.addCarpetSize,
+              onAction: () => _handleAdd(context),
+            ),
+            if (state.carpetSizes.isEmpty)
+              AppCard(
+                child: EmptyState(
                   icon: Icons.straighten_outlined,
                   message: AppStrings.noCarpetSizes,
-                )
-              else
-                Table(
-                  columnWidths: const {
-                    0: FlexColumnWidth(4),
-                    1: FlexColumnWidth(2.5),
-                    2: FlexColumnWidth(2),
-                    3: FlexColumnWidth(2.8),
-                  },
-                  defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-                  children: [
-                    SettingsTableHelper.buildHeaderRow([
-                      AppStrings.tableHeaderDimensions,
-                      AppStrings.tableHeaderArea,
-                      AppStrings.tableHeaderStatus,
-                      AppStrings.tableHeaderActions,
-                    ]),
-                    ...state.carpetSizes.map((cs) {
-                      return TableRow(
-                        decoration: SettingsTableHelper.rowDecoration,
-                        children: [
-                          Padding(
-                            padding: SettingsTableHelper.cellPadding,
-                            child: Text(
-                              '${_formatNum(cs.length)} م × ${_formatNum(cs.width)} م',
-                              style: AppTextStyles.titleMedium.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: SettingsTableHelper.cellPadding,
-                            child: Text(
-                              '${_formatNum(cs.area)} م²',
-                              style: AppTextStyles.titleMedium.copyWith(
-                                color: AppColors.primaryDark,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: SettingsTableHelper.cellPadding,
-                            child: Align(
-                              alignment: AlignmentDirectional.centerStart,
-                              child: ActiveStatusBadge(isActive: cs.isActive),
-                            ),
-                          ),
-                          Padding(
-                            padding: SettingsTableHelper.cellPadding,
-                            child: SettingsRowActions(
-                              onEdit: () => _handleEdit(context, cs),
-                              onToggleStatus: () => _handleToggleStatus(context, cs),
-                              isActive: cs.isActive,
-                            ),
-                          ),
-                        ],
-                      );
-                    }),
-                  ],
                 ),
-            ],
-          ),
+              )
+            else
+              SettingsCardGrid(
+                children: [
+                  for (final cs in state.carpetSizes)
+                    SettingsCard(
+                      icon: Icons.straighten_outlined,
+                      title: '${_formatNum(cs.length)} × ${_formatNum(cs.width)} م',
+                      subtitle: '${_formatNum(cs.area)} م²',
+                      isActive: cs.isActive,
+                      onEdit: () => _handleEdit(context, cs),
+                      onToggleActive: (_) => _handleToggleStatus(context, cs),
+                    ),
+                ],
+              ),
+          ],
         );
       },
     );

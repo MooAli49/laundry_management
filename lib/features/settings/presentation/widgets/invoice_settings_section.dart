@@ -5,83 +5,21 @@ import '../../../../core/localization/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
-import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
 import 'settings_table_components.dart';
 
-class InvoiceSettingsSection extends StatefulWidget {
+class InvoiceSettingsSection extends StatelessWidget {
   const InvoiceSettingsSection({super.key});
 
   @override
-  State<InvoiceSettingsSection> createState() => _InvoiceSettingsSectionState();
-}
-
-class _InvoiceSettingsSectionState extends State<InvoiceSettingsSection> {
-  late final TextEditingController _footerController;
-  bool _initialized = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _footerController = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _footerController.dispose();
-    super.dispose();
-  }
-
-  void _syncFooter(SettingsState state) {
-    if (state.settings != null && !_initialized) {
-      _footerController.text = state.settings!.invoiceFooterText ?? '';
-      _initialized = true;
-    }
-  }
-
-  Future<void> _handleSaveFooter() async {
-    final cubit = context.read<SettingsCubit>();
-    final current = cubit.state.settings;
-    if (current == null) return;
-
-    final success = await cubit.updateBusinessInfo(
-      businessName: current.businessName,
-      phone: current.phone,
-      address: current.address,
-      invoiceFooterText: _footerController.text.trim().isEmpty
-          ? null
-          : _footerController.text.trim(),
-    );
-
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(AppStrings.saveBusinessSettingsSuccess),
-          backgroundColor: AppColors.success,
-        ),
-      );
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return BlocConsumer<SettingsCubit, SettingsState>(
-      listener: (context, state) {
-        if (state.settings != null && !_initialized) {
-          _syncFooter(state);
-        }
-      },
+    return BlocBuilder<SettingsCubit, SettingsState>(
       builder: (context, state) {
         if (state.isLoading && state.settings == null) {
           return const Center(child: LoadingIndicator());
-        }
-
-        if (!_initialized && state.settings != null) {
-          _syncFooter(state);
         }
 
         final settings = state.settings;
@@ -90,301 +28,325 @@ class _InvoiceSettingsSectionState extends State<InvoiceSettingsSection> {
             : 'مغسلة الأمل الحديثة';
         final phone = settings?.phone ?? '01012345678';
         final address = settings?.address ?? 'القاهرة - مصر الجديدة';
-        final liveFooter = _footerController.text.trim().isNotEmpty
-            ? _footerController.text.trim()
-            : (settings?.invoiceFooterText ?? 'شكراً لتعاملكم معنا، نسعد بخدمتكم دائماً');
+        final liveFooter = (settings?.invoiceFooterText?.isNotEmpty == true)
+            ? settings!.invoiceFooterText!
+            : 'شكراً لتعاملكم معنا، نسعد بخدمتكم دائماً';
 
-        return AppCard(
-          padding: const EdgeInsets.all(AppSpacing.xxl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SettingsSectionHeader(
-                title: AppStrings.invoicePreviewTitle,
-                subtitle: AppStrings.invoicePreviewDescription,
-                actions: [
-                  AppButton(
-                    label: AppStrings.save,
-                    icon: Icons.save_outlined,
-                    isLoading: state.isSaving,
-                    onPressed: state.isSaving ? null : _handleSaveFooter,
-                  ),
-                ],
-              ),
-              const Divider(height: AppSpacing.xxl, color: AppColors.divider),
-              Row(
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: AppCard(
+              padding: const EdgeInsets.all(AppSpacing.xxl),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Editor Column
-                  Expanded(
-                    flex: 5,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            AppStrings.tabInvoice,
+                            style: AppTextStyles.titleLarge.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                              fontSize: 20,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            AppStrings.invoicePreviewTitle,
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _showReceiptPreviewDialog(
+                          context,
+                          businessName,
+                          phone,
+                          address,
+                          liveFooter,
+                        ),
+                        icon: const Icon(Icons.visibility_outlined, size: 18, color: AppColors.primary),
+                        label: Text(
+                          'معاينة الفاتورة',
+                          style: AppTextStyles.labelMedium.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFE2E8F0)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        ),
+                      ),
+                    ],
+                  ),
+                  AppSpacing.gapMd,
+                  const SettingsInfoBanner(
+                    message: 'تُبنى الفاتورة تلقائياً من «بيانات النشاط» (الاسم، الهاتف، العنوان، الشعار، نص التذييل) ومن بيانات الطلب. لتعديل هوية النشاط انتقل إلى قسم «بيانات النشاط».',
+                  ),
+                  AppSpacing.gapMd,
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20.0),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          AppStrings.invoiceFooterLabel,
-                          style: AppTextStyles.titleMedium.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        AppSpacing.gapXs,
-                        Text(
-                          'اكتب نص التذييل المطبوع أسفل كل فاتورة حرارية (مثل سياسة الاستلام أو رسالة شكر للعميل).',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        AppSpacing.gapMd,
-                        AppTextField(
-                          controller: _footerController,
-                          hintText: AppStrings.invoiceFooterHint,
-                          maxLines: 4,
-                          onChanged: (_) => setState(() {}),
-                        ),
-                        AppSpacing.gapLg,
-                        Container(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          decoration: BoxDecoration(
-                            color: AppColors.infoLight,
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                            border: Border.all(
-                              color: AppColors.info.withValues(alpha: 0.25),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.print_outlined,
-                                color: AppColors.info,
-                                size: 20,
-                              ),
-                              AppSpacing.gapHorizontalSm,
-                              Expanded(
-                                child: Text(
-                                  'المعاينة المجاورة تمثل الطباعة الحية على بكرة ورق طابعة الكاشير الحرارية مقاس 80 مم بدقة 203 DPI.',
-                                  style: AppTextStyles.bodySmall.copyWith(
-                                    color: AppColors.infoDark,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        AppSpacing.gapXxl,
-                        AppButton(
-                          label: AppStrings.save,
-                          icon: Icons.save_outlined,
-                          isLoading: state.isSaving,
-                          onPressed: state.isSaving ? null : _handleSaveFooter,
-                        ),
+                        _buildSummaryRow('اسم النشاط', businessName),
+                        const Divider(height: 24, color: Color(0xFFE2E8F0)),
+                        _buildSummaryRow('رقم الهاتف', phone),
+                        const Divider(height: 24, color: Color(0xFFE2E8F0)),
+                        _buildSummaryRow('العنوان', address),
+                        const Divider(height: 24, color: Color(0xFFE2E8F0)),
+                        _buildSummaryRow('نص التذييل', liveFooter),
                       ],
                     ),
                   ),
-                  AppSpacing.gapHorizontalXxl,
-                  // 80mm Live Thermal Receipt Preview Tray
-                  Expanded(
-                    flex: 4,
-                    child: Container(
-                      padding: const EdgeInsets.all(AppSpacing.xl),
-                      decoration: BoxDecoration(
-                        color: AppColors.secondaryLight,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                        border: Border.all(color: AppColors.border),
+                  AppSpacing.gapXxl,
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _showReceiptPreviewDialog(
+                        context,
+                        businessName,
+                        phone,
+                        address,
+                        liveFooter,
                       ),
-                      child: Center(
-                        child: Container(
-                          width: 350,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.lg,
-                            vertical: AppSpacing.xl,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                            border: Border.all(color: AppColors.borderStrong),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x14000000),
-                                blurRadius: 12,
-                                offset: Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              // Thermal paper cut indicator header
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.receipt_long_outlined,
-                                    size: 16,
-                                    color: AppColors.textTertiary,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'فاتورة استلام (80 مم)',
-                                    style: AppTextStyles.caption.copyWith(
-                                      color: AppColors.textTertiary,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              AppSpacing.gapSm,
-                              _buildDashedDivider(),
-                              AppSpacing.gapMd,
-                              Text(
-                                businessName,
-                                textAlign: TextAlign.center,
-                                style: AppTextStyles.titleLarge.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              if (phone.isNotEmpty) ...[
-                                AppSpacing.gapXs,
-                                Text(
-                                  phone,
-                                  style: AppTextStyles.bodySmall.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                              if (address.isNotEmpty) ...[
-                                AppSpacing.gapXs,
-                                Text(
-                                  address,
-                                  textAlign: TextAlign.center,
-                                  style: AppTextStyles.bodySmall.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                              AppSpacing.gapMd,
-                              _buildDashedDivider(),
-                              AppSpacing.gapSm,
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      'رقم الطلب: #1024',
-                                      style: AppTextStyles.labelMedium.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  Text('13/09/2026', style: AppTextStyles.bodySmall),
-                                ],
-                              ),
-                              AppSpacing.gapSm,
-                              _buildDashedDivider(),
-                              AppSpacing.gapMd,
-                              // Sample Items
-                              _buildReceiptLine(AppStrings.sampleInvoiceItem1, '120.00 ج.م'),
-                              AppSpacing.gapSm,
-                              _buildReceiptLine(AppStrings.sampleInvoiceItem2, '180.00 ج.م'),
-                              AppSpacing.gapMd,
-                              _buildDashedDivider(),
-                              AppSpacing.gapSm,
-                              _buildReceiptLine(AppStrings.sampleInvoiceSubtotal, '300.00 ج.م'),
-                              AppSpacing.gapSm,
-                              _buildReceiptLine(
-                                AppStrings.sampleInvoiceTotal,
-                                '300.00 ج.م',
-                                isBold: true,
-                              ),
-                              AppSpacing.gapSm,
-                              _buildReceiptLine(AppStrings.sampleInvoicePaid, '300.00 ج.م'),
-                              AppSpacing.gapSm,
-                              _buildReceiptLine(AppStrings.sampleInvoiceRemaining, '0.00 ج.م'),
-                              AppSpacing.gapLg,
-                              _buildDashedDivider(),
-                              AppSpacing.gapMd,
-                              // Live Footer text
-                              Container(
-                                padding: const EdgeInsets.all(AppSpacing.sm),
-                                decoration: BoxDecoration(
-                                  color: AppColors.secondary.withValues(alpha: 0.5),
-                                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                                ),
-                                child: Text(
-                                  liveFooter,
-                                  textAlign: TextAlign.center,
-                                  style: AppTextStyles.bodySmall.copyWith(
-                                    color: AppColors.textSecondary,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                      icon: const Icon(Icons.receipt_long_outlined, size: 18, color: Colors.white),
+                      label: Text(
+                        'معاينة الفاتورة',
+                        style: AppTextStyles.labelLarge.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                         ),
                       ),
                     ),
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _buildDashedDivider() {
-    return const SizedBox(
-      height: 1,
-      width: double.infinity,
-      child: CustomPaint(painter: _ReceiptDashedLinePainter()),
+  Widget _buildSummaryRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 120,
+          child: Text(
+            label,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildReceiptLine(String label, String value, {bool isBold = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: Text(
+  void _showReceiptPreviewDialog(
+    BuildContext context,
+    String businessName,
+    String phone,
+    String address,
+    String liveFooter,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: Center(
+            child: SingleChildScrollView(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  _buildSampleReceiptCard(
+                    businessName: businessName,
+                    phone: phone,
+                    address: address,
+                    footerText: liveFooter,
+                  ),
+                  PositionedDirectional(
+                    top: 8,
+                    start: 8,
+                    child: IconButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      icon: const Icon(Icons.close, color: AppColors.textSecondary),
+                      tooltip: 'إغلاق',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSampleReceiptCard({
+    required String businessName,
+    required String phone,
+    required String address,
+    required String footerText,
+  }) {
+    return Container(
+      width: 340,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1A000000),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            businessName,
+            textAlign: TextAlign.center,
+            style: AppTextStyles.titleLarge.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            phone,
+            textAlign: TextAlign.center,
+            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+          ),
+          Text(
+            address,
+            textAlign: TextAlign.center,
+            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          _buildDashedLine(),
+          const SizedBox(height: 10),
+          Text(
+            'فاتورة استلام طلب (نموذج 80 مم)',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.labelMedium.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 10),
+          _buildReceiptRow('رقم الطلب', 'ORD-2026-001'),
+          _buildReceiptRow('العميل', 'محمد أحمد'),
+          _buildReceiptRow('التاريخ', '2026/09/13'),
+          const SizedBox(height: 8),
+          _buildDashedLine(),
+          const SizedBox(height: 8),
+          _buildReceiptRow('غسيل وكي قميص × 3', '120.00 ج.م'),
+          _buildReceiptRow('تنظيف جاف بدلة × 1', '80.00 ج.م'),
+          _buildReceiptRow('سجادة مقاس 2×3 × 1', '240.00 ج.م'),
+          const SizedBox(height: 8),
+          _buildDashedLine(),
+          const SizedBox(height: 8),
+          _buildReceiptRow('الإجمالي', '440.00 ج.م', isBold: true),
+          _buildReceiptRow('المدفوع', '200.00 ج.م'),
+          _buildReceiptRow('المتبقي', '240.00 ج.م', isBold: true),
+          const SizedBox(height: 12),
+          _buildDashedLine(),
+          const SizedBox(height: 12),
+          Text(
+            footerText,
+            textAlign: TextAlign.center,
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReceiptRow(String label, String value, {bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
             label,
             style: isBold
-                ? AppTextStyles.titleSmall.copyWith(fontWeight: FontWeight.bold)
-                : AppTextStyles.bodySmall,
+                ? AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)
+                : AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
           ),
-        ),
-        AppSpacing.gapHorizontalSm,
-        Text(
-          value,
-          style: isBold
-              ? AppTextStyles.titleSmall.copyWith(fontWeight: FontWeight.bold)
-              : AppTextStyles.bodySmall,
-        ),
-      ],
+          Text(
+            value,
+            style: isBold
+                ? AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)
+                : AppTextStyles.bodySmall.copyWith(color: AppColors.textPrimary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashedLine() {
+    return CustomPaint(
+      size: const Size(double.infinity, 1.0),
+      painter: _ReceiptDashedLinePainter(),
     );
   }
 }
 
 class _ReceiptDashedLinePainter extends CustomPainter {
-  const _ReceiptDashedLinePainter();
-
   @override
   void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFD1D5DB)
+      ..strokeWidth = 1.0;
     const dashWidth = 4.0;
     const dashSpace = 3.0;
-    final paint = Paint()
-      ..color = AppColors.borderStrong
-      ..strokeWidth = 1.0;
-
     double startX = 0;
     while (startX < size.width) {
-      canvas.drawLine(
-        Offset(startX, 0),
-        Offset(startX + dashWidth, 0),
-        paint,
-      );
+      canvas.drawLine(Offset(startX, 0), Offset(startX + dashWidth, 0), paint);
       startX += dashWidth + dashSpace;
     }
   }

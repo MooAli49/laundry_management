@@ -195,7 +195,7 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
       backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 540, maxHeight: 720),
+        constraints: const BoxConstraints(maxWidth: 480, maxHeight: 720),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.xl),
           child: Form(

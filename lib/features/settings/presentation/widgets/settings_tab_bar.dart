@@ -5,18 +5,6 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 
-class SettingsTabItem {
-  final String label;
-  final IconData icon;
-  final IconData selectedIcon;
-
-  const SettingsTabItem({
-    required this.label,
-    required this.icon,
-    required this.selectedIcon,
-  });
-}
-
 class SettingsTabBar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onTabSelected;
@@ -27,72 +15,33 @@ class SettingsTabBar extends StatelessWidget {
     required this.onTabSelected,
   });
 
-  static const List<SettingsTabItem> tabs = [
-    SettingsTabItem(
-      label: AppStrings.tabBusinessInfo,
-      icon: Icons.store_outlined,
-      selectedIcon: Icons.store,
-    ),
-    SettingsTabItem(
-      label: AppStrings.tabInvoice,
-      icon: Icons.receipt_outlined,
-      selectedIcon: Icons.receipt,
-    ),
-    SettingsTabItem(
-      label: AppStrings.tabServices,
-      icon: Icons.local_laundry_service_outlined,
-      selectedIcon: Icons.local_laundry_service,
-    ),
-    SettingsTabItem(
-      label: AppStrings.tabItemTypes,
-      icon: Icons.category_outlined,
-      selectedIcon: Icons.category,
-    ),
-    SettingsTabItem(
-      label: AppStrings.tabItemDefinitions,
-      icon: Icons.list_alt_outlined,
-      selectedIcon: Icons.list_alt,
-    ),
-    SettingsTabItem(
-      label: AppStrings.tabCarpetSizes,
-      icon: Icons.straighten_outlined,
-      selectedIcon: Icons.straighten,
-    ),
-    SettingsTabItem(
-      label: AppStrings.tabStorageLocations,
-      icon: Icons.inventory_2_outlined,
-      selectedIcon: Icons.inventory_2,
-    ),
-    SettingsTabItem(
-      label: AppStrings.tabExpenseCategories,
-      icon: Icons.account_balance_wallet_outlined,
-      selectedIcon: Icons.account_balance_wallet,
-    ),
+  static const List<String> tabs = [
+    AppStrings.tabBusinessInfo,
+    AppStrings.tabInvoice,
+    AppStrings.tabServices,
+    AppStrings.tabItemTypes,
+    AppStrings.tabItemDefinitions,
+    AppStrings.tabCarpetSizes,
+    AppStrings.tabStorageLocations,
+    AppStrings.tabExpenseCategories,
   ];
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: const Color(0xFFF1F5F9), // Soft neutral pill container
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-        border: Border.all(color: AppColors.border),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0817212E),
-            blurRadius: 4,
-            offset: Offset(0, 1),
-          ),
-        ],
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
-      padding: const EdgeInsets.all(AppSpacing.xs),
+      padding: const EdgeInsets.all(4.0),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: List.generate(tabs.length, (index) {
-            final tab = tabs[index];
+            final label = tabs[index];
             final isSelected = index == selectedIndex;
 
             return Padding(
@@ -102,44 +51,38 @@ class SettingsTabBar extends StatelessWidget {
                 child: InkWell(
                   onTap: () => onTabSelected(index),
                   borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  hoverColor: isSelected ? null : AppColors.secondary,
+                  hoverColor: isSelected ? null : Colors.white.withValues(alpha: 0.5),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md + 2,
-                      vertical: AppSpacing.sm + 2,
+                      horizontal: 16.0,
+                      vertical: 8.0,
                     ),
                     decoration: BoxDecoration(
-                      color: isSelected ? AppColors.primaryLighter : Colors.transparent,
+                      color: isSelected ? Colors.white : Colors.transparent,
                       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                      border: Border.all(
-                        color: isSelected
-                            ? AppColors.primary.withValues(alpha: 0.25)
-                            : Colors.transparent,
-                      ),
+                      border: isSelected
+                          ? Border.all(color: const Color(0xFFE2E8F0), width: 0.8)
+                          : null,
+                      boxShadow: isSelected
+                          ? const [
+                              BoxShadow(
+                                color: Color(0x0F000000),
+                                blurRadius: 4,
+                                offset: Offset(0, 1.5),
+                              ),
+                            ]
+                          : null,
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isSelected ? tab.selectedIcon : tab.icon,
-                          size: 18,
-                          color: isSelected
-                              ? AppColors.primaryDark
-                              : AppColors.textSecondary,
-                        ),
-                        AppSpacing.gapHorizontalSm,
-                        Text(
-                          tab.label,
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: isSelected
-                                ? AppColors.primaryDark
-                                : AppColors.textSecondary,
-                            fontWeight:
-                                isSelected ? FontWeight.w700 : FontWeight.w500,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      label,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: isSelected
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w500,
+                      ),
                     ),
                   ),
                 ),

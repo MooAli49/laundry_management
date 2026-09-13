@@ -3,16 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../domain/entities/storage_location.dart';
 import '../cubit/storage_locations_management_cubit.dart';
 import '../cubit/storage_locations_management_state.dart';
-import 'active_status_badge.dart';
 import 'deactivation_confirm_dialog.dart';
 import 'settings_table_components.dart';
 import 'storage_location_form_dialog.dart';
@@ -79,98 +75,39 @@ class StorageLocationsSection extends StatelessWidget {
           return const Center(child: LoadingIndicator());
         }
 
-        return AppCard(
-          padding: const EdgeInsets.all(AppSpacing.xxl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SettingsSectionHeader(
-                title: AppStrings.tabStorageLocations,
-                subtitle: 'إدارة أرفف ومواقع تخزين القطع الجاهزة لتسليمها للعملاء',
-                actions: [
-                  AppButton(
-                    label: AppStrings.addStorageLocation,
-                    icon: Icons.add,
-                    onPressed: () => _handleAdd(context),
-                  ),
-                ],
-              ),
-              const Divider(height: AppSpacing.xxl, color: AppColors.divider),
-              if (state.locations.isEmpty)
-                EmptyState(
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SettingsTopHeader(
+              title: AppStrings.tabStorageLocations,
+              count: state.locations.length,
+              countLabel: 'مواقع',
+              actionLabel: AppStrings.addStorageLocation,
+              onAction: () => _handleAdd(context),
+            ),
+            if (state.locations.isEmpty)
+              AppCard(
+                child: EmptyState(
                   icon: Icons.inventory_2_outlined,
                   message: AppStrings.noStorageLocations,
-                )
-              else
-                Table(
-                  columnWidths: const {
-                    0: FlexColumnWidth(4.5),
-                    1: FlexColumnWidth(2),
-                    2: FlexColumnWidth(3),
-                  },
-                  defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-                  children: [
-                    SettingsTableHelper.buildHeaderRow([
-                      AppStrings.tableHeaderName,
-                      AppStrings.tableHeaderStatus,
-                      AppStrings.tableHeaderActions,
-                    ]),
-                    ...state.locations.map((loc) {
-                      return TableRow(
-                        decoration: SettingsTableHelper.rowDecoration,
-                        children: [
-                          Padding(
-                            padding: SettingsTableHelper.cellPadding,
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 32,
-                                  height: 32,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.secondary,
-                                    borderRadius:
-                                        BorderRadius.circular(AppSpacing.radiusSm),
-                                  ),
-                                  child: const Icon(
-                                    Icons.inventory_2_outlined,
-                                    size: 16,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                                AppSpacing.gapHorizontalSm,
-                                Expanded(
-                                  child: Text(
-                                    loc.name,
-                                    style: AppTextStyles.titleMedium.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Padding(
-                            padding: SettingsTableHelper.cellPadding,
-                            child: Align(
-                              alignment: AlignmentDirectional.centerStart,
-                              child: ActiveStatusBadge(isActive: loc.isActive),
-                            ),
-                          ),
-                          Padding(
-                            padding: SettingsTableHelper.cellPadding,
-                            child: SettingsRowActions(
-                              onEdit: () => _handleEdit(context, loc),
-                              onToggleStatus: () => _handleToggleStatus(context, loc),
-                              isActive: loc.isActive,
-                            ),
-                          ),
-                        ],
-                      );
-                    }),
-                  ],
                 ),
-            ],
-          ),
+              )
+            else
+              SettingsCardGrid(
+                children: [
+                  for (final loc in state.locations)
+                    SettingsCard(
+                      icon: Icons.location_on_outlined,
+                      title: loc.name,
+                      subtitle: 'جاهز للتخزين',
+                      secondarySubtitle: 'كل أنواع القطع',
+                      isActive: loc.isActive,
+                      onEdit: () => _handleEdit(context, loc),
+                      onToggleActive: (_) => _handleToggleStatus(context, loc),
+                    ),
+                ],
+              ),
+          ],
         );
       },
     );

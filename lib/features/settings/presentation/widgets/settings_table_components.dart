@@ -5,6 +5,292 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 
+/// Standard Section Top Header for Settings Master Data (Figma layout).
+class SettingsTopHeader extends StatelessWidget {
+  final String title;
+  final int? count;
+  final String? countLabel;
+  final String actionLabel;
+  final VoidCallback onAction;
+
+  const SettingsTopHeader({
+    super.key,
+    required this.title,
+    this.count,
+    this.countLabel,
+    required this.actionLabel,
+    required this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Right side in RTL: Title + item count tag
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                title,
+                style: AppTextStyles.titleLarge.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              if (count != null) ...[
+                const SizedBox(width: 10),
+                Text(
+                  countLabel != null ? '$count $countLabel' : '$count عنصر',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          // Left side in RTL: Primary "+ إضافة [الكيان]" action button
+          ElevatedButton.icon(
+            onPressed: onAction,
+            icon: const Icon(Icons.add, size: 18, color: Colors.white),
+            label: Text(
+              actionLabel,
+              style: AppTextStyles.labelLarge.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Soft blue informational callout banner matching Figma.
+class SettingsInfoBanner extends StatelessWidget {
+  final String message;
+
+  const SettingsInfoBanner({super.key, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0F2FE), // Light sky blue
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        border: Border.all(color: const Color(0xFFBAE6FD), width: 0.8),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.info_outline,
+            size: 20,
+            color: Color(0xFF0284C7),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: const Color(0xFF0369A1),
+                fontWeight: FontWeight.w500,
+                fontSize: 13.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Reusable Master Data Card matching Figma.
+class SettingsCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String? secondarySubtitle;
+  final bool isActive;
+  final VoidCallback onEdit;
+  final ValueChanged<bool> onToggleActive;
+
+  const SettingsCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.secondarySubtitle,
+    required this.isActive,
+    required this.onEdit,
+    required this.onToggleActive,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 3,
+            offset: Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Icon Container (44x44, rounded 10px, soft background)
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            ),
+            child: Icon(
+              icon,
+              size: 22,
+              color: const Color(0xFF475569),
+            ),
+          ),
+          const SizedBox(width: 14),
+          // Title + Subtitle
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                    fontSize: 15.5,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: 13.0,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (secondarySubtitle != null && secondarySubtitle!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    secondarySubtitle!,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSecondary.withValues(alpha: 0.8),
+                      fontSize: 12.0,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Actions Area: Status badge + Edit pencil + Active Switch
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.5),
+                decoration: BoxDecoration(
+                  color: isActive ? AppColors.successLight : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: isActive
+                        ? AppColors.success.withValues(alpha: 0.25)
+                        : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6.0,
+                      height: 6.0,
+                      decoration: BoxDecoration(
+                        color: isActive ? AppColors.success : const Color(0xFF94A3B8),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5.0),
+                    Text(
+                      isActive ? AppStrings.statusActive : AppStrings.statusInactive,
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: isActive ? AppColors.successDark : const Color(0xFF64748B),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11.0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Edit button
+              InkWell(
+                onTap: onEdit,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                child: const Padding(
+                  padding: EdgeInsets.all(6.0),
+                  child: Icon(
+                    Icons.edit_outlined,
+                    size: 18,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              // Switch
+              Transform.scale(
+                scale: 0.82,
+                child: Switch(
+                  value: isActive,
+                  onChanged: onToggleActive,
+                  activeThumbColor: AppColors.primary,
+                  activeTrackColor: AppColors.primary.withValues(alpha: 0.3),
+                  inactiveThumbColor: const Color(0xFF94A3B8),
+                  inactiveTrackColor: const Color(0xFFE2E8F0),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Standard Section Header for Settings Master Data cards.
 class SettingsSectionHeader extends StatelessWidget {
   final String title;
@@ -207,6 +493,37 @@ class SettingsRowActions extends StatelessWidget {
             ),
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// Responsive 2-column card grid helper for tablet layouts.
+class SettingsCardGrid extends StatelessWidget {
+  final List<Widget> children;
+
+  const SettingsCardGrid({super.key, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    if (children.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      children: [
+        for (int i = 0; i < children.length; i += 2) ...[
+          if (i > 0) const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: children[i]),
+              const SizedBox(width: 12),
+              if (i + 1 < children.length)
+                Expanded(child: children[i + 1])
+              else
+                const Expanded(child: SizedBox.shrink()),
+            ],
+          ),
+        ],
       ],
     );
   }

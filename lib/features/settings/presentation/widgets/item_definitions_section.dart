@@ -3,16 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../domain/entities/item_definition.dart';
 import '../cubit/item_types_management_cubit.dart';
 import '../cubit/item_types_management_state.dart';
-import 'active_status_badge.dart';
 import 'deactivation_confirm_dialog.dart';
 import 'item_definition_form_dialog.dart';
 import 'settings_table_components.dart';
@@ -84,165 +81,83 @@ class ItemDefinitionsSection extends StatelessWidget {
           return const Center(child: LoadingIndicator());
         }
 
-        final filteredDefs = state.filteredDefinitions;
         final typeNameMap = {for (var t in state.itemTypes) t.id: t.name};
+        final groupedDefs = <String, List<ItemDefinition>>{};
+        for (final def in state.definitions) {
+          groupedDefs.putIfAbsent(def.itemTypeId, () => []).add(def);
+        }
 
-        return AppCard(
-          padding: const EdgeInsets.all(AppSpacing.xxl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SettingsSectionHeader(
-                title: AppStrings.tabItemDefinitions,
-                subtitle: 'إدارة القطع والتعريفات التابعة لكل نوع (مثل قميص، بنطلون، بطانية)',
-                actions: [
-                  // Filter dropdown
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: 2.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      border: Border.all(color: AppColors.border),
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.filter_list_outlined,
-                          size: 18,
-                          color: AppColors.textSecondary,
-                        ),
-                        AppSpacing.gapHorizontalSm,
-                        DropdownButtonHideUnderline(
-                          child: DropdownButton<String?>(
-                            value: state.selectedFilterItemTypeId,
-                            hint: Text(
-                              AppStrings.allItemDefinitions,
-                              style: AppTextStyles.bodyMedium,
-                            ),
-                            items: [
-                              DropdownMenuItem<String?>(
-                                value: null,
-                                child: Text(
-                                  AppStrings.allItemDefinitions,
-                                  style: AppTextStyles.bodyMedium.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              ...state.itemTypes.map((type) {
-                                return DropdownMenuItem<String?>(
-                                  value: type.id,
-                                  child: Text(
-                                    type.name,
-                                    style: AppTextStyles.bodyMedium,
-                                  ),
-                                );
-                              }),
-                            ],
-                            onChanged: (val) {
-                              context
-                                  .read<ItemTypesManagementCubit>()
-                                  .selectFilterItemType(val);
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  AppButton(
-                    label: AppStrings.addItemDefinition,
-                    icon: Icons.add,
-                    onPressed: () => _handleAdd(context, state),
-                  ),
-                ],
-              ),
-              const Divider(height: AppSpacing.xxl, color: AppColors.divider),
-              if (filteredDefs.isEmpty)
-                EmptyState(
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SettingsTopHeader(
+              title: AppStrings.tabItemDefinitions,
+              count: state.definitions.length,
+              countLabel: 'عنصر',
+              actionLabel: AppStrings.addItemDefinition,
+              onAction: () => _handleAdd(context, state),
+            ),
+            const SettingsInfoBanner(
+              message:
+                  'تعريف القطعة نوع فرعي يتبع نوع قطعة (مثل: عجمي، صوف، حرير للسجاد). يظهر في الطلب الجديد فقط عندما يمتلك نوع القطعة تعريفات.',
+            ),
+            if (state.definitions.isEmpty)
+              AppCard(
+                child: EmptyState(
                   icon: Icons.list_alt_outlined,
                   message: AppStrings.noItemDefinitions,
-                )
-              else
-                Table(
-                  columnWidths: const {
-                    0: FlexColumnWidth(4),
-                    1: FlexColumnWidth(3),
-                    2: FlexColumnWidth(2),
-                    3: FlexColumnWidth(2.8),
-                  },
-                  defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-                  children: [
-                    SettingsTableHelper.buildHeaderRow([
-                      AppStrings.tableHeaderName,
-                      AppStrings.tableHeaderItemType,
-                      AppStrings.tableHeaderStatus,
-                      AppStrings.tableHeaderActions,
-                    ]),
-                    ...filteredDefs.map((def) {
-                      final typeName = typeNameMap[def.itemTypeId] ?? '-';
-                      return TableRow(
-                        decoration: SettingsTableHelper.rowDecoration,
+                ),
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final entry in groupedDefs.entries) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Row(
                         children: [
-                          Padding(
-                            padding: SettingsTableHelper.cellPadding,
-                            child: Text(
-                              def.name,
-                              style: AppTextStyles.titleMedium.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
+                          const Icon(
+                            Icons.inventory_2_outlined,
+                            size: 18,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            typeNameMap[entry.key] ?? 'نوع غير معروف',
+                            style: AppTextStyles.titleMedium.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
                             ),
                           ),
-                          Padding(
-                            padding: SettingsTableHelper.cellPadding,
-                            child: Align(
-                              alignment: AlignmentDirectional.centerStart,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.sm,
-                                  vertical: AppSpacing.xs,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.secondary,
-                                  borderRadius: BorderRadius.circular(
-                                    AppSpacing.radiusSm,
-                                  ),
-                                ),
-                                child: Text(
-                                  typeName,
-                                  style: AppTextStyles.bodySmall.copyWith(
-                                    color: AppColors.textPrimary,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: SettingsTableHelper.cellPadding,
-                            child: Align(
-                              alignment: AlignmentDirectional.centerStart,
-                              child: ActiveStatusBadge(isActive: def.isActive),
-                            ),
-                          ),
-                          Padding(
-                            padding: SettingsTableHelper.cellPadding,
-                            child: SettingsRowActions(
-                              onEdit: () => _handleEdit(context, def, state),
-                              onToggleStatus: () => _handleToggleStatus(context, def),
-                              isActive: def.isActive,
+                          const SizedBox(width: 8),
+                          Text(
+                            '(${entry.value.length})',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ],
-                      );
-                    }),
+                      ),
+                    ),
+                    SettingsCardGrid(
+                      children: [
+                        for (final def in entry.value)
+                          SettingsCard(
+                            icon: Icons.category_outlined,
+                            title: def.name,
+                            subtitle: '0 طلب',
+                            isActive: def.isActive,
+                            onEdit: () => _handleEdit(context, def, state),
+                            onToggleActive: (_) => _handleToggleStatus(context, def),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
                   ],
-                ),
-            ],
-          ),
+                ],
+              ),
+          ],
         );
       },
     );
