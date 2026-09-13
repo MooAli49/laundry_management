@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../core/localization/app_strings.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/page_header.dart';
 import '../cubit/carpet_sizes_management_cubit.dart';
@@ -59,14 +60,22 @@ class _SettingsScreenContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Padding(
-          padding: AppSpacing.paddingPage,
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.page,
+            AppSpacing.page,
+            AppSpacing.page,
+            AppSpacing.page,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const PageHeader(title: AppStrings.settings),
-              AppSpacing.gapLg,
+              const PageHeader(
+                title: AppStrings.settings,
+                subtitle: AppStrings.settingsSubtitle,
+              ),
               BlocBuilder<SettingsCubit, SettingsState>(
                 buildWhen: (prev, curr) => prev.selectedTabIndex != curr.selectedTabIndex,
                 builder: (context, state) {

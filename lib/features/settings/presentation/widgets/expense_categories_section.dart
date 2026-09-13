@@ -15,6 +15,7 @@ import '../cubit/expense_categories_management_state.dart';
 import 'active_status_badge.dart';
 import 'deactivation_confirm_dialog.dart';
 import 'expense_category_form_dialog.dart';
+import 'settings_table_components.dart';
 
 class ExpenseCategoriesSection extends StatelessWidget {
   const ExpenseCategoriesSection({super.key});
@@ -68,30 +69,14 @@ class ExpenseCategoriesSection extends StatelessWidget {
         }
 
         return AppCard(
-          padding: const EdgeInsets.all(AppSpacing.xl),
+          padding: const EdgeInsets.all(AppSpacing.xxl),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(AppStrings.tabExpenseCategories,
-                            style: AppTextStyles.titleLarge),
-                        AppSpacing.gapXs,
-                        Text(
-                          'إدارة بنود وتصنيفات المصروفات التشغيلية للمغسلة',
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  AppSpacing.gapHorizontalMd,
+              SettingsSectionHeader(
+                title: AppStrings.tabExpenseCategories,
+                subtitle: 'إدارة بنود وتصنيفات المصروفات التشغيلية للمغسلة',
+                actions: [
                   AppButton(
                     label: AppStrings.addExpenseCategory,
                     icon: Icons.add,
@@ -108,90 +93,64 @@ class ExpenseCategoriesSection extends StatelessWidget {
               else
                 Table(
                   columnWidths: const {
-                    0: FlexColumnWidth(4),
+                    0: FlexColumnWidth(4.5),
                     1: FlexColumnWidth(2),
                     2: FlexColumnWidth(3),
                   },
                   defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                   children: [
-                    TableRow(
-                      decoration: const BoxDecoration(
-                        color: AppColors.secondary,
-                        borderRadius: BorderRadius.all(
-                            Radius.circular(AppSpacing.radiusSm)),
-                      ),
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(AppStrings.tableHeaderName,
-                              style: AppTextStyles.labelLarge),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(AppStrings.tableHeaderStatus,
-                              style: AppTextStyles.labelLarge),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(AppStrings.tableHeaderActions,
-                              style: AppTextStyles.labelLarge),
-                        ),
-                      ],
-                    ),
+                    SettingsTableHelper.buildHeaderRow([
+                      AppStrings.tableHeaderName,
+                      AppStrings.tableHeaderStatus,
+                      AppStrings.tableHeaderActions,
+                    ]),
                     ...state.categories.map((cat) {
                       return TableRow(
-                        decoration: const BoxDecoration(
-                          border:
-                              Border(bottom: BorderSide(color: AppColors.divider)),
-                        ),
+                        decoration: SettingsTableHelper.rowDecoration,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            child: Text(cat.name,
-                                style: AppTextStyles.titleMedium),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            child: Align(
-                              alignment: Alignment.centerRight,
-                              child: ActiveStatusBadge(isActive: cat.isActive),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
+                            padding: SettingsTableHelper.cellPadding,
                             child: Row(
-                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                IconButton(
-                                  icon:
-                                      const Icon(Icons.edit_outlined, size: 20),
-                                  color: AppColors.primary,
-                                  tooltip: AppStrings.edit,
-                                  onPressed: () => _handleEdit(context, cat),
+                                Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.secondary,
+                                    borderRadius:
+                                        BorderRadius.circular(AppSpacing.radiusSm),
+                                  ),
+                                  child: const Icon(
+                                    Icons.account_balance_wallet_outlined,
+                                    size: 16,
+                                    color: AppColors.primary,
+                                  ),
                                 ),
                                 AppSpacing.gapHorizontalSm,
-                                TextButton(
-                                  onPressed: () =>
-                                      _handleToggleStatus(context, cat),
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: cat.isActive
-                                        ? AppColors.error
-                                        : AppColors.success,
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: AppSpacing.sm),
-                                  ),
+                                Expanded(
                                   child: Text(
-                                    cat.isActive
-                                        ? AppStrings.actionDeactivate
-                                        : AppStrings.actionActivate,
-                                    style: AppTextStyles.labelMedium.copyWith(
-                                      color: cat.isActive
-                                          ? AppColors.error
-                                          : AppColors.success,
+                                    cat.name,
+                                    style: AppTextStyles.titleMedium.copyWith(
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ),
                               ],
+                            ),
+                          ),
+                          Padding(
+                            padding: SettingsTableHelper.cellPadding,
+                            child: Align(
+                              alignment: AlignmentDirectional.centerStart,
+                              child: ActiveStatusBadge(isActive: cat.isActive),
+                            ),
+                          ),
+                          Padding(
+                            padding: SettingsTableHelper.cellPadding,
+                            child: SettingsRowActions(
+                              onEdit: () => _handleEdit(context, cat),
+                              onToggleStatus: () => _handleToggleStatus(context, cat),
+                              isActive: cat.isActive,
                             ),
                           ),
                         ],

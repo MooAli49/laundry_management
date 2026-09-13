@@ -15,6 +15,7 @@ import '../cubit/carpet_sizes_management_state.dart';
 import 'active_status_badge.dart';
 import 'carpet_size_form_dialog.dart';
 import 'deactivation_confirm_dialog.dart';
+import 'settings_table_components.dart';
 
 class CarpetSizesSection extends StatelessWidget {
   const CarpetSizesSection({super.key});
@@ -68,29 +69,14 @@ class CarpetSizesSection extends StatelessWidget {
         }
 
         return AppCard(
-          padding: const EdgeInsets.all(AppSpacing.xl),
+          padding: const EdgeInsets.all(AppSpacing.xxl),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(AppStrings.tabCarpetSizes, style: AppTextStyles.titleLarge),
-                        AppSpacing.gapXs,
-                        Text(
-                          'إدارة مقاسات السجاد القياسية وحساب المساحات بالمتر المربع',
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  AppSpacing.gapHorizontalMd,
+              SettingsSectionHeader(
+                title: AppStrings.tabCarpetSizes,
+                subtitle: 'إدارة مقاسات السجاد القياسية وحساب المساحات بالمتر المربع',
+                actions: [
                   AppButton(
                     label: AppStrings.addCarpetSize,
                     icon: Icons.add,
@@ -107,93 +93,55 @@ class CarpetSizesSection extends StatelessWidget {
               else
                 Table(
                   columnWidths: const {
-                    0: FlexColumnWidth(3),
-                    1: FlexColumnWidth(3),
+                    0: FlexColumnWidth(4),
+                    1: FlexColumnWidth(2.5),
                     2: FlexColumnWidth(2),
-                    3: FlexColumnWidth(3),
+                    3: FlexColumnWidth(2.8),
                   },
                   defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                   children: [
-                    TableRow(
-                      decoration: const BoxDecoration(
-                        color: AppColors.secondary,
-                        borderRadius: BorderRadius.all(Radius.circular(AppSpacing.radiusSm)),
-                      ),
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(AppStrings.tableHeaderDimensions, style: AppTextStyles.labelLarge),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(AppStrings.tableHeaderArea, style: AppTextStyles.labelLarge),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(AppStrings.tableHeaderStatus, style: AppTextStyles.labelLarge),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(AppStrings.tableHeaderActions, style: AppTextStyles.labelLarge),
-                        ),
-                      ],
-                    ),
+                    SettingsTableHelper.buildHeaderRow([
+                      AppStrings.tableHeaderDimensions,
+                      AppStrings.tableHeaderArea,
+                      AppStrings.tableHeaderStatus,
+                      AppStrings.tableHeaderActions,
+                    ]),
                     ...state.carpetSizes.map((cs) {
                       return TableRow(
-                        decoration: const BoxDecoration(
-                          border: Border(bottom: BorderSide(color: AppColors.divider)),
-                        ),
+                        decoration: SettingsTableHelper.rowDecoration,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
+                            padding: SettingsTableHelper.cellPadding,
                             child: Text(
                               '${_formatNum(cs.length)} م × ${_formatNum(cs.width)} م',
-                              style: AppTextStyles.titleMedium,
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            child: Text(
-                              '${_formatNum(cs.area)} م²',
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
+                              style: AppTextStyles.titleMedium.copyWith(
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
+                            padding: SettingsTableHelper.cellPadding,
+                            child: Text(
+                              '${_formatNum(cs.area)} م²',
+                              style: AppTextStyles.titleMedium.copyWith(
+                                color: AppColors.primaryDark,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: SettingsTableHelper.cellPadding,
                             child: Align(
-                              alignment: Alignment.centerRight,
+                              alignment: AlignmentDirectional.centerStart,
                               child: ActiveStatusBadge(isActive: cs.isActive),
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined, size: 20),
-                                  color: AppColors.primary,
-                                  tooltip: AppStrings.edit,
-                                  onPressed: () => _handleEdit(context, cs),
-                                ),
-                                AppSpacing.gapHorizontalSm,
-                                TextButton(
-                                  onPressed: () => _handleToggleStatus(context, cs),
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: cs.isActive ? AppColors.error : AppColors.success,
-                                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                                  ),
-                                  child: Text(
-                                    cs.isActive ? AppStrings.actionDeactivate : AppStrings.actionActivate,
-                                    style: AppTextStyles.labelMedium.copyWith(
-                                      color: cs.isActive ? AppColors.error : AppColors.success,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            padding: SettingsTableHelper.cellPadding,
+                            child: SettingsRowActions(
+                              onEdit: () => _handleEdit(context, cs),
+                              onToggleStatus: () => _handleToggleStatus(context, cs),
+                              isActive: cs.isActive,
                             ),
                           ),
                         ],

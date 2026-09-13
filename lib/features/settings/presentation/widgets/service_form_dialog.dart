@@ -78,7 +78,11 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
         ? svc.pricingType
         : PricingType.perPiece;
 
-    final initialPriceText = svc != null ? (svc.price.toEgp == svc.price.toEgp.roundToDouble() ? svc.price.toEgp.toInt().toString() : svc.price.toEgp.toStringAsFixed(2)) : '';
+    final initialPriceText = svc != null
+        ? (svc.price.toEgp == svc.price.toEgp.roundToDouble()
+            ? svc.price.toEgp.toInt().toString()
+            : svc.price.toEgp.toStringAsFixed(2))
+        : '';
     _priceController = TextEditingController(text: initialPriceText);
     _originalPrice = svc?.price;
 
@@ -143,18 +147,15 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
       return;
     }
 
-    if (_selectedTypeIds.isEmpty) {
-      setState(() => _inlineError = AppStrings.selectAtLeastOneItemType);
-      return;
-    }
-
     final cubit = context.read<ServicesManagementCubit>();
     bool success;
 
     if (widget.service == null) {
       success = await cubit.createService(
         name: _nameController.text.trim(),
-        description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
+        description: _descriptionController.text.trim().isEmpty
+            ? null
+            : _descriptionController.text.trim(),
         pricingType: _selectedPricingType,
         price: money,
         supportedItemTypeIds: _selectedTypeIds.toList(),
@@ -162,7 +163,9 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
     } else {
       final updated = widget.service!.copyWith(
         name: _nameController.text.trim(),
-        description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
+        description: _descriptionController.text.trim().isEmpty
+            ? null
+            : _descriptionController.text.trim(),
         pricingType: _selectedPricingType,
         price: money,
       );
@@ -187,12 +190,12 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
 
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
       backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
+        constraints: const BoxConstraints(maxWidth: 540, maxHeight: 720),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.xl),
           child: Form(
@@ -207,17 +210,20 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                   children: [
                     Text(
                       isEditing ? AppStrings.editService : AppStrings.addService,
-                      style: AppTextStyles.titleLarge,
+                      style: AppTextStyles.titleLarge.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(Icons.close, size: 20),
                       onPressed: () => Navigator.of(context).pop(false),
                     ),
                   ],
                 ),
-                const Divider(color: AppColors.divider),
+                const Divider(height: AppSpacing.lg, color: AppColors.divider),
                 Expanded(
                   child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -227,16 +233,25 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                             decoration: BoxDecoration(
                               color: AppColors.errorLight,
                               borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                              border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                              border: Border.all(
+                                color: AppColors.error.withValues(alpha: 0.3),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+                                const Icon(
+                                  Icons.error_outline,
+                                  color: AppColors.error,
+                                  size: 20,
+                                ),
                                 AppSpacing.gapHorizontalSm,
                                 Expanded(
                                   child: Text(
                                     _inlineError!,
-                                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: AppColors.error,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -263,7 +278,12 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                         ),
                         AppSpacing.gapLg,
                         // Pricing Type selector (V1 only)
-                        Text(AppStrings.pricingTypeLabel, style: AppTextStyles.labelLarge),
+                        Text(
+                          AppStrings.pricingTypeLabel,
+                          style: AppTextStyles.labelLarge.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                         AppSpacing.gapSm,
                         Wrap(
                           spacing: AppSpacing.sm,
@@ -278,16 +298,22 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                                   setState(() => _selectedPricingType = type);
                                 }
                               },
-                              selectedColor: AppColors.primaryLight.withValues(alpha: 0.2),
-                              backgroundColor: AppColors.secondary,
+                              selectedColor: AppColors.primaryLighter,
+                              backgroundColor: AppColors.surface,
                               labelStyle: AppTextStyles.labelMedium.copyWith(
-                                color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected
+                                    ? AppColors.primaryDark
+                                    : AppColors.textPrimary,
+                                fontWeight:
+                                    isSelected ? FontWeight.bold : FontWeight.normal,
                               ),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                                borderRadius:
+                                    BorderRadius.circular(AppSpacing.radiusMd),
                                 side: BorderSide(
-                                  color: isSelected ? AppColors.primary : AppColors.border,
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : AppColors.border,
                                 ),
                               ),
                             );
@@ -299,7 +325,8 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                           controller: _priceController,
                           label: '${_getPriceLabel()} (ج.م) *',
                           hintText: '0.00',
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType:
+                              const TextInputType.numberWithOptions(decimal: true),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
                               return AppStrings.servicePriceRequired;
@@ -318,12 +345,19 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                             padding: const EdgeInsets.all(AppSpacing.md),
                             decoration: BoxDecoration(
                               color: AppColors.warningLight,
-                              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                              border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+                              borderRadius:
+                                  BorderRadius.circular(AppSpacing.radiusMd),
+                              border: Border.all(
+                                color: AppColors.warning.withValues(alpha: 0.4),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.info_outline, color: AppColors.warning, size: 20),
+                                const Icon(
+                                  Icons.info_outline,
+                                  color: AppColors.warning,
+                                  size: 20,
+                                ),
                                 AppSpacing.gapHorizontalSm,
                                 Expanded(
                                   child: Text(
@@ -340,12 +374,19 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                         ],
                         AppSpacing.gapLg,
                         // Supported Item Types
-                        Text(AppStrings.supportedItemTypesLabel, style: AppTextStyles.labelLarge),
+                        Text(
+                          AppStrings.supportedItemTypesLabel,
+                          style: AppTextStyles.labelLarge.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                         AppSpacing.gapSm,
                         if (widget.availableItemTypes.isEmpty)
                           Text(
                             AppStrings.noItemTypes,
-                            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
                           )
                         else
                           Wrap(
@@ -365,16 +406,23 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                                     }
                                   });
                                 },
-                                selectedColor: AppColors.primaryLight.withValues(alpha: 0.2),
-                                backgroundColor: AppColors.secondary,
+                                selectedColor: AppColors.primaryLighter,
+                                backgroundColor: AppColors.surface,
                                 labelStyle: AppTextStyles.labelMedium.copyWith(
-                                  color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  color: isSelected
+                                      ? AppColors.primaryDark
+                                      : AppColors.textPrimary,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
                                 ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                                  borderRadius:
+                                      BorderRadius.circular(AppSpacing.radiusMd),
                                   side: BorderSide(
-                                    color: isSelected ? AppColors.primary : AppColors.border,
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : AppColors.border,
                                   ),
                                 ),
                               );
@@ -385,7 +433,7 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                     ),
                   ),
                 ),
-                const Divider(color: AppColors.divider),
+                const Divider(height: AppSpacing.lg, color: AppColors.divider),
                 AppSpacing.gapSm,
                 // Actions
                 Row(

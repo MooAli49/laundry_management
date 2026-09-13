@@ -16,6 +16,7 @@ import '../cubit/services_management_state.dart';
 import 'active_status_badge.dart';
 import 'deactivation_confirm_dialog.dart';
 import 'service_form_dialog.dart';
+import 'settings_table_components.dart';
 
 class ServicesSection extends StatelessWidget {
   const ServicesSection({super.key});
@@ -88,30 +89,14 @@ class ServicesSection extends StatelessWidget {
         }
 
         return AppCard(
-          padding: const EdgeInsets.all(AppSpacing.xl),
+          padding: const EdgeInsets.all(AppSpacing.xxl),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(AppStrings.tabServices, style: AppTextStyles.titleLarge),
-                        AppSpacing.gapXs,
-                        Text(
-                          'إدارة الخدمات المتاحة والأسعار المرتبطة بها',
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  AppSpacing.gapHorizontalMd,
+              SettingsSectionHeader(
+                title: AppStrings.tabServices,
+                subtitle: 'إدارة الخدمات المتاحة والأسعار المرتبطة بها في نظام المغسلة',
+                actions: [
                   AppButton(
                     label: AppStrings.addService,
                     icon: Icons.add,
@@ -128,55 +113,39 @@ class ServicesSection extends StatelessWidget {
               else
                 Table(
                   columnWidths: const {
-                    0: FlexColumnWidth(3),
+                    0: FlexColumnWidth(3.5),
                     1: FlexColumnWidth(2),
                     2: FlexColumnWidth(2),
-                    3: FlexColumnWidth(2),
-                    4: FlexColumnWidth(3),
+                    3: FlexColumnWidth(1.8),
+                    4: FlexColumnWidth(2.7),
                   },
                   defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                   children: [
-                    TableRow(
-                      decoration: const BoxDecoration(
-                        color: AppColors.secondary,
-                        borderRadius: BorderRadius.all(Radius.circular(AppSpacing.radiusSm)),
-                      ),
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(AppStrings.tableHeaderName, style: AppTextStyles.labelLarge),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(AppStrings.tableHeaderPricingType, style: AppTextStyles.labelLarge),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(AppStrings.tableHeaderPrice, style: AppTextStyles.labelLarge),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(AppStrings.tableHeaderStatus, style: AppTextStyles.labelLarge),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(AppStrings.tableHeaderActions, style: AppTextStyles.labelLarge),
-                        ),
-                      ],
-                    ),
+                    SettingsTableHelper.buildHeaderRow([
+                      AppStrings.tableHeaderName,
+                      AppStrings.tableHeaderPricingType,
+                      AppStrings.tableHeaderPrice,
+                      AppStrings.tableHeaderStatus,
+                      AppStrings.tableHeaderActions,
+                    ]),
                     ...state.services.map((svc) {
                       return TableRow(
-                        decoration: const BoxDecoration(
-                          border: Border(bottom: BorderSide(color: AppColors.divider)),
-                        ),
+                        decoration: SettingsTableHelper.rowDecoration,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
+                            padding: SettingsTableHelper.cellPadding,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(svc.name, style: AppTextStyles.titleMedium),
-                                if (svc.description != null && svc.description!.isNotEmpty) ...[
+                                Text(
+                                  svc.name,
+                                  style: AppTextStyles.titleMedium.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                if (svc.description != null &&
+                                    svc.description!.isNotEmpty) ...[
                                   AppSpacing.gapXs,
                                   Text(
                                     svc.description!,
@@ -189,55 +158,53 @@ class ServicesSection extends StatelessWidget {
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            child: Text(
-                              _getPricingTypeLabel(svc.pricingType),
-                              style: AppTextStyles.bodyMedium,
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            child: Text(
-                              '${svc.price.toEgp.toStringAsFixed(2)} ج.م',
-                              style: AppTextStyles.titleSmall.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.bold,
+                            padding: SettingsTableHelper.cellPadding,
+                            child: Align(
+                              alignment: AlignmentDirectional.centerStart,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.sm,
+                                  vertical: AppSpacing.xs,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.secondary,
+                                  borderRadius: BorderRadius.circular(
+                                    AppSpacing.radiusSm,
+                                  ),
+                                ),
+                                child: Text(
+                                  _getPricingTypeLabel(svc.pricingType),
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
+                            padding: SettingsTableHelper.cellPadding,
+                            child: Text(
+                              '${svc.price.toEgp.toStringAsFixed(2)} ج.م',
+                              style: AppTextStyles.titleMedium.copyWith(
+                                color: AppColors.primaryDark,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: SettingsTableHelper.cellPadding,
                             child: Align(
-                              alignment: Alignment.centerRight,
+                              alignment: AlignmentDirectional.centerStart,
                               child: ActiveStatusBadge(isActive: svc.isActive),
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined, size: 20),
-                                  color: AppColors.primary,
-                                  tooltip: AppStrings.edit,
-                                  onPressed: () => _handleEdit(context, svc),
-                                ),
-                                AppSpacing.gapHorizontalSm,
-                                TextButton(
-                                  onPressed: () => _handleToggleStatus(context, svc),
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: svc.isActive ? AppColors.error : AppColors.success,
-                                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                                  ),
-                                  child: Text(
-                                    svc.isActive ? AppStrings.actionDeactivate : AppStrings.actionActivate,
-                                    style: AppTextStyles.labelMedium.copyWith(
-                                      color: svc.isActive ? AppColors.error : AppColors.success,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            padding: SettingsTableHelper.cellPadding,
+                            child: SettingsRowActions(
+                              onEdit: () => _handleEdit(context, svc),
+                              onToggleStatus: () => _handleToggleStatus(context, svc),
+                              isActive: svc.isActive,
                             ),
                           ),
                         ],

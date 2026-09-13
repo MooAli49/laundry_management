@@ -15,6 +15,7 @@ import '../cubit/item_types_management_state.dart';
 import 'active_status_badge.dart';
 import 'deactivation_confirm_dialog.dart';
 import 'item_definition_form_dialog.dart';
+import 'settings_table_components.dart';
 
 class ItemDefinitionsSection extends StatelessWidget {
   const ItemDefinitionsSection({super.key});
@@ -84,86 +85,85 @@ class ItemDefinitionsSection extends StatelessWidget {
         }
 
         final filteredDefs = state.filteredDefinitions;
-
-        // Find type name map for fast display
         final typeNameMap = {for (var t in state.itemTypes) t.id: t.name};
 
         return AppCard(
-          padding: const EdgeInsets.all(AppSpacing.xl),
+          padding: const EdgeInsets.all(AppSpacing.xxl),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header with filter and Add button
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              SettingsSectionHeader(
+                title: AppStrings.tabItemDefinitions,
+                subtitle: 'إدارة القطع والتعريفات التابعة لكل نوع (مثل قميص، بنطلون، بطانية)',
+                actions: [
+                  // Filter dropdown
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: 2.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      border: Border.all(color: AppColors.border),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(AppStrings.tabItemDefinitions, style: AppTextStyles.titleLarge),
-                        AppSpacing.gapXs,
-                        Text(
-                          'إدارة القطع والتعريفات التابعة لكل نوع (مثل قميص، بنطلون، بطانية)',
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textSecondary,
+                        const Icon(
+                          Icons.filter_list_outlined,
+                          size: 18,
+                          color: AppColors.textSecondary,
+                        ),
+                        AppSpacing.gapHorizontalSm,
+                        DropdownButtonHideUnderline(
+                          child: DropdownButton<String?>(
+                            value: state.selectedFilterItemTypeId,
+                            hint: Text(
+                              AppStrings.allItemDefinitions,
+                              style: AppTextStyles.bodyMedium,
+                            ),
+                            items: [
+                              DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text(
+                                  AppStrings.allItemDefinitions,
+                                  style: AppTextStyles.bodyMedium.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              ...state.itemTypes.map((type) {
+                                return DropdownMenuItem<String?>(
+                                  value: type.id,
+                                  child: Text(
+                                    type.name,
+                                    style: AppTextStyles.bodyMedium,
+                                  ),
+                                );
+                              }),
+                            ],
+                            onChanged: (val) {
+                              context
+                                  .read<ItemTypesManagementCubit>()
+                                  .selectFilterItemType(val);
+                            },
                           ),
                         ),
                       ],
                     ),
                   ),
-                  AppSpacing.gapHorizontalMd,
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Filter dropdown
-                      Text(
-                        AppStrings.filterDefinitionsByItemType,
-                        style: AppTextStyles.labelLarge,
-                      ),
-                      AppSpacing.gapHorizontalSm,
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.border),
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String?>(
-                            value: state.selectedFilterItemTypeId,
-                            hint: Text(AppStrings.allItemDefinitions, style: AppTextStyles.bodyMedium),
-                            items: [
-                              DropdownMenuItem<String?>(
-                                value: null,
-                                child: Text(AppStrings.allItemDefinitions, style: AppTextStyles.bodyMedium),
-                              ),
-                              ...state.itemTypes.map((type) {
-                                return DropdownMenuItem<String?>(
-                                  value: type.id,
-                                  child: Text(type.name, style: AppTextStyles.bodyMedium),
-                                );
-                              }),
-                            ],
-                            onChanged: (val) {
-                              context.read<ItemTypesManagementCubit>().selectFilterItemType(val);
-                            },
-                          ),
-                        ),
-                      ),
-                      AppSpacing.gapHorizontalLg,
-                      AppButton(
-                        label: AppStrings.addItemDefinition,
-                        icon: Icons.add,
-                        onPressed: () => _handleAdd(context, state),
-                      ),
-                    ],
+                  AppButton(
+                    label: AppStrings.addItemDefinition,
+                    icon: Icons.add,
+                    onPressed: () => _handleAdd(context, state),
                   ),
                 ],
               ),
               const Divider(height: AppSpacing.xxl, color: AppColors.divider),
               if (filteredDefs.isEmpty)
                 EmptyState(
-                  icon: Icons.style_outlined,
+                  icon: Icons.list_alt_outlined,
                   message: AppStrings.noItemDefinitions,
                 )
               else
@@ -172,83 +172,68 @@ class ItemDefinitionsSection extends StatelessWidget {
                     0: FlexColumnWidth(4),
                     1: FlexColumnWidth(3),
                     2: FlexColumnWidth(2),
-                    3: FlexColumnWidth(3),
+                    3: FlexColumnWidth(2.8),
                   },
                   defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                   children: [
-                    TableRow(
-                      decoration: const BoxDecoration(
-                        color: AppColors.secondary,
-                        borderRadius: BorderRadius.all(Radius.circular(AppSpacing.radiusSm)),
-                      ),
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(AppStrings.tableHeaderName, style: AppTextStyles.labelLarge),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(AppStrings.tableHeaderItemType, style: AppTextStyles.labelLarge),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(AppStrings.tableHeaderStatus, style: AppTextStyles.labelLarge),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Text(AppStrings.tableHeaderActions, style: AppTextStyles.labelLarge),
-                        ),
-                      ],
-                    ),
+                    SettingsTableHelper.buildHeaderRow([
+                      AppStrings.tableHeaderName,
+                      AppStrings.tableHeaderItemType,
+                      AppStrings.tableHeaderStatus,
+                      AppStrings.tableHeaderActions,
+                    ]),
                     ...filteredDefs.map((def) {
-                      final typeName = typeNameMap[def.itemTypeId] ?? '';
-
+                      final typeName = typeNameMap[def.itemTypeId] ?? '-';
                       return TableRow(
-                        decoration: const BoxDecoration(
-                          border: Border(bottom: BorderSide(color: AppColors.divider)),
-                        ),
+                        decoration: SettingsTableHelper.rowDecoration,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            child: Text(def.name, style: AppTextStyles.titleMedium),
+                            padding: SettingsTableHelper.cellPadding,
+                            child: Text(
+                              def.name,
+                              style: AppTextStyles.titleMedium.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            child: Text(typeName, style: AppTextStyles.bodyMedium),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
+                            padding: SettingsTableHelper.cellPadding,
                             child: Align(
-                              alignment: Alignment.centerRight,
+                              alignment: AlignmentDirectional.centerStart,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.sm,
+                                  vertical: AppSpacing.xs,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.secondary,
+                                  borderRadius: BorderRadius.circular(
+                                    AppSpacing.radiusSm,
+                                  ),
+                                ),
+                                child: Text(
+                                  typeName,
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: SettingsTableHelper.cellPadding,
+                            child: Align(
+                              alignment: AlignmentDirectional.centerStart,
                               child: ActiveStatusBadge(isActive: def.isActive),
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined, size: 20),
-                                  color: AppColors.primary,
-                                  tooltip: AppStrings.edit,
-                                  onPressed: () => _handleEdit(context, def, state),
-                                ),
-                                AppSpacing.gapHorizontalSm,
-                                TextButton(
-                                  onPressed: () => _handleToggleStatus(context, def),
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: def.isActive ? AppColors.error : AppColors.success,
-                                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                                  ),
-                                  child: Text(
-                                    def.isActive ? AppStrings.actionDeactivate : AppStrings.actionActivate,
-                                    style: AppTextStyles.labelMedium.copyWith(
-                                      color: def.isActive ? AppColors.error : AppColors.success,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            padding: SettingsTableHelper.cellPadding,
+                            child: SettingsRowActions(
+                              onEdit: () => _handleEdit(context, def, state),
+                              onToggleStatus: () => _handleToggleStatus(context, def),
+                              isActive: def.isActive,
                             ),
                           ),
                         ],

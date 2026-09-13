@@ -11,6 +11,7 @@ import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
+import 'settings_table_components.dart';
 
 class BusinessInfoSection extends StatefulWidget {
   const BusinessInfoSection({super.key});
@@ -105,47 +106,30 @@ class _BusinessInfoSectionState extends State<BusinessInfoSection> {
         }
 
         return AppCard(
-          padding: const EdgeInsets.all(AppSpacing.xl),
+          padding: const EdgeInsets.all(AppSpacing.xxl),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          AppStrings.tabBusinessInfo,
-                          style: AppTextStyles.titleLarge,
-                        ),
-                        AppSpacing.gapXs,
-                        Text(
-                          AppStrings.settingsSubtitle,
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
+                SettingsSectionHeader(
+                  title: AppStrings.tabBusinessInfo,
+                  subtitle: AppStrings.settingsSubtitle,
+                  actions: [
+                    AppButton(
+                      label: AppStrings.save,
+                      icon: Icons.save_outlined,
+                      isLoading: state.isSaving,
+                      onPressed: state.isSaving ? null : _handleSave,
                     ),
-                  ),
-                  AppSpacing.gapHorizontalMd,
-                  AppButton(
-                    label: AppStrings.save,
-                    icon: Icons.save_outlined,
-                    isLoading: state.isSaving,
-                    onPressed: state.isSaving ? null : _handleSave,
-                  ),
                   ],
                 ),
                 const Divider(height: AppSpacing.xxl, color: AppColors.divider),
                 AppSpacing.gapMd,
                 ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 800),
+                  constraints: const BoxConstraints(maxWidth: 880),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -155,6 +139,11 @@ class _BusinessInfoSectionState extends State<BusinessInfoSection> {
                               controller: _nameController,
                               label: AppStrings.businessNameLabel,
                               hintText: AppStrings.businessNameHint,
+                              prefixIcon: const Icon(
+                                Icons.store_outlined,
+                                size: 20,
+                                color: AppColors.textSecondary,
+                              ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
                                   return AppStrings.businessNameRequired;
@@ -170,6 +159,11 @@ class _BusinessInfoSectionState extends State<BusinessInfoSection> {
                               label: AppStrings.businessPhoneLabel,
                               hintText: AppStrings.businessPhoneHint,
                               keyboardType: TextInputType.phone,
+                              prefixIcon: const Icon(
+                                Icons.phone_outlined,
+                                size: 20,
+                                color: AppColors.textSecondary,
+                              ),
                             ),
                           ),
                         ],
@@ -179,6 +173,11 @@ class _BusinessInfoSectionState extends State<BusinessInfoSection> {
                         controller: _addressController,
                         label: AppStrings.businessAddressLabel,
                         hintText: AppStrings.businessAddressHint,
+                        prefixIcon: const Icon(
+                          Icons.location_on_outlined,
+                          size: 20,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                       AppSpacing.gapLg,
                       AppTextField(
@@ -186,6 +185,47 @@ class _BusinessInfoSectionState extends State<BusinessInfoSection> {
                         label: AppStrings.invoiceFooterLabel,
                         hintText: AppStrings.invoiceFooterHint,
                         maxLines: 3,
+                      ),
+                      AppSpacing.gapXxl,
+                      // Notice info callout
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: BoxDecoration(
+                          color: AppColors.infoLight,
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                          border: Border.all(
+                            color: AppColors.info.withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.info_outline,
+                              color: AppColors.info,
+                              size: 20,
+                            ),
+                            AppSpacing.gapHorizontalSm,
+                            Expanded(
+                              child: Text(
+                                'تنبيه: التعديلات على بيانات النشاط ستظهر تلقائياً في ترويسة وتذييل فواتير الاستلام للطلبات الجديدة.',
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.infoDark,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      AppSpacing.gapXxl,
+                      Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: AppButton(
+                          label: AppStrings.save,
+                          icon: Icons.save_outlined,
+                          isLoading: state.isSaving,
+                          onPressed: state.isSaving ? null : _handleSave,
+                        ),
                       ),
                     ],
                   ),

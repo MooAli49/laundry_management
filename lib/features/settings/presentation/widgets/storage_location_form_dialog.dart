@@ -108,7 +108,7 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
 
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
       backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
@@ -129,17 +129,20 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
                       isEditing
                           ? AppStrings.editStorageLocation
                           : AppStrings.addStorageLocation,
-                      style: AppTextStyles.titleLarge,
+                      style: AppTextStyles.titleLarge.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(Icons.close, size: 20),
                       onPressed: () => Navigator.of(context).pop(false),
                     ),
                   ],
                 ),
-                const Divider(color: AppColors.divider),
+                const Divider(height: AppSpacing.lg, color: AppColors.divider),
                 Expanded(
                   child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -151,18 +154,24 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
                               borderRadius:
                                   BorderRadius.circular(AppSpacing.radiusMd),
                               border: Border.all(
-                                  color: AppColors.error.withValues(alpha: 0.3)),
+                                color: AppColors.error.withValues(alpha: 0.3),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.error_outline,
-                                    color: AppColors.error, size: 20),
+                                const Icon(
+                                  Icons.error_outline,
+                                  color: AppColors.error,
+                                  size: 20,
+                                ),
                                 AppSpacing.gapHorizontalSm,
                                 Expanded(
                                   child: Text(
                                     _inlineError!,
-                                    style: AppTextStyles.bodySmall
-                                        .copyWith(color: AppColors.error),
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: AppColors.error,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -174,6 +183,11 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
                           controller: _nameController,
                           label: AppStrings.storageLocationNameLabel,
                           hintText: AppStrings.storageLocationNameHint,
+                          prefixIcon: const Icon(
+                            Icons.inventory_2_outlined,
+                            size: 20,
+                            color: AppColors.textSecondary,
+                          ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
                               return AppStrings.storageLocationNameRequired;
@@ -184,14 +198,17 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
                         AppSpacing.gapLg,
                         Text(
                           AppStrings.supportedItemTypesLabel,
-                          style: AppTextStyles.labelLarge,
+                          style: AppTextStyles.labelLarge.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                         AppSpacing.gapSm,
                         if (widget.availableItemTypes.isEmpty)
                           Text(
                             AppStrings.noItemTypes,
-                            style: AppTextStyles.bodySmall
-                                .copyWith(color: AppColors.textSecondary),
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
                           )
                         else
                           Wrap(
@@ -212,12 +229,11 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
                                     }
                                   });
                                 },
-                                selectedColor: AppColors.primaryLight
-                                    .withValues(alpha: 0.2),
-                                backgroundColor: AppColors.secondary,
+                                selectedColor: AppColors.primaryLighter,
+                                backgroundColor: AppColors.surface,
                                 labelStyle: AppTextStyles.labelMedium.copyWith(
                                   color: isSelected
-                                      ? AppColors.primary
+                                      ? AppColors.primaryDark
                                       : AppColors.textPrimary,
                                   fontWeight: isSelected
                                       ? FontWeight.bold
@@ -240,7 +256,7 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
                     ),
                   ),
                 ),
-                const Divider(color: AppColors.divider),
+                const Divider(height: AppSpacing.lg, color: AppColors.divider),
                 AppSpacing.gapSm,
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,

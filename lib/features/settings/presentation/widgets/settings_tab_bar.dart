@@ -77,6 +77,13 @@ class SettingsTabBar extends StatelessWidget {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         border: Border.all(color: AppColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0817212E),
+            blurRadius: 4,
+            offset: Offset(0, 1),
+          ),
+        ],
       ),
       padding: const EdgeInsets.all(AppSpacing.xs),
       child: SingleChildScrollView(
@@ -91,16 +98,25 @@ class SettingsTabBar extends StatelessWidget {
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 2.0),
               child: Material(
-                color: isSelected ? AppColors.primaryLighter : Colors.transparent,
-                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                color: Colors.transparent,
                 child: InkWell(
                   onTap: () => onTabSelected(index),
                   borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                   hoverColor: isSelected ? null : AppColors.secondary,
-                  child: Container(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
+                      horizontal: AppSpacing.md + 2,
                       vertical: AppSpacing.sm + 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.primaryLighter : Colors.transparent,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      border: Border.all(
+                        color: isSelected
+                            ? AppColors.primary.withValues(alpha: 0.25)
+                            : Colors.transparent,
+                      ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,

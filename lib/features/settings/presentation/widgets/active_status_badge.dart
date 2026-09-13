@@ -4,6 +4,10 @@ import '../../../../core/localization/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 
+/// Pill badge representing Active (فعّال) or Inactive (معطّل) state.
+///
+/// Features a colored status indicator dot, smooth rounded pill shape,
+/// and accessible contrasting colors adhering to the Figma design system.
 class ActiveStatusBadge extends StatelessWidget {
   final bool isActive;
 
@@ -12,17 +16,22 @@ class ActiveStatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = isActive ? AppColors.successLight : AppColors.secondary;
-    final fg = isActive ? AppColors.success : AppColors.textSecondary;
+    final fg = isActive ? AppColors.successDark : AppColors.textSecondary;
+    final dotColor = isActive ? AppColors.success : AppColors.textDisabled;
+    final borderColor = isActive
+        ? AppColors.success.withValues(alpha: 0.25)
+        : AppColors.border;
     final label = isActive ? AppStrings.statusActive : AppStrings.statusInactive;
 
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: 10.0,
-        vertical: 3.0,
+        vertical: 4.0,
       ),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: borderColor, width: 1.0),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -32,7 +41,7 @@ class ActiveStatusBadge extends StatelessWidget {
             width: 6.0,
             height: 6.0,
             decoration: BoxDecoration(
-              color: fg.withValues(alpha: 0.8),
+              color: dotColor,
               shape: BoxShape.circle,
             ),
           ),
@@ -41,7 +50,8 @@ class ActiveStatusBadge extends StatelessWidget {
             label,
             style: AppTextStyles.labelSmall.copyWith(
               color: fg,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
+              fontSize: 11.5,
             ),
           ),
         ],

@@ -11,6 +11,7 @@ import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
+import 'settings_table_components.dart';
 
 class InvoiceSettingsSection extends StatefulWidget {
   const InvoiceSettingsSection({super.key});
@@ -94,26 +95,27 @@ class _InvoiceSettingsSectionState extends State<InvoiceSettingsSection> {
             : (settings?.invoiceFooterText ?? 'شكراً لتعاملكم معنا، نسعد بخدمتكم دائماً');
 
         return AppCard(
-          padding: const EdgeInsets.all(AppSpacing.xl),
+          padding: const EdgeInsets.all(AppSpacing.xxl),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                AppStrings.invoicePreviewTitle,
-                style: AppTextStyles.titleLarge,
-              ),
-              AppSpacing.gapXs,
-              Text(
-                AppStrings.invoicePreviewDescription,
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+              SettingsSectionHeader(
+                title: AppStrings.invoicePreviewTitle,
+                subtitle: AppStrings.invoicePreviewDescription,
+                actions: [
+                  AppButton(
+                    label: AppStrings.save,
+                    icon: Icons.save_outlined,
+                    isLoading: state.isSaving,
+                    onPressed: state.isSaving ? null : _handleSaveFooter,
+                  ),
+                ],
               ),
               const Divider(height: AppSpacing.xxl, color: AppColors.divider),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Left side (in RTL, Right side): Footer editing
+                  // Editor Column
                   Expanded(
                     flex: 5,
                     child: Column(
@@ -121,7 +123,16 @@ class _InvoiceSettingsSectionState extends State<InvoiceSettingsSection> {
                       children: [
                         Text(
                           AppStrings.invoiceFooterLabel,
-                          style: AppTextStyles.titleMedium,
+                          style: AppTextStyles.titleMedium.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        AppSpacing.gapXs,
+                        Text(
+                          'اكتب نص التذييل المطبوع أسفل كل فاتورة حرارية (مثل سياسة الاستلام أو رسالة شكر للعميل).',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                         AppSpacing.gapMd,
                         AppTextField(
@@ -131,6 +142,36 @@ class _InvoiceSettingsSectionState extends State<InvoiceSettingsSection> {
                           onChanged: (_) => setState(() {}),
                         ),
                         AppSpacing.gapLg,
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: AppColors.infoLight,
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            border: Border.all(
+                              color: AppColors.info.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.print_outlined,
+                                color: AppColors.info,
+                                size: 20,
+                              ),
+                              AppSpacing.gapHorizontalSm,
+                              Expanded(
+                                child: Text(
+                                  'المعاينة المجاورة تمثل الطباعة الحية على بكرة ورق طابعة الكاشير الحرارية مقاس 80 مم بدقة 203 DPI.',
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: AppColors.infoDark,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        AppSpacing.gapXxl,
                         AppButton(
                           label: AppStrings.save,
                           icon: Icons.save_outlined,
@@ -141,99 +182,146 @@ class _InvoiceSettingsSectionState extends State<InvoiceSettingsSection> {
                     ),
                   ),
                   AppSpacing.gapHorizontalXxl,
-                  // 80mm Live Thermal Receipt Preview Card
+                  // 80mm Live Thermal Receipt Preview Tray
                   Expanded(
                     flex: 4,
-                    child: Center(
-                      child: Container(
-                        width: 360,
-                        padding: const EdgeInsets.all(AppSpacing.lg),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                          border: Border.all(color: AppColors.borderStrong),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text(
-                              businessName,
-                              textAlign: TextAlign.center,
-                              style: AppTextStyles.titleLarge.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            if (phone.isNotEmpty) ...[
-                              AppSpacing.gapXs,
-                              Text(
-                                phone,
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
+                    child: Container(
+                      padding: const EdgeInsets.all(AppSpacing.xl),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondaryLight,
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Center(
+                        child: Container(
+                          width: 350,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.lg,
+                            vertical: AppSpacing.xl,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            border: Border.all(color: AppColors.borderStrong),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x14000000),
+                                blurRadius: 12,
+                                offset: Offset(0, 4),
                               ),
                             ],
-                            if (address.isNotEmpty) ...[
-                              AppSpacing.gapXs,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // Thermal paper cut indicator header
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.receipt_long_outlined,
+                                    size: 16,
+                                    color: AppColors.textTertiary,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'فاتورة استلام (80 مم)',
+                                    style: AppTextStyles.caption.copyWith(
+                                      color: AppColors.textTertiary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              AppSpacing.gapSm,
+                              _buildDashedDivider(),
+                              AppSpacing.gapMd,
                               Text(
-                                address,
+                                businessName,
                                 textAlign: TextAlign.center,
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.textSecondary,
+                                style: AppTextStyles.titleLarge.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              if (phone.isNotEmpty) ...[
+                                AppSpacing.gapXs,
+                                Text(
+                                  phone,
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                              if (address.isNotEmpty) ...[
+                                AppSpacing.gapXs,
+                                Text(
+                                  address,
+                                  textAlign: TextAlign.center,
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                              AppSpacing.gapMd,
+                              _buildDashedDivider(),
+                              AppSpacing.gapSm,
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'رقم الطلب: #1024',
+                                      style: AppTextStyles.labelMedium.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  Text('13/09/2026', style: AppTextStyles.bodySmall),
+                                ],
+                              ),
+                              AppSpacing.gapSm,
+                              _buildDashedDivider(),
+                              AppSpacing.gapMd,
+                              // Sample Items
+                              _buildReceiptLine(AppStrings.sampleInvoiceItem1, '120.00 ج.م'),
+                              AppSpacing.gapSm,
+                              _buildReceiptLine(AppStrings.sampleInvoiceItem2, '180.00 ج.م'),
+                              AppSpacing.gapMd,
+                              _buildDashedDivider(),
+                              AppSpacing.gapSm,
+                              _buildReceiptLine(AppStrings.sampleInvoiceSubtotal, '300.00 ج.م'),
+                              AppSpacing.gapSm,
+                              _buildReceiptLine(
+                                AppStrings.sampleInvoiceTotal,
+                                '300.00 ج.م',
+                                isBold: true,
+                              ),
+                              AppSpacing.gapSm,
+                              _buildReceiptLine(AppStrings.sampleInvoicePaid, '300.00 ج.م'),
+                              AppSpacing.gapSm,
+                              _buildReceiptLine(AppStrings.sampleInvoiceRemaining, '0.00 ج.م'),
+                              AppSpacing.gapLg,
+                              _buildDashedDivider(),
+                              AppSpacing.gapMd,
+                              // Live Footer text
+                              Container(
+                                padding: const EdgeInsets.all(AppSpacing.sm),
+                                decoration: BoxDecoration(
+                                  color: AppColors.secondary.withValues(alpha: 0.5),
+                                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                                ),
+                                child: Text(
+                                  liveFooter,
+                                  textAlign: TextAlign.center,
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: AppColors.textSecondary,
+                                    fontStyle: FontStyle.italic,
+                                  ),
                                 ),
                               ),
                             ],
-                            AppSpacing.gapMd,
-                            _buildDashedDivider(),
-                            AppSpacing.gapSm,
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text('رقم الطلب: #1024', style: AppTextStyles.labelMedium),
-                                Text('13/09/2026', style: AppTextStyles.bodySmall),
-                              ],
-                            ),
-                            AppSpacing.gapSm,
-                            _buildDashedDivider(),
-                            AppSpacing.gapMd,
-                            // Sample Items
-                            _buildReceiptLine(AppStrings.sampleInvoiceItem1, '120.00 ج.م'),
-                            AppSpacing.gapSm,
-                            _buildReceiptLine(AppStrings.sampleInvoiceItem2, '180.00 ج.م'),
-                            AppSpacing.gapMd,
-                            _buildDashedDivider(),
-                            AppSpacing.gapSm,
-                            _buildReceiptLine(AppStrings.sampleInvoiceSubtotal, '300.00 ج.م'),
-                            AppSpacing.gapSm,
-                            _buildReceiptLine(
-                              AppStrings.sampleInvoiceTotal,
-                              '300.00 ج.م',
-                              isBold: true,
-                            ),
-                            AppSpacing.gapSm,
-                            _buildReceiptLine(AppStrings.sampleInvoicePaid, '300.00 ج.م'),
-                            AppSpacing.gapSm,
-                            _buildReceiptLine(AppStrings.sampleInvoiceRemaining, '0.00 ج.م'),
-                            AppSpacing.gapLg,
-                            _buildDashedDivider(),
-                            AppSpacing.gapMd,
-                            // Footer text
-                            Text(
-                              liveFooter,
-                              textAlign: TextAlign.center,
-                              style: AppTextStyles.bodySmall.copyWith(
-                                color: AppColors.textSecondary,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
@@ -248,41 +336,60 @@ class _InvoiceSettingsSectionState extends State<InvoiceSettingsSection> {
   }
 
   Widget _buildDashedDivider() {
-    return Row(
-      children: List.generate(
-        24,
-        (index) => Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2.0),
-            child: Container(
-              height: 1,
-              color: AppColors.borderStrong,
-            ),
-          ),
-        ),
-      ),
+    return const SizedBox(
+      height: 1,
+      width: double.infinity,
+      child: CustomPaint(painter: _ReceiptDashedLinePainter()),
     );
   }
 
-  Widget _buildReceiptLine(String title, String value, {bool isBold = false}) {
+  Widget _buildReceiptLine(String label, String value, {bool isBold = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Expanded(
           child: Text(
-            title,
-            style: (isBold ? AppTextStyles.titleSmall : AppTextStyles.bodySmall).copyWith(
-              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-            ),
+            label,
+            style: isBold
+                ? AppTextStyles.titleSmall.copyWith(fontWeight: FontWeight.bold)
+                : AppTextStyles.bodySmall,
           ),
         ),
+        AppSpacing.gapHorizontalSm,
         Text(
           value,
-          style: (isBold ? AppTextStyles.titleSmall : AppTextStyles.bodySmall).copyWith(
-            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-          ),
+          style: isBold
+              ? AppTextStyles.titleSmall.copyWith(fontWeight: FontWeight.bold)
+              : AppTextStyles.bodySmall,
         ),
       ],
     );
   }
 }
+
+class _ReceiptDashedLinePainter extends CustomPainter {
+  const _ReceiptDashedLinePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const dashWidth = 4.0;
+    const dashSpace = 3.0;
+    final paint = Paint()
+      ..color = AppColors.borderStrong
+      ..strokeWidth = 1.0;
+
+    double startX = 0;
+    while (startX < size.width) {
+      canvas.drawLine(
+        Offset(startX, 0),
+        Offset(startX + dashWidth, 0),
+        paint,
+      );
+      startX += dashWidth + dashSpace;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+

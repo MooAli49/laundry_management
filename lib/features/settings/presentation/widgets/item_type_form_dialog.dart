@@ -76,7 +76,7 @@ class _ItemTypeFormDialogState extends State<ItemTypeFormDialog> {
 
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
       backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
@@ -95,15 +95,17 @@ class _ItemTypeFormDialogState extends State<ItemTypeFormDialog> {
                   children: [
                     Text(
                       isEditing ? AppStrings.editItemType : AppStrings.addItemType,
-                      style: AppTextStyles.titleLarge,
+                      style: AppTextStyles.titleLarge.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(Icons.close, size: 20),
                       onPressed: () => Navigator.of(context).pop(false),
                     ),
                   ],
                 ),
-                const Divider(color: AppColors.divider),
+                const Divider(height: AppSpacing.lg, color: AppColors.divider),
                 AppSpacing.gapMd,
                 if (_inlineError != null) ...[
                   Container(
@@ -111,16 +113,25 @@ class _ItemTypeFormDialogState extends State<ItemTypeFormDialog> {
                     decoration: BoxDecoration(
                       color: AppColors.errorLight,
                       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                      border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: AppColors.error.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+                        const Icon(
+                          Icons.error_outline,
+                          color: AppColors.error,
+                          size: 20,
+                        ),
                         AppSpacing.gapHorizontalSm,
                         Expanded(
                           child: Text(
                             _inlineError!,
-                            style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.error,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -132,6 +143,11 @@ class _ItemTypeFormDialogState extends State<ItemTypeFormDialog> {
                   controller: _nameController,
                   label: AppStrings.itemTypeNameLabel,
                   hintText: AppStrings.itemTypeNameHint,
+                  prefixIcon: const Icon(
+                    Icons.category_outlined,
+                    size: 20,
+                    color: AppColors.textSecondary,
+                  ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return AppStrings.itemTypeNameRequired;

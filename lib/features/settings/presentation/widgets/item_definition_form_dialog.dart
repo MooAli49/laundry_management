@@ -117,7 +117,7 @@ class _ItemDefinitionFormDialogState extends State<ItemDefinitionFormDialog> {
 
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
       backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
@@ -135,16 +135,20 @@ class _ItemDefinitionFormDialogState extends State<ItemDefinitionFormDialog> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      isEditing ? AppStrings.editItemDefinition : AppStrings.addItemDefinition,
-                      style: AppTextStyles.titleLarge,
+                      isEditing
+                          ? AppStrings.editItemDefinition
+                          : AppStrings.addItemDefinition,
+                      style: AppTextStyles.titleLarge.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(Icons.close, size: 20),
                       onPressed: () => Navigator.of(context).pop(false),
                     ),
                   ],
                 ),
-                const Divider(color: AppColors.divider),
+                const Divider(height: AppSpacing.lg, color: AppColors.divider),
                 AppSpacing.gapMd,
                 if (_inlineError != null) ...[
                   Container(
@@ -152,16 +156,25 @@ class _ItemDefinitionFormDialogState extends State<ItemDefinitionFormDialog> {
                     decoration: BoxDecoration(
                       color: AppColors.errorLight,
                       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                      border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: AppColors.error.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+                        const Icon(
+                          Icons.error_outline,
+                          color: AppColors.error,
+                          size: 20,
+                        ),
                         AppSpacing.gapHorizontalSm,
                         Expanded(
                           child: Text(
                             _inlineError!,
-                            style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.error,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -170,13 +183,24 @@ class _ItemDefinitionFormDialogState extends State<ItemDefinitionFormDialog> {
                   AppSpacing.gapMd,
                 ],
                 // Item Type Dropdown
-                Text(AppStrings.tableHeaderItemType, style: AppTextStyles.labelLarge),
+                Text(
+                  AppStrings.tableHeaderItemType,
+                  style: AppTextStyles.labelLarge.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 AppSpacing.gapXs,
                 DropdownButtonFormField<String>(
-                  initialValue: _selectedItemTypeId.isNotEmpty ? _selectedItemTypeId : null,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                  initialValue:
+                      _selectedItemTypeId.isNotEmpty ? _selectedItemTypeId : null,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.md,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    ),
                   ),
                   items: widget.availableItemTypes.map((type) {
                     return DropdownMenuItem<String>(
@@ -198,6 +222,11 @@ class _ItemDefinitionFormDialogState extends State<ItemDefinitionFormDialog> {
                   controller: _nameController,
                   label: AppStrings.itemDefinitionNameLabel,
                   hintText: AppStrings.itemDefinitionNameHint,
+                  prefixIcon: const Icon(
+                    Icons.list_alt_outlined,
+                    size: 20,
+                    color: AppColors.textSecondary,
+                  ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return AppStrings.itemDefinitionNameRequired;

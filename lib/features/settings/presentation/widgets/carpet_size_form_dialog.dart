@@ -135,7 +135,7 @@ class _CarpetSizeFormDialogState extends State<CarpetSizeFormDialog> {
 
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
       backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
@@ -154,15 +154,17 @@ class _CarpetSizeFormDialogState extends State<CarpetSizeFormDialog> {
                   children: [
                     Text(
                       isEditing ? AppStrings.editCarpetSize : AppStrings.addCarpetSize,
-                      style: AppTextStyles.titleLarge,
+                      style: AppTextStyles.titleLarge.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(Icons.close, size: 20),
                       onPressed: () => Navigator.of(context).pop(false),
                     ),
                   ],
                 ),
-                const Divider(color: AppColors.divider),
+                const Divider(height: AppSpacing.lg, color: AppColors.divider),
                 AppSpacing.gapMd,
                 if (_inlineError != null) ...[
                   Container(
@@ -170,16 +172,25 @@ class _CarpetSizeFormDialogState extends State<CarpetSizeFormDialog> {
                     decoration: BoxDecoration(
                       color: AppColors.errorLight,
                       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                      border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: AppColors.error.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+                        const Icon(
+                          Icons.error_outline,
+                          color: AppColors.error,
+                          size: 20,
+                        ),
                         AppSpacing.gapHorizontalSm,
                         Expanded(
                           child: Text(
                             _inlineError!,
-                            style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.error,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -194,7 +205,13 @@ class _CarpetSizeFormDialogState extends State<CarpetSizeFormDialog> {
                         controller: _lengthController,
                         label: AppStrings.carpetLengthLabel,
                         hintText: 'مثال: 3.0',
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        prefixIcon: const Icon(
+                          Icons.straighten_outlined,
+                          size: 20,
+                          color: AppColors.textSecondary,
+                        ),
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return AppStrings.carpetLengthRequired;
@@ -213,7 +230,13 @@ class _CarpetSizeFormDialogState extends State<CarpetSizeFormDialog> {
                         controller: _widthController,
                         label: AppStrings.carpetWidthLabel,
                         hintText: 'مثال: 2.0',
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        prefixIcon: const Icon(
+                          Icons.straighten_outlined,
+                          size: 20,
+                          color: AppColors.textSecondary,
+                        ),
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return AppStrings.carpetWidthRequired;
@@ -229,11 +252,16 @@ class _CarpetSizeFormDialogState extends State<CarpetSizeFormDialog> {
                   ],
                 ),
                 AppSpacing.gapLg,
-                // Read-only Area
+                // Read-only Area with auto calculation indicator
                 AppTextField(
                   controller: _areaController,
-                  label: AppStrings.carpetAreaLabel,
+                  label: '${AppStrings.carpetAreaLabel} (يُحسب تلقائياً)',
                   enabled: false,
+                  prefixIcon: const Icon(
+                    Icons.square_foot_outlined,
+                    size: 20,
+                    color: AppColors.primary,
+                  ),
                 ),
                 AppSpacing.gapXxl,
                 Row(
