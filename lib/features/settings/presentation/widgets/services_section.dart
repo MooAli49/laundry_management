@@ -133,6 +133,7 @@ class ServicesSection extends StatelessWidget {
                       isActive: svc.isActive,
                       onEdit: () => _handleEdit(context, svc),
                       onToggleActive: (_) => _handleToggleStatus(context, svc),
+                      useOutlinedEditButton: true,
                     ),
                     const SizedBox(height: 10),
                   ],

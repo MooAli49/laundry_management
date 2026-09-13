@@ -7,7 +7,7 @@ import '../../../../core/theme/app_text_styles.dart';
 
 /// Standard Section Top Header for Settings Master Data (Figma layout).
 class SettingsTopHeader extends StatelessWidget {
-  final String title;
+  final String? title;
   final int? count;
   final String? countLabel;
   final String actionLabel;
@@ -15,7 +15,7 @@ class SettingsTopHeader extends StatelessWidget {
 
   const SettingsTopHeader({
     super.key,
-    required this.title,
+    this.title,
     this.count,
     this.countLabel,
     required this.actionLabel,
@@ -30,31 +30,25 @@ class SettingsTopHeader extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Right side in RTL: Title + item count tag
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                title,
-                style: AppTextStyles.titleLarge.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
+          // Right side in RTL: Standard item count tag ("X عنصر")
+          if (count != null)
+            Text(
+              '$count عنصر',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
               ),
-              if (count != null) ...[
-                const SizedBox(width: 10),
-                Text(
-                  countLabel != null ? '$count $countLabel' : '$count عنصر',
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ],
-          ),
+            )
+          else if (title != null && title!.isNotEmpty)
+            Text(
+              title!,
+              style: AppTextStyles.titleLarge.copyWith(
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            )
+          else
+            const SizedBox.shrink(),
           // Left side in RTL: Primary "+ إضافة [الكيان]" action button
           ElevatedButton.icon(
             onPressed: onAction,
@@ -124,23 +118,25 @@ class SettingsInfoBanner extends StatelessWidget {
 
 /// Reusable Master Data Card matching Figma.
 class SettingsCard extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
   final String title;
   final String subtitle;
   final String? secondarySubtitle;
   final bool isActive;
   final VoidCallback onEdit;
   final ValueChanged<bool> onToggleActive;
+  final bool useOutlinedEditButton;
 
   const SettingsCard({
     super.key,
-    required this.icon,
+    this.icon,
     required this.title,
     required this.subtitle,
     this.secondarySubtitle,
     required this.isActive,
     required this.onEdit,
     required this.onToggleActive,
+    this.useOutlinedEditButton = false,
   });
 
   @override
@@ -162,20 +158,22 @@ class SettingsCard extends StatelessWidget {
       child: Row(
         children: [
           // Icon Container (44x44, rounded 10px, soft background)
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          if (icon != null) ...[
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              ),
+              child: Icon(
+                icon,
+                size: 22,
+                color: const Color(0xFF475569),
+              ),
             ),
-            child: Icon(
-              icon,
-              size: 22,
-              color: const Color(0xFF475569),
-            ),
-          ),
-          const SizedBox(width: 14),
+            const SizedBox(width: 14),
+          ],
           // Title + Subtitle
           Expanded(
             child: Column(
@@ -257,19 +255,46 @@ class SettingsCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              // Edit button
-              InkWell(
-                onTap: onEdit,
-                borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                child: const Padding(
-                  padding: EdgeInsets.all(6.0),
-                  child: Icon(
+              // Edit button: Outlined "[ ✏️ تعديل ]" button for services, or bare pencil icon
+              if (useOutlinedEditButton)
+                OutlinedButton.icon(
+                  onPressed: onEdit,
+                  icon: const Icon(
                     Icons.edit_outlined,
-                    size: 18,
-                    color: Color(0xFF64748B),
+                    size: 14,
+                    color: Color(0xFF475569),
+                  ),
+                  label: Text(
+                    'تعديل',
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: const Color(0xFF475569),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12.0,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFE2E8F0)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                )
+              else
+                InkWell(
+                  onTap: onEdit,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  child: const Padding(
+                    padding: EdgeInsets.all(6.0),
+                    child: Icon(
+                      Icons.edit_outlined,
+                      size: 18,
+                      color: Color(0xFF64748B),
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(width: 6),
               // Switch
               Transform.scale(

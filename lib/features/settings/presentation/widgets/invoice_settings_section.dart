@@ -64,7 +64,7 @@ class InvoiceSettingsSection extends StatelessWidget {
                           ),
                         ],
                       ),
-                      OutlinedButton.icon(
+                      OutlinedButton(
                         onPressed: () => _showReceiptPreviewDialog(
                           context,
                           businessName,
@@ -72,20 +72,19 @@ class InvoiceSettingsSection extends StatelessWidget {
                           address,
                           liveFooter,
                         ),
-                        icon: const Icon(Icons.visibility_outlined, size: 18, color: AppColors.primary),
-                        label: Text(
-                          'معاينة الفاتورة',
-                          style: AppTextStyles.labelMedium.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(color: Color(0xFFE2E8F0)),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                           ),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        ),
+                        child: Text(
+                          'معاينة الفاتورة',
+                          style: AppTextStyles.labelMedium.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
@@ -114,36 +113,6 @@ class InvoiceSettingsSection extends StatelessWidget {
                         const Divider(height: 24, color: Color(0xFFE2E8F0)),
                         _buildSummaryRow('نص التذييل', liveFooter),
                       ],
-                    ),
-                  ),
-                  AppSpacing.gapXxl,
-                  Align(
-                    alignment: AlignmentDirectional.centerEnd,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _showReceiptPreviewDialog(
-                        context,
-                        businessName,
-                        phone,
-                        address,
-                        liveFooter,
-                      ),
-                      icon: const Icon(Icons.receipt_long_outlined, size: 18, color: Colors.white),
-                      label: Text(
-                        'معاينة الفاتورة',
-                        style: AppTextStyles.labelLarge.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                        ),
-                      ),
                     ),
                   ),
                 ],

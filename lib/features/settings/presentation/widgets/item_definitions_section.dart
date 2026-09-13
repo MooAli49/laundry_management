@@ -144,7 +144,6 @@ class ItemDefinitionsSection extends StatelessWidget {
                       children: [
                         for (final def in entry.value)
                           SettingsCard(
-                            icon: Icons.category_outlined,
                             title: def.name,
                             subtitle: '0 طلب',
                             isActive: def.isActive,

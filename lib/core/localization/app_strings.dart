@@ -259,8 +259,8 @@ class AppStrings {
   static const String noExpenseCategories = 'لا توجد تصنيفات مصروفات مضافة';
 
   // Settings — Shared Table & Status
-  static const String statusActive = 'فعّال';
-  static const String statusInactive = 'معطّل';
+  static const String statusActive = 'مُفعّلة';
+  static const String statusInactive = 'معطّلة';
   static const String actionActivate = 'تفعيل';
   static const String actionDeactivate = 'تعطيل';
   static const String confirmDeactivationTitle = 'تأكيد التعطيل';
