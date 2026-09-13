@@ -1148,8 +1148,10 @@ class _OrderDetailView extends StatelessWidget {
       context: context,
       builder: (dialogCtx) => Dialog(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
         ),
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
           child: SingleChildScrollView(
@@ -1158,20 +1160,13 @@ class _OrderDetailView extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'تأكيد تسليم وإكمال الطلب',
-                      style: AppTextStyles.titleLarge,
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.of(dialogCtx).pop(),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
+                Text(
+                  'تأكيد تسليم وإكمال الطلب',
+                  style: AppTextStyles.titleLarge.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                AppSpacing.gapMd,
+                AppSpacing.gapLg,
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(AppSpacing.md),
@@ -1192,14 +1187,8 @@ class _OrderDetailView extends StatelessWidget {
                 ),
                 AppSpacing.gapXl,
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    AppButton(
-                      label: 'إلغاء',
-                      variant: AppButtonVariant.secondary,
-                      onPressed: () => Navigator.of(dialogCtx).pop(),
-                    ),
-                    AppSpacing.gapHorizontalMd,
                     AppButton(
                       label: 'تأكيد التسليم والإكمال',
                       variant: AppButtonVariant.primary,
@@ -1207,6 +1196,12 @@ class _OrderDetailView extends StatelessWidget {
                         Navigator.of(dialogCtx).pop();
                         cubit.completeOrder(handoverConfirmed: true);
                       },
+                    ),
+                    AppSpacing.gapHorizontalMd,
+                    AppButton(
+                      label: 'إلغاء',
+                      variant: AppButtonVariant.secondary,
+                      onPressed: () => Navigator.of(dialogCtx).pop(),
                     ),
                   ],
                 ),

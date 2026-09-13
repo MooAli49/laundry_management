@@ -84,8 +84,10 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: SingleChildScrollView(
@@ -94,15 +96,11 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('إضافة دفعة', style: AppTextStyles.titleLarge),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
+              Text(
+                'إضافة دفعة',
+                style: AppTextStyles.titleLarge.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               AppSpacing.gapLg,
 
@@ -196,7 +194,7 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
                   Expanded(
                     child: _buildMethodButton(
                       PaymentMethod.cash,
-                      'كاش',
+                      'نقدي',
                       Icons.payments_outlined,
                     ),
                   ),
@@ -204,7 +202,7 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
                   Expanded(
                     child: _buildMethodButton(
                       PaymentMethod.instapay,
-                      'إنستاباي',
+                      'InstaPay',
                       Icons.flash_on,
                     ),
                   ),
@@ -222,20 +220,20 @@ class _AddPaymentDialogState extends State<AddPaymentDialog> {
 
               // Actions
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
+                  AppButton(
+                    label: 'تأكيد الدفع',
+                    isLoading: _isLoading,
+                    onPressed: _handleConfirm,
+                  ),
+                  AppSpacing.gapHorizontalMd,
                   AppButton(
                     label: 'إلغاء',
                     variant: AppButtonVariant.secondary,
                     onPressed: _isLoading
                         ? null
                         : () => Navigator.of(context).pop(),
-                  ),
-                  AppSpacing.gapHorizontalMd,
-                  AppButton(
-                    label: 'تأكيد الدفع',
-                    isLoading: _isLoading,
-                    onPressed: _handleConfirm,
                   ),
                 ],
               ),

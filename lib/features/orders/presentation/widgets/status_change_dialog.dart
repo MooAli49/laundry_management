@@ -114,6 +114,8 @@ class _StatusChangeDialogState extends State<StatusChangeDialog> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
         child: SingleChildScrollView(
@@ -122,17 +124,13 @@ class _StatusChangeDialogState extends State<StatusChangeDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(_dialogTitle, style: AppTextStyles.titleLarge),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
+              Text(
+                _dialogTitle,
+                style: AppTextStyles.titleLarge.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-              AppSpacing.gapMd,
+              AppSpacing.gapLg,
 
               Container(
                 width: double.infinity,
@@ -171,18 +169,18 @@ class _StatusChangeDialogState extends State<StatusChangeDialog> {
               AppSpacing.gapXl,
 
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  AppButton(
-                    label: 'إلغاء',
-                    variant: AppButtonVariant.secondary,
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                  ),
-                  AppSpacing.gapHorizontalMd,
                   AppButton(
                     label: 'تأكيد التعديل',
                     isLoading: _isLoading,
                     onPressed: _handleConfirm,
+                  ),
+                  AppSpacing.gapHorizontalMd,
+                  AppButton(
+                    label: 'إلغاء',
+                    variant: AppButtonVariant.secondary,
+                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
                   ),
                 ],
               ),

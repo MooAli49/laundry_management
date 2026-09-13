@@ -57,6 +57,8 @@ class _CancelOrderDialogState extends State<CancelOrderDialog> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: SingleChildScrollView(
@@ -65,20 +67,14 @@ class _CancelOrderDialogState extends State<CancelOrderDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'إلغاء الطلب',
-                    style: AppTextStyles.titleLarge.copyWith(color: AppColors.error),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
+              Text(
+                'إلغاء الطلب',
+                style: AppTextStyles.titleLarge.copyWith(
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-              AppSpacing.gapMd,
+              AppSpacing.gapLg,
 
               Container(
                 padding: const EdgeInsets.all(AppSpacing.md),
@@ -110,19 +106,19 @@ class _CancelOrderDialogState extends State<CancelOrderDialog> {
               AppSpacing.gapXl,
 
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  AppButton(
-                    label: 'تراجع',
-                    variant: AppButtonVariant.secondary,
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                  ),
-                  AppSpacing.gapHorizontalMd,
                   AppButton(
                     label: 'تأكيد الإلغاء',
                     variant: AppButtonVariant.destructive,
                     isLoading: _isLoading,
                     onPressed: _handleConfirm,
+                  ),
+                  AppSpacing.gapHorizontalMd,
+                  AppButton(
+                    label: 'تراجع',
+                    variant: AppButtonVariant.secondary,
+                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
                   ),
                 ],
               ),

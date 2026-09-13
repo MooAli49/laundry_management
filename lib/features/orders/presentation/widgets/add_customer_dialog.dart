@@ -93,6 +93,8 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: SingleChildScrollView(
@@ -101,18 +103,11 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'إضافة عميل جديد',
-                    style: AppTextStyles.titleLarge,
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
+              Text(
+                'إضافة عميل جديد',
+                style: AppTextStyles.titleLarge.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               AppSpacing.gapLg,
 
@@ -163,18 +158,18 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
               AppSpacing.gapXl,
 
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  AppButton(
-                    label: 'إلغاء',
-                    variant: AppButtonVariant.secondary,
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                  ),
-                  AppSpacing.gapHorizontalMd,
                   AppButton(
                     label: 'حفظ العميل',
                     isLoading: _isLoading,
                     onPressed: _handleSave,
+                  ),
+                  AppSpacing.gapHorizontalMd,
+                  AppButton(
+                    label: 'إلغاء',
+                    variant: AppButtonVariant.secondary,
+                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
                   ),
                 ],
               ),
