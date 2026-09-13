@@ -201,6 +201,16 @@ class ServiceRepositoryImpl implements ServiceRepository {
     }
   }
 
+  @override
+  Future<List<String>> getSupportedItemTypeIds(String serviceId) async {
+    try {
+      return await _servicesDao.getSupportedItemTypeIds(serviceId);
+    } catch (e) {
+      if (e is Failure) rethrow;
+      throw DatabaseFailure(e.toString());
+    }
+  }
+
   Service _mapToDomain(app_db.Service row) {
     return Service(
       id: row.id,
