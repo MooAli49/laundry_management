@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:laundry_management/core/theme/app_colors.dart';
+import 'package:laundry_management/core/theme/app_spacing.dart';
+import 'package:laundry_management/core/theme/app_text_styles.dart';
 import 'package:laundry_management/core/theme/app_theme.dart';
+import 'package:laundry_management/core/widgets/app_button.dart';
 import 'package:laundry_management/core/widgets/order_status_badge.dart';
 import 'package:laundry_management/domain/entities/customer.dart';
 import 'package:laundry_management/domain/entities/order.dart';
@@ -318,6 +322,116 @@ void main() {
 
         expect(find.text('إضافة عميل جديد'), findsOneWidget);
         expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'Delete item confirmation dialog follows approved Settings pattern and confirms action',
+      (tester) async {
+        var isDeleted = false;
+
+        await tester.pumpWidget(
+          testBoilerplate(
+            Builder(
+              builder: (context) {
+                return ElevatedButton(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (dialogCtx) => Dialog(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+                        ),
+                        backgroundColor: AppColors.surface,
+                        surfaceTintColor: Colors.transparent,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 440),
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(AppSpacing.xl),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'حذف القطعة',
+                                  style: AppTextStyles.titleLarge.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                AppSpacing.gapLg,
+                                Text(
+                                  'هل أنت متأكد من حذف هذه القطعة من الطلب؟',
+                                  style: AppTextStyles.bodyMedium.copyWith(
+                                    color: AppColors.textSecondary,
+                                    height: 1.5,
+                                  ),
+                                ),
+                                AppSpacing.gapXxl,
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.start,
+                                  children: [
+                                    AppButton(
+                                      label: 'حذف القطعة',
+                                      variant: AppButtonVariant.destructive,
+                                      onPressed: () {
+                                        Navigator.of(dialogCtx).pop();
+                                        isDeleted = true;
+                                      },
+                                    ),
+                                    AppSpacing.gapHorizontalMd,
+                                    AppButton(
+                                      label: 'إلغاء',
+                                      variant: AppButtonVariant.secondary,
+                                      onPressed: () => Navigator.of(dialogCtx).pop(),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text('Open Dialog'),
+                );
+              },
+            ),
+          ),
+        );
+
+        // Open dialog
+        await tester.tap(find.text('Open Dialog'));
+        await tester.pumpAndSettle();
+
+        // Verify title only in header, message, text-only buttons
+        expect(find.text('حذف القطعة'), findsNWidgets(2)); // Title & Button
+        expect(
+          find.text('هل أنت متأكد من حذف هذه القطعة من الطلب؟'),
+          findsOneWidget,
+        );
+        expect(find.text('إلغاء'), findsOneWidget);
+
+        // Tap cancel -> dialog dismisses, isDeleted stays false
+        await tester.tap(find.text('إلغاء'));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('هل أنت متأكد من حذف هذه القطعة من الطلب؟'),
+          findsNothing,
+        );
+        expect(isDeleted, isFalse);
+
+        // Open dialog again and confirm
+        await tester.tap(find.text('Open Dialog'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.widgetWithText(AppButton, 'حذف القطعة'));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('هل أنت متأكد من حذف هذه القطعة من الطلب؟'),
+          findsNothing,
+        );
+        expect(isDeleted, isTrue);
       },
     );
   });

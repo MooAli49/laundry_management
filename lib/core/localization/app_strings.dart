@@ -139,4 +139,140 @@ class AppStrings {
   static const String selectAtLeastOneItem = 'يجب اختيار قطعة واحدة على الأقل';
   static const String selectLocation = 'يجب اختيار مكان التخزين';
   static const String orderNumberPrefix = 'طلب #';
+
+  // Settings — Navigation Tabs
+  static const String settingsSubtitle = 'إدارة البيانات الأساسية وإعدادات النظام';
+  static const String tabBusinessInfo = 'بيانات النشاط';
+  static const String tabInvoice = 'الفاتورة';
+  static const String tabServices = 'الخدمات';
+  static const String tabItemTypes = 'أنواع القطع';
+  static const String tabItemDefinitions = 'تعريفات القطع';
+  static const String tabCarpetSizes = 'مقاسات السجاد';
+  static const String tabStorageLocations = 'مواقع التخزين';
+  static const String tabExpenseCategories = 'تصنيفات المصروفات';
+
+  // Settings — Business Info
+  static const String businessNameLabel = 'اسم النشاط *';
+  static const String businessNameHint = 'مثال: مغسلة الأمانة الحديثة';
+  static const String businessNameRequired = 'اسم النشاط مطلوب';
+  static const String businessPhoneLabel = 'رقم الهاتف';
+  static const String businessPhoneHint = 'مثال: 01012345678';
+  static const String businessAddressLabel = 'العنوان';
+  static const String businessAddressHint = 'مثال: شارع الجمهورية، المعادي، القاهرة';
+  static const String invoiceFooterLabel = 'نص تذييل الفاتورة';
+  static const String invoiceFooterHint = 'مثال: شكراً لتعاملكم معنا، نسعد بخدمتكم دائماً';
+  static const String saveBusinessSettingsSuccess = 'تم حفظ بيانات النشاط بنجاح';
+
+  // Settings — Invoice Preview
+  static const String invoicePreviewTitle = 'معاينة الفاتورة الحرارية (80 مم)';
+  static const String invoicePreviewDescription =
+      'هذه معاينة حية لشكل الفاتورة بناءً على بيانات النشاط المدخلة';
+  static const String sampleInvoiceItem1 = 'بدلة رجالي (2 قطعة) — غسيل ومكواة';
+  static const String sampleInvoiceItem2 = 'سجادة صوف (2 × 3 م) — غسيل سجاد';
+  static const String sampleInvoiceSubtotal = 'الإجمالي الفرعي';
+  static const String sampleInvoiceTotal = 'الإجمالي المطلوب';
+  static const String sampleInvoicePaid = 'المدفوع';
+  static const String sampleInvoiceRemaining = 'المتبقي';
+
+  // Settings — Services
+  static const String addService = 'إضافة خدمة جديدة';
+  static const String editService = 'تعديل الخدمة';
+  static const String serviceNameLabel = 'اسم الخدمة *';
+  static const String serviceNameHint = 'مثال: غسيل ومكواة';
+  static const String serviceDescriptionLabel = 'الوصف';
+  static const String serviceDescriptionHint = 'وصف اختياري للخدمة';
+  static const String pricingTypeLabel = 'نوع التسعير *';
+  static const String pricingPerPiece = 'بالقطعة';
+  static const String pricingPerSquareMeter = 'بالمتر المربع';
+  static const String pricingFixedPrice = 'سعر ثابت';
+  static const String servicePriceLabel = 'السعر *';
+  static const String priceLabelPerPiece = 'سعر القطعة';
+  static const String priceLabelPerSquareMeter = 'سعر المتر المربع';
+  static const String priceLabelFixedPrice = 'السعر الثابت';
+  static const String supportedItemTypesLabel = 'أنواع القطع المدعومة *';
+  static const String selectAtLeastOneItemType = 'يجب اختيار نوع قطعة واحد على الأقل';
+  static const String serviceNameRequired = 'اسم الخدمة مطلوب';
+  static const String servicePriceRequired = 'السعر مطلوب';
+  static const String servicePriceMustBePositive = 'السعر يجب أن يكون أكبر من صفر';
+  static const String servicePriceChangeNotice =
+      'سيتم تطبيق السعر الجديد على الطلبات الجديدة فقط. الطلبات الحالية لن تتأثر.';
+  static const String duplicateNameError = 'هذا الاسم مستخدم بالفعل';
+  static const String deactivateServiceConfirmMessage =
+      'سيتم تعطيل الخدمة ولن تظهر للطلبات الجديدة.\nالطلبات الحالية لن تتأثر.';
+  static const String noServices = 'لا توجد خدمات مضافة';
+
+  // Settings — Item Types
+  static const String addItemType = 'إضافة نوع قطعة';
+  static const String editItemType = 'تعديل نوع القطعة';
+  static const String itemTypeNameLabel = 'اسم نوع القطعة *';
+  static const String itemTypeNameHint = 'مثال: ملابس، سجاد، ستائر';
+  static const String itemTypeNameRequired = 'اسم نوع القطعة مطلوب';
+  static const String deactivateItemTypeConfirmMessage =
+      'سيتم تعطيل نوع القطعة ولن يظهر في الطلبات الجديدة.';
+  static const String noItemTypes = 'لا توجد أنواع قطع مضافة';
+  static const String definitionsCount = 'عدد التعريفات';
+
+  // Settings — Item Definitions
+  static const String addItemDefinition = 'إضافة تعريف قطعة';
+  static const String editItemDefinition = 'تعديل تعريف القطعة';
+  static const String filterDefinitionsByItemType = 'عرض تعريفات:';
+  static const String allItemDefinitions = 'جميع التعريفات';
+  static const String itemDefinitionNameLabel = 'اسم التعريف *';
+  static const String itemDefinitionNameHint = 'مثال: قميص، بنطلون، فستان';
+  static const String itemDefinitionNameRequired = 'اسم التعريف مطلوب';
+  static const String deactivateItemDefinitionConfirmMessage =
+      'سيتم تعطيل تعريف القطعة ولن يظهر في الطلبات الجديدة.';
+  static const String noItemDefinitions = 'لا توجد تعريفات مضافة';
+
+  // Settings — Carpet Sizes
+  static const String addCarpetSize = 'إضافة مقاس سجاد';
+  static const String editCarpetSize = 'تعديل مقاس السجاد';
+  static const String carpetLengthLabel = 'الطول (م) *';
+  static const String carpetWidthLabel = 'العرض (م) *';
+  static const String carpetAreaLabel = 'المساحة (م²)';
+  static const String carpetLengthRequired = 'الطول مطلوب ويجب أن يكون أكبر من صفر';
+  static const String carpetWidthRequired = 'العرض مطلوب ويجب أن يكون أكبر من صفر';
+  static const String deactivateCarpetSizeConfirmMessage =
+      'سيتم تعطيل مقاس السجاد ولن يظهر في الطلبات الجديدة.';
+  static const String noCarpetSizes = 'لا توجد مقاسات سجاد مضافة';
+
+  // Settings — Storage Locations
+  static const String addStorageLocation = 'إضافة موقع تخزين';
+  static const String editStorageLocation = 'تعديل موقع التخزين';
+  static const String storageLocationNameLabel = 'اسم الموقع *';
+  static const String storageLocationNameHint = 'مثال: رف A-1، ستاند السجاد 2';
+  static const String storageLocationNameRequired = 'اسم الموقع مطلوب';
+  static const String storageLocationCannotDeactivateWithItems =
+      'لا يمكن تعطيل موقع التخزين لوجود قطع مخزنة به حالياً';
+  static const String deactivateStorageLocationConfirmMessage =
+      'سيتم تعطيل موقع التخزين ولن يتاح لتخزين قطع جديدة.';
+  static const String noStorageLocations = 'لا توجد مواقع تخزين مضافة';
+
+  // Settings — Expense Categories
+  static const String addExpenseCategory = 'إضافة تصنيف مصروفات';
+  static const String editExpenseCategory = 'تعديل تصنيف المصروفات';
+  static const String expenseCategoryNameLabel = 'اسم التصنيف *';
+  static const String expenseCategoryNameHint = 'مثال: فواتير كهرباء، منظفات، صيانة';
+  static const String expenseCategoryNameRequired = 'اسم التصنيف مطلوب';
+  static const String deactivateExpenseCategoryConfirmMessage =
+      'سيتم تعطيل تصنيف المصروفات ولن يظهر في تسجيل المصروفات الجديدة.';
+  static const String noExpenseCategories = 'لا توجد تصنيفات مصروفات مضافة';
+
+  // Settings — Shared Table & Status
+  static const String statusActive = 'مُفعّلة';
+  static const String statusInactive = 'معطّلة';
+  static const String actionActivate = 'تفعيل';
+  static const String actionDeactivate = 'تعطيل';
+  static const String confirmDeactivationTitle = 'تأكيد التعطيل';
+  static const String confirmDeactivationButton = 'نعم، تعطيل';
+  static const String tableHeaderName = 'الاسم';
+  static const String tableHeaderStatus = 'الحالة';
+  static const String tableHeaderActions = 'الإجراءات';
+  static const String tableHeaderPricingType = 'نوع التسعير';
+  static const String tableHeaderPrice = 'السعر';
+  static const String tableHeaderSupportedTypes = 'أنواع القطع المدعومة';
+  static const String tableHeaderDimensions = 'المقاس';
+  static const String tableHeaderArea = 'المساحة';
+  static const String tableHeaderItemType = 'نوع القطعة';
 }
+

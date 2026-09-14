@@ -204,6 +204,16 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
     }
   }
 
+  @override
+  Future<List<String>> getSupportedItemTypeIds(String storageLocationId) async {
+    try {
+      return await _storageLocationsDao.getSupportedItemTypeIds(storageLocationId);
+    } catch (e) {
+      if (e is Failure) rethrow;
+      throw DatabaseFailure(e.toString());
+    }
+  }
+
   StorageLocation _mapToDomain(app_db.StorageLocation row) {
     return StorageLocation(
       id: row.id,

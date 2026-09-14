@@ -38,7 +38,7 @@ class OrdersFilterBar extends StatelessWidget {
           ...statusFilters.map((filter) {
             final isSelected = filter == selectedFilter;
             return Padding(
-              padding: const EdgeInsets.only(left: 6.0),
+              padding: const EdgeInsetsDirectional.only(end: 6.0),
               child: InkWell(
                 onTap: () => onFilterSelected(filter),
                 borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
@@ -74,12 +74,12 @@ class OrdersFilterBar extends StatelessWidget {
             width: 1.0,
             height: 20.0,
             color: AppColors.border,
-            margin: const EdgeInsets.symmetric(horizontal: 8.0),
+            margin: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
           ),
 
           // Remaining Balance Filter Toggle
           Padding(
-            padding: const EdgeInsets.only(left: 8.0),
+            padding: const EdgeInsetsDirectional.only(end: 8.0),
             child: InkWell(
               onTap: () {
                 if (selectedFilter == OrderListFilter.hasRemaining) {
@@ -126,7 +126,7 @@ class OrdersFilterBar extends StatelessWidget {
           // Clear Filters Action Button
           if (isFiltered)
             Padding(
-              padding: const EdgeInsets.only(left: 12.0),
+              padding: const EdgeInsetsDirectional.only(end: 12.0),
               child: InkWell(
                 onTap: () => onFilterSelected(OrderListFilter.all),
                 borderRadius: BorderRadius.circular(AppSpacing.radiusSm),

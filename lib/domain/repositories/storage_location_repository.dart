@@ -17,4 +17,5 @@ abstract class StorageLocationRepository {
   Future<List<StorageLocation>> getCompatibleLocationsForItemType(String itemTypeId);
   Future<void> activateStorageLocation(String id);
   Future<void> deactivateStorageLocation(String id);
+  Future<List<String>> getSupportedItemTypeIds(String storageLocationId);
 }

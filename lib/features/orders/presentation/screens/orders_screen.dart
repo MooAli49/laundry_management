@@ -59,11 +59,10 @@ class _OrdersView extends StatelessWidget {
               builder: (context, state) {
                 return PageHeader(
                   title: AppStrings.orders,
-                  subtitle: 'إجمالي ${state.orders.length} طلب',
+                  subtitle: '${state.orders.length} طلب',
                   actions: [
                     AppButton(
-                      label: 'إضافة طلب',
-                      icon: Icons.add,
+                      label: '+ إضافة طلب',
                       onPressed: () => context.go(AppRoutes.ordersNew),
                     ),
                   ],
@@ -74,8 +73,7 @@ class _OrdersView extends StatelessWidget {
 
             // Search Bar
             AppTextField(
-              hintText: 'بحث برقم الطلب، اسم العميل، أو رقم الهاتف...',
-              prefixIcon: const Icon(Icons.search),
+              hintText: 'ابحث برقم الطلب أو اسم العميل أو الهاتف',
               onChanged: cubit.search,
             ),
             AppSpacing.gapMd,
@@ -111,8 +109,8 @@ class _OrdersView extends StatelessWidget {
                   if (state.orders.isEmpty) {
                     return EmptyState(
                       icon: Icons.receipt_long_outlined,
-                      title: 'لا توجد طلبات مطابقة للبحث',
-                      message: 'لم يتم العثور على أي طلبات وفقاً لمعايير البحث أو الفلتر المحددة.',
+                      title: 'لا توجد نتائج مطابقة',
+                      message: 'جرّب تعديل البحث أو مسح الفلاتر',
                       actionButton: AppButton(
                         label: 'إعادة ضبط الفلاتر',
                         variant: AppButtonVariant.secondary,

@@ -59,6 +59,12 @@ import '../../features/orders/presentation/cubit/create_order_cubit.dart';
 import '../../features/orders/presentation/cubit/order_detail_cubit.dart';
 import '../../features/orders/presentation/cubit/orders_list_cubit.dart';
 import '../../features/reports/presentation/cubit/reports_cubit.dart';
+import '../../features/settings/presentation/cubit/carpet_sizes_management_cubit.dart';
+import '../../features/settings/presentation/cubit/expense_categories_management_cubit.dart';
+import '../../features/settings/presentation/cubit/item_types_management_cubit.dart';
+import '../../features/settings/presentation/cubit/services_management_cubit.dart';
+import '../../features/settings/presentation/cubit/settings_cubit.dart';
+import '../../features/settings/presentation/cubit/storage_locations_management_cubit.dart';
 import '../../features/storage/presentation/cubit/storage_cubit.dart';
 
 final getIt = GetIt.instance;
@@ -397,6 +403,51 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
       () => RecordPaymentCubit(
         orderRepository: getIt<OrderRepository>(),
         paymentRepository: getIt<PaymentRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<SettingsCubit>()) {
+    getIt.registerFactory<SettingsCubit>(
+      () => SettingsCubit(
+        settingsRepository: getIt<SettingsRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<ServicesManagementCubit>()) {
+    getIt.registerFactory<ServicesManagementCubit>(
+      () => ServicesManagementCubit(
+        serviceRepository: getIt<ServiceRepository>(),
+        itemTypeRepository: getIt<ItemTypeRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<ItemTypesManagementCubit>()) {
+    getIt.registerFactory<ItemTypesManagementCubit>(
+      () => ItemTypesManagementCubit(
+        itemTypeRepository: getIt<ItemTypeRepository>(),
+        itemDefinitionRepository: getIt<ItemDefinitionRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<CarpetSizesManagementCubit>()) {
+    getIt.registerFactory<CarpetSizesManagementCubit>(
+      () => CarpetSizesManagementCubit(
+        carpetSizeRepository: getIt<CarpetSizeRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<StorageLocationsManagementCubit>()) {
+    getIt.registerFactory<StorageLocationsManagementCubit>(
+      () => StorageLocationsManagementCubit(
+        storageLocationRepository: getIt<StorageLocationRepository>(),
+        itemTypeRepository: getIt<ItemTypeRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<ExpenseCategoriesManagementCubit>()) {
+    getIt.registerFactory<ExpenseCategoriesManagementCubit>(
+      () => ExpenseCategoriesManagementCubit(
+        expenseCategoryRepository: getIt<ExpenseCategoryRepository>(),
       ),
     );
   }

@@ -127,6 +127,8 @@ class _StoreItemsDialogState extends State<StoreItemsDialog> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
       ),
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
         child: SingleChildScrollView(
@@ -135,15 +137,11 @@ class _StoreItemsDialogState extends State<StoreItemsDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('تخزين عناصر الطلب', style: AppTextStyles.titleLarge),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
+              Text(
+                'تخزين عناصر الطلب',
+                style: AppTextStyles.titleLarge.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               AppSpacing.gapLg,
 
@@ -246,20 +244,20 @@ class _StoreItemsDialogState extends State<StoreItemsDialog> {
               AppSpacing.gapXl,
 
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  AppButton(
-                    label: 'إلغاء',
-                    variant: AppButtonVariant.secondary,
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                  ),
-                  AppSpacing.gapHorizontalMd,
                   AppButton(
                     label: 'تخزين',
                     isLoading: _isLoading,
                     onPressed: (_isLoading || _selectedLocation == null || _selectedItemIds.isEmpty)
                         ? null
                         : _handleStore,
+                  ),
+                  AppSpacing.gapHorizontalMd,
+                  AppButton(
+                    label: 'إلغاء',
+                    variant: AppButtonVariant.secondary,
+                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
                   ),
                 ],
               ),

@@ -17,4 +17,5 @@ abstract class ServiceRepository {
   Future<List<Service>> getServicesForItemType(String itemTypeId);
   Future<void> activateService(String id);
   Future<void> deactivateService(String id);
+  Future<List<String>> getSupportedItemTypeIds(String serviceId);
 }
