@@ -489,7 +489,6 @@ class _OrderItemFormState extends State<OrderItemForm> {
             alignment: Alignment.centerLeft,
             child: AppButton(
               label: 'إضافة القطعة',
-              icon: Icons.add,
               variant: AppButtonVariant.secondary,
               onPressed:
                   state.draftItemType == null || state.draftService == null

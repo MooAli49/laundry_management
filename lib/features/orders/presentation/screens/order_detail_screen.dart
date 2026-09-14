@@ -126,7 +126,6 @@ class _OrderDetailView extends StatelessWidget {
                   ),
                   child: AppButton(
                     label: 'معاينة الفاتورة',
-                    icon: Icons.visibility_outlined,
                     variant: AppButtonVariant.secondary,
                     onPressed: () {
                       showDialog(
@@ -474,7 +473,7 @@ class _OrderDetailView extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'عناصر الطلب (${items.length})',
+                'عناصر الطلب — ${items.length} عنصر',
                 style: AppTextStyles.titleMedium.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -845,7 +844,6 @@ class _OrderDetailView extends StatelessWidget {
               width: double.infinity,
               child: AppButton(
                 label: 'إضافة دفعة',
-                icon: Icons.add,
                 onPressed: () {
                   showDialog(
                     context: context,
@@ -1017,8 +1015,7 @@ class _OrderDetailView extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: AppButton(
-              label: 'تسليم وإكمال الطلب',
-              icon: Icons.check_circle_outline,
+              label: 'إكمال الطلب',
               variant: AppButtonVariant.primary,
               isLoading: state.isActionLoading,
               onPressed: canComplete
@@ -1051,7 +1048,6 @@ class _OrderDetailView extends StatelessWidget {
             width: double.infinity,
             child: AppButton(
               label: 'إلغاء الطلب',
-              icon: Icons.cancel_outlined,
               variant: AppButtonVariant.destructive,
               isLoading: state.isActionLoading,
               onPressed: () {

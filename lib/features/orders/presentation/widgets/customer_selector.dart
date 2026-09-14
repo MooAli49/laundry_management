@@ -122,7 +122,6 @@ class _CustomerSelectorState extends State<CustomerSelector> {
               child: AppTextField(
                 controller: _searchController,
                 hintText: 'ابحث بالاسم أو رقم الهاتف...',
-                prefixIcon: const Icon(Icons.search, color: AppColors.textTertiary),
                 onChanged: widget.onSearch,
               ),
             ),

@@ -8,6 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/date_formatter.dart';
+import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/loading_indicator.dart';
@@ -76,6 +77,69 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
     if (picked != null) {
       cubit.updateExpectedPickupDate(OrderDate.fromDate(picked));
     }
+  }
+
+  void _confirmDeleteItem(
+    BuildContext context,
+    CreateOrderCubit cubit,
+    int index,
+  ) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+        ),
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'حذف القطعة',
+                  style: AppTextStyles.titleLarge.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                AppSpacing.gapLg,
+                Text(
+                  'هل أنت متأكد من حذف هذه القطعة من الطلب؟',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+                AppSpacing.gapXxl,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    AppButton(
+                      label: 'حذف القطعة',
+                      variant: AppButtonVariant.destructive,
+                      onPressed: () {
+                        Navigator.of(dialogCtx).pop();
+                        cubit.removeItem(index);
+                      },
+                    ),
+                    AppSpacing.gapHorizontalMd,
+                    AppButton(
+                      label: 'إلغاء',
+                      variant: AppButtonVariant.secondary,
+                      onPressed: () => Navigator.of(dialogCtx).pop(),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -188,7 +252,7 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                 // Added Items List
                                 if (state.items.isNotEmpty) ...[
                                   Text(
-                                    'القطع المضافة للطلب (${state.items.length})',
+                                    'القطع المضافة للطلب — ${state.items.length} قطعة',
                                     style: AppTextStyles.titleMedium.copyWith(
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -284,7 +348,11 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                             AppSpacing.gapHorizontalSm,
                                             IconButton(
                                               onPressed: () =>
-                                                  cubit.removeItem(index),
+                                                  _confirmDeleteItem(
+                                                    context,
+                                                    cubit,
+                                                    index,
+                                                  ),
                                               icon: const Icon(
                                                 Icons.delete_outline,
                                                 color: AppColors.error,

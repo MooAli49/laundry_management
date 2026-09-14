@@ -18,6 +18,14 @@ class OrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final order = item.order;
     final customer = item.customer;
+    final customerName = customer?.name ??
+        (order.customerNameSnapshot.isNotEmpty
+            ? order.customerNameSnapshot
+            : 'عميل غير مسجل');
+    final customerPhone = customer?.phone ??
+        (order.customerPhoneSnapshot.isNotEmpty
+            ? order.customerPhoneSnapshot
+            : null);
 
     return AppCard(
       onTap: onTap,
@@ -65,7 +73,7 @@ class OrderCard extends StatelessWidget {
                 ),
                 AppSpacing.gapXs,
                 Text(
-                  customer?.name ?? 'عميل غير مسجل',
+                  customerName,
                   style: AppTextStyles.bodySmall.copyWith(
                     color: AppColors.textSecondary,
                     fontSize: 13,
@@ -73,6 +81,16 @@ class OrderCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (customerPhone != null && customerPhone.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    customerPhone,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textTertiary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
