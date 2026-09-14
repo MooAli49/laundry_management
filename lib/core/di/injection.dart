@@ -1,0 +1,461 @@
+import 'package:get_it/get_it.dart';
+
+import '../../data/local/daos/business_settings_dao.dart';
+import '../../data/local/daos/carpet_sizes_dao.dart';
+import '../../data/local/daos/customers_dao.dart';
+import '../../data/local/daos/expense_categories_dao.dart';
+import '../../data/local/daos/expenses_dao.dart';
+import '../../data/local/daos/item_definitions_dao.dart';
+import '../../data/local/daos/item_types_dao.dart';
+import '../../data/local/daos/orders_dao.dart';
+import '../../data/local/daos/payments_dao.dart';
+import '../../data/local/daos/services_dao.dart';
+import '../../data/local/daos/storage_locations_dao.dart';
+import '../../data/local/daos/storage_records_dao.dart';
+import '../../data/local/daos/sync_operations_dao.dart';
+import '../../data/local/database/app_database.dart';
+import '../../data/local/database/dev_test_data.dart';
+import '../../data/repositories/carpet_size_repository_impl.dart';
+import '../../data/repositories/customer_repository_impl.dart';
+import '../../data/repositories/dashboard_repository_impl.dart';
+import '../../data/repositories/expense_category_repository_impl.dart';
+import '../../data/repositories/expense_repository_impl.dart';
+import '../../data/repositories/item_definition_repository_impl.dart';
+import '../../data/repositories/item_type_repository_impl.dart';
+import '../../data/repositories/order_repository_impl.dart';
+import '../../data/repositories/payment_repository_impl.dart';
+import '../../data/repositories/reports_repository_impl.dart';
+import '../../data/repositories/service_repository_impl.dart';
+import '../../data/repositories/settings_repository_impl.dart';
+import '../../data/repositories/storage_location_repository_impl.dart';
+import '../../data/repositories/storage_repository_impl.dart';
+import '../../domain/repositories/carpet_size_repository.dart';
+import '../../domain/repositories/customer_repository.dart';
+import '../../domain/repositories/dashboard_repository.dart';
+import '../../domain/repositories/expense_category_repository.dart';
+import '../../domain/repositories/expense_repository.dart';
+import '../../domain/repositories/item_definition_repository.dart';
+import '../../domain/repositories/item_type_repository.dart';
+import '../../domain/repositories/order_repository.dart';
+import '../../domain/repositories/payment_repository.dart';
+import '../../domain/repositories/reports_repository.dart';
+import '../../domain/repositories/service_repository.dart';
+import '../../domain/repositories/settings_repository.dart';
+import '../../application/use_cases/cancel_order_use_case.dart';
+import '../../application/use_cases/change_order_status_use_case.dart';
+import '../../application/use_cases/complete_order_use_case.dart';
+import '../../application/use_cases/create_order_use_case.dart';
+import '../../application/use_cases/move_stored_item_use_case.dart';
+import '../../application/use_cases/store_order_items_use_case.dart';
+import '../../application/use_cases/unstore_item_use_case.dart';
+import '../../domain/repositories/storage_location_repository.dart';
+import '../../domain/repositories/storage_repository.dart';
+import '../../features/customers/presentation/cubit/customer_detail_cubit.dart';
+import '../../features/customers/presentation/cubit/customers_list_cubit.dart';
+import '../../features/dashboard/presentation/cubit/dashboard_cubit.dart';
+import '../../features/dashboard/presentation/cubit/record_payment_cubit.dart';
+import '../../features/expenses/presentation/cubit/add_expense_cubit.dart';
+import '../../features/orders/presentation/cubit/create_order_cubit.dart';
+import '../../features/orders/presentation/cubit/order_detail_cubit.dart';
+import '../../features/orders/presentation/cubit/orders_list_cubit.dart';
+import '../../features/reports/presentation/cubit/reports_cubit.dart';
+import '../../features/settings/presentation/cubit/carpet_sizes_management_cubit.dart';
+import '../../features/settings/presentation/cubit/expense_categories_management_cubit.dart';
+import '../../features/settings/presentation/cubit/item_types_management_cubit.dart';
+import '../../features/settings/presentation/cubit/services_management_cubit.dart';
+import '../../features/settings/presentation/cubit/settings_cubit.dart';
+import '../../features/settings/presentation/cubit/storage_locations_management_cubit.dart';
+import '../../features/storage/presentation/cubit/storage_cubit.dart';
+
+final getIt = GetIt.instance;
+
+Future<void> initDependencies({bool? enableDevTestData}) async {
+  // 1. Core Local Database
+  if (!getIt.isRegistered<AppDatabase>()) {
+    getIt.registerLazySingleton<AppDatabase>(() => AppDatabase());
+  }
+
+  // 2. DAOs
+  if (!getIt.isRegistered<CustomersDao>()) {
+    getIt.registerLazySingleton<CustomersDao>(() => CustomersDao(getIt<AppDatabase>()));
+  }
+  if (!getIt.isRegistered<OrdersDao>()) {
+    getIt.registerLazySingleton<OrdersDao>(() => OrdersDao(getIt<AppDatabase>()));
+  }
+  if (!getIt.isRegistered<PaymentsDao>()) {
+    getIt.registerLazySingleton<PaymentsDao>(() => PaymentsDao(getIt<AppDatabase>()));
+  }
+  if (!getIt.isRegistered<StorageLocationsDao>()) {
+    getIt.registerLazySingleton<StorageLocationsDao>(() => StorageLocationsDao(getIt<AppDatabase>()));
+  }
+  if (!getIt.isRegistered<StorageRecordsDao>()) {
+    getIt.registerLazySingleton<StorageRecordsDao>(() => StorageRecordsDao(getIt<AppDatabase>()));
+  }
+  if (!getIt.isRegistered<ServicesDao>()) {
+    getIt.registerLazySingleton<ServicesDao>(() => ServicesDao(getIt<AppDatabase>()));
+  }
+  if (!getIt.isRegistered<ItemTypesDao>()) {
+    getIt.registerLazySingleton<ItemTypesDao>(() => ItemTypesDao(getIt<AppDatabase>()));
+  }
+  if (!getIt.isRegistered<ItemDefinitionsDao>()) {
+    getIt.registerLazySingleton<ItemDefinitionsDao>(() => ItemDefinitionsDao(getIt<AppDatabase>()));
+  }
+  if (!getIt.isRegistered<CarpetSizesDao>()) {
+    getIt.registerLazySingleton<CarpetSizesDao>(() => CarpetSizesDao(getIt<AppDatabase>()));
+  }
+  if (!getIt.isRegistered<ExpenseCategoriesDao>()) {
+    getIt.registerLazySingleton<ExpenseCategoriesDao>(() => ExpenseCategoriesDao(getIt<AppDatabase>()));
+  }
+  if (!getIt.isRegistered<ExpensesDao>()) {
+    getIt.registerLazySingleton<ExpensesDao>(() => ExpensesDao(getIt<AppDatabase>()));
+  }
+  if (!getIt.isRegistered<BusinessSettingsDao>()) {
+    getIt.registerLazySingleton<BusinessSettingsDao>(() => BusinessSettingsDao(getIt<AppDatabase>()));
+  }
+  if (!getIt.isRegistered<SyncOperationsDao>()) {
+    getIt.registerLazySingleton<SyncOperationsDao>(() => SyncOperationsDao(getIt<AppDatabase>()));
+  }
+
+  // 3. Repositories (Bound to Domain interfaces)
+  if (!getIt.isRegistered<CustomerRepository>()) {
+    getIt.registerLazySingleton<CustomerRepository>(
+      () => CustomerRepositoryImpl(
+        customersDao: getIt<CustomersDao>(),
+        syncOperationsDao: getIt<SyncOperationsDao>(),
+        db: getIt<AppDatabase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<OrderRepository>()) {
+    getIt.registerLazySingleton<OrderRepository>(
+      () => OrderRepositoryImpl(
+        ordersDao: getIt<OrdersDao>(),
+        storageRecordsDao: getIt<StorageRecordsDao>(),
+        syncOperationsDao: getIt<SyncOperationsDao>(),
+        db: getIt<AppDatabase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<PaymentRepository>()) {
+    getIt.registerLazySingleton<PaymentRepository>(
+      () => PaymentRepositoryImpl(
+        paymentsDao: getIt<PaymentsDao>(),
+        ordersDao: getIt<OrdersDao>(),
+        syncOperationsDao: getIt<SyncOperationsDao>(),
+        db: getIt<AppDatabase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<StorageRepository>()) {
+    getIt.registerLazySingleton<StorageRepository>(
+      () => StorageRepositoryImpl(
+        storageRecordsDao: getIt<StorageRecordsDao>(),
+        storageLocationsDao: getIt<StorageLocationsDao>(),
+        syncOperationsDao: getIt<SyncOperationsDao>(),
+        ordersDao: getIt<OrdersDao>(),
+        db: getIt<AppDatabase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<StorageLocationRepository>()) {
+    getIt.registerLazySingleton<StorageLocationRepository>(
+      () => StorageLocationRepositoryImpl(
+        storageLocationsDao: getIt<StorageLocationsDao>(),
+        storageRecordsDao: getIt<StorageRecordsDao>(),
+        syncOperationsDao: getIt<SyncOperationsDao>(),
+        db: getIt<AppDatabase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<ServiceRepository>()) {
+    getIt.registerLazySingleton<ServiceRepository>(
+      () => ServiceRepositoryImpl(
+        servicesDao: getIt<ServicesDao>(),
+        syncOperationsDao: getIt<SyncOperationsDao>(),
+        db: getIt<AppDatabase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<ItemTypeRepository>()) {
+    getIt.registerLazySingleton<ItemTypeRepository>(
+      () => ItemTypeRepositoryImpl(
+        itemTypesDao: getIt<ItemTypesDao>(),
+        syncOperationsDao: getIt<SyncOperationsDao>(),
+        db: getIt<AppDatabase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<ItemDefinitionRepository>()) {
+    getIt.registerLazySingleton<ItemDefinitionRepository>(
+      () => ItemDefinitionRepositoryImpl(
+        itemDefinitionsDao: getIt<ItemDefinitionsDao>(),
+        syncOperationsDao: getIt<SyncOperationsDao>(),
+        db: getIt<AppDatabase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<CarpetSizeRepository>()) {
+    getIt.registerLazySingleton<CarpetSizeRepository>(
+      () => CarpetSizeRepositoryImpl(
+        carpetSizesDao: getIt<CarpetSizesDao>(),
+        syncOperationsDao: getIt<SyncOperationsDao>(),
+        db: getIt<AppDatabase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<ExpenseCategoryRepository>()) {
+    getIt.registerLazySingleton<ExpenseCategoryRepository>(
+      () => ExpenseCategoryRepositoryImpl(
+        expenseCategoriesDao: getIt<ExpenseCategoriesDao>(),
+        syncOperationsDao: getIt<SyncOperationsDao>(),
+        db: getIt<AppDatabase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<ExpenseRepository>()) {
+    getIt.registerLazySingleton<ExpenseRepository>(
+      () => ExpenseRepositoryImpl(
+        expensesDao: getIt<ExpensesDao>(),
+        syncOperationsDao: getIt<SyncOperationsDao>(),
+        db: getIt<AppDatabase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<ReportsRepository>()) {
+    getIt.registerLazySingleton<ReportsRepository>(
+      () => ReportsRepositoryImpl(
+        ordersDao: getIt<OrdersDao>(),
+        paymentsDao: getIt<PaymentsDao>(),
+        expensesDao: getIt<ExpensesDao>(),
+        expenseRepository: getIt<ExpenseRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<DashboardRepository>()) {
+    getIt.registerLazySingleton<DashboardRepository>(
+      () => DashboardRepositoryImpl(
+        ordersDao: getIt<OrdersDao>(),
+        orderRepository: getIt<OrderRepository>(),
+        paymentRepository: getIt<PaymentRepository>(),
+        storageRepository: getIt<StorageRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<SettingsRepository>()) {
+    getIt.registerLazySingleton<SettingsRepository>(
+      () => SettingsRepositoryImpl(
+        settingsDao: getIt<BusinessSettingsDao>(),
+        syncOperationsDao: getIt<SyncOperationsDao>(),
+        db: getIt<AppDatabase>(),
+      ),
+    );
+  }
+
+  // 4. Application UseCases
+  if (!getIt.isRegistered<CreateOrderUseCase>()) {
+    getIt.registerLazySingleton<CreateOrderUseCase>(
+      () => CreateOrderUseCase(
+        orderRepository: getIt<OrderRepository>(),
+        customerRepository: getIt<CustomerRepository>(),
+        serviceRepository: getIt<ServiceRepository>(),
+        itemTypeRepository: getIt<ItemTypeRepository>(),
+        itemDefinitionRepository: getIt<ItemDefinitionRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<StoreOrderItemsUseCase>()) {
+    getIt.registerLazySingleton<StoreOrderItemsUseCase>(
+      () => StoreOrderItemsUseCase(
+        orderRepository: getIt<OrderRepository>(),
+        storageRepository: getIt<StorageRepository>(),
+        storageLocationRepository: getIt<StorageLocationRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<MoveStoredItemUseCase>()) {
+    getIt.registerLazySingleton<MoveStoredItemUseCase>(
+      () => MoveStoredItemUseCase(
+        orderRepository: getIt<OrderRepository>(),
+        storageRepository: getIt<StorageRepository>(),
+        storageLocationRepository: getIt<StorageLocationRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<ChangeOrderStatusUseCase>()) {
+    getIt.registerLazySingleton<ChangeOrderStatusUseCase>(
+      () => ChangeOrderStatusUseCase(getIt<OrderRepository>()),
+    );
+  }
+  if (!getIt.isRegistered<CompleteOrderUseCase>()) {
+    getIt.registerLazySingleton<CompleteOrderUseCase>(
+      () => CompleteOrderUseCase(
+        orderRepository: getIt<OrderRepository>(),
+        paymentRepository: getIt<PaymentRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<CancelOrderUseCase>()) {
+    getIt.registerLazySingleton<CancelOrderUseCase>(
+      () => CancelOrderUseCase(getIt<OrderRepository>()),
+    );
+  }
+  if (!getIt.isRegistered<UnstoreItemUseCase>()) {
+    getIt.registerLazySingleton<UnstoreItemUseCase>(
+      () => UnstoreItemUseCase(
+        storageRepository: getIt<StorageRepository>(),
+      ),
+    );
+  }
+
+  // 5. Presentation Cubits
+  if (!getIt.isRegistered<OrdersListCubit>()) {
+    getIt.registerFactory<OrdersListCubit>(
+      () => OrdersListCubit(
+        orderRepository: getIt<OrderRepository>(),
+        customerRepository: getIt<CustomerRepository>(),
+        paymentRepository: getIt<PaymentRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<CreateOrderCubit>()) {
+    getIt.registerFactory<CreateOrderCubit>(
+      () => CreateOrderCubit(
+        customerRepository: getIt<CustomerRepository>(),
+        itemTypeRepository: getIt<ItemTypeRepository>(),
+        itemDefinitionRepository: getIt<ItemDefinitionRepository>(),
+        serviceRepository: getIt<ServiceRepository>(),
+        carpetSizeRepository: getIt<CarpetSizeRepository>(),
+        settingsRepository: getIt<SettingsRepository>(),
+        createOrderUseCase: getIt<CreateOrderUseCase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<OrderDetailCubit>()) {
+    getIt.registerFactory<OrderDetailCubit>(
+      () => OrderDetailCubit(
+        orderRepository: getIt<OrderRepository>(),
+        customerRepository: getIt<CustomerRepository>(),
+        paymentRepository: getIt<PaymentRepository>(),
+        storageRepository: getIt<StorageRepository>(),
+        storageLocationRepository: getIt<StorageLocationRepository>(),
+        settingsRepository: getIt<SettingsRepository>(),
+        storeOrderItemsUseCase: getIt<StoreOrderItemsUseCase>(),
+        changeOrderStatusUseCase: getIt<ChangeOrderStatusUseCase>(),
+        completeOrderUseCase: getIt<CompleteOrderUseCase>(),
+        cancelOrderUseCase: getIt<CancelOrderUseCase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<CustomersListCubit>()) {
+    getIt.registerFactory<CustomersListCubit>(
+      () => CustomersListCubit(
+        customerRepository: getIt<CustomerRepository>(),
+        orderRepository: getIt<OrderRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<CustomerDetailCubit>()) {
+    getIt.registerFactory<CustomerDetailCubit>(
+      () => CustomerDetailCubit(
+        customerRepository: getIt<CustomerRepository>(),
+        orderRepository: getIt<OrderRepository>(),
+        paymentRepository: getIt<PaymentRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<StorageCubit>()) {
+    getIt.registerFactory<StorageCubit>(
+      () => StorageCubit(
+        storageRepository: getIt<StorageRepository>(),
+        storageLocationRepository: getIt<StorageLocationRepository>(),
+        itemTypeRepository: getIt<ItemTypeRepository>(),
+        serviceRepository: getIt<ServiceRepository>(),
+        storeOrderItemsUseCase: getIt<StoreOrderItemsUseCase>(),
+        moveStoredItemUseCase: getIt<MoveStoredItemUseCase>(),
+        unstoreItemUseCase: getIt<UnstoreItemUseCase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<ReportsCubit>()) {
+    getIt.registerFactory<ReportsCubit>(
+      () => ReportsCubit(
+        reportsRepository: getIt<ReportsRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<DashboardCubit>()) {
+    getIt.registerFactory<DashboardCubit>(
+      () => DashboardCubit(
+        dashboardRepository: getIt<DashboardRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<AddExpenseCubit>()) {
+    getIt.registerFactory<AddExpenseCubit>(
+      () => AddExpenseCubit(
+        categoryRepository: getIt<ExpenseCategoryRepository>(),
+        expenseRepository: getIt<ExpenseRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<RecordPaymentCubit>()) {
+    getIt.registerFactory<RecordPaymentCubit>(
+      () => RecordPaymentCubit(
+        orderRepository: getIt<OrderRepository>(),
+        paymentRepository: getIt<PaymentRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<SettingsCubit>()) {
+    getIt.registerFactory<SettingsCubit>(
+      () => SettingsCubit(
+        settingsRepository: getIt<SettingsRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<ServicesManagementCubit>()) {
+    getIt.registerFactory<ServicesManagementCubit>(
+      () => ServicesManagementCubit(
+        serviceRepository: getIt<ServiceRepository>(),
+        itemTypeRepository: getIt<ItemTypeRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<ItemTypesManagementCubit>()) {
+    getIt.registerFactory<ItemTypesManagementCubit>(
+      () => ItemTypesManagementCubit(
+        itemTypeRepository: getIt<ItemTypeRepository>(),
+        itemDefinitionRepository: getIt<ItemDefinitionRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<CarpetSizesManagementCubit>()) {
+    getIt.registerFactory<CarpetSizesManagementCubit>(
+      () => CarpetSizesManagementCubit(
+        carpetSizeRepository: getIt<CarpetSizeRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<StorageLocationsManagementCubit>()) {
+    getIt.registerFactory<StorageLocationsManagementCubit>(
+      () => StorageLocationsManagementCubit(
+        storageLocationRepository: getIt<StorageLocationRepository>(),
+        itemTypeRepository: getIt<ItemTypeRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<ExpenseCategoriesManagementCubit>()) {
+    getIt.registerFactory<ExpenseCategoriesManagementCubit>(
+      () => ExpenseCategoriesManagementCubit(
+        expenseCategoryRepository: getIt<ExpenseCategoryRepository>(),
+      ),
+    );
+  }
+
+  // 6. Optional Dev / Test Data seeding (Strictly gated by flag or parameter)
+  final shouldSeedDevData = enableDevTestData ?? DevTestData.isEnabled;
+  if (shouldSeedDevData) {
+    await DevTestData.seedDevData(getIt<AppDatabase>());
+  }
+}
+
