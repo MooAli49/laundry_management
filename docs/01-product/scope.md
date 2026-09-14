@@ -1019,3 +1019,87 @@ Changes should be documented before implementation.
 The relevant documentation must be updated whenever an approved scope change occurs.
 
 The implementation must always reflect the latest approved documentation.
+
+---
+
+# 35. Current Active Implementation Milestone
+
+## Offline / Sync Integration
+
+Status:
+
+    Active Implementation Phase
+
+### 35.1 What This Milestone Is
+
+Offline / Sync Integration is the current active implementation milestone.
+
+It is **not** a new V1 business feature.
+
+It is an **infrastructure / integration** phase that connects the existing Local-First application to the approved Supabase remote backend, while preserving all existing V1 business rules, entity lifecycle states, and user workflows.
+
+The Orders module has completed its Local-First implementation and final E2E verification.
+
+### 35.2 Local-First Remains Mandatory
+
+V1 workflows remain Local-First.
+
+Network availability must not block normal approved V1 operations.
+
+The following must continue working without an active Internet connection:
+
+- Customer management
+- Order management
+- Order item management
+- Storage management
+- Payment recording
+- Expense management
+- Dashboard
+- Reports
+- Settings
+
+The local database remains the operational source of truth for the Flutter client.
+
+The UI must continue to reflect successful local writes immediately, without waiting for remote acknowledgment.
+
+### 35.3 What Is Being Implemented
+
+The following synchronization infrastructure is being implemented in this milestone:
+
+- Durable Sync Queue (persisted locally).
+- Atomic local mutation + sync operation enqueue.
+- Sync Engine (retry, ordering, failure classification, crash recovery).
+- Remote Data Sources communicating with Supabase via Retrofit + Dio.
+- Idempotent remote operation processing.
+- Dependency-aware synchronization ordering.
+- Entity-specific conflict handling strategy.
+- Financial record protection.
+
+### 35.4 SaaS / Multi-Tenant Readiness
+
+The architecture should remain suitable for future multi-device / multi-tenant / SaaS evolution.
+
+This is an architectural goal only.
+
+The following are **not** part of the current implementation:
+
+- Tenants
+- Branches
+- Roles
+- Permissions
+- Subscription management
+- Multi-tenant UI
+- Employee management
+- User accounts
+
+These remain explicitly out of scope until a separate milestone introduces them.
+
+### 35.5 Scope Boundary
+
+The following are not introduced by this milestone:
+
+- New V1 business features.
+- Changes to existing Order lifecycle statuses.
+- Sync-lifecycle statuses on business entities (PendingSync, Syncing, SyncFailed).
+- User-facing multi-tenant or SaaS functionality.
+- Complex distributed conflict resolution (advanced multi-device merge algorithms, CRDTs, etc.).

@@ -1147,7 +1147,143 @@ Implementation convenience must not override approved business requirements.
 
 ---
 
-## 55. Current Approved Decisions Summary
+## 55. Offline / Sync Integration — Approved / Active Implementation Phase
+
+Status:
+
+    Approved / Active
+
+### 55.1 Phase Description
+
+Offline / Sync Integration is now the **active** implementation phase.
+
+It is not a new V1 business feature.
+
+It is an infrastructure / integration phase that connects the existing Local-First application to the approved Supabase remote backend while preserving all existing business rules.
+
+The Orders module has completed its Local-First implementation and final E2E verification.
+
+### 55.2 Remote Backend Platform
+
+    Supabase
+
+Status:
+
+    Approved
+
+Supabase is the approved remote backend platform for the Offline / Sync Integration phase.
+
+Supabase must remain behind the approved Remote Data Source boundary.
+
+Feature-level code must not directly call Supabase.
+
+### 55.3 Approved Architectural Constraints
+
+The following constraints are binding for this phase and for all future phases unless explicitly superseded by a documented decision.
+
+#### 55.3.1 Local-First Write Path
+
+Local persistence is the primary client operation.
+
+A network connection must never be required for normal approved V1 workflows.
+
+Synchronization happens asynchronously after the local operation succeeds.
+
+#### 55.3.2 Stable Entity Identity
+
+Business entities that participate in synchronization must use stable UUIDs.
+
+The same entity UUID must remain stable between local and remote storage.
+
+The Sync Engine must never replace a local entity UUID with a newly generated remote ID.
+
+#### 55.3.3 Stable Synchronization Operation Identity
+
+Every synchronization operation must have a stable operation ID.
+
+Retries must reuse the same operation ID.
+
+Retrying an operation must not create duplicate logical records.
+
+#### 55.3.4 Atomic Enqueue
+
+A local business mutation and the corresponding synchronization operation must be persisted atomically in the same local transaction.
+
+We must never end up with:
+
+    business change without sync operation
+
+OR:
+
+    sync operation without the corresponding business change
+
+#### 55.3.5 Idempotent Remote Processing
+
+The remote / Supabase side must safely process retries.
+
+Duplicate delivery of the same synchronization operation must not create duplicate business records.
+
+#### 55.3.6 Separation Between Business State and Synchronization State
+
+Sync state must NOT become part of business lifecycle state.
+
+Do not introduce business statuses such as:
+
+    PendingSync
+    Syncing
+    SyncFailed
+
+Order lifecycle remains exactly the approved lifecycle:
+
+    Processing → Ready → Completed
+    or
+    Processing → Cancelled
+
+#### 55.3.7 Conflict Handling
+
+Conflict resolution must be deterministic.
+
+It must be defined at the entity / business-rule level.
+
+It must NOT be delegated to UI behavior.
+
+Do not assume generic last-write-wins is automatically correct for every entity.
+
+#### 55.3.8 Financial Safety
+
+Payments and other financial records require special protection.
+
+Synchronization must never silently overwrite, duplicate, or lose financial history.
+
+#### 55.3.9 Dependency-Aware Synchronization
+
+Synchronization order must respect entity relationships and dependencies.
+
+Parent / reference data must be available before dependent records when required by the backend.
+
+Example:
+
+    Customer must exist remotely before an Order referencing that Customer is synchronized.
+
+#### 55.3.10 Architecture Boundary
+
+Feature Cubits and Widgets must NOT contain synchronization engine logic.
+
+They must not manage queues, retries, conflict resolution, connectivity detection, or synchronization triggers.
+
+Sync belongs to the Data / Infrastructure layer and communicates through the approved repository / application boundaries.
+
+#### 55.3.11 Future SaaS Readiness
+
+The architecture should remain suitable for future multi-device / multi-tenant / SaaS evolution.
+
+However, SaaS functionality itself is NOT part of the current implementation.
+
+Do NOT introduce tenants, branches, roles, permissions, subscription management, or multi-tenant UI as part of this phase.
+
+---
+
+## 56. Current Approved Decisions Summary
 
 The following decisions are currently approved:
 
@@ -1177,6 +1313,8 @@ The following decisions are currently approved:
     +
     Persistent Sync Queue
     +
+    Supabase (remote backend for Offline / Sync Integration)
+    +
     Pagination
     +
     Local Search
@@ -1203,7 +1341,7 @@ The following decisions are currently approved:
 
 ---
 
-## 56. Current TBD Decisions
+## 57. Current TBD Decisions
 
 The following technical decisions are intentionally not finalized yet:
 
@@ -1226,7 +1364,7 @@ They are Approved technical decisions.
 
 ---
 
-## 57. Deferred Decisions
+## 58. Deferred Decisions
 
 The following are intentionally deferred from V1:
 
@@ -1243,7 +1381,7 @@ These should not be implemented unless requirements change.
 
 ---
 
-## 58. Final Technical Direction
+## 59. Final Technical Direction
 
 The V1 technical direction is:
 
@@ -1287,7 +1425,7 @@ The exact technology choices marked as TBD must be finalized before implementati
 
 ---
 
-## 59. Final Rule
+## 60. Final Rule
 
 The most important technical rule is:
 

@@ -116,28 +116,32 @@ The current implementation phase includes:
 - Seed data
 - Offline-first local operation
 
-### 4.2 Deferred Implementation Scope
+### 4.2 Active and Deferred Implementation Scope
 
-The following are intentionally deferred until the local Flutter implementation is complete and the corresponding requirements are approved:
+The **Offline / Sync Integration** phase is now active. The following are now being implemented:
 
-- Backend implementation
-- Production remote API integration
-- Production synchronization execution
-- Advanced multi-device conflict resolution
-- Real-time synchronization
-- Complex background synchronization
-- Distributed locking
-- CRDTs
-- Event sourcing
-- Advanced caching architecture
-- Authentication implementation unless explicitly required
-- Advanced delivery management
-- Advanced analytics
-- AI assistant
-- Barcode workflows
-- Other future features not approved for V1
+- Synchronization infrastructure (Sync Queue, Sync Engine, Remote Data Sources).
+- Remote API integration with the approved Supabase backend via Retrofit + Dio.
+- Conflict handling per the approved entity-specific strategy.
 
-The implementation agent must not begin deferred functionality simply because the architecture is synchronization-ready or because corresponding folders exist.
+The following remain intentionally deferred:
+
+- Advanced multi-device conflict resolution.
+- Real-time synchronization.
+- Complex background synchronization.
+- Distributed locking.
+- CRDTs.
+- Event sourcing.
+- Advanced caching architecture.
+- Authentication implementation unless explicitly required.
+- Advanced delivery management.
+- Advanced analytics.
+- AI assistant.
+- Barcode workflows.
+- Multi-tenant / SaaS functionality.
+- Other future features not approved for V1.
+
+The implementation agent must not implement deferred functionality simply because the architecture is synchronization-ready or because corresponding folders exist.
 
 ---
 

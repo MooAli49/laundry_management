@@ -40,21 +40,38 @@ Local operation must not depend on network availability.
 
 ## 2. Current Implementation Status
 
-Synchronization is approved architecturally but deferred from the current local Flutter implementation phase.
+> **ACTIVE IMPLEMENTATION PHASE**
 
-The current phase focuses on completing the local application.
+Offline / Sync Integration is now the **active** implementation phase.
 
-Therefore, during the current implementation phase:
+The Orders module has completed its Local-First implementation and final E2E verification.
 
-- Local database must work independently.
-- Repositories must support local operations.
-- Cubits must work without networking.
-- The Sync Engine does not need to be implemented yet.
-- Remote API calls do not need to be implemented yet.
-- Background synchronization does not need to be implemented yet.
-- Conflict resolution does not need to be implemented yet.
+The project is now connecting the existing Local-First application to the approved Supabase remote backend.
 
-The codebase must, however, avoid architectural decisions that would make future synchronization difficult to add.
+This phase is an **infrastructure / integration** phase.
+
+It is not a new V1 business feature.
+
+Existing V1 business rules, domain entities, and lifecycle states remain unchanged.
+
+### What must be implemented in this phase:
+
+- Durable Sync Queue (local database, persisted).
+- Atomic local mutation + sync operation enqueue.
+- Stable operation IDs preserved across retries.
+- Sync Engine with retry, ordering, failure classification, and crash recovery.
+- Remote Data Sources communicating with Supabase via Retrofit + Dio.
+- Idempotent remote processing.
+- Dependency-aware synchronization ordering.
+- Conflict handling per the approved entity-specific strategy.
+- Financial record protection.
+
+### What remains unchanged from the Local-First phase:
+
+- All local workflows must continue working without network access.
+- The local database remains the operational source of truth.
+- Cubits and Widgets must remain unaware of sync mechanics.
+- Business entity lifecycle statuses must not include sync states.
 
 ---
 
@@ -1210,21 +1227,74 @@ No orphan sync operation should remain.
 
 ---
 
-## 59. Current Phase Restrictions
+## 59. Approved Architectural Constraints for This Phase
 
-Until the local implementation phase is complete, the coding agent must not implement:
+The following architectural decisions are approved and must be followed during the Offline / Sync Integration phase.
 
-- Sync Engine
-- Background sync
-- Remote synchronization
-- Conflict resolution
-- Network-dependent UI
-- Retry scheduler
-- Connectivity-triggered sync
+These are the binding decisions documented in `technical-decisions.md`.
 
-unless explicitly requested as part of the networking/sync implementation phase.
+1. **Local-First write path.**
+   Local persistence is the primary client operation.
+   A network connection must never be required for normal approved V1 workflows.
+   Synchronization happens asynchronously after the local operation.
 
-The documentation exists now to establish the future architecture.
+2. **Stable entity identity.**
+   Business entities that participate in synchronization must use stable UUIDs.
+   The same entity UUID must remain stable between local and remote storage.
+   The Sync Engine must never replace a local entity UUID with a new remote ID.
+
+3. **Stable synchronization operation identity.**
+   Every synchronization operation must have a stable operation ID.
+   Retries must reuse the same operation ID.
+   Retrying an operation must not create duplicate logical records.
+
+4. **Atomic enqueue.**
+   A local business mutation and the corresponding synchronization operation must be persisted atomically in the same local transaction.
+   We must never end up with a business change without a sync operation, or a sync operation without its corresponding business change.
+
+5. **Idempotent remote processing.**
+   The remote / Supabase side must safely process retries.
+   Duplicate delivery of the same synchronization operation must not create duplicate business records.
+
+6. **Separation between business state and synchronization state.**
+   Sync state must NOT become part of business lifecycle state.
+   Do not introduce business statuses such as PendingSync, Syncing, or SyncFailed.
+   Order lifecycle remains exactly the approved lifecycle (Processing → Ready → Completed or Cancelled).
+
+7. **Conflict handling.**
+   Conflict resolution must be deterministic.
+   It must be defined at the entity / business-rule level.
+   It must NOT be delegated to UI behavior.
+   Do not assume generic last-write-wins is automatically correct for every entity.
+
+8. **Financial safety.**
+   Payments and other financial records require special protection.
+   Synchronization must never silently overwrite, duplicate, or lose financial history.
+
+9. **Dependency-aware synchronization.**
+   Synchronization order must respect entity relationships / dependencies.
+   Parent / reference data must be available before dependent records when required.
+   Example: Customer must exist remotely before dependent Orders are synchronized.
+
+10. **Architecture boundary.**
+    Feature Cubits and Widgets must NOT contain synchronization engine logic.
+    They must not manage queues, retries, conflict resolution, connectivity synchronization, etc.
+    Sync belongs to the Data / Infrastructure layer and communicates through approved repository / application boundaries.
+
+11. **Supabase.**
+    Supabase is the approved remote backend platform for this phase.
+    Supabase must remain behind the approved Remote Data Source boundary.
+    Feature-level code must not directly call Supabase.
+
+12. **Future SaaS readiness.**
+    The architecture should remain suitable for future multi-device / multi-tenant / SaaS evolution.
+    However, SaaS functionality itself is NOT part of the current implementation.
+    Do NOT introduce tenants, branches, roles, permissions, subscription management, or multi-tenant UI as part of this phase.
+
+13. **Current phase scope.**
+    Offline / Sync Integration is an infrastructure / integration phase.
+    It is not a new business feature.
+    It connects the existing Local-First application to the approved remote backend while preserving all existing business rules.
 
 ---
 

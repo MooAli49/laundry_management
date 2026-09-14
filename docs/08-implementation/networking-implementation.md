@@ -12,9 +12,9 @@ Networking is part of the Data/Core infrastructure boundary.
 
 The Presentation Layer must never communicate with the network directly.
 
-The current V1 implementation is local-first. Backend networking and synchronization are intentionally deferred until the local Flutter implementation is complete.
+The project is now in the **Offline / Sync Integration** implementation phase. Networking infrastructure (Dio + Retrofit, Remote Data Sources) is now being implemented to support synchronization with the approved Supabase remote backend.
 
-Therefore, this document defines the future networking implementation contract without requiring networking to be implemented prematurely.
+The Local-First constraint remains fully in force: local workflows must continue to work without network access.
 
 ---
 
@@ -22,17 +22,16 @@ Therefore, this document defines the future networking implementation contract w
 
 Networking is:
 
-Approved for the final V1 architecture.
+    Approved / Active
 
-Deferred for the current local implementation phase.
+The Offline / Sync Integration phase is now active. Networking infrastructure is now being implemented to connect the local application to the approved Supabase remote backend via the Sync Engine and Remote Data Sources.
 
-The current implementation must continue to work without:
+The following Local-First constraints remain unchanged:
 
-- Internet access
-- Dio
-- Retrofit
-- Remote API availability
-- Synchronization
+- All V1 workflows must continue to work without Internet access.
+- Dio and Retrofit must not be called from normal local business paths.
+- Feature Cubits must not directly perform HTTP requests.
+- The local database remains the operational source of truth.
 
 The local database remains the operational source of truth during normal application operation.
 
