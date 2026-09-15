@@ -24,6 +24,11 @@ class SyncEngine {
   final DateTime Function() _clock;
 
   bool _isSyncing = false;
+  bool _isInitialized = false;
+  bool _isDisposed = false;
+  StreamSubscription<bool>? _connectivitySubscription;
+  Timer? _periodicTimer;
+
   SyncEngineState _state = const SyncEngineState.idle();
   final StreamController<SyncEngineState> _stateController =
       StreamController<SyncEngineState>.broadcast();
@@ -51,13 +56,63 @@ class SyncEngine {
   /// Whether a sync cycle is currently active.
   bool get isSyncing => _isSyncing;
 
+  /// Whether the sync engine has been initialized.
+  bool get isInitialized => _isInitialized;
+
+  /// Whether the sync engine has been disposed.
+  bool get isDisposed => _isDisposed;
+
+  /// Initializes the synchronization engine lifecycle and foreground triggers.
+  ///
+  /// Subscribes to [NetworkInfo.onConnectivityChanged] to automatically trigger
+  /// [sync] when connectivity is restored to true.
+  /// Starts an optional [periodicSyncInterval] timer (defaults to 15 minutes)
+  /// that triggers [sync] while the application is foregrounded.
+  ///
+  /// If [triggerInitialSync] is true, triggers an initial [sync] asynchronously
+  /// without blocking application startup.
+  ///
+  /// Calling [initialize] multiple times is safe and idempotent.
+  Future<void> initialize({
+    bool triggerInitialSync = true,
+    Duration? periodicSyncInterval = const Duration(minutes: 15),
+  }) async {
+    if (_isDisposed || _isInitialized) {
+      return;
+    }
+    _isInitialized = true;
+
+    // 1. Subscribe to network connectivity changes
+    _connectivitySubscription = _networkInfo.onConnectivityChanged.listen((
+      isConnected,
+    ) {
+      if (_isDisposed) return;
+      if (isConnected) {
+        unawaited(sync());
+      }
+    });
+
+    // 2. Start optional periodic foreground sync timer
+    if (periodicSyncInterval != null && periodicSyncInterval > Duration.zero) {
+      _periodicTimer = Timer.periodic(periodicSyncInterval, (_) {
+        if (_isDisposed) return;
+        unawaited(sync());
+      });
+    }
+
+    // 3. Trigger initial sync asynchronously (fire-and-forget, non-blocking)
+    if (triggerInitialSync) {
+      unawaited(sync());
+    }
+  }
+
   /// Triggers a synchronization cycle across eligible operations in the queue.
   ///
   /// If a cycle is already in progress, returns the current in-progress state.
   /// If the device is offline, returns the current state without modifying the queue.
   Future<SyncEngineState> sync() async {
-    // 1. Re-entrancy / Concurrency guard
-    if (_isSyncing) {
+    // 1. Re-entrancy / Concurrency guard & disposal check
+    if (_isDisposed || _isSyncing) {
       return _state;
     }
 
@@ -110,11 +165,15 @@ class SyncEngine {
 
       // 4. Sequential processing
       for (var i = 0; i < operations.length; i++) {
+        if (_isDisposed) {
+          break;
+        }
+
         final op = operations[i];
 
         // Check if connectivity was lost mid-processing
         final stillConnected = await _networkInfo.isConnected;
-        if (!stillConnected) {
+        if (!stillConnected || _isDisposed) {
           // Stop processing safely without marking current unconfirmed operation as synced
           break;
         }
@@ -264,6 +323,13 @@ class SyncEngine {
   }
 
   void dispose() {
-    _stateController.close();
+    _isDisposed = true;
+    _connectivitySubscription?.cancel();
+    _connectivitySubscription = null;
+    _periodicTimer?.cancel();
+    _periodicTimer = null;
+    if (!_stateController.isClosed) {
+      _stateController.close();
+    }
   }
 }

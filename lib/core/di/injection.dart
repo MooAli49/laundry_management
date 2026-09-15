@@ -230,6 +230,7 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
         retryPolicy: getIt<SyncRetryPolicy>(),
         errorClassifier: getIt<SyncErrorClassifier>(),
       ),
+      dispose: (engine) => engine.dispose(),
     );
   }
 
