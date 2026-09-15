@@ -910,21 +910,26 @@ The Domain must remain independent from networking technology.
 
 ---
 
-## 44. No Premature Networking Implementation
+## 44. Networking Implementation Phase
 
-During the current local Flutter implementation phase:
+The local-only phase has been completed.
 
-Do not:
+The project has now entered the **Offline / Sync Integration** phase, and networking infrastructure (Dio + Retrofit + Remote Data Sources) is now being implemented.
 
-- Add Dio merely because it is approved for future use.
-- Add Retrofit merely because it is approved for future use.
-- Create API endpoints that are not currently required.
-- Implement authentication.
-- Implement synchronization.
-- Implement remote conflict resolution.
-- Replace local operations with network calls.
+The following continue to be prohibited in this and all future phases:
 
-The goal is to complete the local operational implementation first.
+- Calling Dio or Retrofit directly from normal local-only business operations.
+- Replacing local operations with blocking network calls.
+- Creating API endpoints that are not required by the approved sync architecture.
+- Implementing end-user authentication (login/registration) in V1.
+- Making local workflows dependent on remote availability.
+
+The following may now be implemented as part of the active Offline / Sync Integration phase:
+
+- Centralized Dio client configuration.
+- Retrofit API clients for approved synchronization endpoints.
+- Remote Data Sources used exclusively by the Sync Engine.
+- Supabase Edge Function integration behind the approved Remote Data Source boundary.
 
 ---
 
@@ -944,23 +949,27 @@ The networking implementation must not introduce these concepts prematurely.
 
 ---
 
-## 46. Future Supabase Integration
+## 46. Supabase Integration
 
 The approved backend platform is:
 
-Supabase
+    Supabase
 
 The server-side API layer is:
 
-Supabase Edge Functions
+    Supabase Edge Functions
 
 The Flutter networking layer is:
 
-Dio + Retrofit
+    Dio + Retrofit
 
-The Flutter client should communicate through the approved API boundary rather than coupling feature code directly to backend-specific infrastructure.
+Supabase is now the active remote synchronization backend for the Offline / Sync Integration phase.
 
-Do not allow individual features to directly depend on Supabase SDK behavior when the approved architecture requires the centralized API boundary.
+Supabase must remain behind the approved Remote Data Source boundary.
+
+The Flutter client communicates through the approved API boundary (Remote Data Source → Retrofit → Dio → Supabase Edge Functions).
+
+Individual features must not directly depend on Supabase SDK behavior.
 
 ---
 

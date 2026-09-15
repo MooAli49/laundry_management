@@ -467,16 +467,16 @@ Local data must preserve the approved database design.
 
 ## 22. Remote Data Layer
 
-Remote data infrastructure exists for the eventual synchronization architecture.
+Remote data infrastructure exists for synchronization with the backend.
 
 The approved networking technologies are:
 
 Dio
 Retrofit
 
-Remote implementation should not become the primary operational dependency of local workflows.
+Remote implementation must not become the primary operational dependency of local workflows.
 
-Remote API work is deferred until the synchronization phase.
+Remote API communication is active in the Offline / Sync Integration phase, operating behind the Remote Data Source boundary.
 
 ## 23. Data Models
 
@@ -852,26 +852,23 @@ Remote API
 
 Remote synchronization must not be mixed into presentation code.
 
-## 43. Synchronization Deferral
+## 43. Synchronization Phase Boundary
 
-Synchronization execution is deferred until the synchronization phase.
+The project has entered the Offline / Sync Integration phase.
 
-Do not implement advanced synchronization behavior during the initial local Flutter implementation.
+Core synchronization infrastructure (durable Sync Queue, atomic enqueue, Sync Engine, Retrofit + Dio, idempotent remote calls, exponential backoff retries) is now active.
 
-Do not add speculative:
+The following remain deferred from this phase:
 
-- Background sync
-- Conflict resolution
+- Platform-specific background sync
+- Advanced multi-device distributed conflict resolution
 - Real-time synchronization
 - Distributed locking
 - CRDTs
-- Advanced retry orchestration
 
-without an approved implementation phase.
+## 44. Sync-Integrated Architecture
 
-## 44. Sync-Ready Architecture
-
-Although synchronization execution is deferred, local architecture should remain compatible with it.
+Local architecture and remote synchronization integrate through the durable Sync Queue:
 
 Where required:
 
@@ -879,7 +876,7 @@ Business Data
 +
 Sync Operation
 
-should be treated as one logical transaction.
+are persisted atomically in the same database transaction.
 
 The exact synchronization behavior is defined by the synchronization documentation.
 

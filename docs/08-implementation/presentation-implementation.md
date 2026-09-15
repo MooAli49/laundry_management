@@ -786,32 +786,31 @@ Presentation code must not assume that the network is always available.
 
 Screens should primarily consume the local application state through repositories.
 
-The UI should remain useful when:
+The UI must remain fully operational when:
 
 - Internet is unavailable
 - Data has not synchronized yet
 - Changes are queued for synchronization
 
-Backend synchronization remains a separate concern and is not part of the current local implementation phase.
+Backend synchronization remains a separate infrastructure concern operating below the Repository boundary.
 
-Do not add network-dependent presentation behavior unless explicitly required by the current implementation scope.
+Presentation code must never perform network requests directly or block user interactions on synchronization.
 
 ---
 
 ## 27. Sync-Aware UI
 
-When synchronization-related information is eventually exposed to users, it must be represented through approved presentation state.
+When synchronization-related information is exposed to users, it must be represented through dedicated presentation state.
 
 Examples may include:
 
-- Pending sync
-- Synced
-- Sync failed
+- Sync status indicators (Pending, Synced, Failed)
 - Last synchronization time
+- Manual sync trigger (if approved)
 
-However, synchronization UI should not be implemented prematurely if the corresponding backend/sync implementation is deferred.
+Synchronization state must NOT be embedded into business entities (no syncStatus or lastSyncedAt in Order, Customer, Payment).
 
-The current local implementation must remain functional without backend synchronization.
+Presentation workflows must not depend on sync completion to proceed.
 
 ---
 

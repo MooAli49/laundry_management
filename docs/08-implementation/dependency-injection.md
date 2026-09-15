@@ -546,13 +546,11 @@ The testing strategy should remain consistent with the Data Layer implementation
 
 ---
 
-## 24. Future Networking Dependencies
+## 24. Networking Dependencies
 
-Backend networking is intentionally deferred from the current local implementation phase.
+With the project now entering the Offline / Sync Integration phase, networking dependencies (centralized Dio client, Retrofit API interfaces, Remote Data Sources) are registered through the centralized DI graph rather than constructed directly by repositories or Cubits.
 
-When networking is implemented later, its dependencies should be added to the DI graph rather than constructed directly by repositories or Cubits.
-
-The future conceptual graph may become:
+The conceptual dependency graph is:
 
 Presentation
 ↓
@@ -564,42 +562,38 @@ Local Data / Remote Data
 ↓
 Dio / Retrofit / Backend
 
-The current implementation must not add networking dependencies merely because the final architecture will eventually support them.
+Presentation and Cubits must not resolve or depend on Dio, Retrofit, or Remote Data Sources directly.
 
 ---
 
-## 25. Future Sync Dependencies
+## 25. Synchronization Dependencies
 
-Synchronization is also deferred from the current local implementation phase.
+With the project entering the Offline / Sync Integration phase, synchronization dependencies are registered through the same centralized DI mechanism (`get_it`).
 
-When synchronization is implemented later, its dependencies should be registered through the same DI mechanism.
+Sync infrastructure dependencies include:
 
-Potential future dependencies may include:
-
-- Sync service
-- Sync queue processor
-- Remote API client
+- Sync queue DAO / persistence
+- Sync Engine / processor
+- Remote API client / Remote Data Source
 - Connectivity service
 - Sync coordinator
 
-These should not be registered or implemented prematurely if they are outside the current implementation scope.
+These dependencies belong strictly to the Data / Infrastructure layer and must not be injected into Feature Cubits or Widgets.
 
 ---
 
 ## 26. Offline-First DI
 
-The current application must remain fully functional without backend synchronization.
+The application must remain fully functional offline even with networking and synchronization registered.
 
 Therefore:
 
-- Local database dependencies are required now.
-- Repository dependencies required for local operation are required now.
-- Networking dependencies are deferred.
-- Sync dependencies are deferred.
+- Local database dependencies remain the primary operational data source.
+- Repository dependencies required for local operation continue to operate offline-first.
+- Networking and Sync dependencies belong strictly to the Data / Infrastructure layer.
+- Feature Cubits must not depend on Sync Engine or remote networking clients.
 
-Do not make current Cubits depend on a future SyncService simply because synchronization will eventually exist.
-
-Dependencies should reflect the current implementation phase.
+Normal business operations must never block on remote DI components.
 
 ---
 
@@ -935,8 +929,8 @@ Dependency Injection implementation is considered complete when:
 - Test dependencies can replace production dependencies.
 - No circular dependencies exist.
 - No duplicate production registrations exist.
-- Current implementation does not depend on deferred networking.
-- Current implementation does not depend on deferred synchronization.
+- Local operations do not depend on remote networking availability.
+- Normal business workflows do not depend on remote synchronization completion.
 - The dependency graph remains:
 
 Presentation
@@ -967,8 +961,8 @@ The following rules are authoritative for the current implementation:
 12. Repositories must not construct presentation objects.
 13. Do not introduce circular dependencies.
 14. Do not introduce another DI framework.
-15. Networking remains deferred.
-16. Synchronization remains deferred.
+15. Remote networking (Dio + Retrofit) and Synchronization are active for the Offline / Sync Integration phase.
+16. Feature Cubits and UI remain strictly decoupled from networking and synchronization infrastructure.
 17. DI must support isolated testing.
 18. Dependency lifetimes must be chosen intentionally.
 19. New dependencies must follow the existing dependency graph.

@@ -712,21 +712,17 @@ Do not introduce network calls into local workflows simply to validate or persis
 
 ## 38. Synchronization
 
-Synchronization execution is deferred.
+The project has entered the Offline / Sync Integration phase.
 
-The codebase may contain synchronization-ready infrastructure.
+Core synchronization infrastructure (Sync Queue, atomic enqueue, Sync Engine, Retrofit + Dio remote communication, idempotent retries) is now active.
 
-Do not implement advanced synchronization behavior before the synchronization phase is explicitly started.
-
-Do not add:
+The following remain deferred from this phase:
 
 - Real-time sync
-- Background sync
+- Platform-specific background sync
 - CRDTs
-- Advanced conflict resolution
+- Advanced multi-device distributed conflict resolution
 - Distributed locking
-
-without approval.
 
 ## 39. Logging
 

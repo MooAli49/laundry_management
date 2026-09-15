@@ -606,23 +606,23 @@ First launch must not require internet access simply to initialize the local app
 
 ---
 
-## 18. Synchronization Readiness
+## 18. Synchronization Integration
 
-The application is synchronization-ready but synchronization execution is deferred.
+The project has entered the Offline / Sync Integration phase.
 
-The database includes the approved synchronization infrastructure.
+The database persists local business mutations and enqueues sync operations atomically.
 
-When local business data requires synchronization, the architecture must support:
+The architecture enforces:
 
 Business Transaction
 ↓
 Local Business Change
-↓
-Sync Operation Creation
++
+Sync Operation Creation (atomic, same transaction)
 ↓
 Commit
 
-The implementation must preserve this future capability without implementing advanced synchronization prematurely.
+Sync Engine processes operations asynchronously while local operations remain fully functional offline.
 
 Do not implement:
 
@@ -1416,7 +1416,7 @@ The V1 implementation is considered ready for final review when:
 - Expenses are implemented as independent financial transactions.
 - Net Profit is derived correctly.
 - Tax is not exposed as an active V1 workflow.
-- Synchronization remains ready but deferred from execution.
+- Offline / Sync Integration connects local operations to Supabase while preserving local-first principles.
 - No known documentation/code contradiction remains.
 
 ---

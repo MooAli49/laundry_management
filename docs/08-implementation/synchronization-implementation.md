@@ -422,19 +422,31 @@ The exact error classification must follow the final backend error contract.
 
 ## 19. Retry Strategy
 
-The approved future retry direction is:
+The approved retry architecture is:
 
-Exponential Backoff
-+
-Maximum Retry Count
-+
-Permanent Failure State
+    Exponential Backoff
+    +
+    Maximum Retry Count
+    +
+    Permanent Failure State
 
-The exact constants are not finalized in this document.
+Retryable failures are retried with exponential backoff until the maximum retry count is reached.
 
-Do not invent arbitrary final retry values during the local implementation phase.
+Once the maximum retry count is exceeded, the operation transitions to a permanent failure state.
 
-A retry strategy should avoid:
+Operations in permanent failure state are not automatically retried.
+
+Retries are safe because all synchronization operations are idempotent: retrying the same operation with the same stable operation ID must not create duplicate business effects.
+
+The exact numeric constants (initial delay, backoff multiplier, maximum delay, maximum retry count) are implementation-level configuration.
+
+Those values must be chosen during synchronization implementation based on:
+
+- Observed platform behavior
+- Battery and network usage constraints
+- Backend rate-limiting requirements
+
+A retry strategy must avoid:
 
 - Continuous immediate retries
 - Excessive battery consumption
@@ -463,10 +475,9 @@ The exact scheduling mechanism may later use:
 
 - Application-triggered synchronization
 - Connectivity-triggered synchronization
-- Background execution
-- Periodic sync
+- Periodic sync while foregrounded
 
-The final mechanism depends on the platform/background requirements and is outside the current local-only phase.
+Foreground synchronization is part of the current implementation phase. Platform-specific background execution is deferred.
 
 ---
 
@@ -501,12 +512,11 @@ Possible triggers include:
 - Application resume
 - Connectivity restored
 - Manual refresh/sync
-- Background execution
-- Periodic execution
+- Periodic execution while running in foreground
 
-The exact trigger strategy will be finalized when background synchronization is implemented.
+Foreground synchronization triggers are part of the active sync implementation. Platform-specific background execution remains deferred.
 
-The local implementation must not require any of these triggers for normal operation.
+The local operational workflows must not require any of these triggers for normal offline operation.
 
 ---
 
@@ -908,17 +918,21 @@ It must not bypass the centralized networking infrastructure.
 
 ## 43. Authentication and Sync
 
-The current V1 application does not implement end-user authentication.
+V1 does not implement an end-user authentication system for the application UI.
 
-Therefore, synchronization must not introduce:
+The application does not include:
 
-- Login
-- Registration
+- Login screens
+- User registration
 - User sessions
 - Role management
 - Permission management
 
-Any backend-level protection required for API access must remain an infrastructure concern and follow the approved backend architecture.
+Therefore, synchronization must not introduce end-user authentication UI.
+
+Any backend-level protection required for API access (e.g., API keys, service-level authentication) must remain an infrastructure concern, implemented centrally, and must not appear inside feature code.
+
+Authentication infrastructure is handled at the centralized networking layer per `networking-implementation.md` §15.
 
 ---
 
@@ -939,16 +953,24 @@ Queue records should contain only the information required to reproduce the sync
 
 ## 45. Data Retention
 
-Successfully synchronized operations may eventually be:
+The approved data retention policy for successfully synchronized operations is:
 
-- Marked Synced
-- Retained for audit/debugging
-- Archived
-- Removed according to the final database strategy
+Successfully synchronized operations (status: Synced) are **retained** in the local Sync Queue for audit and diagnostics.
 
-The exact retention policy is not finalized here.
+They are not automatically deleted the moment synchronization succeeds.
 
-Do not automatically delete synchronization history merely because an operation succeeded unless the database design explicitly requires it.
+Retained Synced records may eventually be archived or purged according to a database maintenance policy, but that maintenance must not interfere with business data integrity.
+
+The specific cleanup/archival mechanism (e.g., periodic background cleanup, manual trigger, time-based expiry) is an implementation-level detail.
+
+Rationale:
+
+- Synced operation records provide an audit trail of what was synchronized.
+- Immediate deletion would make it impossible to diagnose synchronization issues after the fact.
+- Business entities themselves (Orders, Payments, etc.) remain present regardless of sync record retention.
+- Audit requirements for financial records (Payments, Expenses) make retention preferable to immediate deletion.
+
+Do not treat successfully synchronized records as disposable immediately after success.
 
 ---
 
@@ -1056,20 +1078,13 @@ Do not prematurely optimize with complex batching or concurrency without evidenc
 
 ## 52. Background Synchronization
 
-Background synchronization is a future concern.
+Platform-specific background synchronization is **deferred** from the current Offline / Sync Integration phase.
 
-It should be introduced only after:
+Foreground synchronization is the active requirement for this phase and must handle queue processing, retry, and crash recovery.
 
-- Local-first behavior is complete.
-- Networking is implemented.
-- Sync queue processing is stable.
-- Retry behavior is verified.
-- Crash recovery is verified.
-- Platform background limitations are understood.
+Do not make the application dependent on platform background execution for correctness.
 
-Do not make the application dependent on background execution for correctness.
-
-Foreground synchronization must remain capable of recovering pending operations.
+Foreground synchronization must remain capable of recovering pending operations whenever the application is active.
 
 ---
 
@@ -1100,7 +1115,7 @@ The system may eventually support multiple clients/devices synchronizing against
 
 The local implementation must therefore preserve stable identifiers and synchronization metadata.
 
-However, multi-device synchronization behavior is not required to be implemented during the current local phase.
+However, advanced multi-device conflict resolution, distributed locking, and real-time collaboration remain deferred to a future phase.
 
 Do not introduce distributed synchronization complexity prematurely.
 

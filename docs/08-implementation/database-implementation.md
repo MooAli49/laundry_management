@@ -3269,9 +3269,9 @@ but the local database implementation must remain independently usable.
 
 ---
 
-## 151. Future Sync Compatibility
+## 151. Sync Compatibility
 
-Even though remote synchronization is deferred, the local implementation must preserve:
+The local database implementation preserves:
 
     Stable UUIDs
     SyncOperation records
@@ -3280,22 +3280,21 @@ Even though remote synchronization is deferred, the local implementation must pr
     Explicit entity identity
     Deterministic timestamps
 
-This allows future synchronization without redesigning the local identity model.
+This ensures robust synchronization without compromising local data integrity.
 
 ---
 
-## 152. No Backend Dependency
+## 152. Local Autonomy / No Backend Dependency
 
-The V1 local implementation must compile and operate without requiring:
+Local database operations must never block on remote availability.
 
-    Supabase project configuration
-    API URL
-    API key
-    Dio client
-    Retrofit generated client
-    Edge Function availability
+The local application must be capable of running and performing all local business transactions without requiring:
 
-Remote integration is a later phase.
+    Active network connection
+    Live Supabase Edge Function response
+    Immediate remote acknowledgment
+
+While Supabase and Dio + Retrofit are active in the Offline / Sync Integration phase, local operations remain completely autonomous.
 
 ---
 

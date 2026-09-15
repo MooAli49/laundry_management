@@ -511,9 +511,9 @@ This applies to:
 
 ---
 
-## 18. Future Synchronization Boundary
+## 18. Synchronization Boundary
 
-Synchronization is deferred from the current local implementation phase.
+Synchronization operates as an infrastructure concern behind the Repository/Data boundary.
 
 Feature code must not implement synchronization logic directly.
 
@@ -524,7 +524,7 @@ Do not add:
 - Retry logic inside Screens
 - Connectivity logic inside Widgets
 
-When synchronization is introduced, it remains behind the Repository/Data infrastructure.
+Synchronization remains strictly behind the Repository/Data infrastructure.
 
 ---
 
@@ -3250,7 +3250,7 @@ The V1 feature implementation must follow these principles:
 5. Domain rules remain outside Widgets.
 6. V1 uses Cubit rather than requiring Bloc.
 7. Local-first behavior is the default.
-8. Networking and synchronization remain deferred.
+8. Features remain decoupled from networking and synchronization infrastructure.
 9. Physical OrderItems retain independent identity.
 10. Historical transaction values remain stable.
 11. Order lifecycle rules are enforced consistently.
