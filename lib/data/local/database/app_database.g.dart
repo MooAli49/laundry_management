@@ -8445,6 +8445,17 @@ class $SyncOperationsTable extends SyncOperations
         type: DriftSqlType.dateTime,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _nextRetryAtMeta = const VerificationMeta(
+    'nextRetryAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> nextRetryAt = GeneratedColumn<DateTime>(
+    'next_retry_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -8478,6 +8489,7 @@ class $SyncOperationsTable extends SyncOperations
     retryCount,
     lastError,
     lastAttemptAt,
+    nextRetryAt,
     createdAt,
     updatedAt,
   ];
@@ -8558,6 +8570,15 @@ class $SyncOperationsTable extends SyncOperations
         ),
       );
     }
+    if (data.containsKey('next_retry_at')) {
+      context.handle(
+        _nextRetryAtMeta,
+        nextRetryAt.isAcceptableOrUnknown(
+          data['next_retry_at']!,
+          _nextRetryAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -8619,6 +8640,10 @@ class $SyncOperationsTable extends SyncOperations
         DriftSqlType.dateTime,
         data['${effectivePrefix}last_attempt_at'],
       ),
+      nextRetryAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}next_retry_at'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -8646,6 +8671,7 @@ class SyncOperation extends DataClass implements Insertable<SyncOperation> {
   final int retryCount;
   final String? lastError;
   final DateTime? lastAttemptAt;
+  final DateTime? nextRetryAt;
   final DateTime createdAt;
   final DateTime updatedAt;
   const SyncOperation({
@@ -8658,6 +8684,7 @@ class SyncOperation extends DataClass implements Insertable<SyncOperation> {
     required this.retryCount,
     this.lastError,
     this.lastAttemptAt,
+    this.nextRetryAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -8678,6 +8705,9 @@ class SyncOperation extends DataClass implements Insertable<SyncOperation> {
     }
     if (!nullToAbsent || lastAttemptAt != null) {
       map['last_attempt_at'] = Variable<DateTime>(lastAttemptAt);
+    }
+    if (!nullToAbsent || nextRetryAt != null) {
+      map['next_retry_at'] = Variable<DateTime>(nextRetryAt);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -8701,6 +8731,9 @@ class SyncOperation extends DataClass implements Insertable<SyncOperation> {
       lastAttemptAt: lastAttemptAt == null && nullToAbsent
           ? const Value.absent()
           : Value(lastAttemptAt),
+      nextRetryAt: nextRetryAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nextRetryAt),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -8721,6 +8754,7 @@ class SyncOperation extends DataClass implements Insertable<SyncOperation> {
       retryCount: serializer.fromJson<int>(json['retryCount']),
       lastError: serializer.fromJson<String?>(json['lastError']),
       lastAttemptAt: serializer.fromJson<DateTime?>(json['lastAttemptAt']),
+      nextRetryAt: serializer.fromJson<DateTime?>(json['nextRetryAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -8738,6 +8772,7 @@ class SyncOperation extends DataClass implements Insertable<SyncOperation> {
       'retryCount': serializer.toJson<int>(retryCount),
       'lastError': serializer.toJson<String?>(lastError),
       'lastAttemptAt': serializer.toJson<DateTime?>(lastAttemptAt),
+      'nextRetryAt': serializer.toJson<DateTime?>(nextRetryAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -8753,6 +8788,7 @@ class SyncOperation extends DataClass implements Insertable<SyncOperation> {
     int? retryCount,
     Value<String?> lastError = const Value.absent(),
     Value<DateTime?> lastAttemptAt = const Value.absent(),
+    Value<DateTime?> nextRetryAt = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => SyncOperation(
@@ -8767,6 +8803,7 @@ class SyncOperation extends DataClass implements Insertable<SyncOperation> {
     lastAttemptAt: lastAttemptAt.present
         ? lastAttemptAt.value
         : this.lastAttemptAt,
+    nextRetryAt: nextRetryAt.present ? nextRetryAt.value : this.nextRetryAt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -8789,6 +8826,9 @@ class SyncOperation extends DataClass implements Insertable<SyncOperation> {
       lastAttemptAt: data.lastAttemptAt.present
           ? data.lastAttemptAt.value
           : this.lastAttemptAt,
+      nextRetryAt: data.nextRetryAt.present
+          ? data.nextRetryAt.value
+          : this.nextRetryAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -8806,6 +8846,7 @@ class SyncOperation extends DataClass implements Insertable<SyncOperation> {
           ..write('retryCount: $retryCount, ')
           ..write('lastError: $lastError, ')
           ..write('lastAttemptAt: $lastAttemptAt, ')
+          ..write('nextRetryAt: $nextRetryAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -8823,6 +8864,7 @@ class SyncOperation extends DataClass implements Insertable<SyncOperation> {
     retryCount,
     lastError,
     lastAttemptAt,
+    nextRetryAt,
     createdAt,
     updatedAt,
   );
@@ -8839,6 +8881,7 @@ class SyncOperation extends DataClass implements Insertable<SyncOperation> {
           other.retryCount == this.retryCount &&
           other.lastError == this.lastError &&
           other.lastAttemptAt == this.lastAttemptAt &&
+          other.nextRetryAt == this.nextRetryAt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -8853,6 +8896,7 @@ class SyncOperationsCompanion extends UpdateCompanion<SyncOperation> {
   final Value<int> retryCount;
   final Value<String?> lastError;
   final Value<DateTime?> lastAttemptAt;
+  final Value<DateTime?> nextRetryAt;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -8866,6 +8910,7 @@ class SyncOperationsCompanion extends UpdateCompanion<SyncOperation> {
     this.retryCount = const Value.absent(),
     this.lastError = const Value.absent(),
     this.lastAttemptAt = const Value.absent(),
+    this.nextRetryAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -8880,6 +8925,7 @@ class SyncOperationsCompanion extends UpdateCompanion<SyncOperation> {
     this.retryCount = const Value.absent(),
     this.lastError = const Value.absent(),
     this.lastAttemptAt = const Value.absent(),
+    this.nextRetryAt = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
@@ -8899,6 +8945,7 @@ class SyncOperationsCompanion extends UpdateCompanion<SyncOperation> {
     Expression<int>? retryCount,
     Expression<String>? lastError,
     Expression<DateTime>? lastAttemptAt,
+    Expression<DateTime>? nextRetryAt,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -8913,6 +8960,7 @@ class SyncOperationsCompanion extends UpdateCompanion<SyncOperation> {
       if (retryCount != null) 'retry_count': retryCount,
       if (lastError != null) 'last_error': lastError,
       if (lastAttemptAt != null) 'last_attempt_at': lastAttemptAt,
+      if (nextRetryAt != null) 'next_retry_at': nextRetryAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -8929,6 +8977,7 @@ class SyncOperationsCompanion extends UpdateCompanion<SyncOperation> {
     Value<int>? retryCount,
     Value<String?>? lastError,
     Value<DateTime?>? lastAttemptAt,
+    Value<DateTime?>? nextRetryAt,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -8943,6 +8992,7 @@ class SyncOperationsCompanion extends UpdateCompanion<SyncOperation> {
       retryCount: retryCount ?? this.retryCount,
       lastError: lastError ?? this.lastError,
       lastAttemptAt: lastAttemptAt ?? this.lastAttemptAt,
+      nextRetryAt: nextRetryAt ?? this.nextRetryAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -8979,6 +9029,9 @@ class SyncOperationsCompanion extends UpdateCompanion<SyncOperation> {
     if (lastAttemptAt.present) {
       map['last_attempt_at'] = Variable<DateTime>(lastAttemptAt.value);
     }
+    if (nextRetryAt.present) {
+      map['next_retry_at'] = Variable<DateTime>(nextRetryAt.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -9003,6 +9056,7 @@ class SyncOperationsCompanion extends UpdateCompanion<SyncOperation> {
           ..write('retryCount: $retryCount, ')
           ..write('lastError: $lastError, ')
           ..write('lastAttemptAt: $lastAttemptAt, ')
+          ..write('nextRetryAt: $nextRetryAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -16605,6 +16659,7 @@ typedef $$SyncOperationsTableCreateCompanionBuilder =
       Value<int> retryCount,
       Value<String?> lastError,
       Value<DateTime?> lastAttemptAt,
+      Value<DateTime?> nextRetryAt,
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<int> rowid,
@@ -16620,6 +16675,7 @@ typedef $$SyncOperationsTableUpdateCompanionBuilder =
       Value<int> retryCount,
       Value<String?> lastError,
       Value<DateTime?> lastAttemptAt,
+      Value<DateTime?> nextRetryAt,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -16676,6 +16732,11 @@ class $$SyncOperationsTableFilterComposer
 
   ColumnFilters<DateTime> get lastAttemptAt => $composableBuilder(
     column: $table.lastAttemptAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get nextRetryAt => $composableBuilder(
+    column: $table.nextRetryAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -16744,6 +16805,11 @@ class $$SyncOperationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get nextRetryAt => $composableBuilder(
+    column: $table.nextRetryAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -16799,6 +16865,11 @@ class $$SyncOperationsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<DateTime> get nextRetryAt => $composableBuilder(
+    column: $table.nextRetryAt,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -16848,6 +16919,7 @@ class $$SyncOperationsTableTableManager
                 Value<int> retryCount = const Value.absent(),
                 Value<String?> lastError = const Value.absent(),
                 Value<DateTime?> lastAttemptAt = const Value.absent(),
+                Value<DateTime?> nextRetryAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -16861,6 +16933,7 @@ class $$SyncOperationsTableTableManager
                 retryCount: retryCount,
                 lastError: lastError,
                 lastAttemptAt: lastAttemptAt,
+                nextRetryAt: nextRetryAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -16876,6 +16949,7 @@ class $$SyncOperationsTableTableManager
                 Value<int> retryCount = const Value.absent(),
                 Value<String?> lastError = const Value.absent(),
                 Value<DateTime?> lastAttemptAt = const Value.absent(),
+                Value<DateTime?> nextRetryAt = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -16889,6 +16963,7 @@ class $$SyncOperationsTableTableManager
                 retryCount: retryCount,
                 lastError: lastError,
                 lastAttemptAt: lastAttemptAt,
+                nextRetryAt: nextRetryAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

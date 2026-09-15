@@ -17,8 +17,8 @@ void main() {
   });
 
   group('1. Schema and Table Initialization', () {
-    test('all 17 tables exist and schema version is 2', () async {
-      expect(db.schemaVersion, equals(2));
+    test('all 17 tables exist and schema version is 3', () async {
+      expect(db.schemaVersion, equals(3));
 
       // Query sqlite_master to verify all 17 tables are physically present
       final tables = await db

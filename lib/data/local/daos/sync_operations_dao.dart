@@ -13,6 +13,7 @@ class SyncOperationsDao extends DatabaseAccessor<app_db.AppDatabase> {
     required String entityId,
     required String operationType,
     String? payload,
+    DateTime? nextRetryAt,
   }) async {
     final now = DateTime.now();
     await into(db.syncOperations).insert(
@@ -24,6 +25,7 @@ class SyncOperationsDao extends DatabaseAccessor<app_db.AppDatabase> {
         payload: Value(payload),
         status: const Value('pending'),
         retryCount: const Value(0),
+        nextRetryAt: Value(nextRetryAt),
         createdAt: Value(now),
         updatedAt: Value(now),
       ),
@@ -38,17 +40,24 @@ class SyncOperationsDao extends DatabaseAccessor<app_db.AppDatabase> {
         .get();
   }
 
-  Future<void> markOperationCompleted(String id) async {
+  Future<void> markOperationSynced(String id) async {
     final now = DateTime.now();
     await (update(db.syncOperations)..where((t) => t.id.equals(id))).write(
       app_db.SyncOperationsCompanion(
-        status: const Value('completed'),
+        status: const Value('synced'),
         updatedAt: Value(now),
       ),
     );
   }
 
-  Future<void> markOperationFailed(String id, String error) async {
+  @Deprecated('Use markOperationSynced instead')
+  Future<void> markOperationCompleted(String id) => markOperationSynced(id);
+
+  Future<void> markOperationFailed(
+    String id,
+    String error, {
+    DateTime? nextRetryAt,
+  }) async {
     final now = DateTime.now();
     final existing = await (select(db.syncOperations)..where((t) => t.id.equals(id))).getSingleOrNull();
     final retry = (existing?.retryCount ?? 0) + 1;
@@ -58,6 +67,7 @@ class SyncOperationsDao extends DatabaseAccessor<app_db.AppDatabase> {
         retryCount: Value(retry),
         lastError: Value(error),
         lastAttemptAt: Value(now),
+        nextRetryAt: Value(nextRetryAt),
         updatedAt: Value(now),
       ),
     );

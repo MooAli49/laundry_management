@@ -424,9 +424,12 @@ void main() {
       expect(pending.first.entityId, 'ord-123');
       expect(pending.first.status, 'pending');
 
-      await syncOperationsDao.markOperationCompleted(pending.first.id);
+      await syncOperationsDao.markOperationSynced(pending.first.id);
       final pendingAfterComplete = await syncOperationsDao.getPendingOperations();
       expect(pendingAfterComplete.isEmpty, isTrue);
+
+      final row = await (db.select(db.syncOperations)..where((t) => t.id.equals(pending.first.id))).getSingle();
+      expect(row.status, 'synced');
     });
   });
 }

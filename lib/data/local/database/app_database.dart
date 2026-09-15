@@ -51,7 +51,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -83,6 +83,19 @@ class AppDatabase extends _$AppDatabase {
           WHERE customer_name_snapshot = ''
              OR customer_name_snapshot IS NULL;
         ''');
+      }
+      if (from < 3) {
+        await m.addColumn(syncOperations, syncOperations.nextRetryAt);
+
+        await customStatement('''
+          UPDATE sync_operations
+          SET status = 'synced'
+          WHERE status = 'completed';
+        ''');
+
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_sync_operations_status_next_retry ON sync_operations(status, next_retry_at);',
+        );
       }
     },
     beforeOpen: (OpeningDetails details) async {
@@ -203,6 +216,9 @@ class AppDatabase extends _$AppDatabase {
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_sync_operations_status_created_at ON sync_operations(status, created_at);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_sync_operations_status_next_retry ON sync_operations(status, next_retry_at);',
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_sync_operations_entity ON sync_operations(entity_type, entity_id);',
