@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
@@ -14,9 +16,13 @@ import 'package:laundry_management/domain/sync/sync_retry_policy.dart';
 class FakeNetworkInfo implements NetworkInfo {
   bool isConnectedValue = true;
   final List<bool> connectivitySequence = [];
+  Future<bool> Function()? onCheckConnectivity;
 
   @override
   Future<bool> get isConnected async {
+    if (onCheckConnectivity != null) {
+      return await onCheckConnectivity!();
+    }
     if (connectivitySequence.isNotEmpty) {
       return connectivitySequence.removeAt(0);
     }
@@ -486,6 +492,60 @@ void main() {
         expect(dispatcher.dispatchedOperations.length, equals(1));
         expect(dispatcher.dispatchedOperations.first.id, equals(originalOp.id));
         expect(dispatcher.dispatchedOperations.first.entityId, equals('c-1'));
+      },
+    );
+
+    test(
+      '15. Pre-first-await concurrency race window: concurrent call during initial connectivity check is rejected',
+      () async {
+        await dao.recordOperation(
+          entityType: 'customer',
+          entityId: 'c-1',
+          operationType: 'create',
+        );
+
+        final connectivityCompleter = Completer<bool>();
+        var connectivityCheckCount = 0;
+
+        networkInfo.onCheckConnectivity = () {
+          connectivityCheckCount++;
+          if (connectivityCheckCount == 1) {
+            return connectivityCompleter.future;
+          }
+          return Future.value(true);
+        };
+
+        // 1. Start sync() call #1
+        final syncFuture1 = syncEngine.sync();
+
+        // Allow call #1 to run up to the suspended connectivity check
+        await Future<void>.delayed(Duration.zero);
+        expect(connectivityCheckCount, equals(1));
+        expect(syncEngine.isSyncing, isTrue);
+
+        // 2 & 3. While call #1 is suspended before connectivity returns, call sync() #2
+        final state2 = await syncEngine.sync();
+
+        // 4. Verify call #2 does NOT start another sync cycle and returns the current syncing state
+        expect(state2.status, equals(SyncEngineStatus.syncing));
+        expect(dispatcher.dispatchedOperations, isEmpty);
+
+        // 5. Resume call #1
+        connectivityCompleter.complete(true);
+        final state1 = await syncFuture1;
+
+        // 6. Verify only one queue processing cycle occurred
+        // 7. Verify the operation was dispatched exactly once
+        // 8. Verify final state is completed
+        expect(state1.status, equals(SyncEngineStatus.completed));
+        expect(dispatcher.dispatchedOperations.length, equals(1));
+        expect(dispatcher.dispatchedOperations.first.entityId, equals('c-1'));
+        expect(syncEngine.isSyncing, isFalse);
+
+        final customerRow = await (db.select(
+          db.syncOperations,
+        )..where((t) => t.entityId.equals('c-1'))).getSingle();
+        expect(customerRow.status, equals('synced'));
       },
     );
   });

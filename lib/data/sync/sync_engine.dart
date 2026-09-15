@@ -61,25 +61,31 @@ class SyncEngine {
       return _state;
     }
 
-    // 2. Network connectivity check
-    final isConnected = await _networkInfo.isConnected;
-    if (!isConnected) {
-      final remaining = await _syncOperationsDao.getEligibleOperations(
-        asOf: _clock(),
-      );
-      _updateState(
-        _state.copyWith(
-          status: SyncEngineStatus.idle,
-          pendingOperationsCount: remaining.length,
-        ),
-      );
-      return _state;
-    }
-
     _isSyncing = true;
-    final now = _clock();
+    _updateState(
+      SyncEngineState.syncing(
+        lastSyncTime: _state.lastSyncTime,
+        pendingOperationsCount: _state.pendingOperationsCount,
+      ),
+    );
 
     try {
+      // 2. Network connectivity check
+      final isConnected = await _networkInfo.isConnected;
+      if (!isConnected) {
+        final remaining = await _syncOperationsDao.getEligibleOperations(
+          asOf: _clock(),
+        );
+        _updateState(
+          _state.copyWith(
+            status: SyncEngineStatus.idle,
+            pendingOperationsCount: remaining.length,
+          ),
+        );
+        return _state;
+      }
+
+      final now = _clock();
       // 3. Fetch eligible operations in deterministic order
       final operations = await _syncOperationsDao.getEligibleOperations(
         asOf: now,
