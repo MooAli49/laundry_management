@@ -32,9 +32,38 @@ class SyncOperationsDao extends DatabaseAccessor<app_db.AppDatabase> {
     );
   }
 
-  Future<List<app_db.SyncOperation>> getPendingOperations({int limit = 50}) async {
+  Future<List<app_db.SyncOperation>> getPendingOperations({
+    int limit = 50,
+  }) async {
     return (select(db.syncOperations)
           ..where((t) => t.status.equals('pending'))
+          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)])
+          ..limit(limit))
+        .get();
+  }
+
+  /// Returns operations eligible for synchronization at [asOf] timestamp.
+  ///
+  /// Eligible operations are:
+  /// 1. Status 'pending' with no retry scheduled or retry timestamp <= [asOf].
+  /// 2. Status 'failed' with a scheduled retry timestamp <= [asOf].
+  ///
+  /// Results are ordered chronologically by [createdAt] ascending.
+  Future<List<app_db.SyncOperation>> getEligibleOperations({
+    DateTime? asOf,
+    int limit = 50,
+  }) async {
+    final effectiveAsOf = asOf ?? DateTime.now();
+    return (select(db.syncOperations)
+          ..where(
+            (t) =>
+                (t.status.equals('pending') &
+                    (t.nextRetryAt.isNull() |
+                        t.nextRetryAt.isSmallerOrEqualValue(effectiveAsOf))) |
+                (t.status.equals('failed') &
+                    t.nextRetryAt.isNotNull() &
+                    t.nextRetryAt.isSmallerOrEqualValue(effectiveAsOf)),
+          )
           ..orderBy([(t) => OrderingTerm.asc(t.createdAt)])
           ..limit(limit))
         .get();
@@ -45,6 +74,7 @@ class SyncOperationsDao extends DatabaseAccessor<app_db.AppDatabase> {
     await (update(db.syncOperations)..where((t) => t.id.equals(id))).write(
       app_db.SyncOperationsCompanion(
         status: const Value('synced'),
+        nextRetryAt: const Value(null),
         updatedAt: Value(now),
       ),
     );
@@ -59,7 +89,9 @@ class SyncOperationsDao extends DatabaseAccessor<app_db.AppDatabase> {
     DateTime? nextRetryAt,
   }) async {
     final now = DateTime.now();
-    final existing = await (select(db.syncOperations)..where((t) => t.id.equals(id))).getSingleOrNull();
+    final existing = await (select(
+      db.syncOperations,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     final retry = (existing?.retryCount ?? 0) + 1;
     await (update(db.syncOperations)..where((t) => t.id.equals(id))).write(
       app_db.SyncOperationsCompanion(

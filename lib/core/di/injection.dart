@@ -76,6 +76,9 @@ import '../../data/datasources/remote/order_remote_api.dart';
 import '../../data/datasources/remote/payment_remote_api.dart';
 import '../../data/datasources/remote/remote_api_dispatcher.dart';
 import '../../data/datasources/remote/storage_remote_api.dart';
+import '../../data/sync/sync_engine.dart';
+import '../../domain/sync/sync_error_classifier.dart';
+import '../../domain/sync/sync_retry_policy.dart';
 
 final getIt = GetIt.instance;
 
@@ -206,6 +209,27 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
   if (!getIt.isRegistered<SyncOperationsDao>()) {
     getIt.registerLazySingleton<SyncOperationsDao>(
       () => SyncOperationsDao(getIt<AppDatabase>()),
+    );
+  }
+
+  // Sync Infrastructure
+  if (!getIt.isRegistered<SyncRetryPolicy>()) {
+    getIt.registerLazySingleton<SyncRetryPolicy>(() => SyncRetryPolicy());
+  }
+  if (!getIt.isRegistered<SyncErrorClassifier>()) {
+    getIt.registerLazySingleton<SyncErrorClassifier>(
+      () => const SyncErrorClassifier(),
+    );
+  }
+  if (!getIt.isRegistered<SyncEngine>()) {
+    getIt.registerLazySingleton<SyncEngine>(
+      () => SyncEngine(
+        syncOperationsDao: getIt<SyncOperationsDao>(),
+        remoteApiDispatcher: getIt<RemoteApiDispatcher>(),
+        networkInfo: getIt<NetworkInfo>(),
+        retryPolicy: getIt<SyncRetryPolicy>(),
+        errorClassifier: getIt<SyncErrorClassifier>(),
+      ),
     );
   }
 
