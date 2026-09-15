@@ -1,5 +1,13 @@
+import 'package:dio/dio.dart';
 import 'package:get_it/get_it.dart';
 
+import '../../application/use_cases/cancel_order_use_case.dart';
+import '../../application/use_cases/change_order_status_use_case.dart';
+import '../../application/use_cases/complete_order_use_case.dart';
+import '../../application/use_cases/create_order_use_case.dart';
+import '../../application/use_cases/move_stored_item_use_case.dart';
+import '../../application/use_cases/store_order_items_use_case.dart';
+import '../../application/use_cases/unstore_item_use_case.dart';
 import '../../data/local/daos/business_settings_dao.dart';
 import '../../data/local/daos/carpet_sizes_dao.dart';
 import '../../data/local/daos/customers_dao.dart';
@@ -41,13 +49,6 @@ import '../../domain/repositories/payment_repository.dart';
 import '../../domain/repositories/reports_repository.dart';
 import '../../domain/repositories/service_repository.dart';
 import '../../domain/repositories/settings_repository.dart';
-import '../../application/use_cases/cancel_order_use_case.dart';
-import '../../application/use_cases/change_order_status_use_case.dart';
-import '../../application/use_cases/complete_order_use_case.dart';
-import '../../application/use_cases/create_order_use_case.dart';
-import '../../application/use_cases/move_stored_item_use_case.dart';
-import '../../application/use_cases/store_order_items_use_case.dart';
-import '../../application/use_cases/unstore_item_use_case.dart';
 import '../../domain/repositories/storage_location_repository.dart';
 import '../../domain/repositories/storage_repository.dart';
 import '../../features/customers/presentation/cubit/customer_detail_cubit.dart';
@@ -66,6 +67,15 @@ import '../../features/settings/presentation/cubit/services_management_cubit.dar
 import '../../features/settings/presentation/cubit/settings_cubit.dart';
 import '../../features/settings/presentation/cubit/storage_locations_management_cubit.dart';
 import '../../features/storage/presentation/cubit/storage_cubit.dart';
+import '../network/dio_client.dart';
+import '../network/network_info.dart';
+import '../../data/datasources/remote/customer_remote_api.dart';
+import '../../data/datasources/remote/expense_remote_api.dart';
+import '../../data/datasources/remote/master_data_remote_api.dart';
+import '../../data/datasources/remote/order_remote_api.dart';
+import '../../data/datasources/remote/payment_remote_api.dart';
+import '../../data/datasources/remote/remote_api_dispatcher.dart';
+import '../../data/datasources/remote/storage_remote_api.dart';
 
 final getIt = GetIt.instance;
 
@@ -75,45 +85,128 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
     getIt.registerLazySingleton<AppDatabase>(() => AppDatabase());
   }
 
+  // Core Networking Infrastructure
+  if (!getIt.isRegistered<NetworkInfo>()) {
+    getIt.registerLazySingleton<NetworkInfo>(() => NetworkInfoImpl());
+  }
+  if (!getIt.isRegistered<DioClient>()) {
+    getIt.registerLazySingleton<DioClient>(() => DioClient());
+  }
+  if (!getIt.isRegistered<Dio>()) {
+    getIt.registerLazySingleton<Dio>(() => getIt<DioClient>().dio);
+  }
+
+  // Remote APIs
+  if (!getIt.isRegistered<CustomerRemoteApi>()) {
+    getIt.registerLazySingleton<CustomerRemoteApi>(
+      () => CustomerRemoteApi(getIt<Dio>()),
+    );
+  }
+  if (!getIt.isRegistered<OrderRemoteApi>()) {
+    getIt.registerLazySingleton<OrderRemoteApi>(
+      () => OrderRemoteApi(getIt<Dio>()),
+    );
+  }
+  if (!getIt.isRegistered<PaymentRemoteApi>()) {
+    getIt.registerLazySingleton<PaymentRemoteApi>(
+      () => PaymentRemoteApi(getIt<Dio>()),
+    );
+  }
+  if (!getIt.isRegistered<StorageRemoteApi>()) {
+    getIt.registerLazySingleton<StorageRemoteApi>(
+      () => StorageRemoteApi(getIt<Dio>()),
+    );
+  }
+  if (!getIt.isRegistered<ExpenseRemoteApi>()) {
+    getIt.registerLazySingleton<ExpenseRemoteApi>(
+      () => ExpenseRemoteApi(getIt<Dio>()),
+    );
+  }
+  if (!getIt.isRegistered<MasterDataRemoteApi>()) {
+    getIt.registerLazySingleton<MasterDataRemoteApi>(
+      () => MasterDataRemoteApi(getIt<Dio>()),
+    );
+  }
+
+  // Remote API Dispatcher
+  if (!getIt.isRegistered<RemoteApiDispatcher>()) {
+    getIt.registerLazySingleton<RemoteApiDispatcher>(
+      () => RemoteApiDispatcher(
+        customerApi: getIt<CustomerRemoteApi>(),
+        orderApi: getIt<OrderRemoteApi>(),
+        paymentApi: getIt<PaymentRemoteApi>(),
+        storageApi: getIt<StorageRemoteApi>(),
+        expenseApi: getIt<ExpenseRemoteApi>(),
+        masterDataApi: getIt<MasterDataRemoteApi>(),
+      ),
+    );
+  }
+
   // 2. DAOs
   if (!getIt.isRegistered<CustomersDao>()) {
-    getIt.registerLazySingleton<CustomersDao>(() => CustomersDao(getIt<AppDatabase>()));
+    getIt.registerLazySingleton<CustomersDao>(
+      () => CustomersDao(getIt<AppDatabase>()),
+    );
   }
   if (!getIt.isRegistered<OrdersDao>()) {
-    getIt.registerLazySingleton<OrdersDao>(() => OrdersDao(getIt<AppDatabase>()));
+    getIt.registerLazySingleton<OrdersDao>(
+      () => OrdersDao(getIt<AppDatabase>()),
+    );
   }
   if (!getIt.isRegistered<PaymentsDao>()) {
-    getIt.registerLazySingleton<PaymentsDao>(() => PaymentsDao(getIt<AppDatabase>()));
+    getIt.registerLazySingleton<PaymentsDao>(
+      () => PaymentsDao(getIt<AppDatabase>()),
+    );
   }
   if (!getIt.isRegistered<StorageLocationsDao>()) {
-    getIt.registerLazySingleton<StorageLocationsDao>(() => StorageLocationsDao(getIt<AppDatabase>()));
+    getIt.registerLazySingleton<StorageLocationsDao>(
+      () => StorageLocationsDao(getIt<AppDatabase>()),
+    );
   }
   if (!getIt.isRegistered<StorageRecordsDao>()) {
-    getIt.registerLazySingleton<StorageRecordsDao>(() => StorageRecordsDao(getIt<AppDatabase>()));
+    getIt.registerLazySingleton<StorageRecordsDao>(
+      () => StorageRecordsDao(getIt<AppDatabase>()),
+    );
   }
   if (!getIt.isRegistered<ServicesDao>()) {
-    getIt.registerLazySingleton<ServicesDao>(() => ServicesDao(getIt<AppDatabase>()));
+    getIt.registerLazySingleton<ServicesDao>(
+      () => ServicesDao(getIt<AppDatabase>()),
+    );
   }
   if (!getIt.isRegistered<ItemTypesDao>()) {
-    getIt.registerLazySingleton<ItemTypesDao>(() => ItemTypesDao(getIt<AppDatabase>()));
+    getIt.registerLazySingleton<ItemTypesDao>(
+      () => ItemTypesDao(getIt<AppDatabase>()),
+    );
   }
   if (!getIt.isRegistered<ItemDefinitionsDao>()) {
-    getIt.registerLazySingleton<ItemDefinitionsDao>(() => ItemDefinitionsDao(getIt<AppDatabase>()));
+    getIt.registerLazySingleton<ItemDefinitionsDao>(
+      () => ItemDefinitionsDao(getIt<AppDatabase>()),
+    );
   }
   if (!getIt.isRegistered<CarpetSizesDao>()) {
-    getIt.registerLazySingleton<CarpetSizesDao>(() => CarpetSizesDao(getIt<AppDatabase>()));
+    getIt.registerLazySingleton<CarpetSizesDao>(
+      () => CarpetSizesDao(getIt<AppDatabase>()),
+    );
   }
   if (!getIt.isRegistered<ExpenseCategoriesDao>()) {
-    getIt.registerLazySingleton<ExpenseCategoriesDao>(() => ExpenseCategoriesDao(getIt<AppDatabase>()));
+    getIt.registerLazySingleton<ExpenseCategoriesDao>(
+      () => ExpenseCategoriesDao(getIt<AppDatabase>()),
+    );
   }
   if (!getIt.isRegistered<ExpensesDao>()) {
-    getIt.registerLazySingleton<ExpensesDao>(() => ExpensesDao(getIt<AppDatabase>()));
+    getIt.registerLazySingleton<ExpensesDao>(
+      () => ExpensesDao(getIt<AppDatabase>()),
+    );
   }
   if (!getIt.isRegistered<BusinessSettingsDao>()) {
-    getIt.registerLazySingleton<BusinessSettingsDao>(() => BusinessSettingsDao(getIt<AppDatabase>()));
+    getIt.registerLazySingleton<BusinessSettingsDao>(
+      () => BusinessSettingsDao(getIt<AppDatabase>()),
+    );
   }
   if (!getIt.isRegistered<SyncOperationsDao>()) {
-    getIt.registerLazySingleton<SyncOperationsDao>(() => SyncOperationsDao(getIt<AppDatabase>()));
+    getIt.registerLazySingleton<SyncOperationsDao>(
+      () => SyncOperationsDao(getIt<AppDatabase>()),
+    );
   }
 
   // 3. Repositories (Bound to Domain interfaces)
@@ -301,9 +394,7 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
   }
   if (!getIt.isRegistered<UnstoreItemUseCase>()) {
     getIt.registerLazySingleton<UnstoreItemUseCase>(
-      () => UnstoreItemUseCase(
-        storageRepository: getIt<StorageRepository>(),
-      ),
+      () => UnstoreItemUseCase(storageRepository: getIt<StorageRepository>()),
     );
   }
 
@@ -378,16 +469,12 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
   }
   if (!getIt.isRegistered<ReportsCubit>()) {
     getIt.registerFactory<ReportsCubit>(
-      () => ReportsCubit(
-        reportsRepository: getIt<ReportsRepository>(),
-      ),
+      () => ReportsCubit(reportsRepository: getIt<ReportsRepository>()),
     );
   }
   if (!getIt.isRegistered<DashboardCubit>()) {
     getIt.registerFactory<DashboardCubit>(
-      () => DashboardCubit(
-        dashboardRepository: getIt<DashboardRepository>(),
-      ),
+      () => DashboardCubit(dashboardRepository: getIt<DashboardRepository>()),
     );
   }
   if (!getIt.isRegistered<AddExpenseCubit>()) {
@@ -408,9 +495,7 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
   }
   if (!getIt.isRegistered<SettingsCubit>()) {
     getIt.registerFactory<SettingsCubit>(
-      () => SettingsCubit(
-        settingsRepository: getIt<SettingsRepository>(),
-      ),
+      () => SettingsCubit(settingsRepository: getIt<SettingsRepository>()),
     );
   }
   if (!getIt.isRegistered<ServicesManagementCubit>()) {
@@ -458,4 +543,3 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
     await DevTestData.seedDevData(getIt<AppDatabase>());
   }
 }
-
