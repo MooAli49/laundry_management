@@ -10,6 +10,7 @@ import '../local/daos/orders_dao.dart';
 import '../local/daos/payments_dao.dart';
 import '../local/daos/sync_operations_dao.dart';
 import '../local/database/app_database.dart' as app_db;
+import '../sync/sync_payload_builder.dart';
 
 class PaymentRepositoryImpl implements PaymentRepository {
   final PaymentsDao _paymentsDao;
@@ -79,6 +80,7 @@ class PaymentRepositoryImpl implements PaymentRepository {
           entityType: 'payment',
           entityId: payment.id,
           operationType: 'create',
+          payload: SyncPayloadBuilder.buildPaymentPayload(payment),
         );
 
         return payment;
@@ -173,7 +175,7 @@ class PaymentRepositoryImpl implements PaymentRepository {
       id: row.id,
       orderId: row.orderId,
       amount: Money.fromPiastres(row.amount),
-      paymentMethod: PaymentMethod.values.byName(row.paymentMethod),
+      paymentMethod: PaymentMethod.fromValue(row.paymentMethod),
       paidAt: row.paidAt,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,

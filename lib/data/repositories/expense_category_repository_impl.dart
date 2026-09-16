@@ -6,6 +6,7 @@ import '../../domain/repositories/expense_category_repository.dart';
 import '../local/daos/expense_categories_dao.dart';
 import '../local/daos/sync_operations_dao.dart';
 import '../local/database/app_database.dart' as app_db;
+import '../sync/sync_payload_builder.dart';
 
 class ExpenseCategoryRepositoryImpl implements ExpenseCategoryRepository {
   final ExpenseCategoriesDao _expenseCategoriesDao;
@@ -38,6 +39,7 @@ class ExpenseCategoryRepositoryImpl implements ExpenseCategoryRepository {
           entityType: 'expense_category',
           entityId: category.id,
           operationType: 'create',
+          payload: SyncPayloadBuilder.buildExpenseCategoryPayload(category),
         );
 
         return category;
@@ -75,6 +77,9 @@ class ExpenseCategoryRepositoryImpl implements ExpenseCategoryRepository {
           entityType: 'expense_category',
           entityId: category.id,
           operationType: 'update',
+          payload: SyncPayloadBuilder.buildExpenseCategoryUpdatePayload(
+            category,
+          ),
         );
 
         return category;
@@ -129,11 +134,17 @@ class ExpenseCategoryRepositoryImpl implements ExpenseCategoryRepository {
           throw ValidationFailure('Expense category not found');
         }
 
-        await _expenseCategoriesDao.setActiveStatus(id, true, DateTime.now());
+        final now = DateTime.now();
+        await _expenseCategoriesDao.setActiveStatus(id, true, now);
         await _syncOperationsDao.recordOperation(
           entityType: 'expense_category',
           entityId: id,
           operationType: 'activate',
+          payload: SyncPayloadBuilder.buildExpenseCategoryStatusPayload(
+            id,
+            true,
+            updatedAt: now,
+          ),
         );
       });
     } catch (e) {
@@ -151,11 +162,17 @@ class ExpenseCategoryRepositoryImpl implements ExpenseCategoryRepository {
           throw ValidationFailure('Expense category not found');
         }
 
-        await _expenseCategoriesDao.setActiveStatus(id, false, DateTime.now());
+        final now = DateTime.now();
+        await _expenseCategoriesDao.setActiveStatus(id, false, now);
         await _syncOperationsDao.recordOperation(
           entityType: 'expense_category',
           entityId: id,
           operationType: 'deactivate',
+          payload: SyncPayloadBuilder.buildExpenseCategoryStatusPayload(
+            id,
+            false,
+            updatedAt: now,
+          ),
         );
       });
     } catch (e) {

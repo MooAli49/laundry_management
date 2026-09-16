@@ -14,6 +14,7 @@ import 'package:laundry_management/data/repositories/order_repository_impl.dart'
 import 'package:laundry_management/data/repositories/payment_repository_impl.dart';
 import 'package:laundry_management/data/repositories/storage_repository_impl.dart';
 import 'package:laundry_management/domain/entities/customer.dart';
+import 'package:laundry_management/domain/entities/dashboard_data.dart';
 import 'package:laundry_management/domain/enums/order_status.dart';
 import 'package:laundry_management/domain/enums/payment_method.dart';
 import 'package:laundry_management/domain/value_objects/money.dart';
@@ -356,4 +357,349 @@ void main() {
       }
     },
   );
+
+  test('date-boundary test: todayOrdersCount accurately respects today start and end of day', () async {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day, 0, 0, 0);
+    final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+    final yesterdayEnd = todayStart.subtract(const Duration(milliseconds: 1));
+    final tomorrowStart = todayEnd.add(const Duration(milliseconds: 1));
+
+    final customer = Customer(
+      id: 'cust-bounds',
+      name: 'عميل الحدود',
+      phone: '01011112222',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await customersDao.insertCustomer(
+      CustomersCompanion.insert(
+        id: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+        createdAt: customer.createdAt,
+        updatedAt: customer.updatedAt,
+      ),
+    );
+
+    // 1. Order created yesterday at 23:59:59.999 (NOT today)
+    await ordersDao.insertOrder(
+      OrdersCompanion.insert(
+        id: 'ord-yesterday',
+        orderNumber: '26-901',
+        customerId: customer.id,
+        customerNameSnapshot: const Value('عميل الحدود'),
+        customerPhoneSnapshot: const Value('01011112222'),
+        status: const Value('processing'),
+        expectedPickupDate: OrderDate.today().toDateTime(),
+        subtotal: 1000,
+        total: 1000,
+        createdAt: yesterdayEnd,
+        updatedAt: yesterdayEnd,
+      ),
+    );
+
+    // 2. Order created today at 00:00:00 (IS today)
+    await ordersDao.insertOrder(
+      OrdersCompanion.insert(
+        id: 'ord-today-start',
+        orderNumber: '26-902',
+        customerId: customer.id,
+        customerNameSnapshot: const Value('عميل الحدود'),
+        customerPhoneSnapshot: const Value('01011112222'),
+        status: const Value('processing'),
+        expectedPickupDate: OrderDate.today().toDateTime(),
+        subtotal: 1000,
+        total: 1000,
+        createdAt: todayStart,
+        updatedAt: todayStart,
+      ),
+    );
+
+    // 3. Order created today at 23:59:59.999 (IS today)
+    await ordersDao.insertOrder(
+      OrdersCompanion.insert(
+        id: 'ord-today-end',
+        orderNumber: '26-903',
+        customerId: customer.id,
+        customerNameSnapshot: const Value('عميل الحدود'),
+        customerPhoneSnapshot: const Value('01011112222'),
+        status: const Value('processing'),
+        expectedPickupDate: OrderDate.today().toDateTime(),
+        subtotal: 1000,
+        total: 1000,
+        createdAt: todayEnd,
+        updatedAt: todayEnd,
+      ),
+    );
+
+    // 4. Order created tomorrow at 00:00:00.001 (NOT today)
+    await ordersDao.insertOrder(
+      OrdersCompanion.insert(
+        id: 'ord-tomorrow',
+        orderNumber: '26-904',
+        customerId: customer.id,
+        customerNameSnapshot: const Value('عميل الحدود'),
+        customerPhoneSnapshot: const Value('01011112222'),
+        status: const Value('processing'),
+        expectedPickupDate: OrderDate.today().toDateTime(),
+        subtotal: 1000,
+        total: 1000,
+        createdAt: tomorrowStart,
+        updatedAt: tomorrowStart,
+      ),
+    );
+
+    final data = await dashboardRepository.getDashboardData();
+    expect(data.todayOrdersCount, 2, reason: 'Only ord-today-start and ord-today-end were created today');
+  });
+
+  test('overdue and pickup status exclusions: completed and cancelled orders are excluded from attention', () async {
+    final now = DateTime.now();
+    final today = OrderDate.today();
+    final pastDate = OrderDate.fromDate(now.subtract(const Duration(days: 3)));
+
+    final customer = Customer(
+      id: 'cust-exclusions',
+      name: 'عميل الاستثناءات',
+      phone: '01033334444',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await customersDao.insertCustomer(
+      CustomersCompanion.insert(
+        id: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+        createdAt: customer.createdAt,
+        updatedAt: customer.updatedAt,
+      ),
+    );
+
+    // 1. Completed order with past pickup date -> NOT overdue
+    await ordersDao.insertOrder(
+      OrdersCompanion.insert(
+        id: 'ord-overdue-completed',
+        orderNumber: '26-801',
+        customerId: customer.id,
+        customerNameSnapshot: const Value('عميل الاستثناءات'),
+        customerPhoneSnapshot: const Value('01033334444'),
+        status: const Value('completed'),
+        expectedPickupDate: pastDate.toDateTime(),
+        completedAt: Value(now),
+        subtotal: 2000,
+        total: 2000,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    // 2. Cancelled order with past pickup date -> NOT overdue
+    await ordersDao.insertOrder(
+      OrdersCompanion.insert(
+        id: 'ord-overdue-cancelled',
+        orderNumber: '26-802',
+        customerId: customer.id,
+        customerNameSnapshot: const Value('عميل الاستثناءات'),
+        customerPhoneSnapshot: const Value('01033334444'),
+        status: const Value('cancelled'),
+        expectedPickupDate: pastDate.toDateTime(),
+        cancelledAt: Value(now),
+        cancellationReason: const Value('ملغي'),
+        subtotal: 2000,
+        total: 2000,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    // 3. Active processing order with past pickup date -> IS overdue
+    await ordersDao.insertOrder(
+      OrdersCompanion.insert(
+        id: 'ord-overdue-active',
+        orderNumber: '26-803',
+        customerId: customer.id,
+        customerNameSnapshot: const Value('عميل الاستثناءات'),
+        customerPhoneSnapshot: const Value('01033334444'),
+        status: const Value('processing'),
+        expectedPickupDate: pastDate.toDateTime(),
+        subtotal: 2000,
+        total: 2000,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    // 4. Active ready order with today pickup date -> IS today pickup
+    await ordersDao.insertOrder(
+      OrdersCompanion.insert(
+        id: 'ord-today-pickup-active',
+        orderNumber: '26-804',
+        customerId: customer.id,
+        customerNameSnapshot: const Value('عميل الاستثناءات'),
+        customerPhoneSnapshot: const Value('01033334444'),
+        status: const Value('ready'),
+        expectedPickupDate: today.toDateTime(),
+        subtotal: 2000,
+        total: 2000,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    final data = await dashboardRepository.getDashboardData();
+    expect(data.overdueOrdersCount, 1, reason: 'Only ord-overdue-active is overdue');
+    expect(data.todayPickupOrdersCount, 1, reason: 'Only ord-today-pickup-active is due today');
+  });
+
+  test('payment remaining consistency: cancelled orders excluded, fully paid orders excluded', () async {
+    final now = DateTime.now();
+
+    final customer = Customer(
+      id: 'cust-payments',
+      name: 'عميل الدفع',
+      phone: '01055556666',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await customersDao.insertCustomer(
+      CustomersCompanion.insert(
+        id: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+        createdAt: customer.createdAt,
+        updatedAt: customer.updatedAt,
+      ),
+    );
+
+    // 1. Cancelled order with 0 payments -> NOT counted in unpaidOrdersCount or remaining
+    await ordersDao.insertOrder(
+      OrdersCompanion.insert(
+        id: 'ord-pay-cancelled',
+        orderNumber: '26-701',
+        customerId: customer.id,
+        customerNameSnapshot: const Value('عميل الدفع'),
+        customerPhoneSnapshot: const Value('01055556666'),
+        status: const Value('cancelled'),
+        expectedPickupDate: OrderDate.today().toDateTime(),
+        cancelledAt: Value(now),
+        cancellationReason: const Value('ملغي'),
+        subtotal: 8000,
+        total: 8000,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    // 2. Active order fully paid -> NOT counted in unpaidOrdersCount or remaining
+    await ordersDao.insertOrder(
+      OrdersCompanion.insert(
+        id: 'ord-pay-full',
+        orderNumber: '26-702',
+        customerId: customer.id,
+        customerNameSnapshot: const Value('عميل الدفع'),
+        customerPhoneSnapshot: const Value('01055556666'),
+        status: const Value('processing'),
+        expectedPickupDate: OrderDate.today().toDateTime(),
+        subtotal: 5000,
+        total: 5000,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await paymentsDao.insertPayment(
+      PaymentsCompanion.insert(
+        id: 'pay-full',
+        orderId: 'ord-pay-full',
+        amount: 5000,
+        paymentMethod: PaymentMethod.cash.name,
+        paidAt: now,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    // 3. Active order partially paid -> counted (remaining 2000)
+    await ordersDao.insertOrder(
+      OrdersCompanion.insert(
+        id: 'ord-pay-partial',
+        orderNumber: '26-703',
+        customerId: customer.id,
+        customerNameSnapshot: const Value('عميل الدفع'),
+        customerPhoneSnapshot: const Value('01055556666'),
+        status: const Value('ready'),
+        expectedPickupDate: OrderDate.today().toDateTime(),
+        subtotal: 6000,
+        total: 6000,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await paymentsDao.insertPayment(
+      PaymentsCompanion.insert(
+        id: 'pay-partial',
+        orderId: 'ord-pay-partial',
+        amount: 4000,
+        paymentMethod: PaymentMethod.instapay.name,
+        paidAt: now,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    final data = await dashboardRepository.getDashboardData();
+    expect(data.unpaidOrdersCount, 1);
+    expect(data.totalRemainingAmount, const Money.fromPiastres(2000));
+  });
+
+  test('reactive watchDashboardData emits initial state and updates when database mutates', () async {
+    final now = DateTime.now();
+
+    final customer = Customer(
+      id: 'cust-watch',
+      name: 'عميل البث',
+      phone: '01077778888',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await customersDao.insertCustomer(
+      CustomersCompanion.insert(
+        id: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+        createdAt: customer.createdAt,
+        updatedAt: customer.updatedAt,
+      ),
+    );
+
+    final emissions = <DashboardData>[];
+    final sub = dashboardRepository.watchDashboardData().listen(emissions.add);
+
+    // Wait for initial emission
+    await Future.delayed(const Duration(milliseconds: 50));
+    expect(emissions.isNotEmpty, isTrue);
+    final initialCount = emissions.last.todayOrdersCount;
+
+    // Mutate database: insert new order
+    await ordersDao.insertOrder(
+      OrdersCompanion.insert(
+        id: 'ord-watch-new',
+        orderNumber: '26-601',
+        customerId: customer.id,
+        customerNameSnapshot: const Value('عميل البث'),
+        customerPhoneSnapshot: const Value('01077778888'),
+        status: const Value('processing'),
+        expectedPickupDate: OrderDate.today().toDateTime(),
+        subtotal: 3000,
+        total: 3000,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    await Future.delayed(const Duration(milliseconds: 100));
+    expect(emissions.last.todayOrdersCount, initialCount + 1, reason: 'Stream automatically re-emitted with new order');
+
+    await sub.cancel();
+  });
 }

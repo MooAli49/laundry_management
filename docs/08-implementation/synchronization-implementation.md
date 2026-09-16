@@ -1420,3 +1420,404 @@ Synchronization second.
 Network failure must never erase or invalidate a successfully committed local business operation.
 
 The synchronization system exists to make local operations eventually consistent with the backend while preserving correctness, idempotency, data integrity, and offline usability.
+
+---
+
+## 63. Step 10 — Payment Synchronization Specification
+
+### 63.1 Overview
+The payment synchronization pipeline ensures offline-first payment capture with authoritative server-side validation and atomic order balance updates upon remote sync.
+
+```text
+RecordPaymentDialog / RecordPaymentCubit
+        ↓
+PaymentRepositoryImpl.recordPayment()
+        ↓
+Local Drift Transaction
+        ├── payments (inserted locally)
+        └── sync_operations (enqueued with self-contained payload)
+        ↓
+SyncEngine
+        ↓
+RemoteApiDispatcher
+        ↓
+PaymentRemoteApi (@POST('/api/v1/payments'))
+        ↓
+Supabase Edge Function (/api/v1/payments)
+        ↓
+PostgreSQL RPC sync_create_payment()
+        ↓
+Atomic ACID Transaction (FOR UPDATE lock, balance check, payment insert, paid_amount update, idempotency log)
+```
+
+### 63.2 Payment Entity & Payload Mapping
+- **Local Domain**: `Payment` (`id`, `orderId`, `amount`, `paymentMethod`, `paidAt`, `createdAt`, `updatedAt`).
+- **Monetary Units**: Integer minor units (piastres / `BIGINT`). No floating-point numbers.
+- **Payment Method Mapping**:
+  - `PaymentMethod.cash` → `"cash"`
+  - `PaymentMethod.instapay` → `"insta_pay"`
+  - `PaymentMethod.ewallet` → `"e_wallet"`
+- **Timestamps**: Serialized as UTC ISO-8601 strings (`2026-09-16T10:30:00.000Z`).
+- **Payload Schema**:
+  ```json
+  {
+    "id": "<UUID>",
+    "order_id": "<UUID>",
+    "amount": 8000,
+    "payment_method": "cash | insta_pay | e_wallet",
+    "paid_at": "<ISO-8601 UTC>",
+    "created_at": "<ISO-8601 UTC>",
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+
+### 63.3 Remote API & Edge Function Contracts
+- `POST /api/v1/payments`: Creates a new payment remotely via `sync_create_payment()`. Reads `X-Operation-ID` header. Returns `201 Created` with payment representation.
+- `GET /api/v1/payments/:id`: Retrieves a payment by ID. Returns `200 OK` or `404 Not Found`.
+- `GET /api/v1/payments?order_id=<UUID>`: Retrieves all payments for an order, ordered by `paid_at DESC`.
+- **Payment Immutability (V1)**: Payments are immutable once recorded. `PATCH`, `PUT`, and `DELETE` are disallowed and return `404 Not Found`.
+
+### 63.4 PostgreSQL RPC: `sync_create_payment`
+Executed under `SECURITY DEFINER` within a single PostgreSQL ACID transaction:
+1. **Idempotency Check**: Queries `sync_idempotency_log` by `operation_id`. If existing, immediately returns the previously recorded payload without re-inserting or incrementing `orders.paid_amount`.
+2. **Payload Validation**: Validates UUID formats, `amount > 0`, and allowed payment methods.
+3. **Concurrency Protection**: Locks the referenced order row using `SELECT total, paid_amount, status FROM orders WHERE id = v_order_id FOR UPDATE`.
+4. **Business Rule Enforcement**:
+   - Rejects payments for cancelled orders (`HTTP 409 CONFLICT`).
+   - Calculates remaining balance: `remaining = total - paid_amount`.
+   - Rejects overpayment if `amount > remaining` (`HTTP 409 CONFLICT`).
+5. **Atomic Payment & Balance Mutation**:
+   - `INSERT INTO payments (...) VALUES (...)`.
+   - `UPDATE orders SET paid_amount = paid_amount + v_amount, updated_at = now() WHERE id = v_order_id`.
+6. **Idempotency Logging**: Inserts record into `sync_idempotency_log` within the same transaction.
+7. **Return Payload**: Returns JSON representation of the persisted payment.
+
+---
+
+## 64. Step 11 — Expense & Expense Category Synchronization Specification
+
+### 64.1 Overview
+The expense and expense category synchronization pipeline provides offline-first expense management with remote persistence to Supabase. Local mutations occur atomically in SQLite/Drift and enqueue self-contained JSON payloads in `sync_operations`. When online, the `SyncEngine` dispatches these operations through `RemoteApiDispatcher`, calling Retrofit endpoints which proxy through Supabase Edge Functions to transactional `SECURITY DEFINER` PostgreSQL RPCs.
+
+```text
+AddExpenseDialog / ExpenseCategoryManagement
+        ↓
+ExpenseRepositoryImpl / ExpenseCategoryRepositoryImpl
+        ↓
+Local Drift Transaction
+        ├── expense_categories / expenses (inserted/updated locally)
+        └── sync_operations (enqueued with self-contained payload)
+        ↓
+SyncEngine
+        ↓
+RemoteApiDispatcher
+        ↓
+ExpenseRemoteApi / ExpenseCategoryRemoteApi
+        ├── @POST('/api/v1/expense-categories') / @PATCH('/api/v1/expense-categories/{id}')
+        └── @POST('/api/v1/expenses') / @PATCH('/api/v1/expenses/{id}')
+        ↓
+Supabase Edge Function (/api/v1/expense-categories, /api/v1/expenses)
+        ↓
+PostgreSQL RPCs (sync_create_expense_category, sync_update_expense_category, sync_create_expense, sync_update_expense)
+        ↓
+Atomic ACID Transaction (validation, mutation, sync_idempotency_log)
+```
+
+### 64.2 Entity & Payload Mapping
+
+#### Expense Categories
+- **Local Domain**: `ExpenseCategory` (`id`, `name`, `isActive`, `createdAt`, `updatedAt`).
+- **Normalized Uniqueness**: Category names are unique regardless of case and surrounding whitespace (`LOWER(TRIM(name))`). Duplicate attempts return `HTTP 409 CONFLICT`.
+- **Create Payload**:
+  ```json
+  {
+    "id": "<UUID>",
+    "name": "<string>",
+    "is_active": true,
+    "created_at": "<ISO-8601 UTC>",
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+- **Update Payload**:
+  ```json
+  {
+    "name": "<string>",
+    "is_active": true,
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+- **Status (Activate/Deactivate) Payload**:
+  ```json
+  {
+    "is_active": true,
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+
+#### Expenses
+- **Local Domain**: `Expense` (`id`, `categoryId`, `amount`, `expenseName`, `expenseDate`, `notes`, `categoryNameSnapshot`, `createdAt`, `updatedAt`).
+- **Monetary Units**: Integer minor units (piastres / `BIGINT`). Zero or negative amounts are invalid (`amount > 0`).
+- **Expense Date**: Stored as date-only `YYYY-MM-DD` (never shifted by timezone offsets).
+- **Category Name Snapshot**: Historical snapshot preserved at time of creation (`category_name_snapshot`).
+- **Custom Name Validation**: If category snapshot is `'أخرى'`, `expense_name` is mandatory and must be non-empty.
+- **Create Payload**:
+  ```json
+  {
+    "id": "<UUID>",
+    "expense_category_id": "<UUID>",
+    "amount": 15000,
+    "expense_name": "<nullable string>",
+    "expense_date": "2026-09-16",
+    "notes": "<nullable string>",
+    "category_name_snapshot": "<string>",
+    "created_at": "<ISO-8601 UTC>",
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+- **Update Payload**:
+  ```json
+  {
+    "amount": 15000,
+    "expense_name": "<nullable string>",
+    "expense_date": "2026-09-16",
+    "notes": "<nullable string>",
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+  *(Note: `expense_category_id` is immutable once created and cannot be modified via update).*
+
+### 64.3 Remote API & Edge Function Contracts
+
+#### `/api/v1/expense-categories`
+- `GET /api/v1/expense-categories`: Returns all categories ordered by `created_at ASC`. Supports optional `?is_active=true|false` query filter.
+- `GET /api/v1/expense-categories/:id`: Returns single category or `404 Not Found`.
+- `POST /api/v1/expense-categories`: Requires `X-Operation-ID`. Calls `sync_create_expense_category`. Returns `201 Created`.
+- `PATCH /api/v1/expense-categories/:id`: Requires `X-Operation-ID`. Calls `sync_update_expense_category`. Returns `200 OK`.
+- `DELETE /api/v1/expense-categories/:id`: Physical deletion is prohibited; returns `404 Not Found`.
+
+#### `/api/v1/expenses`
+- `GET /api/v1/expenses`: Returns expenses ordered by `expense_date DESC, created_at DESC`. Supports query filters:
+  - `category_id` / `categoryId` (UUID)
+  - `start_date` / `startDate` (`YYYY-MM-DD`)
+  - `end_date` / `endDate` (`YYYY-MM-DD`)
+  - `page`, `limit`, `offset` (pagination)
+- `GET /api/v1/expenses/:id`: Returns single expense or `404 Not Found`.
+- `POST /api/v1/expenses`: Requires `X-Operation-ID`. Calls `sync_create_expense`. Returns `201 Created`.
+- `PATCH /api/v1/expenses/:id`: Requires `X-Operation-ID`. Calls `sync_update_expense`. Returns `200 OK`.
+- `DELETE /api/v1/expenses/:id`: Physical deletion is prohibited; returns `404 Not Found`.
+
+### 64.4 PostgreSQL RPCs & Database Constraints
+
+All mutations run via `SECURITY DEFINER` RPCs within a single ACID transaction logging to `sync_idempotency_log`:
+
+1. **`sync_create_expense_category(p_op_id text, p_category jsonb)`**:
+   - Idempotency check on `p_op_id`: returns existing payload if duplicate.
+   - Validates non-empty `id` and non-empty trimmed `name`.
+   - Rejects duplicate normalized name via unique index `idx_expense_categories_name_lower` (`HTTP 409 CONFLICT`).
+   - Inserts row and logs operation. Returns entity JSON.
+
+2. **`sync_update_expense_category(p_op_id text, p_category_id text, p_category jsonb)`**:
+   - Idempotency check on `p_op_id`: returns existing payload if duplicate.
+   - Verifies category exists (`P0002` / `HTTP 404 NOT_FOUND` if missing).
+   - Updates `name`, `is_active`, and `updated_at`.
+   - Logs operation and returns updated entity JSON.
+
+3. **`sync_create_expense(p_op_id text, p_expense jsonb)`**:
+   - Idempotency check on `p_op_id`: returns existing payload if duplicate.
+   - Validates `amount > 0` and `expense_date`.
+   - Verifies referenced `expense_category_id` exists (`23503` / `HTTP 400 FOREIGN_KEY_VIOLATION`).
+   - Validates that if `category_name_snapshot == 'أخرى'`, `expense_name` must be non-empty (`HTTP 422 VALIDATION_ERROR`).
+   - Inserts expense row and logs operation. Returns entity JSON.
+
+4. **`sync_update_expense(p_op_id text, p_expense_id text, p_expense jsonb)`**:
+   - Idempotency check on `p_op_id`: returns existing payload if duplicate.
+   - Verifies expense exists (`P0002` / `HTTP 404 NOT_FOUND` if missing).
+   - Validates `amount > 0` if amount is being updated.
+   - Updates `amount`, `expense_name`, `expense_date`, `notes`, and `updated_at`. Protects `expense_category_id` from mutation.
+   - Logs operation and returns updated entity JSON.
+
+#### Security & Access Control
+- Remote tables `public.expense_categories` and `public.expenses` have Row Level Security (RLS) enabled.
+- Default-deny policies prevent direct access from `anon` and `authenticated` roles.
+- Flutter interacts exclusively via Edge Functions using `service_role` through transactional RPCs.
+
+---
+
+## 65. Step 12 — Master Data & Settings Synchronization Specification
+
+### 65.1 Overview
+Master Data and Business Settings synchronization completes remote persistence for all configuration entities in the Laundry Management System:
+1. `ItemType` (Clothing categories / types)
+2. `ItemDefinition` (Specific laundry service items belonging to an `ItemType`)
+3. `CarpetSize` (Configurable carpet dimensions `length x width` with calculated `area`)
+4. `StorageLocation` (Physical storage shelves/bins with many-to-many supported item types)
+5. `BusinessSettings` (Singleton shop configuration: name, phone, address, tax rate, receipt note, etc.)
+
+Local mutations occur atomically within Drift transactions in their respective repository implementations (`ItemTypeRepositoryImpl`, `ItemDefinitionRepositoryImpl`, `CarpetSizeRepositoryImpl`, `StorageLocationRepositoryImpl`, `SettingsRepositoryImpl`), simultaneously enqueuing self-contained JSON payloads into `sync_operations`. When online, mutations dispatch through the Supabase Edge Function `api` to transactional `SECURITY DEFINER` PostgreSQL RPCs with idempotency logging in `sync_idempotency_log`.
+
+### 65.2 Entity & Payload Schema Mapping
+
+#### 1. Item Types (`item_types`)
+- **Local Domain**: `ItemType` (`id`, `name`, `isActive`, `createdAt`, `updatedAt`).
+- **Normalized Uniqueness**: Case-insensitive and trimmed name uniqueness (`UNIQUE (name)`).
+- **Create Payload**:
+  ```json
+  {
+    "id": "<UUID>",
+    "name": "<string>",
+    "is_active": true,
+    "created_at": "<ISO-8601 UTC>",
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+- **Update Payload**:
+  ```json
+  {
+    "name": "<string>",
+    "is_active": true,
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+
+#### 2. Item Definitions (`item_definitions`)
+- **Local Domain**: `ItemDefinition` (`id`, `itemTypeId`, `name`, `pricingType`, `defaultPrice`, `isActive`, `createdAt`, `updatedAt`).
+- **Foreign Key**: References `item_types(id)` with `ON DELETE RESTRICT`.
+- **Pricing Type Mapping**: `perItem` → `"fixed"`, `perMeter` → `"per_meter"`, `custom` → `"custom"`.
+- **Monetary Unit**: Minor units (piastres / `BIGINT`).
+- **Composite Uniqueness**: `UNIQUE (item_type_id, name)`.
+- **Create Payload**:
+  ```json
+  {
+    "id": "<UUID>",
+    "item_type_id": "<UUID>",
+    "name": "<string>",
+    "pricing_type": "fixed | per_meter | custom",
+    "default_price": 2500,
+    "is_active": true,
+    "created_at": "<ISO-8601 UTC>",
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+- **Update Payload**:
+  ```json
+  {
+    "name": "<string>",
+    "pricing_type": "fixed | per_meter | custom",
+    "default_price": 2500,
+    "is_active": true,
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+
+#### 3. Carpet Sizes (`carpet_sizes`)
+- **Local Domain**: `CarpetSize` (`id`, `length`, `width`, `area`, `isActive`, `createdAt`, `updatedAt`).
+- **Dimensions**: Floating point numbers > 0. Unique index on `UNIQUE (length, width)`.
+- **Create Payload**:
+  ```json
+  {
+    "id": "<UUID>",
+    "length": 3.5,
+    "width": 2.5,
+    "area": 8.75,
+    "is_active": true,
+    "created_at": "<ISO-8601 UTC>",
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+- **Update Payload**:
+  ```json
+  {
+    "length": 4.0,
+    "width": 2.5,
+    "area": 10.0,
+    "is_active": true,
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+
+#### 4. Storage Locations (`storage_locations` & `storage_location_item_types`)
+- **Local Domain**: `StorageLocation` (`id`, `name`, `supportedItemTypeIds`, `isActive`, `createdAt`, `updatedAt`).
+- **Uniqueness**: `name` is unique.
+- **Many-to-Many Linking**: Link table `storage_location_item_types` links storage locations to multiple `item_types` with `ON DELETE CASCADE`.
+- **Create Payload**:
+  ```json
+  {
+    "id": "<UUID>",
+    "name": "<string>",
+    "is_active": true,
+    "supported_item_type_ids": ["<UUID>", "<UUID>"],
+    "created_at": "<ISO-8601 UTC>",
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+- **Update Payload**:
+  ```json
+  {
+    "name": "<string>",
+    "is_active": true,
+    "supported_item_type_ids": ["<UUID>"],
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+
+#### 5. Business Settings (`business_settings`)
+- **Local Domain**: `BusinessSettings` (`businessName`, `phoneNumber`, `address`, `taxRate`, `taxNumber`, `receiptFooterText`, `logoUrl`, `printerPaperSize`, `autoBackupEnabled`, `syncFrequencyMinutes`, `updatedAt`).
+- **Singleton Row**: Stored remotely with primary key `id = 'singleton'`. Always mutated via `PATCH /business-settings`.
+- **Tax Rate**: Must be between 0.0 and 1.0 inclusive (`CHECK (tax_rate >= 0 AND tax_rate <= 1)`).
+- **Update Payload**:
+  ```json
+  {
+    "business_name": "مغسلة النور",
+    "phone_number": "01012345678",
+    "address": "القاهرة",
+    "tax_rate": 0.14,
+    "tax_number": "123-456-789",
+    "receipt_footer_text": "شكراً لتعاملكم معنا",
+    "logo_url": null,
+    "printer_paper_size": "80mm",
+    "auto_backup_enabled": true,
+    "sync_frequency_minutes": 15,
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+
+### 65.3 Remote API & Edge Function Contracts
+- **Endpoints**:
+  - `/api/v1/item-types`: `GET`, `GET /:id`, `POST`, `PATCH /:id`
+  - `/api/v1/item-definitions`: `GET`, `GET /:id`, `POST`, `PATCH /:id`
+  - `/api/v1/carpet-sizes`: `GET`, `GET /:id`, `POST`, `PATCH /:id`
+  - `/api/v1/storage-locations`: `GET`, `GET /:id`, `POST`, `PATCH /:id`
+  - `/api/v1/business-settings`: `GET`, `PATCH`
+- **Immutability / Deletion Policy**: Physical deletion is prohibited across all master data and settings in V1. `DELETE` on all endpoints returns `404 Not Found`. Deactivation is performed via `is_active: false` in `PATCH`.
+- **Idempotency**: All mutation endpoints require and validate the `X-Operation-ID` header.
+
+### 65.4 PostgreSQL RPCs
+9 transactional `SECURITY DEFINER` RPCs were deployed via migration `20260916000004_master_data_schema.sql`:
+1. `sync_create_item_type(p_op_id, p_item_type)`
+2. `sync_update_item_type(p_op_id, p_item_type_id, p_item_type)`
+3. `sync_create_item_definition(p_op_id, p_item_def)`
+4. `sync_update_item_definition(p_op_id, p_item_def_id, p_item_def)`
+5. `sync_create_carpet_size(p_op_id, p_carpet_size)`
+6. `sync_update_carpet_size(p_op_id, p_carpet_size_id, p_carpet_size)`
+7. `sync_create_storage_location(p_op_id, p_location)`
+8. `sync_update_storage_location(p_op_id, p_location_id, p_location)`
+9. `sync_update_business_settings(p_op_id, p_settings)`
+
+All RPCs log to `sync_idempotency_log` within the transaction and return cached results on replay. Default-deny RLS is enforced across all master data tables.
+
+---
+
+## 66. Dashboard Operational Aggregation & Offline-First Reactivity
+
+The Dashboard operates in accordance with the system's Offline-First principles:
+
+### 66.1 Architecture & Local Source of Truth
+- **Zero Remote Dependencies**: The Dashboard does not issue remote HTTP queries or RPCs. It reads exclusively from the local Drift SQLite database.
+- **Database-Side Aggregation**: All operational overview metrics (`todayOrdersCount`, `readyOrdersCount`, `processingOrdersCount`, `totalRemaining`, `unpaidOrdersCount`, `overdueOrdersCount`, `todayPickupOrdersCount`) are evaluated within SQLite using conditional aggregations (`SUM(CASE ...)`). Dart memory is not used to scan or filter full table collections.
+- **Enrichment**: Recent orders and today's pickups are retrieved with minimal joins and enriched with `PaymentSummary` calculations directly from local records.
+
+### 66.2 Reactive Stream via Drift Table Updates
+- **Mechanism**: `DashboardRepository.watchDashboardData()` observes local table events via `db.tableUpdates()` for `orders`, `payments`, `storage_records`, and `order_items`.
+- **Automatic Sync Reflection**: When the background sync worker or local operations insert, update, or delete records in any of the 4 operational tables, `db.tableUpdates` triggers an immediate re-evaluation of `getDashboardData()`.
+- **No Polling**: No background polling loops or periodic timers are utilized.
+- **Clean Disposals**: Because `tableUpdates` operates via broadcast stream controllers rather than query stream listeners, subscription cancellations cleanly dispose without leaving unexecuted timer callbacks or lingering tasks.

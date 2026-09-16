@@ -91,4 +91,12 @@ class DashboardRepositoryImpl implements DashboardRepository {
       recentOrders: recentItems,
     );
   }
+
+  @override
+  Stream<DashboardData> watchDashboardData() async* {
+    yield await getDashboardData();
+    yield* _ordersDao
+        .watchDashboardUpdates()
+        .asyncMap((_) => getDashboardData());
+  }
 }

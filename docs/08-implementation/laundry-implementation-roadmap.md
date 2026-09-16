@@ -23,11 +23,10 @@ The implementation workflow remains:
 | Task #05 | Core Presentation Foundation | Establish the core Flutter presentation foundation and prepare the first production-ready screen flow. | Completed / Locked |
 | Task #06 | Orders — End-to-End | Implement the core Order experience from creation through order management, using the existing business workflows. | Completed / Locked |
 | Task #07 | Customers | Implement customer management and its integration with Orders. | Completed / Locked |
-| Task #08 | Storage | Implement the operational storage workflow for physical OrderItems, including storing and moving items. | Completed / Locked |
-| Task #09 | Payments | Implement the payment workflow and payment-related Order experience. | Completed / Locked |
-| **Task #10** | **Expenses & Reports** | Implement operational expense management and operational/financial reporting as a tightly coupled unified feature. | **In Progress** |
-| Task #11 | Services & Pricing / Settings | Implement management of services, pricing/master data, and approved Settings workflows. | Planned |
-| Task #12 | Dashboard | Implement the operational Dashboard using real data from the completed workflows. | Planned |
+| Task #09 | Payments | Implement the payment workflow, payment-related Order experience, and Step 10 Live Supabase backend synchronization. | Completed / Locked |
+| Task #10 | Expenses & Reports | Implement operational expense management and operational/financial reporting as a tightly coupled unified feature, and Step 11 Live Supabase backend synchronization. | Completed / Locked |
+| Task #11 | Services & Pricing / Settings | Implement management of services, pricing/master data, and approved Settings workflows, and Step 12 Live Supabase backend synchronization. | Completed / Locked |
+| Task #12 | Dashboard | Implement the operational Dashboard using real data from the completed workflows. | Planned (Current Next Task) |
 | Task #13 | Reports | *(Merged into Task #10 — Expenses & Reports)* | Merged into Task #10 |
 | Task #14 | Invoice / Receipt | Implement invoice/receipt viewing and printing using historical Order information. | Planned |
 | Task #15 | Offline / Sync Integration | Integrate and verify synchronization after the core local workflows are stable. | Planned |
@@ -186,33 +185,35 @@ Services and pricing are master/configuration data used by operational workflows
 
 They belong under Settings rather than the primary navigation.
 
-This task should provide the approved management experience without expanding the V1 configuration scope.
+This task provides the approved management experience without expanding the V1 configuration scope, coupled with Step 12 Live Supabase Backend Synchronization:
+- **Local Persistence & Sync Enqueue**: `ItemType`, `ItemDefinition`, `CarpetSize`, `StorageLocation`, and `BusinessSettings` persist locally via Drift transactions and enqueue non-null, self-contained JSON sync payloads.
+- **Remote Supabase Schema**: Migration `20260916000004_master_data_schema.sql` creates tables `item_types`, `item_definitions`, `carpet_sizes`, `storage_locations`, `storage_location_item_types`, and `business_settings` with default-deny RLS.
+- **Transactional RPCs**: 9 `SECURITY DEFINER` RPCs handle idempotency logging (`sync_idempotency_log`), FK integrity, check constraints, and atomic mutations.
+- **Edge Function API**: Deployed and active on `/item-types`, `/item-definitions`, `/carpet-sizes`, `/storage-locations`, and `/business-settings`.
+- **Status**: Completed / Locked. Next task is Task #12 — Dashboard.
 
 ---
 
 ## Task #12 — Dashboard
 
-The Dashboard should come after the core transactional workflows because it is an operational overview of real system data.
-
-It should not become a replacement for Orders, Storage, Customers, or Reports.
-
-Approved Dashboard focus includes:
-
-- Orders created today
-- Orders Ready
-- Items/orders requiring storage
-- Outstanding payments
-- Overdue orders
-- Today's expected pickups
-- Recent orders
-- Quick actions
-
-Approved Quick Actions:
-
-- Add Order
-- Add Customer
-- Record Payment
-- Add Expense
+The Dashboard provides an operational overview of real system data without replacing Orders, Storage, Customers, or Reports:
+- **Operational Overview Metrics**: All 7 operational metrics implemented via optimized Drift database-side aggregations:
+  1. Orders created today (`today_orders_count` using local midnight boundaries `00:00:00.000` to `23:59:59.999`)
+  2. Ready orders (`ready_orders_count` matching `OrderStatus.ready`)
+  3. Items requiring storage (`itemsRequiringStorageCount` matching active orders with no active storage records via `StorageRepository.countItemsRequiringStorage()`)
+  4. Outstanding payments (`totalRemaining` in piastres + `unpaidOrdersCount` for non-cancelled orders with `total - paid > 0`)
+  5. Overdue orders (`overdueOrdersCount` where `expectedPickupDate < today` and order not completed or cancelled)
+  6. Today's expected pickups (`todayPickupOrdersCount` count + list capped at 5 active orders due today)
+  7. Recent orders (latest 5 orders with `PaymentSummary` remaining amount enrichment)
+- **Reactive Stream**: `DashboardRepository.watchDashboardData()` reactive via Drift `db.tableUpdates` monitoring `orders`, `payments`, `storage_records`, and `order_items` tables with zero polling and zero pending timers.
+- **Quick Actions**: All 4 actions operational:
+  1. Add Order (`/orders/new`)
+  2. Add Customer (`CustomerFormDialog` with duplicate handling & `onViewExisting` navigation)
+  3. Record Payment (`RecordPaymentDialog` two-step flow: search/select order + record payment with live balance validation)
+  4. Add Expense (`AddExpenseDialog` with active category selection and expense recording)
+- **Responsive Layout & Design**: Single-column mobile layout, two-column responsive tablet/desktop layout with full Arabic RTL support.
+- **Verification**: 100% test pass rate across unit, repository, cubit, widget, and integration suites (735/735 passing, `flutter analyze` 0 issues, `git diff --check` clean).
+- **Status**: Completed / Locked. Next task is Task #14 — Invoice / Receipt.
 
 ---
 
@@ -415,13 +416,13 @@ Task #05  Core Presentation Foundation     ✅ LOCKED
 Task #06  Orders — End-to-End              ✅ LOCKED
 Task #07  Customers                        ✅ LOCKED
 Task #08  Storage                          ✅ LOCKED
+Task #09  Payments                         ✅ LOCKED (Step 10 Backend Sync Complete)
+Task #10  Expenses & Reports               ✅ LOCKED (Step 11 Backend Sync Complete)
 
-Task #09  Payments                         ← CURRENT NEXT TASK
-Task #10  Expenses
-Task #11  Services & Pricing / Settings
-Task #12  Dashboard
-Task #13  Reports
-Task #14  Invoice / Receipt
+Task #11  Services & Pricing / Settings    ✅ LOCKED (Step 12 Backend Sync Complete)
+Task #12  Dashboard                        ✅ LOCKED
+Task #13  Reports (Merged into #10)        ✅ LOCKED
+Task #14  Invoice / Receipt                ← CURRENT NEXT TASK
 Task #15  Offline / Sync Integration
 Task #16  Full Integration / QA / Hardening
 ```

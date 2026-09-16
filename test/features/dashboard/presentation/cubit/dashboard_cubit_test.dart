@@ -24,6 +24,12 @@ class FakeDashboardRepository implements DashboardRepository {
     if (shouldThrow) throw Exception('Repository failure');
     return mockData;
   }
+
+  @override
+  Stream<DashboardData> watchDashboardData() async* {
+    if (shouldThrow) throw Exception('Repository failure');
+    yield mockData;
+  }
 }
 
 void main() {

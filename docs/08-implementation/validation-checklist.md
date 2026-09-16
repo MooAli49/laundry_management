@@ -1351,9 +1351,9 @@ Never silently invent a new rule during implementation.
 - [ ] Application can start without any network access.
 - [ ] Customers can be created without network access.
 - [ ] Orders can be created without network access.
-- [ ] Payments can be recorded without network access.
+- [x] Payments can be recorded without network access.
 - [ ] Storage operations work without network access.
-- [ ] Expenses can be created without network access.
+- [x] Expenses can be created without network access.
 - [ ] Dashboard loads from local data without network access.
 - [ ] Reports load from local data without network access.
 - [ ] Sync queue accumulates operations locally when offline and processes them when connectivity is restored.
@@ -1367,3 +1367,137 @@ Never silently invent a new rule during implementation.
 - [ ] No multi-tenant UI was introduced in this phase.
 - [ ] No subscription management was introduced in this phase.
 - [ ] The synchronization boundary (Sync Engine behind Remote Data Source) is structured so that future multi-tenant backend support can be added without rewriting Presentation or Domain layers.
+
+---
+
+### 55.18 Step 10 — Payment Remote Synchronization Validation
+
+- [x] Payment payload is generated locally via `SyncPayloadBuilder.buildPaymentPayload()`.
+- [x] Payment sync operation is enqueued with a non-null, self-contained JSON payload.
+- [x] Local payment insertion and sync enqueue are atomic within a single Drift transaction.
+- [x] Failed sync enqueue rolls back local payment insertion.
+- [x] Remote Supabase `payments` table created with RLS and default-deny security.
+- [x] Remote `orders` table includes `paid_amount` column.
+- [x] PostgreSQL RPC `sync_create_payment` is transactional and protects against concurrency race conditions via `FOR UPDATE`.
+- [x] Payment creation is idempotent; duplicate `X-Operation-ID` replays return cached payload without duplicate increment of `orders.paid_amount`.
+- [x] Overpayment beyond remaining order balance is rejected with `HTTP 409 CONFLICT`.
+- [x] Payments on cancelled orders are rejected with `HTTP 409 CONFLICT`.
+- [x] Payments with zero or negative amounts are rejected with `HTTP 422 VALIDATION_ERROR`.
+- [x] Payments with invalid payment methods are rejected with `HTTP 422 VALIDATION_ERROR`.
+- [x] Missing orders return `HTTP 404 NOT_FOUND`.
+- [x] Payments remain immutable in V1; PATCH/PUT/DELETE return `HTTP 404 NOT_FOUND`.
+- [x] Retrofit client and RemoteApiDispatcher are verified against `/api/v1/payments`.
+- [x] Live Supabase backend integration test suite (`step10_live_payment_integration_test.dart`) passes 100%.
+
+---
+
+### 55.19 Step 11 — Expense & Expense Category Remote Synchronization Validation
+
+- [x] Expense payload generated locally via `SyncPayloadBuilder.buildExpensePayload()`.
+- [x] Expense update payload generated locally via `SyncPayloadBuilder.buildExpenseUpdatePayload()`.
+- [x] Expense Category payload generated locally via `SyncPayloadBuilder.buildExpenseCategoryPayload()`.
+- [x] Expense Category update payload generated locally via `SyncPayloadBuilder.buildExpenseCategoryUpdatePayload()`.
+- [x] Expense Category status payload generated locally via `SyncPayloadBuilder.buildExpenseCategoryStatusPayload()`.
+- [x] Expense amount represented in integer minor units (piastres / `BIGINT`). Floating-point money prohibited.
+- [x] `expense_date` serialized as date-only `YYYY-MM-DD` without timezone distortion.
+- [x] Expense creation and update enqueued with non-null, validated JSON payloads.
+- [x] Expense Category creation, update, activation, and deactivation enqueued with non-null JSON payloads.
+- [x] Local expense and category mutations + sync queue enqueues are atomic within single Drift transactions.
+- [x] Failed sync enqueue rolls back local database mutations.
+- [x] Remote Supabase `expense_categories` and `expenses` tables deployed with RLS and default-deny policies.
+- [x] Normalized unique index `idx_expense_categories_name_lower` (`LOWER(TRIM(name))`) prevents duplicate category names.
+- [x] Foreign key constraint `expenses.expense_category_id -> expense_categories.id` enforced with `ON DELETE RESTRICT`.
+- [x] Amount constraint `amount > 0` enforced on database level.
+- [x] Indexes `idx_expenses_category_date` and `idx_expenses_date` created and active.
+- [x] PostgreSQL RPCs `sync_create_expense_category`, `sync_update_expense_category`, `sync_create_expense`, `sync_update_expense` deployed with `SECURITY DEFINER` and ACID transactions.
+- [x] RPCs enforce idempotency via `sync_idempotency_log` using `p_op_id`.
+- [x] Replaying operations with identical `X-Operation-ID` returns cached response without duplicate mutations.
+- [x] Custom name validation for category "أخرى" enforced (empty name rejected with `HTTP 422 VALIDATION_ERROR`).
+- [x] Edge Function routes `/expense-categories` and `/expenses` deployed and operational.
+- [x] Physical deletion prohibited (DELETE returns `HTTP 404 NOT_FOUND`).
+- [x] Filtering by category ID, date ranges (`start_date`, `end_date`), pagination, and sorting verified.
+- [x] Unit test suite (`sync_payload_builder_test.dart`) passes 100%.
+- [x] Repository test suite (`expense_repository_impl_test.dart`) passes 100%.
+- [x] Live Supabase integration test suite (`step11_live_expense_integration_test.dart`) passes 100% (15/15).
+- [x] Regression test suite (`step10_live_payment_integration_test.dart`) passes 100% (13/13).
+
+---
+
+### 55.20 Step 12 — Master Data & Settings Remote Synchronization Validation
+
+- [x] ItemType payload generated locally via `SyncPayloadBuilder.buildItemTypePayload()`, `buildItemTypeUpdatePayload()`, and `buildItemTypeStatusPayload()`.
+- [x] ItemDefinition payload generated locally via `SyncPayloadBuilder.buildItemDefinitionPayload()` and `buildItemDefinitionUpdatePayload()`.
+- [x] CarpetSize payload generated locally via `SyncPayloadBuilder.buildCarpetSizePayload()` and `buildCarpetSizeUpdatePayload()`.
+- [x] StorageLocation payload generated locally via `SyncPayloadBuilder.buildStorageLocationPayload()` and `buildStorageLocationUpdatePayload()`, including `supported_item_type_ids`.
+- [x] BusinessSettings payload generated locally via `SyncPayloadBuilder.buildBusinessSettingsPayload()`.
+- [x] Local mutations in `ItemTypeRepositoryImpl`, `ItemDefinitionRepositoryImpl`, `CarpetSizeRepositoryImpl`, `StorageLocationRepositoryImpl`, and `SettingsRepositoryImpl` enqueue self-contained non-null JSON sync payloads atomically within Drift transactions.
+- [x] Failed sync enqueue rolls back local database mutations.
+- [x] Remote Supabase migration `20260916000004_master_data_schema.sql` applied successfully.
+- [x] Remote tables `item_types`, `item_definitions`, `carpet_sizes`, `storage_locations`, `storage_location_item_types`, and `business_settings` created with RLS and default-deny policies.
+- [x] Unique constraints enforced: `item_types(name)`, `item_definitions(item_type_id, name)`, `carpet_sizes(length, width)`, `storage_locations(name)`.
+- [x] Foreign key constraints enforced: `item_definitions.item_type_id -> item_types.id`, `storage_location_item_types -> storage_locations.id, item_types.id`.
+- [x] Check constraints enforced: `carpet_sizes` dimensions > 0, `item_definitions` default_price >= 0, `business_settings.tax_rate >= 0 AND <= 1`.
+- [x] 9 PostgreSQL RPCs deployed with `SECURITY DEFINER` and ACID transactions with idempotency logging in `sync_idempotency_log`.
+- [x] Replaying operations with identical `X-Operation-ID` returns cached response without duplicate mutations.
+- [x] Edge Function `api` routes `/item-types`, `/item-definitions`, `/carpet-sizes`, `/storage-locations`, `/business-settings` deployed (version 5) and operational.
+- [x] Physical deletion prohibited across all master data and settings (DELETE returns `HTTP 404 NOT_FOUND`).
+- [x] Unit test suite (`sync_payload_builder_test.dart`) passes 100% (12/12).
+- [x] Live Supabase master data integration test suite (`step12_live_master_data_integration_test.dart`) passes 100% (31/31).
+- [x] Step 10 live payment regression suite (`step10_live_payment_integration_test.dart`) passes 100% (13/13).
+- [x] Step 11 live expense regression suite (`step11_live_expense_integration_test.dart`) passes 100% (15/15).
+- [x] Full Flutter test suite passes 100% (731/731).
+- [x] `flutter analyze` reports 0 issues.
+- [x] `git diff --check` is clean.
+
+---
+
+### 55.21 Task #12 — Dashboard & Daily Overview Operational Implementation Validation
+
+- [x] Operational overview metrics: all 7 metrics computed via database-side aggregation without full-table memory scans:
+  - `todayOrdersCount`: orders created today within local calendar boundaries `00:00:00.000` to `23:59:59.999`.
+  - `readyOrdersCount`: active orders in `OrderStatus.ready`.
+  - `processingOrdersCount`: active orders in `OrderStatus.processing`.
+  - `itemsRequiringStorageCount`: items of active orders (`processing` or `ready`) without active `StorageRecord`.
+  - `totalRemaining`: remaining balance in minor units (piastres) on non-cancelled orders (`total - paid > 0`).
+  - `unpaidOrdersCount`: count of non-cancelled orders with positive remaining balance.
+  - `overdueOrdersCount`: active orders (`status != completed AND status != cancelled`) with `expectedPickupDate < today`.
+  - `todayPickupOrdersCount`: active orders with `expectedPickupDate == today`.
+- [x] Order lists:
+  - `todayPickupOrders`: up to 5 active orders scheduled for pickup today, sorted by pickup date ascending.
+  - `recentOrders`: up to 5 latest orders created, sorted by `createdAt` descending, enriched with `PaymentSummary` calculations.
+- [x] Date handling and boundary enforcement:
+  - Today start (`00:00:00.000`) and end (`23:59:59.999`) strictly tested across midnight boundaries.
+  - `OrderDate.today()` serialized to `DateTime.utc(year, month, day)` matching Drift `expected_pickup_date` column format.
+  - Overdue vs due today vs tomorrow boundary separation strictly validated.
+  - Completed and cancelled orders strictly excluded from attention cards and pickup lists.
+- [x] Outstanding payment semantics:
+  - Reuses existing payment calculation rules (`total - paid`).
+  - Fully paid orders (`remaining == 0`) excluded from outstanding lists and counts.
+  - Cancelled orders excluded from outstanding totals.
+- [x] Storage attention semantics:
+  - Uses existing `StorageRepository.countItemsRequiringStorage()` based on `orders_items` without active `storage_records`.
+- [x] Reactive stream (`DashboardRepository.watchDashboardData()`):
+  - Listens to Drift `db.tableUpdates()` for `orders`, `payments`, `storage_records`, and `order_items`.
+  - Emits initial snapshot immediately on listen, then re-evaluates database-side aggregation on any mutation.
+  - No polling loops.
+  - Zero pending timers on stream cancellation or widget unmount.
+  - Subscription lifecycle correctly managed and disposed in `DashboardCubit.close()`.
+- [x] Quick Actions:
+  - "إضافة طلب": navigates to `/orders/new` and refreshes upon return.
+  - "إضافة عميل": opens `CustomerFormDialog` with duplicate handling and `onViewExisting` detail navigation.
+  - "تسجيل دفعة": opens two-step `RecordPaymentDialog` with live order search, Arabic numerals support, balance validation, and instant payment recording.
+  - "إضافة مصروف": opens `AddExpenseDialog` with category selection and expense recording.
+- [x] RTL & Design System:
+  - Arabic RTL directionality strictly enforced.
+  - Typography, colors, card layouts, and badges adhere strictly to Design System tokens.
+  - Responsive single-column mobile layout and two-column tablet/desktop layout.
+- [x] Test verification:
+  - `test/data/repositories/dashboard_repository_impl_test.dart`: 7/7 passing (boundaries, exclusions, aggregations, reactivity).
+  - `test/features/dashboard/presentation/cubit/dashboard_cubit_test.dart`: 4/4 passing (lifecycle, loading, success, error, refresh).
+  - `test/features/dashboard/presentation/screens/dashboard_screen_test.dart`: 6/6 passing (rendering, quick actions, dialogs, empty states).
+  - `test/features/dashboard/presentation/cubit/record_payment_cubit_test.dart`: 13/13 passing (search normalization, balance validation, payment).
+  - `test/features/dashboard/presentation/widgets/record_payment_dialog_test.dart`: 5/5 passing (two-step dialog interactions, filters).
+  - `test/widget_test.dart`: 4/4 passing (app bootstrap, sidebar navigation, responsive layout).
+  - Full Flutter test suite: 735/735 passing (100%).
+  - `flutter analyze`: 0 issues found.
+  - `git diff --check`: clean (0 trailing whitespace or format issues).

@@ -7,6 +7,7 @@ import '../local/daos/storage_locations_dao.dart';
 import '../local/daos/storage_records_dao.dart';
 import '../local/daos/sync_operations_dao.dart';
 import '../local/database/app_database.dart' as app_db;
+import '../sync/sync_payload_builder.dart';
 
 class StorageLocationRepositoryImpl implements StorageLocationRepository {
   final StorageLocationsDao _storageLocationsDao;
@@ -52,6 +53,10 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
           entityType: 'storage_location',
           entityId: location.id,
           operationType: 'create',
+          payload: SyncPayloadBuilder.buildStorageLocationPayload(
+            location,
+            supportedItemTypeIds,
+          ),
         );
 
         return location;
@@ -88,6 +93,10 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
           ),
         );
 
+        final finalSupportedTypes =
+            supportedItemTypeIds ??
+            await _storageLocationsDao.getSupportedItemTypeIds(location.id);
+
         if (supportedItemTypeIds != null) {
           await _storageLocationsDao.replaceSupportedItemTypes(
             location.id,
@@ -99,6 +108,10 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
           entityType: 'storage_location',
           entityId: location.id,
           operationType: 'update',
+          payload: SyncPayloadBuilder.buildStorageLocationUpdatePayload(
+            location,
+            finalSupportedTypes,
+          ),
         );
 
         return location;
@@ -168,11 +181,17 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
           throw ValidationFailure('Storage location not found');
         }
 
-        await _storageLocationsDao.setActiveStatus(id, true, DateTime.now());
+        final now = DateTime.now();
+        await _storageLocationsDao.setActiveStatus(id, true, now);
         await _syncOperationsDao.recordOperation(
           entityType: 'storage_location',
           entityId: id,
           operationType: 'activate',
+          payload: SyncPayloadBuilder.buildStorageLocationStatusPayload(
+            id,
+            true,
+            updatedAt: now,
+          ),
         );
       });
     } catch (e) {
@@ -198,11 +217,17 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
           );
         }
 
-        await _storageLocationsDao.setActiveStatus(id, false, DateTime.now());
+        final now = DateTime.now();
+        await _storageLocationsDao.setActiveStatus(id, false, now);
         await _syncOperationsDao.recordOperation(
           entityType: 'storage_location',
           entityId: id,
           operationType: 'deactivate',
+          payload: SyncPayloadBuilder.buildStorageLocationStatusPayload(
+            id,
+            false,
+            updatedAt: now,
+          ),
         );
       });
     } catch (e) {

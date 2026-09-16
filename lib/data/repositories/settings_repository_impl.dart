@@ -6,6 +6,7 @@ import '../../domain/repositories/settings_repository.dart';
 import '../local/daos/business_settings_dao.dart';
 import '../local/daos/sync_operations_dao.dart';
 import '../local/database/app_database.dart' as app_db;
+import '../sync/sync_payload_builder.dart';
 
 class SettingsRepositoryImpl implements SettingsRepository {
   final BusinessSettingsDao _settingsDao;
@@ -54,6 +55,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
           entityType: 'business_settings',
           entityId: settings.id,
           operationType: 'update',
+          payload: SyncPayloadBuilder.buildBusinessSettingsPayload(settings),
         );
 
         return settings;

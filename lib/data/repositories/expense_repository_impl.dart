@@ -8,6 +8,7 @@ import '../../domain/value_objects/order_date.dart';
 import '../local/daos/expenses_dao.dart';
 import '../local/daos/sync_operations_dao.dart';
 import '../local/database/app_database.dart' as app_db;
+import '../sync/sync_payload_builder.dart';
 
 class ExpenseRepositoryImpl implements ExpenseRepository {
   final ExpensesDao _expensesDao;
@@ -44,6 +45,7 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
           entityType: 'expense',
           entityId: expense.id,
           operationType: 'create',
+          payload: SyncPayloadBuilder.buildExpensePayload(expense),
         );
 
         return expense;
@@ -83,6 +85,7 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
           entityType: 'expense',
           entityId: expense.id,
           operationType: 'update',
+          payload: SyncPayloadBuilder.buildExpenseUpdatePayload(expense),
         );
 
         return expense;

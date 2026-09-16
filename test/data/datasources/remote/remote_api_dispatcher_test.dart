@@ -97,6 +97,9 @@ class FakePaymentApi implements PaymentRemoteApi {
 
   @override
   Future<dynamic> getPaymentById(String id) async => null;
+
+  @override
+  Future<dynamic> getPayments({String? orderId}) async => null;
 }
 
 class FakeStorageApi implements StorageRemoteApi {

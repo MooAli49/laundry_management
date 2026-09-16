@@ -10,6 +10,9 @@ part 'payment_remote_api.g.dart';
 abstract class PaymentRemoteApi {
   factory PaymentRemoteApi(Dio dio, {String? baseUrl}) = _PaymentRemoteApi;
 
+  @GET('/api/v1/payments')
+  Future<dynamic> getPayments({@Query('order_id') String? orderId});
+
   @GET('/api/v1/payments/{id}')
   Future<dynamic> getPaymentById(@Path('id') String id);
 

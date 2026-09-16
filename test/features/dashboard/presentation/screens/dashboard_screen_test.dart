@@ -35,6 +35,11 @@ class FakeDashboardRepository implements DashboardRepository {
   Future<DashboardData> getDashboardData() async {
     return mockData;
   }
+
+  @override
+  Stream<DashboardData> watchDashboardData() async* {
+    yield mockData;
+  }
 }
 
 void main() {

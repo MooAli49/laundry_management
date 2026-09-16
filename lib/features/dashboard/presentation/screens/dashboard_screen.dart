@@ -46,12 +46,17 @@ class _DashboardView extends StatelessWidget {
         onSave: ({required name, required phone, notes}) async {
           await cubit.createCustomer(name: name, phone: phone, notes: notes);
           if (context.mounted) {
+            context.read<DashboardCubit>().refresh();
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('تمت إضافة العميل بنجاح')),
             );
           }
         },
         onFindDuplicate: cubit.getCustomerByPhone,
+        onViewExisting: (existingCustomer) {
+          Navigator.of(ctx).pop();
+          context.push(AppRoutes.customerDetailPath(existingCustomer.id));
+        },
       ),
     );
   }
@@ -118,7 +123,12 @@ class _DashboardView extends StatelessWidget {
                   label: 'إضافة طلب',
                   icon: Icons.add,
                   variant: AppButtonVariant.primary,
-                  onPressed: () => context.push(AppRoutes.ordersNew),
+                  onPressed: () async {
+                    await context.push(AppRoutes.ordersNew);
+                    if (context.mounted) {
+                      context.read<DashboardCubit>().refresh();
+                    }
+                  },
                 ),
                 AppButton(
                   key: const ValueKey('dashboard_add_customer_button'),

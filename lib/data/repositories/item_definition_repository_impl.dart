@@ -6,6 +6,7 @@ import '../../domain/repositories/item_definition_repository.dart';
 import '../local/daos/item_definitions_dao.dart';
 import '../local/daos/sync_operations_dao.dart';
 import '../local/database/app_database.dart' as app_db;
+import '../sync/sync_payload_builder.dart';
 
 class ItemDefinitionRepositoryImpl implements ItemDefinitionRepository {
   final ItemDefinitionsDao _itemDefinitionsDao;
@@ -41,6 +42,9 @@ class ItemDefinitionRepositoryImpl implements ItemDefinitionRepository {
           entityType: 'item_definition',
           entityId: itemDefinition.id,
           operationType: 'create',
+          payload: SyncPayloadBuilder.buildItemDefinitionPayload(
+            itemDefinition,
+          ),
         );
 
         return itemDefinition;
@@ -81,6 +85,9 @@ class ItemDefinitionRepositoryImpl implements ItemDefinitionRepository {
           entityType: 'item_definition',
           entityId: itemDefinition.id,
           operationType: 'update',
+          payload: SyncPayloadBuilder.buildItemDefinitionUpdatePayload(
+            itemDefinition,
+          ),
         );
 
         return itemDefinition;
@@ -141,11 +148,17 @@ class ItemDefinitionRepositoryImpl implements ItemDefinitionRepository {
           throw ValidationFailure('ItemDefinition not found');
         }
 
-        await _itemDefinitionsDao.setActiveStatus(id, true, DateTime.now());
+        final now = DateTime.now();
+        await _itemDefinitionsDao.setActiveStatus(id, true, now);
         await _syncOperationsDao.recordOperation(
           entityType: 'item_definition',
           entityId: id,
           operationType: 'activate',
+          payload: SyncPayloadBuilder.buildItemDefinitionStatusPayload(
+            id,
+            true,
+            updatedAt: now,
+          ),
         );
       });
     } catch (e) {
@@ -163,11 +176,17 @@ class ItemDefinitionRepositoryImpl implements ItemDefinitionRepository {
           throw ValidationFailure('ItemDefinition not found');
         }
 
-        await _itemDefinitionsDao.setActiveStatus(id, false, DateTime.now());
+        final now = DateTime.now();
+        await _itemDefinitionsDao.setActiveStatus(id, false, now);
         await _syncOperationsDao.recordOperation(
           entityType: 'item_definition',
           entityId: id,
           operationType: 'deactivate',
+          payload: SyncPayloadBuilder.buildItemDefinitionStatusPayload(
+            id,
+            false,
+            updatedAt: now,
+          ),
         );
       });
     } catch (e) {
