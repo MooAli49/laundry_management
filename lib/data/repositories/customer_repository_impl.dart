@@ -7,6 +7,7 @@ import '../../domain/repositories/customer_repository.dart';
 import '../local/daos/customers_dao.dart';
 import '../local/daos/sync_operations_dao.dart';
 import '../local/database/app_database.dart' as app_db;
+import '../sync/sync_payload_builder.dart';
 
 class CustomerRepositoryImpl implements CustomerRepository {
   final CustomersDao _customersDao;
@@ -17,9 +18,9 @@ class CustomerRepositoryImpl implements CustomerRepository {
     required CustomersDao customersDao,
     required SyncOperationsDao syncOperationsDao,
     required app_db.AppDatabase db,
-  })  : _customersDao = customersDao,
-        _syncOperationsDao = syncOperationsDao,
-        _db = db;
+  }) : _customersDao = customersDao,
+       _syncOperationsDao = syncOperationsDao,
+       _db = db;
 
   @override
   Future<Customer> createCustomer(Customer customer) async {
@@ -31,7 +32,9 @@ class CustomerRepositoryImpl implements CustomerRepository {
       if (!PhoneUtils.isValidCustomerPhone(normalizedPhone)) {
         throw const ValidationFailure('رقم الهاتف غير صحيح');
       }
-      final existingByPhone = await _customersDao.getCustomerByPhone(normalizedPhone);
+      final existingByPhone = await _customersDao.getCustomerByPhone(
+        normalizedPhone,
+      );
       if (existingByPhone != null) {
         throw const DuplicateCustomerPhoneFailure();
       }
@@ -54,6 +57,7 @@ class CustomerRepositoryImpl implements CustomerRepository {
           entityType: 'customer',
           entityId: normalizedCustomer.id,
           operationType: 'create',
+          payload: SyncPayloadBuilder.buildCustomerPayload(normalizedCustomer),
         );
 
         return normalizedCustomer;
@@ -62,7 +66,8 @@ class CustomerRepositoryImpl implements CustomerRepository {
       throw ValidationFailure(e.message.toString());
     } catch (e) {
       if (e is Failure) rethrow;
-      final isUniqueViolation = e.toString().toLowerCase().contains('unique') ||
+      final isUniqueViolation =
+          e.toString().toLowerCase().contains('unique') ||
           e.toString().toLowerCase().contains('sqliteexception(1555)') ||
           e.toString().toLowerCase().contains('customers.phone');
       if (isUniqueViolation) {
@@ -82,7 +87,9 @@ class CustomerRepositoryImpl implements CustomerRepository {
       if (!PhoneUtils.isValidCustomerPhone(normalizedPhone)) {
         throw const ValidationFailure('رقم الهاتف غير صحيح');
       }
-      final existingByPhone = await _customersDao.getCustomerByPhone(normalizedPhone);
+      final existingByPhone = await _customersDao.getCustomerByPhone(
+        normalizedPhone,
+      );
       if (existingByPhone != null && existingByPhone.id != customer.id) {
         throw const DuplicateCustomerPhoneFailure();
       }
@@ -90,7 +97,9 @@ class CustomerRepositoryImpl implements CustomerRepository {
       final normalizedCustomer = customer.copyWith(phone: normalizedPhone);
 
       return await _db.transaction(() async {
-        final existing = await _customersDao.getCustomerById(normalizedCustomer.id);
+        final existing = await _customersDao.getCustomerById(
+          normalizedCustomer.id,
+        );
         if (existing == null) {
           throw const ValidationFailure('العميل غير موجود');
         }
@@ -110,6 +119,9 @@ class CustomerRepositoryImpl implements CustomerRepository {
           entityType: 'customer',
           entityId: normalizedCustomer.id,
           operationType: 'update',
+          payload: SyncPayloadBuilder.buildCustomerUpdatePayload(
+            normalizedCustomer,
+          ),
         );
 
         return normalizedCustomer;
@@ -118,7 +130,8 @@ class CustomerRepositoryImpl implements CustomerRepository {
       throw ValidationFailure(e.message.toString());
     } catch (e) {
       if (e is Failure) rethrow;
-      final isUniqueViolation = e.toString().toLowerCase().contains('unique') ||
+      final isUniqueViolation =
+          e.toString().toLowerCase().contains('unique') ||
           e.toString().toLowerCase().contains('sqliteexception(1555)') ||
           e.toString().toLowerCase().contains('customers.phone');
       if (isUniqueViolation) {
@@ -183,8 +196,8 @@ class CustomerRepositoryImpl implements CustomerRepository {
   Stream<List<Customer>> watchCustomers() {
     try {
       return _customersDao.watchCustomers().map(
-            (rows) => rows.map(_mapToDomain).toList(),
-          );
+        (rows) => rows.map(_mapToDomain).toList(),
+      );
     } catch (e) {
       if (e is Failure) rethrow;
       throw DatabaseFailure(e.toString());

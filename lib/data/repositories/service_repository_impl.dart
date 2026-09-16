@@ -8,6 +8,7 @@ import '../../domain/value_objects/money.dart';
 import '../local/daos/services_dao.dart';
 import '../local/daos/sync_operations_dao.dart';
 import '../local/database/app_database.dart' as app_db;
+import '../sync/sync_payload_builder.dart';
 
 class ServiceRepositoryImpl implements ServiceRepository {
   final ServicesDao _servicesDao;
@@ -18,9 +19,9 @@ class ServiceRepositoryImpl implements ServiceRepository {
     required ServicesDao servicesDao,
     required SyncOperationsDao syncOperationsDao,
     required app_db.AppDatabase db,
-  })  : _servicesDao = servicesDao,
-        _syncOperationsDao = syncOperationsDao,
-        _db = db;
+  }) : _servicesDao = servicesDao,
+       _syncOperationsDao = syncOperationsDao,
+       _db = db;
 
   @override
   Future<Service> createService(
@@ -53,6 +54,10 @@ class ServiceRepositoryImpl implements ServiceRepository {
           entityType: 'service',
           entityId: service.id,
           operationType: 'create',
+          payload: SyncPayloadBuilder.buildServicePayload(
+            service,
+            supportedItemTypeIds,
+          ),
         );
 
         return service;
@@ -97,10 +102,18 @@ class ServiceRepositoryImpl implements ServiceRepository {
           );
         }
 
+        final finalSupportedItemTypes =
+            supportedItemTypeIds ??
+            await _servicesDao.getSupportedItemTypeIds(service.id);
+
         await _syncOperationsDao.recordOperation(
           entityType: 'service',
           entityId: service.id,
           operationType: 'update',
+          payload: SyncPayloadBuilder.buildServicePayload(
+            service,
+            finalSupportedItemTypes,
+          ),
         );
 
         return service;
@@ -166,11 +179,17 @@ class ServiceRepositoryImpl implements ServiceRepository {
           throw ValidationFailure('Service not found');
         }
 
-        await _servicesDao.setActiveStatus(id, true, DateTime.now());
+        final now = DateTime.now();
+        await _servicesDao.setActiveStatus(id, true, now);
         await _syncOperationsDao.recordOperation(
           entityType: 'service',
           entityId: id,
           operationType: 'activate',
+          payload: SyncPayloadBuilder.buildServiceStatusPayload(
+            id,
+            true,
+            updatedAt: now,
+          ),
         );
       });
     } catch (e) {
@@ -188,11 +207,17 @@ class ServiceRepositoryImpl implements ServiceRepository {
           throw ValidationFailure('Service not found');
         }
 
-        await _servicesDao.setActiveStatus(id, false, DateTime.now());
+        final now = DateTime.now();
+        await _servicesDao.setActiveStatus(id, false, now);
         await _syncOperationsDao.recordOperation(
           entityType: 'service',
           entityId: id,
           operationType: 'deactivate',
+          payload: SyncPayloadBuilder.buildServiceStatusPayload(
+            id,
+            false,
+            updatedAt: now,
+          ),
         );
       });
     } catch (e) {

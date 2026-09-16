@@ -17,6 +17,7 @@ import '../local/daos/storage_locations_dao.dart';
 import '../local/daos/storage_records_dao.dart';
 import '../local/daos/sync_operations_dao.dart';
 import '../local/database/app_database.dart' as app_db;
+import '../sync/sync_payload_builder.dart';
 
 class StorageRepositoryImpl implements StorageRepository {
   final StorageRecordsDao _storageRecordsDao;
@@ -31,11 +32,11 @@ class StorageRepositoryImpl implements StorageRepository {
     required SyncOperationsDao syncOperationsDao,
     required OrdersDao ordersDao,
     required app_db.AppDatabase db,
-  })  : _storageRecordsDao = storageRecordsDao,
-        _storageLocationsDao = storageLocationsDao,
-        _syncOperationsDao = syncOperationsDao,
-        _ordersDao = ordersDao,
-        _db = db;
+  }) : _storageRecordsDao = storageRecordsDao,
+       _storageLocationsDao = storageLocationsDao,
+       _syncOperationsDao = syncOperationsDao,
+       _ordersDao = ordersDao,
+       _db = db;
 
   @override
   Future<StorageRecord> storeItem({
@@ -44,25 +45,35 @@ class StorageRepositoryImpl implements StorageRepository {
   }) async {
     try {
       return await _db.transaction(() async {
-        final location = await _storageLocationsDao.getLocationById(storageLocationId);
+        final location = await _storageLocationsDao.getLocationById(
+          storageLocationId,
+        );
         if (location == null) {
           throw const ValidationFailure('Storage location not found');
         }
         if (!location.isActive) {
-          throw const BusinessRuleFailure('Cannot store item in an inactive storage location');
+          throw const BusinessRuleFailure(
+            'Cannot store item in an inactive storage location',
+          );
         }
 
-        final activeRecord = await _storageRecordsDao.getActiveRecordForOrderItem(orderItemId);
+        final activeRecord = await _storageRecordsDao
+            .getActiveRecordForOrderItem(orderItemId);
         if (activeRecord != null) {
           throw const BusinessRuleFailure(
             'Item already has an active storage record. Use moveItem to change locations.',
           );
         }
 
-        final orderItem = await (_db.select(_db.orderItems)..where((t) => t.id.equals(orderItemId))).getSingleOrNull();
+        final orderItem = await (_db.select(
+          _db.orderItems,
+        )..where((t) => t.id.equals(orderItemId))).getSingleOrNull();
         if (orderItem != null) {
-          final compatibleLocations = await _storageLocationsDao.getCompatibleLocationsForItemType(orderItem.itemTypeId);
-          final isCompatible = compatibleLocations.any((loc) => loc.id == storageLocationId);
+          final compatibleLocations = await _storageLocationsDao
+              .getCompatibleLocationsForItemType(orderItem.itemTypeId);
+          final isCompatible = compatibleLocations.any(
+            (loc) => loc.id == storageLocationId,
+          );
           if (!isCompatible) {
             throw IncompatibleStorageLocationFailure(
               storageLocationId: storageLocationId,
@@ -84,13 +95,7 @@ class StorageRepositoryImpl implements StorageRepository {
           ),
         );
 
-        await _syncOperationsDao.recordOperation(
-          entityType: 'storage_record',
-          entityId: newId,
-          operationType: 'create',
-        );
-
-        return StorageRecord(
+        final record = StorageRecord(
           id: newId,
           orderItemId: orderItemId,
           storageLocationId: storageLocationId,
@@ -98,6 +103,15 @@ class StorageRepositoryImpl implements StorageRepository {
           createdAt: now,
           updatedAt: now,
         );
+
+        await _syncOperationsDao.recordOperation(
+          entityType: 'storage_record',
+          entityId: newId,
+          operationType: 'create',
+          payload: SyncPayloadBuilder.buildStorageRecordPayload(record),
+        );
+
+        return record;
       });
     } catch (e) {
       if (e is Failure) rethrow;
@@ -112,27 +126,41 @@ class StorageRepositoryImpl implements StorageRepository {
   }) async {
     try {
       return await _db.transaction(() async {
-        final newLocation = await _storageLocationsDao.getLocationById(newStorageLocationId);
+        final newLocation = await _storageLocationsDao.getLocationById(
+          newStorageLocationId,
+        );
         if (newLocation == null) {
           throw const ValidationFailure('New storage location not found');
         }
         if (!newLocation.isActive) {
-          throw const BusinessRuleFailure('Cannot move item to an inactive storage location');
+          throw const BusinessRuleFailure(
+            'Cannot move item to an inactive storage location',
+          );
         }
 
-        final activeRecord = await _storageRecordsDao.getActiveRecordForOrderItem(orderItemId);
+        final activeRecord = await _storageRecordsDao
+            .getActiveRecordForOrderItem(orderItemId);
         if (activeRecord == null) {
-          throw const BusinessRuleFailure('Item has no active storage location to move from');
+          throw const BusinessRuleFailure(
+            'Item has no active storage location to move from',
+          );
         }
 
         if (activeRecord.storageLocationId == newStorageLocationId) {
-          throw const BusinessRuleFailure('Cannot move item to the same storage location');
+          throw const BusinessRuleFailure(
+            'Cannot move item to the same storage location',
+          );
         }
 
-        final orderItem = await (_db.select(_db.orderItems)..where((t) => t.id.equals(orderItemId))).getSingleOrNull();
+        final orderItem = await (_db.select(
+          _db.orderItems,
+        )..where((t) => t.id.equals(orderItemId))).getSingleOrNull();
         if (orderItem != null) {
-          final compatibleLocations = await _storageLocationsDao.getCompatibleLocationsForItemType(orderItem.itemTypeId);
-          final isCompatible = compatibleLocations.any((loc) => loc.id == newStorageLocationId);
+          final compatibleLocations = await _storageLocationsDao
+              .getCompatibleLocationsForItemType(orderItem.itemTypeId);
+          final isCompatible = compatibleLocations.any(
+            (loc) => loc.id == newStorageLocationId,
+          );
           if (!isCompatible) {
             throw IncompatibleStorageLocationFailure(
               storageLocationId: newStorageLocationId,
@@ -158,13 +186,7 @@ class StorageRepositoryImpl implements StorageRepository {
           ),
         );
 
-        await _syncOperationsDao.recordOperation(
-          entityType: 'storage_record',
-          entityId: newId,
-          operationType: 'move',
-        );
-
-        return StorageRecord(
+        final record = StorageRecord(
           id: newId,
           orderItemId: orderItemId,
           storageLocationId: newStorageLocationId,
@@ -172,6 +194,15 @@ class StorageRepositoryImpl implements StorageRepository {
           createdAt: now,
           updatedAt: now,
         );
+
+        await _syncOperationsDao.recordOperation(
+          entityType: 'storage_record',
+          entityId: newId,
+          operationType: 'move',
+          payload: SyncPayloadBuilder.buildStorageRecordPayload(record),
+        );
+
+        return record;
       });
     } catch (e) {
       if (e is Failure) rethrow;
@@ -203,7 +234,9 @@ class StorageRepositoryImpl implements StorageRepository {
   Future<void> unstoreItem(String orderItemId) async {
     try {
       await _db.transaction(() async {
-        final item = await (_db.select(_db.orderItems)..where((t) => t.id.equals(orderItemId))).getSingleOrNull();
+        final item = await (_db.select(
+          _db.orderItems,
+        )..where((t) => t.id.equals(orderItemId))).getSingleOrNull();
         if (item == null) {
           throw const ValidationFailure('Order item not found');
         }
@@ -215,15 +248,22 @@ class StorageRepositoryImpl implements StorageRepository {
 
         // Preserve Task #06 lifecycle rules
         if (order.status == OrderStatus.completed.name) {
-          throw const BusinessRuleFailure('Cannot unstore items from a completed order');
+          throw const BusinessRuleFailure(
+            'Cannot unstore items from a completed order',
+          );
         }
         if (order.status == OrderStatus.cancelled.name) {
-          throw const BusinessRuleFailure('Cannot unstore items from a cancelled order');
+          throw const BusinessRuleFailure(
+            'Cannot unstore items from a cancelled order',
+          );
         }
 
-        final activeRecord = await _storageRecordsDao.getActiveRecordForOrderItem(orderItemId);
+        final activeRecord = await _storageRecordsDao
+            .getActiveRecordForOrderItem(orderItemId);
         if (activeRecord == null) {
-          throw const BusinessRuleFailure('Item has no active storage record to unstore');
+          throw const BusinessRuleFailure(
+            'Item has no active storage record to unstore',
+          );
         }
 
         final now = DateTime.now();
@@ -233,6 +273,12 @@ class StorageRepositoryImpl implements StorageRepository {
           entityType: 'storage_record',
           entityId: activeRecord.id,
           operationType: 'unstore',
+          payload: SyncPayloadBuilder.buildStorageRecordStatusPayload(
+            activeRecord.id,
+            orderItemId,
+            false,
+            updatedAt: now,
+          ),
         );
 
         // Enforce the business invariant:
@@ -250,7 +296,11 @@ class StorageRepositoryImpl implements StorageRepository {
             entityType: 'order',
             entityId: order.id,
             operationType: 'update',
-            payload: 'unstore',
+            payload: SyncPayloadBuilder.buildOrderStatusPayload(
+              order.id,
+              OrderStatus.processing,
+              updatedAt: now,
+            ),
           );
         }
       });
@@ -263,7 +313,9 @@ class StorageRepositoryImpl implements StorageRepository {
   @override
   Future<StorageRecord?> getActiveRecordForOrderItem(String orderItemId) async {
     try {
-      final row = await _storageRecordsDao.getActiveRecordForOrderItem(orderItemId);
+      final row = await _storageRecordsDao.getActiveRecordForOrderItem(
+        orderItemId,
+      );
       return row != null ? _mapToDomain(row) : null;
     } catch (e) {
       if (e is Failure) rethrow;
@@ -272,9 +324,13 @@ class StorageRepositoryImpl implements StorageRepository {
   }
 
   @override
-  Future<List<StorageRecord>> getActiveRecordsForLocation(String storageLocationId) async {
+  Future<List<StorageRecord>> getActiveRecordsForLocation(
+    String storageLocationId,
+  ) async {
     try {
-      final rows = await _storageRecordsDao.getActiveRecordsForLocation(storageLocationId);
+      final rows = await _storageRecordsDao.getActiveRecordsForLocation(
+        storageLocationId,
+      );
       return rows.map(_mapToDomain).toList();
     } catch (e) {
       if (e is Failure) rethrow;
@@ -283,7 +339,10 @@ class StorageRepositoryImpl implements StorageRepository {
   }
 
   @override
-  Future<List<OrderItem>> getItemsRequiringStorage({int limit = 50, int offset = 0}) async {
+  Future<List<OrderItem>> getItemsRequiringStorage({
+    int limit = 50,
+    int offset = 0,
+  }) async {
     try {
       final rows = await _storageRecordsDao.getItemsRequiringStorage(
         limit: limit,
@@ -407,11 +466,13 @@ class StorageRepositoryImpl implements StorageRepository {
   }
 
   @override
-  Stream<List<StorageRecord>> watchActiveRecordsForLocation(String storageLocationId) {
+  Stream<List<StorageRecord>> watchActiveRecordsForLocation(
+    String storageLocationId,
+  ) {
     try {
-      return _storageRecordsDao.watchActiveRecordsForLocation(storageLocationId).map(
-            (rows) => rows.map(_mapToDomain).toList(),
-          );
+      return _storageRecordsDao
+          .watchActiveRecordsForLocation(storageLocationId)
+          .map((rows) => rows.map(_mapToDomain).toList());
     } catch (e) {
       if (e is Failure) rethrow;
       throw DatabaseFailure(e.toString());
@@ -439,7 +500,9 @@ class StorageRepositoryImpl implements StorageRepository {
       expectedPickupDate: OrderDate.fromDate(row.order.expectedPickupDate),
       orderCreatedAt: row.order.createdAt,
       activeRecord: row.record != null ? _mapToDomain(row.record!) : null,
-      storageLocation: row.location != null ? _mapLocationToDomain(row.location!) : null,
+      storageLocation: row.location != null
+          ? _mapLocationToDomain(row.location!)
+          : null,
     );
   }
 

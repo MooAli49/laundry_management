@@ -14,6 +14,7 @@ import '../local/daos/orders_dao.dart';
 import '../local/daos/storage_records_dao.dart';
 import '../local/daos/sync_operations_dao.dart';
 import '../local/database/app_database.dart' as app_db;
+import '../sync/sync_payload_builder.dart';
 
 class OrderRepositoryImpl implements OrderRepository {
   final OrdersDao _ordersDao;
@@ -26,10 +27,10 @@ class OrderRepositoryImpl implements OrderRepository {
     required StorageRecordsDao storageRecordsDao,
     required SyncOperationsDao syncOperationsDao,
     required app_db.AppDatabase db,
-  })  : _ordersDao = ordersDao,
-        _storageRecordsDao = storageRecordsDao,
-        _syncOperationsDao = syncOperationsDao,
-        _db = db;
+  }) : _ordersDao = ordersDao,
+       _storageRecordsDao = storageRecordsDao,
+       _syncOperationsDao = syncOperationsDao,
+       _db = db;
 
   @override
   Future<Order> createOrder({
@@ -69,11 +70,15 @@ class OrderRepositoryImpl implements OrderRepository {
                 customerNameSnapshot: Value(order.customerNameSnapshot),
                 customerPhoneSnapshot: Value(order.customerPhoneSnapshot),
                 status: Value(order.status.name),
-                expectedPickupDate: Value(order.expectedPickupDate.toDateTime()),
+                expectedPickupDate: Value(
+                  order.expectedPickupDate.toDateTime(),
+                ),
                 notes: Value(order.notes),
                 customerPickupRequested: Value(order.customerPickupRequested),
                 customerPickupFee: Value(order.customerPickupFee.piastres),
-                customerDeliveryRequested: Value(order.customerDeliveryRequested),
+                customerDeliveryRequested: Value(
+                  order.customerDeliveryRequested,
+                ),
                 customerDeliveryFee: Value(order.customerDeliveryFee.piastres),
                 subtotal: Value(order.subtotal.piastres),
                 discount: Value(order.discount.piastres),
@@ -97,7 +102,9 @@ class OrderRepositoryImpl implements OrderRepository {
                   itemDefinitionId: Value(item.itemDefinitionId),
                   serviceId: Value(item.serviceId),
                   itemTypeNameSnapshot: Value(item.itemTypeNameSnapshot),
-                  itemDefinitionNameSnapshot: Value(item.itemDefinitionNameSnapshot),
+                  itemDefinitionNameSnapshot: Value(
+                    item.itemDefinitionNameSnapshot,
+                  ),
                   serviceNameSnapshot: Value(item.serviceNameSnapshot),
                   pricingType: Value(item.pricingType.name),
                   quantity: Value(item.quantity),
@@ -126,21 +133,32 @@ class OrderRepositoryImpl implements OrderRepository {
               }
             }
 
+            final committedOrder = order.copyWith(
+              orderNumber: finalOrderNumber,
+            );
+
             // Record sync operation
             await _syncOperationsDao.recordOperation(
               entityType: 'order',
               entityId: order.id,
               operationType: 'create',
+              payload: SyncPayloadBuilder.buildOrderCreatePayload(
+                committedOrder,
+                items,
+              ),
             );
 
-            return order.copyWith(orderNumber: finalOrderNumber);
+            return committedOrder;
           });
         } catch (e) {
-          final isUniqueConstraint = e.toString().toLowerCase().contains('unique') ||
+          final isUniqueConstraint =
+              e.toString().toLowerCase().contains('unique') ||
               e.toString().toLowerCase().contains('sqliteexception(1555)') ||
               e.toString().toLowerCase().contains('orders.order_number');
 
-          if (isUniqueConstraint && attempt < maxRetries && order.orderNumber.isEmpty) {
+          if (isUniqueConstraint &&
+              attempt < maxRetries &&
+              order.orderNumber.isEmpty) {
             // Abort/rollback this failed transaction and retry the ENTIRE creation transaction from the beginning
             continue;
           }
@@ -148,7 +166,9 @@ class OrderRepositoryImpl implements OrderRepository {
           throw DatabaseFailure(e.toString());
         }
       }
-      throw const DatabaseFailure('Failed to generate a unique order number after 5 attempts.');
+      throw const DatabaseFailure(
+        'Failed to generate a unique order number after 5 attempts.',
+      );
     } on ArgumentError catch (e) {
       throw ValidationFailure(e.message.toString());
     } catch (e) {
@@ -167,7 +187,9 @@ class OrderRepositoryImpl implements OrderRepository {
         }
 
         if (order.orderNumber != existing.orderNumber) {
-          throw const BusinessRuleFailure('Order number is immutable and cannot be changed.');
+          throw const BusinessRuleFailure(
+            'Order number is immutable and cannot be changed.',
+          );
         }
 
         await _ordersDao.updateOrder(
@@ -194,13 +216,18 @@ class OrderRepositoryImpl implements OrderRepository {
           ),
         );
 
+        final committedOrder = order.copyWith(
+          orderNumber: existing.orderNumber,
+        );
+
         await _syncOperationsDao.recordOperation(
           entityType: 'order',
           entityId: order.id,
           operationType: 'update',
+          payload: SyncPayloadBuilder.buildOrderUpdatePayload(committedOrder),
         );
 
-        return order.copyWith(orderNumber: existing.orderNumber);
+        return committedOrder;
       });
     } catch (e) {
       if (e is Failure) rethrow;
@@ -309,9 +336,9 @@ class OrderRepositoryImpl implements OrderRepository {
   @override
   Stream<List<Order>> watchRecentOrders({int limit = 20}) {
     try {
-      return _ordersDao.watchRecentOrders(limit: limit).map(
-            (rows) => rows.map(_mapOrderToDomain).toList(),
-          );
+      return _ordersDao
+          .watchRecentOrders(limit: limit)
+          .map((rows) => rows.map(_mapOrderToDomain).toList());
     } catch (e) {
       if (e is Failure) rethrow;
       throw DatabaseFailure(e.toString());
@@ -321,9 +348,9 @@ class OrderRepositoryImpl implements OrderRepository {
   @override
   Stream<Order?> watchOrderById(String id) {
     try {
-      return _ordersDao.watchOrderById(id).map(
-            (row) => row != null ? _mapOrderToDomain(row) : null,
-          );
+      return _ordersDao
+          .watchOrderById(id)
+          .map((row) => row != null ? _mapOrderToDomain(row) : null);
     } catch (e) {
       if (e is Failure) rethrow;
       throw DatabaseFailure(e.toString());
@@ -339,7 +366,9 @@ class OrderRepositoryImpl implements OrderRepository {
           throw ValidationFailure('Order not found');
         }
         if (existing.status != OrderStatus.processing.name) {
-          throw BusinessRuleFailure('Only processing orders can be marked ready');
+          throw BusinessRuleFailure(
+            'Only processing orders can be marked ready',
+          );
         }
 
         final now = DateTime.now();
@@ -353,6 +382,11 @@ class OrderRepositoryImpl implements OrderRepository {
           entityType: 'order',
           entityId: orderId,
           operationType: 'mark_ready',
+          payload: SyncPayloadBuilder.buildOrderStatusPayload(
+            orderId,
+            OrderStatus.ready,
+            updatedAt: now,
+          ),
         );
 
         final updated = await _ordersDao.getOrderById(orderId);
@@ -392,9 +426,9 @@ class OrderRepositoryImpl implements OrderRepository {
         }
 
         // Re-read payments and verify remaining balance == 0
-        final payments = await (_db.select(_db.payments)
-              ..where((t) => t.orderId.equals(orderId)))
-            .get();
+        final payments = await (_db.select(
+          _db.payments,
+        )..where((t) => t.orderId.equals(orderId))).get();
         final totalPaid = payments.fold<int>(0, (sum, p) => sum + p.amount);
         final remaining = existing.total - totalPaid;
         if (remaining > 0) {
@@ -422,6 +456,12 @@ class OrderRepositoryImpl implements OrderRepository {
           entityType: 'order',
           entityId: orderId,
           operationType: 'complete',
+          payload: SyncPayloadBuilder.buildOrderStatusPayload(
+            orderId,
+            OrderStatus.completed,
+            completedAt: now,
+            updatedAt: now,
+          ),
         );
 
         final updated = await _ordersDao.getOrderById(orderId);
@@ -475,6 +515,13 @@ class OrderRepositoryImpl implements OrderRepository {
           entityType: 'order',
           entityId: orderId,
           operationType: 'cancel',
+          payload: SyncPayloadBuilder.buildOrderStatusPayload(
+            orderId,
+            OrderStatus.cancelled,
+            cancelledAt: now,
+            cancellationReason: cancellationReason.trim(),
+            updatedAt: now,
+          ),
         );
 
         final updated = await _ordersDao.getOrderById(orderId);
@@ -500,7 +547,9 @@ class OrderRepositoryImpl implements OrderRepository {
         }
 
         if (existing.status == OrderStatus.cancelled.name) {
-          throw const BusinessRuleFailure('Cancelled orders cannot transition to any other status');
+          throw const BusinessRuleFailure(
+            'Cancelled orders cannot transition to any other status',
+          );
         }
 
         if (newStatus == OrderStatus.completed) {
@@ -514,39 +563,54 @@ class OrderRepositoryImpl implements OrderRepository {
         DateTime? cancelledAt = existing.cancelledAt;
         String? cancellationReason = existing.cancellationReason;
 
-        if (existing.status == OrderStatus.ready.name && newStatus == OrderStatus.processing) {
+        if (existing.status == OrderStatus.ready.name &&
+            newStatus == OrderStatus.processing) {
           if (reason == null || reason.trim().isEmpty) {
-            throw const ValidationFailure('Operational reason is required to correct Ready order back to Processing');
+            throw const ValidationFailure(
+              'Operational reason is required to correct Ready order back to Processing',
+            );
           }
           // Deactivate ALL currently active StorageRecords belonging to the order's physical OrderItems
           final items = await _ordersDao.getOrderItemsRaw(orderId);
           for (final item in items) {
             await _storageRecordsDao.deactivateActiveRecord(item.id, now);
           }
-        } else if (existing.status == OrderStatus.processing.name && newStatus == OrderStatus.ready) {
+        } else if (existing.status == OrderStatus.processing.name &&
+            newStatus == OrderStatus.ready) {
           if (reason == null || reason.trim().isEmpty) {
-            throw const BusinessRuleFailure('Operational reason is required to manually override Processing order to Ready');
+            throw const BusinessRuleFailure(
+              'Operational reason is required to manually override Processing order to Ready',
+            );
           }
-          final allStored = await _storageRecordsDao.areAllOrderItemsStored(orderId);
+          final allStored = await _storageRecordsDao.areAllOrderItemsStored(
+            orderId,
+          );
           if (!allStored) {
             throw const BusinessRuleFailure(
               'لا يمكن تحويل الطلب إلى جاهز: لم يتم تخزين جميع القطع بعد',
             );
           }
           // Manual correction with all items stored preserves storage records and sets status to Ready.
-        } else if (existing.status == OrderStatus.completed.name && newStatus == OrderStatus.processing) {
+        } else if (existing.status == OrderStatus.completed.name &&
+            newStatus == OrderStatus.processing) {
           if (reason == null || reason.trim().isEmpty) {
-            throw const ValidationFailure('Operational reason is required to correct Completed order back to Processing');
+            throw const ValidationFailure(
+              'Operational reason is required to correct Completed order back to Processing',
+            );
           }
           completedAt = null;
           // Completed -> Processing: storage remains inactive.
-        } else if (existing.status == OrderStatus.completed.name && newStatus != OrderStatus.processing) {
-          throw const BusinessRuleFailure('Completed orders can only be corrected back to Processing');
+        } else if (existing.status == OrderStatus.completed.name &&
+            newStatus != OrderStatus.processing) {
+          throw const BusinessRuleFailure(
+            'Completed orders can only be corrected back to Processing',
+          );
         }
 
         if (newStatus == OrderStatus.cancelled) {
           cancelledAt = now;
-          cancellationReason = reason ?? existing.cancellationReason ?? 'تصحيح الحالة';
+          cancellationReason =
+              reason ?? existing.cancellationReason ?? 'تصحيح الحالة';
           final items = await _ordersDao.getOrderItemsRaw(orderId);
           for (final item in items) {
             await _storageRecordsDao.deactivateActiveRecord(item.id, now);
@@ -566,7 +630,14 @@ class OrderRepositoryImpl implements OrderRepository {
           entityType: 'order',
           entityId: orderId,
           operationType: 'status_correction',
-          payload: reason,
+          payload: SyncPayloadBuilder.buildOrderStatusPayload(
+            orderId,
+            newStatus,
+            completedAt: completedAt,
+            cancelledAt: cancelledAt,
+            cancellationReason: cancellationReason,
+            updatedAt: now,
+          ),
         );
 
         final updated = await _ordersDao.getOrderById(orderId);
@@ -663,7 +734,9 @@ class OrderRepositoryImpl implements OrderRepository {
   }
 
   @override
-  Future<Map<String, int>> getOrderCountsByCustomerIds(List<String> customerIds) async {
+  Future<Map<String, int>> getOrderCountsByCustomerIds(
+    List<String> customerIds,
+  ) async {
     try {
       if (customerIds.isEmpty) return {};
       return await _ordersDao.getOrderCountsByCustomerIds(customerIds);
@@ -674,7 +747,9 @@ class OrderRepositoryImpl implements OrderRepository {
   }
 
   @override
-  Future<CustomerOrderAggregate> getCustomerOrderAggregate(String customerId) async {
+  Future<CustomerOrderAggregate> getCustomerOrderAggregate(
+    String customerId,
+  ) async {
     try {
       final res = await _ordersDao.getCustomerOrderAggregate(customerId);
       return CustomerOrderAggregate(

@@ -365,7 +365,11 @@ void main() {
         isTrue,
       );
       expect(
-        syncOps.any((op) => op.entityId == readyOrder.id && op.operationType == 'update' && op.payload == 'unstore'),
+        syncOps.any((op) =>
+            op.entityId == readyOrder.id &&
+            op.operationType == 'update' &&
+            (op.payload == 'unstore' ||
+                (op.payload?.contains('"status":"processing"') ?? false))),
         isTrue,
       );
 
