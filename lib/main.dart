@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -12,7 +13,7 @@ AppLifecycleListener setupAppLifecycleSync(SyncEngine syncEngine) {
   disposeAppLifecycleSync();
   final listener = AppLifecycleListener(
     onResume: () {
-      syncEngine.sync();
+      unawaited(syncEngine.sync().catchError((_, __) => syncEngine.state));
     },
   );
   _appLifecycleListener = listener;

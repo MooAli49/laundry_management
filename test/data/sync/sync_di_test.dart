@@ -39,6 +39,10 @@ class FakeStreamNetworkInfo implements NetworkInfo {
     _controller.add(connected);
   }
 
+  void emitError(Object error) {
+    _controller.addError(error);
+  }
+
   void dispose() {
     _controller.close();
   }
@@ -145,6 +149,14 @@ void main() {
         final netInfo1 = GetIt.instance<NetworkInfo>();
         final netInfo2 = GetIt.instance<NetworkInfo>();
         expect(identical(netInfo1, netInfo2), isTrue);
+
+        final retry1 = GetIt.instance<SyncRetryPolicy>();
+        final retry2 = GetIt.instance<SyncRetryPolicy>();
+        expect(identical(retry1, retry2), isTrue);
+
+        final classifier1 = GetIt.instance<SyncErrorClassifier>();
+        final classifier2 = GetIt.instance<SyncErrorClassifier>();
+        expect(identical(classifier1, classifier2), isTrue);
       },
     );
 
@@ -284,27 +296,43 @@ void main() {
           operationType: 'create',
         );
 
-        // Use short 30ms interval for testing
+        final firstDispatchCompleter = Completer<void>();
+        Completer<void>? secondDispatchCompleter;
+
+        dispatcher.onDispatch = (op) async {
+          if (!firstDispatchCompleter.isCompleted) {
+            firstDispatchCompleter.complete();
+          } else if (secondDispatchCompleter != null &&
+              !secondDispatchCompleter.isCompleted) {
+            secondDispatchCompleter.complete();
+          }
+          return {'status': 'ok'};
+        };
+
+        // Use short 20ms interval for testing
         await syncEngine.initialize(
           triggerInitialSync: false,
-          periodicSyncInterval: const Duration(milliseconds: 30),
+          periodicSyncInterval: const Duration(milliseconds: 20),
         );
 
         expect(dispatcher.dispatchedOperations, isEmpty);
 
-        // Wait for first timer tick
-        await Future<void>.delayed(const Duration(milliseconds: 45));
+        // Wait deterministically for first timer tick
+        await firstDispatchCompleter.future.timeout(const Duration(seconds: 2));
         expect(dispatcher.dispatchedOperations.length, equals(1));
 
         // Enqueue a second operation
+        secondDispatchCompleter = Completer<void>();
         await dao.recordOperation(
           entityType: 'order',
           entityId: 'ord-1',
           operationType: 'create',
         );
 
-        // Wait for second timer tick
-        await Future<void>.delayed(const Duration(milliseconds: 45));
+        // Wait deterministically for second timer tick
+        await secondDispatchCompleter.future.timeout(
+          const Duration(seconds: 2),
+        );
         expect(dispatcher.dispatchedOperations.length, equals(2));
         expect(dispatcher.dispatchedOperations[1].entityId, equals('ord-1'));
       },
@@ -364,7 +392,10 @@ void main() {
 
         expect(dispatcher.dispatchedOperations, isEmpty);
 
-        // Simulate application transitioning to resumed state
+        // Simulate application transitioning from inactive to resumed state
+        TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
         TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(
           AppLifecycleState.resumed,
         );
@@ -477,6 +508,376 @@ void main() {
         final pending = await dao.getPendingOperations();
         expect(pending.length, equals(1));
         expect(pending.first.status, equals('pending'));
+      },
+    );
+
+    test(
+      '12. Optional initial sync: initialize(triggerInitialSync: false) does not sync',
+      () async {
+        await dao.recordOperation(
+          entityType: 'customer',
+          entityId: 'c-1',
+          operationType: 'create',
+        );
+
+        await syncEngine.initialize(
+          triggerInitialSync: false,
+          periodicSyncInterval: null,
+        );
+
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        expect(dispatcher.dispatchedOperations, isEmpty);
+        expect(syncEngine.state.status, equals(SyncEngineStatus.idle));
+      },
+    );
+
+    test(
+      '13. Periodic timer disabled: periodicSyncInterval == null starts no timer',
+      () async {
+        await dao.recordOperation(
+          entityType: 'customer',
+          entityId: 'c-1',
+          operationType: 'create',
+        );
+
+        await syncEngine.initialize(
+          triggerInitialSync: false,
+          periodicSyncInterval: null,
+        );
+
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+
+        expect(dispatcher.dispatchedOperations, isEmpty);
+        expect(syncEngine.state.status, equals(SyncEngineStatus.idle));
+      },
+    );
+
+    test(
+      '14. Timer tick during active sync: safely bypassed by concurrency guard',
+      () async {
+        await dao.recordOperation(
+          entityType: 'customer',
+          entityId: 'c-1',
+          operationType: 'create',
+        );
+
+        final blockCompleter = Completer<void>();
+        final firstDispatchStarted = Completer<void>();
+        var dispatchCount = 0;
+
+        dispatcher.onDispatch = (op) async {
+          dispatchCount++;
+          if (!firstDispatchStarted.isCompleted) {
+            firstDispatchStarted.complete();
+          }
+          await blockCompleter.future;
+          return {'status': 'ok'};
+        };
+
+        // Short timer of 20ms
+        await syncEngine.initialize(
+          triggerInitialSync: false,
+          periodicSyncInterval: const Duration(milliseconds: 20),
+        );
+
+        // Wait for first timer tick to start sync
+        await firstDispatchStarted.future.timeout(const Duration(seconds: 2));
+        expect(syncEngine.isSyncing, isTrue);
+        expect(dispatchCount, equals(1));
+
+        // Allow multiple timer ticks while dispatch is blocked
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        expect(dispatchCount, equals(1));
+
+        blockCompleter.complete();
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        expect(syncEngine.isSyncing, isFalse);
+        expect(syncEngine.state.status, equals(SyncEngineStatus.completed));
+      },
+    );
+
+    test(
+      '15. Repeated dispose(): safe, idempotent, and cancels resources cleanly',
+      () async {
+        await syncEngine.initialize(
+          triggerInitialSync: false,
+          periodicSyncInterval: const Duration(milliseconds: 20),
+        );
+
+        expect(syncEngine.isDisposed, isFalse);
+        syncEngine.dispose();
+        expect(syncEngine.isDisposed, isTrue);
+
+        // Call dispose a second time
+        expect(() => syncEngine.dispose(), returnsNormally);
+        expect(syncEngine.isDisposed, isTrue);
+
+        // Sync on disposed engine is safe no-op
+        final state = await syncEngine.sync();
+        expect(state.status, equals(SyncEngineStatus.idle));
+      },
+    );
+
+    test(
+      '16. GetIt disposal: container reset invokes SyncEngine.dispose() callback',
+      () async {
+        await initDependencies();
+
+        final engine = GetIt.instance<SyncEngine>();
+        expect(engine.isDisposed, isFalse);
+
+        await engine.initialize(
+          triggerInitialSync: false,
+          periodicSyncInterval: null,
+        );
+
+        // Reset GetIt
+        await GetIt.instance.reset();
+
+        // Instance was disposed via registration callback
+        expect(engine.isDisposed, isTrue);
+      },
+    );
+
+    test(
+      '17. Startup error safety: unexpected exception during initial sync does not crash bootstrap',
+      () async {
+        await dao.recordOperation(
+          entityType: 'customer',
+          entityId: 'c-1',
+          operationType: 'create',
+        );
+
+        // Simulate fatal dispatcher failure
+        dispatcher.onDispatch = (op) {
+          throw StateError('Simulated unexpected dispatcher crash');
+        };
+
+        // Initialize with initial sync
+        await syncEngine.initialize(
+          triggerInitialSync: true,
+          periodicSyncInterval: null,
+        );
+
+        // Wait for asynchronous initial sync to process error
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        // State transitioned to failed, no uncaught exception thrown
+        expect(syncEngine.state.status, equals(SyncEngineStatus.failed));
+        expect(
+          syncEngine.state.lastError,
+          contains('Simulated unexpected dispatcher crash'),
+        );
+        expect(syncEngine.isSyncing, isFalse);
+      },
+    );
+
+    test(
+      '18. App lifecycle wiring: repeated setup and dispose are idempotent without leaks',
+      () async {
+        // Setup lifecycle sync multiple times
+        setupAppLifecycleSync(syncEngine);
+        setupAppLifecycleSync(syncEngine);
+
+        // Dispose multiple times
+        expect(() => disposeAppLifecycleSync(), returnsNormally);
+        expect(() => disposeAppLifecycleSync(), returnsNormally);
+      },
+    );
+
+    test(
+      '19. App resume serialization: rapid resume events execute through atomic concurrency guard',
+      () async {
+        await dao.recordOperation(
+          entityType: 'customer',
+          entityId: 'c-1',
+          operationType: 'create',
+        );
+
+        final blockCompleter = Completer<void>();
+        var dispatchCount = 0;
+
+        dispatcher.onDispatch = (op) async {
+          dispatchCount++;
+          await blockCompleter.future;
+          return {'status': 'ok'};
+        };
+
+        setupAppLifecycleSync(syncEngine);
+
+        // Transition from inactive to resumed to trigger onResume
+        TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        expect(syncEngine.isSyncing, isTrue);
+        expect(dispatchCount, equals(1));
+
+        blockCompleter.complete();
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        expect(dispatchCount, equals(1));
+        expect(syncEngine.isSyncing, isFalse);
+        expect(syncEngine.state.status, equals(SyncEngineStatus.completed));
+
+        disposeAppLifecycleSync();
+      },
+    );
+
+    test(
+      '20. Timer + connectivity during active sync: single worker guaranteed',
+      () async {
+        await dao.recordOperation(
+          entityType: 'customer',
+          entityId: 'c-1',
+          operationType: 'create',
+        );
+
+        final blockCompleter = Completer<void>();
+        final timerFired = Completer<void>();
+        var dispatchCalls = 0;
+
+        dispatcher.onDispatch = (op) async {
+          dispatchCalls++;
+          if (!timerFired.isCompleted) {
+            timerFired.complete();
+          }
+          await blockCompleter.future;
+          return {'status': 'ok'};
+        };
+
+        // Initialize with short timer
+        await syncEngine.initialize(
+          triggerInitialSync: false,
+          periodicSyncInterval: const Duration(milliseconds: 20),
+        );
+
+        // Wait for timer to trigger sync
+        await timerFired.future.timeout(const Duration(seconds: 2));
+        expect(syncEngine.isSyncing, isTrue);
+        expect(dispatchCalls, equals(1));
+
+        // While first sync is still blocked, fire connectivity event
+        networkInfo.emit(true);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        // Still exactly 1 dispatch in progress
+        expect(dispatchCalls, equals(1));
+
+        // Unblock dispatch
+        blockCompleter.complete();
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        expect(dispatchCalls, equals(1));
+        expect(dispatcher.dispatchedOperations.length, equals(1));
+        expect(syncEngine.isSyncing, isFalse);
+        expect(syncEngine.state.status, equals(SyncEngineStatus.completed));
+      },
+    );
+
+    test(
+      '21. Disposal during active sync: stops queue processing and does not report completed',
+      () async {
+        await dao.recordOperation(
+          entityType: 'customer',
+          entityId: 'c-1',
+          operationType: 'create',
+        );
+        await dao.recordOperation(
+          entityType: 'customer',
+          entityId: 'c-2',
+          operationType: 'create',
+        );
+
+        final blockCompleter = Completer<void>();
+        var dispatchCalls = 0;
+
+        dispatcher.onDispatch = (op) async {
+          dispatchCalls++;
+          await blockCompleter.future;
+          return {'status': 'ok'};
+        };
+
+        // Start sync
+        final syncFuture = syncEngine.sync();
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        expect(syncEngine.isSyncing, isTrue);
+        expect(dispatchCalls, equals(1));
+
+        // Dispose while first operation is still in-flight
+        syncEngine.dispose();
+        expect(syncEngine.isDisposed, isTrue);
+
+        // Unblock first operation
+        blockCompleter.complete();
+        final finalState = await syncFuture;
+
+        // Second operation was never dispatched because disposal halted loop
+        expect(dispatchCalls, equals(1));
+        expect(dispatcher.dispatchedOperations.length, equals(1));
+        // Must NOT falsely report completed
+        expect(finalState.status, isNot(equals(SyncEngineStatus.completed)));
+        expect(syncEngine.isSyncing, isFalse);
+      },
+    );
+
+    test(
+      '22. Double fault safety: DAO failure during exception handling does not escape or crash',
+      () async {
+        await dao.recordOperation(
+          entityType: 'customer',
+          entityId: 'c-1',
+          operationType: 'create',
+        );
+
+        // First fault: dispatcher throws an unexpected exception
+        dispatcher.onDispatch = (op) async {
+          // Second fault: close database connection so DAO query inside catch fails as well
+          await db.close();
+          throw StateError('Simulated remote crash');
+        };
+
+        // sync() must handle the double-fault defensively without throwing uncaught exception
+        final state = await syncEngine.sync();
+
+        expect(state.status, equals(SyncEngineStatus.failed));
+        expect(state.lastError, isNotNull);
+        expect(syncEngine.isSyncing, isFalse);
+      },
+    );
+
+    test(
+      '23. Connectivity stream error: platform stream error is caught safely without crashing',
+      () async {
+        await syncEngine.initialize(
+          triggerInitialSync: false,
+          periodicSyncInterval: null,
+        );
+
+        // Emit an error on the connectivity stream
+        expect(
+          () => networkInfo.emitError(Exception('Platform stream failed')),
+          returnsNormally,
+        );
+
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        // Engine remains healthy and operational
+        expect(syncEngine.isDisposed, isFalse);
+        expect(syncEngine.state.status, equals(SyncEngineStatus.idle));
       },
     );
   });

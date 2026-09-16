@@ -83,26 +83,29 @@ class SyncEngine {
     _isInitialized = true;
 
     // 1. Subscribe to network connectivity changes
-    _connectivitySubscription = _networkInfo.onConnectivityChanged.listen((
-      isConnected,
-    ) {
-      if (_isDisposed) return;
-      if (isConnected) {
-        unawaited(sync());
-      }
-    });
+    _connectivitySubscription = _networkInfo.onConnectivityChanged.listen(
+      (isConnected) {
+        if (_isDisposed) return;
+        if (isConnected) {
+          unawaited(sync().catchError((_, __) => _state));
+        }
+      },
+      onError: (_) {
+        // Platform connectivity stream errors are safely ignored
+      },
+    );
 
     // 2. Start optional periodic foreground sync timer
     if (periodicSyncInterval != null && periodicSyncInterval > Duration.zero) {
       _periodicTimer = Timer.periodic(periodicSyncInterval, (_) {
         if (_isDisposed) return;
-        unawaited(sync());
+        unawaited(sync().catchError((_, __) => _state));
       });
     }
 
     // 3. Trigger initial sync asynchronously (fire-and-forget, non-blocking)
     if (triggerInitialSync) {
-      unawaited(sync());
+      unawaited(sync().catchError((_, __) => _state));
     }
   }
 
@@ -238,6 +241,10 @@ class SyncEngine {
         }
       }
 
+      if (_isDisposed) {
+        return _state;
+      }
+
       // 5. Completion state update
       final remainingOps = await _syncOperationsDao.getEligibleOperations(
         asOf: _clock(),
@@ -251,14 +258,20 @@ class SyncEngine {
       );
       return _state;
     } catch (unexpectedError) {
-      final remainingOps = await _syncOperationsDao.getEligibleOperations(
-        asOf: _clock(),
-      );
+      int remainingCount = _state.pendingOperationsCount;
+      try {
+        final remainingOps = await _syncOperationsDao.getEligibleOperations(
+          asOf: _clock(),
+        );
+        remainingCount = remainingOps.length;
+      } catch (_) {
+        // Defensive: preserve last known count if DAO query fails during unexpected error
+      }
       _updateState(
         SyncEngineState.failed(
           error: unexpectedError.toString(),
           lastSyncTime: _state.lastSyncTime,
-          pendingOperationsCount: remainingOps.length,
+          pendingOperationsCount: remainingCount,
         ),
       );
       return _state;
