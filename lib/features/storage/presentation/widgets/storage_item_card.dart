@@ -47,7 +47,9 @@ class StorageItemCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       borderRadius: AppSpacing.radiusXl,
       borderColor: isSelected ? AppColors.selectionBorder : AppColors.border,
-      backgroundColor: isSelected ? AppColors.selectionBackground : AppColors.surface,
+      backgroundColor: isSelected
+          ? AppColors.selectionBackground
+          : AppColors.surface,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -62,7 +64,9 @@ class StorageItemCard extends StatelessWidget {
                 activeColor: AppColors.primary,
                 checkColor: AppColors.onPrimary,
                 side: BorderSide(
-                  color: isSelected ? AppColors.primary : AppColors.borderStrong,
+                  color: isSelected
+                      ? AppColors.primary
+                      : AppColors.borderStrong,
                   width: 1.5,
                 ),
                 shape: RoundedRectangleBorder(
@@ -171,7 +175,10 @@ class StorageItemCard extends StatelessWidget {
               children: [
                 // Location Badge (Figma: rounded-full bg-success-light px-2.5 py-1 text-[12px] font-medium text-success)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.successLight,
                     borderRadius: BorderRadius.circular(100),
@@ -248,7 +255,10 @@ class StorageItemCard extends StatelessWidget {
               children: [
                 // Status Badge (Figma: rounded-full bg-warning-light px-2.5 py-1 text-[12px] font-medium text-warning)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.warningLight,
                     borderRadius: BorderRadius.circular(100),

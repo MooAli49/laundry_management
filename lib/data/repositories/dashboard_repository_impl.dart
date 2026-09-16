@@ -20,10 +20,10 @@ class DashboardRepositoryImpl implements DashboardRepository {
     required OrderRepository orderRepository,
     required PaymentRepository paymentRepository,
     required StorageRepository storageRepository,
-  })  : _ordersDao = ordersDao,
-        _orderRepository = orderRepository,
-        _paymentRepository = paymentRepository,
-        _storageRepository = storageRepository;
+  }) : _ordersDao = ordersDao,
+       _orderRepository = orderRepository,
+       _paymentRepository = paymentRepository,
+       _storageRepository = storageRepository;
 
   @override
   Future<DashboardData> getDashboardData() async {
@@ -38,7 +38,8 @@ class DashboardRepositoryImpl implements DashboardRepository {
       todayDate: todayUtc,
     );
 
-    final storageAttentionCount = await _storageRepository.countItemsRequiringStorage();
+    final storageAttentionCount = await _storageRepository
+        .countItemsRequiringStorage();
 
     // Fetch Today's pickups (Date-only active orders capped at 5)
     final activeTodayPickups = await _orderRepository.getOrders(
@@ -56,7 +57,8 @@ class DashboardRepositoryImpl implements DashboardRepository {
       ...recentOrdersRaw.map((o) => o.id),
     }.toList();
 
-    final paymentSummaries = await _paymentRepository.getPaymentSummariesForOrders(orderIdsToEnrich);
+    final paymentSummaries = await _paymentRepository
+        .getPaymentSummariesForOrders(orderIdsToEnrich);
 
     final todayPickupItems = activeTodayPickups.map((order) {
       final summary = paymentSummaries[order.id];

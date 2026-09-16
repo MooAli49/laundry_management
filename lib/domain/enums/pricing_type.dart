@@ -1,6 +1,5 @@
 enum PricingType {
   perPiece('per_piece'),
-  perKilogram('per_kilogram'),
   perSquareMeter('per_square_meter'),
   fixedPrice('fixed_price');
 
@@ -10,7 +9,7 @@ enum PricingType {
 
   static PricingType fromValue(String value) {
     for (final type in PricingType.values) {
-      if (type.value == value) {
+      if (type.value == value || type.name == value) {
         return type;
       }
     }

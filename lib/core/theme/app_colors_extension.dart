@@ -185,20 +185,26 @@ class AppColorsExtension extends ThemeExtension<AppColorsExtension> {
       onInfo: Color.lerp(onInfo, other.onInfo, t)!,
       infoLight: Color.lerp(infoLight, other.infoLight, t)!,
       infoDark: Color.lerp(infoDark, other.infoDark, t)!,
-      disabledBackground:
-          Color.lerp(disabledBackground, other.disabledBackground, t)!,
+      disabledBackground: Color.lerp(
+        disabledBackground,
+        other.disabledBackground,
+        t,
+      )!,
       disabledBorder: Color.lerp(disabledBorder, other.disabledBorder, t)!,
       disabledText: Color.lerp(disabledText, other.disabledText, t)!,
-      selectionBackground:
-          Color.lerp(selectionBackground, other.selectionBackground, t)!,
-      selectionBorder:
-          Color.lerp(selectionBorder, other.selectionBorder, t)!,
-      selectionContent:
-          Color.lerp(selectionContent, other.selectionContent, t)!,
-      surfaceDisabled:
-          Color.lerp(surfaceDisabled, other.surfaceDisabled, t)!,
-      surfaceSelected:
-          Color.lerp(surfaceSelected, other.surfaceSelected, t)!,
+      selectionBackground: Color.lerp(
+        selectionBackground,
+        other.selectionBackground,
+        t,
+      )!,
+      selectionBorder: Color.lerp(selectionBorder, other.selectionBorder, t)!,
+      selectionContent: Color.lerp(
+        selectionContent,
+        other.selectionContent,
+        t,
+      )!,
+      surfaceDisabled: Color.lerp(surfaceDisabled, other.surfaceDisabled, t)!,
+      surfaceSelected: Color.lerp(surfaceSelected, other.surfaceSelected, t)!,
       borderStrong: Color.lerp(borderStrong, other.borderStrong, t)!,
       borderFocused: Color.lerp(borderFocused, other.borderFocused, t)!,
       borderDisabled: Color.lerp(borderDisabled, other.borderDisabled, t)!,

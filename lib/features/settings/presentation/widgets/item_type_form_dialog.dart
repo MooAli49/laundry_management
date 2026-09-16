@@ -57,7 +57,9 @@ class _ItemTypeFormDialogState extends State<ItemTypeFormDialog> {
     if (widget.itemType == null) {
       success = await cubit.createItemType(_nameController.text.trim());
     } else {
-      final updated = widget.itemType!.copyWith(name: _nameController.text.trim());
+      final updated = widget.itemType!.copyWith(
+        name: _nameController.text.trim(),
+      );
       success = await cubit.updateItemType(updated);
     }
 
@@ -145,10 +147,7 @@ class _ItemTypeFormDialogState extends State<ItemTypeFormDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    AppButton(
-                      label: AppStrings.save,
-                      onPressed: _handleSubmit,
-                    ),
+                    AppButton(label: AppStrings.save, onPressed: _handleSubmit),
                     AppSpacing.gapHorizontalMd,
                     AppButton(
                       label: AppStrings.cancel,

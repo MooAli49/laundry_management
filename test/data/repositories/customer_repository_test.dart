@@ -5,7 +5,8 @@ import 'package:laundry_management/data/local/daos/customers_dao.dart';
 import 'package:laundry_management/data/local/daos/orders_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
-import 'package:laundry_management/data/local/database/app_database.dart' as app_db;
+import 'package:laundry_management/data/local/database/app_database.dart'
+    as app_db;
 import 'package:laundry_management/data/local/database/dev_test_data.dart';
 import 'package:laundry_management/data/repositories/customer_repository_impl.dart';
 import 'package:laundry_management/data/repositories/order_repository_impl.dart';
@@ -77,88 +78,112 @@ void main() {
       expect(fetched.notes, 'عميل مميز');
     });
 
-    test('rejects duplicate customer phone on creation with DuplicateCustomerPhoneFailure', () async {
-      final now = DateTime.now();
-      await customerRepository.createCustomer(
-        Customer(
-          id: 'cust-1',
-          name: 'عميل أول',
-          phone: '01012345678',
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-
-      expect(
-        () => customerRepository.createCustomer(
+    test(
+      'rejects duplicate customer phone on creation with DuplicateCustomerPhoneFailure',
+      () async {
+        final now = DateTime.now();
+        await customerRepository.createCustomer(
           Customer(
-            id: 'cust-2',
-            name: 'عميل ثان',
-            phone: '٠١٠١٢٣٤٥٦٧٨', // Same normalized phone
+            id: 'cust-1',
+            name: 'عميل أول',
+            phone: '01012345678',
             createdAt: now,
             updatedAt: now,
           ),
-        ),
-        throwsA(isA<DuplicateCustomerPhoneFailure>()),
-      );
-    });
+        );
 
-    test('rejects empty or invalid Egyptian mobile phone on creation', () async {
-      final now = DateTime.now();
-      // Empty phone rejected at entity boundary
-      expect(
-        () => Customer(
-          id: 'cust-empty',
-          name: 'عميل',
-          phone: '   ',
-          createdAt: now,
-          updatedAt: now,
-        ),
-        throwsA(isA<ArgumentError>()),
-      );
+        expect(
+          () => customerRepository.createCustomer(
+            Customer(
+              id: 'cust-2',
+              name: 'عميل ثان',
+              phone: '٠١٠١٢٣٤٥٦٧٨', // Same normalized phone
+              createdAt: now,
+              updatedAt: now,
+            ),
+          ),
+          throwsA(isA<DuplicateCustomerPhoneFailure>()),
+        );
+      },
+    );
 
-      // Invalid Egyptian prefix (013)
-      expect(
-        () => customerRepository.createCustomer(
-          Customer(
-            id: 'cust-inv-1',
+    test(
+      'rejects empty or invalid Egyptian mobile phone on creation',
+      () async {
+        final now = DateTime.now();
+        // Empty phone rejected at entity boundary
+        expect(
+          () => Customer(
+            id: 'cust-empty',
             name: 'عميل',
-            phone: '01312345678',
+            phone: '   ',
             createdAt: now,
             updatedAt: now,
           ),
-        ),
-        throwsA(isA<ValidationFailure>().having((e) => e.message, 'message', 'رقم الهاتف غير صحيح')),
-      );
+          throwsA(isA<ArgumentError>()),
+        );
 
-      // Invalid length (10 digits)
-      expect(
-        () => customerRepository.createCustomer(
-          Customer(
-            id: 'cust-inv-2',
-            name: 'عميل',
-            phone: '0101234567',
-            createdAt: now,
-            updatedAt: now,
+        // Invalid Egyptian prefix (013)
+        expect(
+          () => customerRepository.createCustomer(
+            Customer(
+              id: 'cust-inv-1',
+              name: 'عميل',
+              phone: '01312345678',
+              createdAt: now,
+              updatedAt: now,
+            ),
           ),
-        ),
-        throwsA(isA<ValidationFailure>().having((e) => e.message, 'message', 'رقم الهاتف غير صحيح')),
-      );
+          throwsA(
+            isA<ValidationFailure>().having(
+              (e) => e.message,
+              'message',
+              'رقم الهاتف غير صحيح',
+            ),
+          ),
+        );
 
-      // Non-digit
-      expect(
-        () => customerRepository.createCustomer(
-          Customer(
-            id: 'cust-inv-3',
-            name: 'عميل',
-            phone: '0101234567a',
-            createdAt: now,
-            updatedAt: now,
+        // Invalid length (10 digits)
+        expect(
+          () => customerRepository.createCustomer(
+            Customer(
+              id: 'cust-inv-2',
+              name: 'عميل',
+              phone: '0101234567',
+              createdAt: now,
+              updatedAt: now,
+            ),
           ),
-        ),
-        throwsA(isA<ValidationFailure>().having((e) => e.message, 'message', 'رقم الهاتف غير صحيح')),
-      );
-    });
+          throwsA(
+            isA<ValidationFailure>().having(
+              (e) => e.message,
+              'message',
+              'رقم الهاتف غير صحيح',
+            ),
+          ),
+        );
+
+        // Non-digit
+        expect(
+          () => customerRepository.createCustomer(
+            Customer(
+              id: 'cust-inv-3',
+              name: 'عميل',
+              phone: '0101234567a',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          ),
+          throwsA(
+            isA<ValidationFailure>().having(
+              (e) => e.message,
+              'message',
+              'رقم الهاتف غير صحيح',
+            ),
+          ),
+        );
+      },
+    );
 
     test('updates customer and validates duplicate phone on update', () async {
       final now = DateTime.now();
@@ -211,71 +236,78 @@ void main() {
       );
     });
 
-    test('updating customer details does not alter historical order snapshots', () async {
-      final now = DateTime.now();
-      final customer = await customerRepository.createCustomer(
-        Customer(
-          id: 'cust-snapshot-test',
-          name: 'الاسم الأصلي',
-          phone: '01055555555',
+    test(
+      'updating customer details does not alter historical order snapshots',
+      () async {
+        final now = DateTime.now();
+        final customer = await customerRepository.createCustomer(
+          Customer(
+            id: 'cust-snapshot-test',
+            name: 'الاسم الأصلي',
+            phone: '01055555555',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+        // Create an order for this customer
+        final itemTypes = await db.select(db.itemTypes).get();
+        final services = await db.select(db.services).get();
+        final itemType = itemTypes.first;
+        final service = services.first;
+
+        final order = Order(
+          id: 'ord-snapshot-test',
+          orderNumber: '26-999',
+          customerId: customer.id,
+          customerNameSnapshot: 'الاسم الأصلي',
+          customerPhoneSnapshot: '01055555555',
+          status: OrderStatus.processing,
+          expectedPickupDate: OrderDate.fromDate(
+            now.add(const Duration(days: 3)),
+          ),
+          subtotal: const Money.fromPiastres(10000),
+          discount: Money.zero,
+          tax: Money.zero,
+          total: const Money.fromPiastres(10000),
           createdAt: now,
           updatedAt: now,
-        ),
-      );
+        );
 
-      // Create an order for this customer
-      final itemTypes = await db.select(db.itemTypes).get();
-      final services = await db.select(db.services).get();
-      final itemType = itemTypes.first;
-      final service = services.first;
+        final item = OrderItem(
+          id: 'item-snap-1',
+          orderId: order.id,
+          itemTypeId: itemType.id,
+          serviceId: service.id,
+          itemTypeNameSnapshot: itemType.name,
+          serviceNameSnapshot: service.name,
+          pricingType: PricingType.fixedPrice,
+          quantity: 1,
+          unitPrice: const Money.fromPiastres(10000),
+          calculatedTotal: const Money.fromPiastres(10000),
+          createdAt: now,
+          updatedAt: now,
+        );
 
-      final order = Order(
-        id: 'ord-snapshot-test',
-        orderNumber: '26-999',
-        customerId: customer.id,
-        customerNameSnapshot: 'الاسم الأصلي',
-        customerPhoneSnapshot: '01055555555',
-        status: OrderStatus.processing,
-        expectedPickupDate: OrderDate.fromDate(now.add(const Duration(days: 3))),
-        subtotal: const Money.fromPiastres(10000),
-        discount: Money.zero,
-        tax: Money.zero,
-        total: const Money.fromPiastres(10000),
-        createdAt: now,
-        updatedAt: now,
-      );
+        await orderRepository.createOrder(order: order, items: [item]);
 
-      final item = OrderItem(
-        id: 'item-snap-1',
-        orderId: order.id,
-        itemTypeId: itemType.id,
-        serviceId: service.id,
-        itemTypeNameSnapshot: itemType.name,
-        serviceNameSnapshot: service.name,
-        pricingType: PricingType.fixedPrice,
-        quantity: 1,
-        unitPrice: const Money.fromPiastres(10000),
-        calculatedTotal: const Money.fromPiastres(10000),
-        createdAt: now,
-        updatedAt: now,
-      );
+        // Now update the customer to a new name and phone
+        await customerRepository.updateCustomer(
+          customer.copyWith(
+            name: 'الاسم الجديد بعد التعديل',
+            phone: '01099999999',
+          ),
+        );
 
-      await orderRepository.createOrder(order: order, items: [item]);
-
-      // Now update the customer to a new name and phone
-      await customerRepository.updateCustomer(
-        customer.copyWith(
-          name: 'الاسم الجديد بعد التعديل',
-          phone: '01099999999',
-        ),
-      );
-
-      // Verify the order still has the original snapshot
-      final reloadedOrder = await orderRepository.getOrderById('ord-snapshot-test');
-      expect(reloadedOrder != null, isTrue);
-      expect(reloadedOrder!.customerNameSnapshot, equals('الاسم الأصلي'));
-      expect(reloadedOrder.customerPhoneSnapshot, equals('01055555555'));
-    });
+        // Verify the order still has the original snapshot
+        final reloadedOrder = await orderRepository.getOrderById(
+          'ord-snapshot-test',
+        );
+        expect(reloadedOrder != null, isTrue);
+        expect(reloadedOrder!.customerNameSnapshot, equals('الاسم الأصلي'));
+        expect(reloadedOrder.customerPhoneSnapshot, equals('01055555555'));
+      },
+    );
 
     test('counts customer orders accurately in OrderRepository', () async {
       final now = DateTime.now();
@@ -311,7 +343,9 @@ void main() {
           customerNameSnapshot: custA.name,
           customerPhoneSnapshot: custA.phone,
           status: OrderStatus.processing,
-          expectedPickupDate: OrderDate.fromDate(now.add(const Duration(days: 3))),
+          expectedPickupDate: OrderDate.fromDate(
+            now.add(const Duration(days: 3)),
+          ),
           subtotal: const Money.fromPiastres(5000),
           discount: Money.zero,
           tax: Money.zero,
@@ -343,7 +377,9 @@ void main() {
         customerNameSnapshot: custB.name,
         customerPhoneSnapshot: custB.phone,
         status: OrderStatus.processing,
-        expectedPickupDate: OrderDate.fromDate(now.add(const Duration(days: 3))),
+        expectedPickupDate: OrderDate.fromDate(
+          now.add(const Duration(days: 3)),
+        ),
         subtotal: const Money.fromPiastres(5000),
         discount: Money.zero,
         tax: Money.zero,

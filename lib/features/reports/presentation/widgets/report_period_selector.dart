@@ -10,8 +10,12 @@ class ReportPeriodSelector extends StatelessWidget {
   final ReportPeriod selectedPeriod;
   final DateTime startDate;
   final DateTime endDate;
-  final void Function(ReportPeriod period, {DateTime? customStart, DateTime? customEnd})
-      onPeriodChanged;
+  final void Function(
+    ReportPeriod period, {
+    DateTime? customStart,
+    DateTime? customEnd,
+  })
+  onPeriodChanged;
 
   const ReportPeriodSelector({
     super.key,
@@ -78,8 +82,12 @@ class ReportPeriodSelector extends StatelessWidget {
                 label: Text(
                   period.label,
                   style: AppTextStyles.bodyMedium.copyWith(
-                    color: isSelected ? AppColors.textOnPrimary : AppColors.textPrimary,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected
+                        ? AppColors.textOnPrimary
+                        : AppColors.textPrimary,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                   ),
                 ),
                 selected: isSelected,
@@ -122,13 +130,18 @@ class ReportPeriodSelector extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.background,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMd,
+                        ),
                         border: Border.all(color: AppColors.border),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.calendar_today_outlined,
-                              size: 16, color: AppColors.textSecondary),
+                          const Icon(
+                            Icons.calendar_today_outlined,
+                            size: 16,
+                            color: AppColors.textSecondary,
+                          ),
                           AppSpacing.gapHorizontalSm,
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -158,13 +171,18 @@ class ReportPeriodSelector extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.background,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMd,
+                        ),
                         border: Border.all(color: AppColors.border),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.calendar_today_outlined,
-                              size: 16, color: AppColors.textSecondary),
+                          const Icon(
+                            Icons.calendar_today_outlined,
+                            size: 16,
+                            color: AppColors.textSecondary,
+                          ),
                           AppSpacing.gapHorizontalSm,
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -189,14 +207,20 @@ class ReportPeriodSelector extends StatelessWidget {
           // Active Date Range Label
           Row(
             children: [
-              const Icon(Icons.date_range, size: 16, color: AppColors.textTertiary),
+              const Icon(
+                Icons.date_range,
+                size: 16,
+                color: AppColors.textTertiary,
+              ),
               AppSpacing.gapHorizontalXs,
               Expanded(
                 child: Text(
                   'الفترة المحددة: ${DateFormatter.formatArabicDate(startDate)} — ${DateFormatter.formatArabicDate(endDate)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
             ],

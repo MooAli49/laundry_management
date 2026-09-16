@@ -21,10 +21,10 @@ class OrdersListCubit extends Cubit<OrdersListState> {
     required OrderRepository orderRepository,
     required CustomerRepository customerRepository,
     required PaymentRepository paymentRepository,
-  })  : _orderRepository = orderRepository,
-        _customerRepository = customerRepository,
-        _paymentRepository = paymentRepository,
-        super(const OrdersListState());
+  }) : _orderRepository = orderRepository,
+       _customerRepository = customerRepository,
+       _paymentRepository = paymentRepository,
+       super(const OrdersListState());
 
   Future<void> loadOrders({bool refresh = false}) async {
     if (state.isLoading && !refresh) return;
@@ -48,21 +48,17 @@ class OrdersListCubit extends Cubit<OrdersListState> {
 
       final viewModels = await _enrichOrders(orders);
 
-      emit(state.copyWith(
-        orders: viewModels,
-        isLoading: false,
-        hasMore: orders.length == _pageSize,
-      ));
+      emit(
+        state.copyWith(
+          orders: viewModels,
+          isLoading: false,
+          hasMore: orders.length == _pageSize,
+        ),
+      );
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isLoading: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isLoading: false, errorMessage: f.message));
     } catch (e) {
-      emit(state.copyWith(
-        isLoading: false,
-        errorMessage: e.toString(),
-      ));
+      emit(state.copyWith(isLoading: false, errorMessage: e.toString()));
     }
   }
 
@@ -88,21 +84,17 @@ class OrdersListCubit extends Cubit<OrdersListState> {
 
       final nextViewModels = await _enrichOrders(nextOrders);
 
-      emit(state.copyWith(
-        orders: [...state.orders, ...nextViewModels],
-        isLoadingMore: false,
-        hasMore: nextOrders.length == _pageSize,
-      ));
+      emit(
+        state.copyWith(
+          orders: [...state.orders, ...nextViewModels],
+          isLoadingMore: false,
+          hasMore: nextOrders.length == _pageSize,
+        ),
+      );
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isLoadingMore: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isLoadingMore: false, errorMessage: f.message));
     } catch (e) {
-      emit(state.copyWith(
-        isLoadingMore: false,
-        errorMessage: e.toString(),
-      ));
+      emit(state.copyWith(isLoadingMore: false, errorMessage: e.toString()));
     }
   }
 
@@ -124,12 +116,18 @@ class OrdersListCubit extends Cubit<OrdersListState> {
     loadOrders(refresh: true);
   }
 
-  Future<List<OrderListItemViewModel>> _enrichOrders(List<dynamic> orders) async {
+  Future<List<OrderListItemViewModel>> _enrichOrders(
+    List<dynamic> orders,
+  ) async {
     final viewModels = <OrderListItemViewModel>[];
     for (final order in orders) {
-      final customer = await _customerRepository.getCustomerById(order.customerId);
+      final customer = await _customerRepository.getCustomerById(
+        order.customerId,
+      );
       final totalPaid = await _paymentRepository.getTotalPaidForOrder(order.id);
-      final remaining = await _paymentRepository.getRemainingAmountForOrder(order.id);
+      final remaining = await _paymentRepository.getRemainingAmountForOrder(
+        order.id,
+      );
 
       viewModels.add(
         OrderListItemViewModel(
@@ -151,7 +149,8 @@ class OrdersListCubit extends Cubit<OrdersListState> {
     DateTime? createdFrom,
     DateTime? createdTo,
     bool? hasRemaining,
-  }) _resolveQueryParams() {
+  })
+  _resolveQueryParams() {
     final filter = state.activeFilter;
     OrderStatus? status = filter.status;
     List<OrderStatus>? excludedStatuses;

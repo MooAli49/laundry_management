@@ -12,13 +12,10 @@ class AddCustomerDialog extends StatefulWidget {
     required String name,
     required String phone,
     String? notes,
-  }) onSave;
+  })
+  onSave;
 
-  const AddCustomerDialog({
-    super.key,
-    this.initialQuery,
-    required this.onSave,
-  });
+  const AddCustomerDialog({super.key, this.initialQuery, required this.onSave});
 
   @override
   State<AddCustomerDialog> createState() => _AddCustomerDialogState();
@@ -125,7 +122,9 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.error,
+                          ),
                         ),
                       ),
                     ],
@@ -169,7 +168,9 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                   AppButton(
                     label: 'إلغاء',
                     variant: AppButtonVariant.secondary,
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isLoading
+                        ? null
+                        : () => Navigator.of(context).pop(),
                   ),
                 ],
               ),

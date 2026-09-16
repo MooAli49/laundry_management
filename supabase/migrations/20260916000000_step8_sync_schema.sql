@@ -1,5 +1,5 @@
 -- =============================================================================
--- Step 8 — Supabase PostgreSQL Schema Migration
+-- Step 9 — Supabase PostgreSQL Schema Migration
 -- Laundry Management System — Offline-First Synchronized Tables & Idempotency
 -- =============================================================================
 
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS services (
     id UUID PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
-    pricing_type TEXT NOT NULL CHECK (pricing_type IN ('fixed', 'per_item', 'area_based')),
+    pricing_type TEXT NOT NULL CHECK (pricing_type IN ('per_piece', 'per_square_meter', 'fixed_price')),
     price BIGINT NOT NULL CHECK (price >= 0),
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS orders (
     customer_name_snapshot TEXT NOT NULL,
     customer_phone_snapshot TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('processing', 'ready', 'completed', 'cancelled')),
-    expected_pickup_date TIMESTAMPTZ NOT NULL,
+    expected_pickup_date DATE NOT NULL,
     notes TEXT,
     customer_pickup_requested BOOLEAN NOT NULL DEFAULT false,
     customer_pickup_fee BIGINT NOT NULL DEFAULT 0 CHECK (customer_pickup_fee >= 0),
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS order_items (
     item_type_name_snapshot TEXT NOT NULL,
     item_definition_name_snapshot TEXT,
     service_name_snapshot TEXT NOT NULL,
-    pricing_type TEXT NOT NULL CHECK (pricing_type IN ('fixed', 'per_item', 'area_based')),
+    pricing_type TEXT NOT NULL CHECK (pricing_type IN ('per_piece', 'per_square_meter', 'fixed_price')),
     quantity DOUBLE PRECISION NOT NULL CHECK (quantity > 0),
     unit_price BIGINT NOT NULL CHECK (unit_price >= 0),
     calculated_total BIGINT NOT NULL CHECK (calculated_total >= 0),
@@ -133,13 +133,14 @@ CREATE TABLE IF NOT EXISTS storage_records (
 );
 
 CREATE INDEX IF NOT EXISTS idx_supabase_storage_records_item ON storage_records(order_item_id);
-CREATE INDEX IF NOT EXISTS idx_supabase_storage_records_active ON storage_records(order_item_id) WHERE is_active = true;
+-- Strict business invariant: An OrderItem cannot have more than one active storage record
+CREATE UNIQUE INDEX IF NOT EXISTS idx_supabase_storage_records_unique_active ON storage_records(order_item_id) WHERE is_active = true;
 
 -- -----------------------------------------------------------------------------
 -- 8. Sync Idempotency Log Table
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS sync_idempotency_log (
-    operation_id UUID PRIMARY KEY,
+    operation_id TEXT PRIMARY KEY,
     entity_type TEXT NOT NULL,
     entity_id TEXT NOT NULL,
     operation_type TEXT NOT NULL,
@@ -148,3 +149,16 @@ CREATE TABLE IF NOT EXISTS sync_idempotency_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_supabase_idempotency_entity ON sync_idempotency_log(entity_type, entity_id);
+
+-- -----------------------------------------------------------------------------
+-- 9. Row Level Security
+-- Protect tables so only trusted server-side Edge Functions (service_role) mutate data.
+-- -----------------------------------------------------------------------------
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE services ENABLE ROW LEVEL SECURITY;
+ALTER TABLE service_item_types ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE order_item_carpets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE storage_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sync_idempotency_log ENABLE ROW LEVEL SECURITY;

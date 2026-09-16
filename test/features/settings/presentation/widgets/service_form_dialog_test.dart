@@ -14,14 +14,20 @@ class MockServiceRepo implements ServiceRepository {
   final Map<String, List<String>> supportedTypes = {};
 
   @override
-  Future<Service> createService(Service service, {required List<String> supportedItemTypeIds}) async {
+  Future<Service> createService(
+    Service service, {
+    required List<String> supportedItemTypeIds,
+  }) async {
     services.add(service);
     supportedTypes[service.id] = supportedItemTypeIds;
     return service;
   }
 
   @override
-  Future<Service> updateService(Service service, {List<String>? supportedItemTypeIds}) async => service;
+  Future<Service> updateService(
+    Service service, {
+    List<String>? supportedItemTypeIds,
+  }) async => service;
   @override
   Future<List<Service>> getAllServices() async => services;
   @override
@@ -29,13 +35,15 @@ class MockServiceRepo implements ServiceRepository {
   @override
   Future<Service?> getServiceById(String id) async => null;
   @override
-  Future<List<Service>> getServicesForItemType(String itemTypeId) async => services;
+  Future<List<Service>> getServicesForItemType(String itemTypeId) async =>
+      services;
   @override
   Future<void> activateService(String id) async {}
   @override
   Future<void> deactivateService(String id) async {}
   @override
-  Future<List<String>> getSupportedItemTypeIds(String serviceId) async => supportedTypes[serviceId] ?? [];
+  Future<List<String>> getSupportedItemTypeIds(String serviceId) async =>
+      supportedTypes[serviceId] ?? [];
 }
 
 class MockItemTypeRepo implements ItemTypeRepository {
@@ -89,16 +97,14 @@ void main() {
       home: Scaffold(
         body: BlocProvider.value(
           value: cubit,
-          child: ServiceFormDialog(
-            availableItemTypes: itemTypeRepo.types,
-          ),
+          child: ServiceFormDialog(availableItemTypes: itemTypeRepo.types),
         ),
       ),
     );
   }
 
   group('ServiceFormDialog Widget Tests', () {
-    testWidgets('displays only V1 pricing types and perKilogram is not displayed', (tester) async {
+    testWidgets('displays only approved V1 pricing types', (tester) async {
       await tester.pumpWidget(buildDialog());
       await tester.pumpAndSettle();
 
@@ -106,11 +112,6 @@ void main() {
       expect(find.text(AppStrings.pricingPerPiece), findsOneWidget);
       expect(find.text(AppStrings.pricingPerSquareMeter), findsOneWidget);
       expect(find.text(AppStrings.pricingFixedPrice), findsOneWidget);
-
-      // Verify perKilogram ('بالكيلو' or 'perKilogram') is NOT displayed
-      expect(find.text('بالكيلو'), findsNothing);
-      expect(find.text('perKilogram'), findsNothing);
-      expect(find.text('per_kilogram'), findsNothing);
     });
 
     testWidgets('rejects empty name on submit', (tester) async {

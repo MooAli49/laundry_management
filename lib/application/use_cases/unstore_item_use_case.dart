@@ -4,17 +4,14 @@ import '../../domain/repositories/storage_repository.dart';
 class UnstoreItemInput {
   final String orderItemId;
 
-  const UnstoreItemInput({
-    required this.orderItemId,
-  });
+  const UnstoreItemInput({required this.orderItemId});
 }
 
 class UnstoreItemUseCase {
   final StorageRepository _storageRepository;
 
-  UnstoreItemUseCase({
-    required StorageRepository storageRepository,
-  }) : _storageRepository = storageRepository;
+  UnstoreItemUseCase({required StorageRepository storageRepository})
+    : _storageRepository = storageRepository;
 
   Future<void> execute(UnstoreItemInput input) async {
     if (input.orderItemId.trim().isEmpty) {

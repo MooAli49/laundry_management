@@ -59,7 +59,8 @@ class InvoicePrinter {
 
   /// Internal grouping key for aggregating semantically identical invoice lines.
   static String _groupingKey(OrderItem item) {
-    final def = '${item.itemDefinitionId ?? ''}_${item.itemDefinitionNameSnapshot ?? ''}';
+    final def =
+        '${item.itemDefinitionId ?? ''}_${item.itemDefinitionNameSnapshot ?? ''}';
     final notes = (item.notes ?? '').trim();
     final carpetKey = item.carpetData != null
         ? '${formatNumber(item.carpetData!.length)}x${formatNumber(item.carpetData!.width)}'
@@ -102,20 +103,32 @@ class InvoicePrinter {
           ? '${first.itemTypeNameSnapshot} (${first.itemDefinitionNameSnapshot}) - ${first.serviceNameSnapshot}'
           : '${first.itemTypeNameSnapshot} - ${first.serviceNameSnapshot}';
 
-      final notes = first.notes?.trim().isNotEmpty == true ? first.notes!.trim() : null;
+      final notes = first.notes?.trim().isNotEmpty == true
+          ? first.notes!.trim()
+          : null;
 
       if (isCarpet) {
-        final totalPieces = group.fold<double>(0.0, (sum, item) => sum + item.quantity);
-        final pieceCount = totalPieces > 0 ? totalPieces : group.length.toDouble();
+        final totalPieces = group.fold<double>(
+          0.0,
+          (sum, item) => sum + item.quantity,
+        );
+        final pieceCount = totalPieces > 0
+            ? totalPieces
+            : group.length.toDouble();
         final quantityDisplay = formatPieceCount(pieceCount);
 
         // Price for ONE carpet piece
         final unitPrice = first.carpetData != null
-            ? Money.fromPiastres((first.unitPrice.piastres * first.carpetData!.area).round())
+            ? Money.fromPiastres(
+                (first.unitPrice.piastres * first.carpetData!.area).round(),
+              )
             : first.calculatedTotal;
 
         // Sum of calculated totals across all carpet pieces in this group
-        final totalPiastres = group.fold<int>(0, (sum, item) => sum + item.calculatedTotal.piastres);
+        final totalPiastres = group.fold<int>(
+          0,
+          (sum, item) => sum + item.calculatedTotal.piastres,
+        );
         final calculatedTotal = Money.fromPiastres(totalPiastres);
 
         String? dimensionsSubtext;
@@ -135,11 +148,17 @@ class InvoicePrinter {
           notes: notes,
         );
       } else {
-        final totalQuantity = group.fold<double>(0.0, (sum, item) => sum + item.quantity);
+        final totalQuantity = group.fold<double>(
+          0.0,
+          (sum, item) => sum + item.quantity,
+        );
         final quantityDisplay = formatPieceCount(totalQuantity);
         final unitPrice = first.unitPrice;
 
-        final totalPiastres = group.fold<int>(0, (sum, item) => sum + item.calculatedTotal.piastres);
+        final totalPiastres = group.fold<int>(
+          0,
+          (sum, item) => sum + item.calculatedTotal.piastres,
+        );
         final calculatedTotal = Money.fromPiastres(totalPiastres);
 
         return InvoiceLineItem(
@@ -199,10 +218,16 @@ class InvoicePrinter {
     pw.Font? boldFont,
   }) async {
     // 1. Resolve embedded fonts (100% offline via rootBundle if not injected)
-    final resolvedRegular = regularFont ??
-        pw.Font.ttf(await rootBundle.load('assets/fonts/IBMPlexSansArabic-Regular.ttf'));
-    final resolvedBold = boldFont ??
-        pw.Font.ttf(await rootBundle.load('assets/fonts/IBMPlexSansArabic-Bold.ttf'));
+    final resolvedRegular =
+        regularFont ??
+        pw.Font.ttf(
+          await rootBundle.load('assets/fonts/IBMPlexSansArabic-Regular.ttf'),
+        );
+    final resolvedBold =
+        boldFont ??
+        pw.Font.ttf(
+          await rootBundle.load('assets/fonts/IBMPlexSansArabic-Bold.ttf'),
+        );
 
     final doc = pw.Document();
 
@@ -221,7 +246,9 @@ class InvoicePrinter {
       margin: const pw.EdgeInsets.symmetric(horizontal: 11.34, vertical: 17.0),
     );
 
-    final businessName = (settings?.businessName != null && settings!.businessName.trim().isNotEmpty)
+    final businessName =
+        (settings?.businessName != null &&
+            settings!.businessName.trim().isNotEmpty)
         ? settings.businessName
         : AppStrings.defaultBusinessName;
     final address = settings?.address;
@@ -249,7 +276,10 @@ class InvoicePrinter {
               // Business Header
               pw.Text(
                 businessName,
-                style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(
+                  fontSize: 11,
+                  fontWeight: pw.FontWeight.bold,
+                ),
                 textAlign: pw.TextAlign.center,
               ),
               if (address != null && address.trim().isNotEmpty) ...[
@@ -283,11 +313,17 @@ class InvoicePrinter {
                 children: [
                   pw.Text(
                     'فاتورة رقم: ',
-                    style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+                    style: pw.TextStyle(
+                      fontSize: 9,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
                   ),
                   pw.Text(
                     order.orderNumber,
-                    style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+                    style: pw.TextStyle(
+                      fontSize: 9,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
                     textDirection: pw.TextDirection.ltr,
                   ),
                 ],
@@ -311,7 +347,10 @@ class InvoicePrinter {
                 pw.SizedBox(height: 2.5),
                 pw.Row(
                   children: [
-                    pw.Text('الهاتف: ', style: const pw.TextStyle(fontSize: 8.5)),
+                    pw.Text(
+                      'الهاتف: ',
+                      style: const pw.TextStyle(fontSize: 8.5),
+                    ),
                     pw.Text(
                       customerPhone,
                       style: const pw.TextStyle(fontSize: 8.5),
@@ -343,7 +382,10 @@ class InvoicePrinter {
                         padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
                         child: pw.Text(
                           'الإجمالي',
-                          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                          style: pw.TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
                           textAlign: pw.TextAlign.left,
                         ),
                       ),
@@ -351,7 +393,10 @@ class InvoicePrinter {
                         padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
                         child: pw.Text(
                           'سعر الوحدة',
-                          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                          style: pw.TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
                           textAlign: pw.TextAlign.left,
                         ),
                       ),
@@ -359,7 +404,10 @@ class InvoicePrinter {
                         padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
                         child: pw.Text(
                           'الكمية',
-                          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                          style: pw.TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
                           textAlign: pw.TextAlign.center,
                         ),
                       ),
@@ -367,7 +415,10 @@ class InvoicePrinter {
                         padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
                         child: pw.Text(
                           'البند / الخدمة',
-                          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                          style: pw.TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
                           textAlign: pw.TextAlign.right,
                         ),
                       ),
@@ -381,7 +432,10 @@ class InvoicePrinter {
                           padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
                           child: pw.Text(
                             line.calculatedTotal.toEgp.toStringAsFixed(2),
-                            style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                            style: pw.TextStyle(
+                              fontSize: 8.5,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
                             textAlign: pw.TextAlign.left,
                             textDirection: pw.TextDirection.ltr,
                           ),
@@ -438,22 +492,57 @@ class InvoicePrinter {
               pw.SizedBox(height: 4),
 
               // Financial Summary (Authoritative historical values)
-              _summaryRow('المجموع الفرعي:', order.subtotal.toEgp.toStringAsFixed(2)),
+              _summaryRow(
+                'المجموع الفرعي:',
+                order.subtotal.toEgp.toStringAsFixed(2),
+              ),
               if (order.discount.isPositive)
-                _summaryRow('الخصم:', order.discount.toEgp.toStringAsFixed(2), prefix: '-'),
-              if (order.customerPickupRequested && order.customerPickupFee.isPositive)
-                _summaryRow('استلام من العميل:', order.customerPickupFee.toEgp.toStringAsFixed(2), prefix: '+'),
-              if (order.customerDeliveryRequested && order.customerDeliveryFee.isPositive)
-                _summaryRow('توصيل للعميل:', order.customerDeliveryFee.toEgp.toStringAsFixed(2), prefix: '+'),
+                _summaryRow(
+                  'الخصم:',
+                  order.discount.toEgp.toStringAsFixed(2),
+                  prefix: '-',
+                ),
+              if (order.customerPickupRequested &&
+                  order.customerPickupFee.isPositive)
+                _summaryRow(
+                  'استلام من العميل:',
+                  order.customerPickupFee.toEgp.toStringAsFixed(2),
+                  prefix: '+',
+                ),
+              if (order.customerDeliveryRequested &&
+                  order.customerDeliveryFee.isPositive)
+                _summaryRow(
+                  'توصيل للعميل:',
+                  order.customerDeliveryFee.toEgp.toStringAsFixed(2),
+                  prefix: '+',
+                ),
               if (order.tax.isPositive)
-                _summaryRow('الضريبة:', order.tax.toEgp.toStringAsFixed(2), prefix: '+'),
+                _summaryRow(
+                  'الضريبة:',
+                  order.tax.toEgp.toStringAsFixed(2),
+                  prefix: '+',
+                ),
               pw.SizedBox(height: 2),
               pw.Divider(thickness: 0.5, borderStyle: pw.BorderStyle.dashed),
               pw.SizedBox(height: 2),
               // Authoritative total (Never recalculated)
-              _summaryRow('الإجمالي:', order.total.toEgp.toStringAsFixed(2), isBold: true, fontSize: 10.0),
-              _summaryRow('المدفوع:', totalPaid.toEgp.toStringAsFixed(2), fontSize: 8.5),
-              _summaryRow('المتبقي:', remainingAmount.toEgp.toStringAsFixed(2), isBold: true, fontSize: 10.0),
+              _summaryRow(
+                'الإجمالي:',
+                order.total.toEgp.toStringAsFixed(2),
+                isBold: true,
+                fontSize: 10.0,
+              ),
+              _summaryRow(
+                'المدفوع:',
+                totalPaid.toEgp.toStringAsFixed(2),
+                fontSize: 8.5,
+              ),
+              _summaryRow(
+                'المتبقي:',
+                remainingAmount.toEgp.toStringAsFixed(2),
+                isBold: true,
+                fontSize: 10.0,
+              ),
 
               pw.SizedBox(height: 5),
               pw.Divider(thickness: 0.5, borderStyle: pw.BorderStyle.dashed),
@@ -502,7 +591,9 @@ class InvoicePrinter {
                   prefix,
                   style: pw.TextStyle(
                     fontSize: fontSize,
-                    fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+                    fontWeight: isBold
+                        ? pw.FontWeight.bold
+                        : pw.FontWeight.normal,
                   ),
                 ),
                 pw.SizedBox(width: 2),
@@ -511,7 +602,9 @@ class InvoicePrinter {
                 amount,
                 style: pw.TextStyle(
                   fontSize: fontSize,
-                  fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+                  fontWeight: isBold
+                      ? pw.FontWeight.bold
+                      : pw.FontWeight.normal,
                 ),
                 textDirection: pw.TextDirection.ltr,
               ),
@@ -520,7 +613,9 @@ class InvoicePrinter {
                 'ج.م',
                 style: pw.TextStyle(
                   fontSize: fontSize,
-                  fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+                  fontWeight: isBold
+                      ? pw.FontWeight.bold
+                      : pw.FontWeight.normal,
                 ),
               ),
             ],

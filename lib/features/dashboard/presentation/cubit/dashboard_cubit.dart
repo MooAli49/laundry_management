@@ -6,21 +6,24 @@ import 'dashboard_state.dart';
 class DashboardCubit extends Cubit<DashboardState> {
   final DashboardRepository _dashboardRepository;
 
-  DashboardCubit({
-    required DashboardRepository dashboardRepository,
-  })  : _dashboardRepository = dashboardRepository,
-        super(const DashboardState());
+  DashboardCubit({required DashboardRepository dashboardRepository})
+    : _dashboardRepository = dashboardRepository,
+      super(const DashboardState());
 
   Future<void> loadDashboard() async {
     emit(state.copyWith(isLoading: true, clearErrorMessage: true));
     try {
       final data = await _dashboardRepository.getDashboardData();
-      emit(state.copyWith(data: data, isLoading: false, clearErrorMessage: true));
+      emit(
+        state.copyWith(data: data, isLoading: false, clearErrorMessage: true),
+      );
     } catch (_) {
-      emit(state.copyWith(
-        isLoading: false,
-        errorMessage: 'تعذر تحميل بيانات الرئيسية',
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          errorMessage: 'تعذر تحميل بيانات الرئيسية',
+        ),
+      );
     }
   }
 

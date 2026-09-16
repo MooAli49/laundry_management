@@ -12,7 +12,8 @@ import 'package:laundry_management/data/local/daos/services_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_locations_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
-import 'package:laundry_management/data/local/database/app_database.dart' as db_pkg;
+import 'package:laundry_management/data/local/database/app_database.dart'
+    as db_pkg;
 import 'package:laundry_management/data/repositories/customer_repository_impl.dart';
 import 'package:laundry_management/data/repositories/order_repository_impl.dart';
 import 'package:laundry_management/data/repositories/payment_repository_impl.dart';
@@ -228,139 +229,193 @@ void main() {
   }
 
   group('OrderDetailCubit', () {
-    test('loadOrderDetail populates order, items, customer, and remaining amount', () async {
-      await seedTestOrder(orderId: 'ord-1', customerId: 'cust-1', totalPiastres: 10000);
+    test(
+      'loadOrderDetail populates order, items, customer, and remaining amount',
+      () async {
+        await seedTestOrder(
+          orderId: 'ord-1',
+          customerId: 'cust-1',
+          totalPiastres: 10000,
+        );
 
-      await cubit.loadOrderDetail('ord-1');
+        await cubit.loadOrderDetail('ord-1');
 
-      expect(cubit.state.order, isNotNull);
-      expect(cubit.state.order!.orderNumber, '26-001');
-      expect(cubit.state.customer?.name, 'عميل تجريبي');
-      expect(cubit.state.items.length, 2);
-      expect(cubit.state.remainingAmount, const Money.fromPiastres(10000));
-      expect(cubit.state.allItemsStored, isFalse);
-      expect(cubit.state.unstoredItems.length, 2);
-      expect(cubit.state.compatibleLocationsByItemType, isNotEmpty);
-      expect(cubit.state.compatibleLocationsForItems(cubit.state.unstoredItems).length, 1);
-      expect(cubit.state.compatibleLocationsForItems(cubit.state.unstoredItems).first.id, 'loc-1');
-    });
+        expect(cubit.state.order, isNotNull);
+        expect(cubit.state.order!.orderNumber, '26-001');
+        expect(cubit.state.customer?.name, 'عميل تجريبي');
+        expect(cubit.state.items.length, 2);
+        expect(cubit.state.remainingAmount, const Money.fromPiastres(10000));
+        expect(cubit.state.allItemsStored, isFalse);
+        expect(cubit.state.unstoredItems.length, 2);
+        expect(cubit.state.compatibleLocationsByItemType, isNotEmpty);
+        expect(
+          cubit.state
+              .compatibleLocationsForItems(cubit.state.unstoredItems)
+              .length,
+          1,
+        );
+        expect(
+          cubit.state
+              .compatibleLocationsForItems(cubit.state.unstoredItems)
+              .first
+              .id,
+          'loc-1',
+        );
+      },
+    );
 
-    test('storeItems with incompatible location sets Arabic error message', () async {
-      await seedTestOrder(orderId: 'ord-compat-test', customerId: 'cust-compat', totalPiastres: 10000);
-      final itemTypes = await db.select(db.itemTypes).get();
-      final now = DateTime.now();
+    test(
+      'storeItems with incompatible location sets Arabic error message',
+      () async {
+        await seedTestOrder(
+          orderId: 'ord-compat-test',
+          customerId: 'cust-compat',
+          totalPiastres: 10000,
+        );
+        final itemTypes = await db.select(db.itemTypes).get();
+        final now = DateTime.now();
 
-      // Create an incompatible location (e.g. for a different item type)
-      final otherItemType = itemTypes.last;
-      await storageLocationRepository.createStorageLocation(
-        StorageLocation(
-          id: 'loc-incompatible',
-          name: 'موقع غير متوافق',
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        ),
-        supportedItemTypeIds: [otherItemType.id],
-      );
+        // Create an incompatible location (e.g. for a different item type)
+        final otherItemType = itemTypes.last;
+        await storageLocationRepository.createStorageLocation(
+          StorageLocation(
+            id: 'loc-incompatible',
+            name: 'موقع غير متوافق',
+            isActive: true,
+            createdAt: now,
+            updatedAt: now,
+          ),
+          supportedItemTypeIds: [otherItemType.id],
+        );
 
-      await cubit.loadOrderDetail('ord-compat-test');
+        await cubit.loadOrderDetail('ord-compat-test');
 
-      await cubit.storeItems(
-        orderItemIds: ['item-1-ord-compat-test'],
-        storageLocationId: 'loc-incompatible',
-      );
+        await cubit.storeItems(
+          orderItemIds: ['item-1-ord-compat-test'],
+          storageLocationId: 'loc-incompatible',
+        );
 
-      expect(cubit.state.errorMessage, equals('الموقع المحدد غير متوافق مع نوع العنصر'));
-      expect(cubit.state.allItemsStored, isFalse);
-    });
+        expect(
+          cubit.state.errorMessage,
+          equals('الموقع المحدد غير متوافق مع نوع العنصر'),
+        );
+        expect(cubit.state.allItemsStored, isFalse);
+      },
+    );
 
-    test('recordPayment rejects overpayment and records valid payment', () async {
-      await seedTestOrder(orderId: 'ord-2', customerId: 'cust-2', totalPiastres: 10000);
-      await cubit.loadOrderDetail('ord-2');
+    test(
+      'recordPayment rejects overpayment and records valid payment',
+      () async {
+        await seedTestOrder(
+          orderId: 'ord-2',
+          customerId: 'cust-2',
+          totalPiastres: 10000,
+        );
+        await cubit.loadOrderDetail('ord-2');
 
-      // Overpayment: 120 EGP (12000 piastres)
-      await cubit.recordPayment(
-        amount: const Money.fromPiastres(12000),
-        method: PaymentMethod.cash,
-      );
+        // Overpayment: 120 EGP (12000 piastres)
+        await cubit.recordPayment(
+          amount: const Money.fromPiastres(12000),
+          method: PaymentMethod.cash,
+        );
 
-      expect(cubit.state.errorMessage, contains('يتجاوز المبلغ المتبقي'));
-      expect(cubit.state.totalPaid, Money.zero);
+        expect(cubit.state.errorMessage, contains('يتجاوز المبلغ المتبقي'));
+        expect(cubit.state.totalPaid, Money.zero);
 
-      // Valid payment: 40 EGP (4000 piastres)
-      await cubit.recordPayment(
-        amount: const Money.fromPiastres(4000),
-        method: PaymentMethod.instapay,
-      );
+        // Valid payment: 40 EGP (4000 piastres)
+        await cubit.recordPayment(
+          amount: const Money.fromPiastres(4000),
+          method: PaymentMethod.instapay,
+        );
 
-      expect(cubit.state.errorMessage, isNull);
-      expect(cubit.state.totalPaid, const Money.fromPiastres(4000));
-      expect(cubit.state.remainingAmount, const Money.fromPiastres(6000));
-      expect(cubit.state.payments.length, 1);
-    });
+        expect(cubit.state.errorMessage, isNull);
+        expect(cubit.state.totalPaid, const Money.fromPiastres(4000));
+        expect(cubit.state.remainingAmount, const Money.fromPiastres(6000));
+        expect(cubit.state.payments.length, 1);
+      },
+    );
 
-    test('storeItems stores items and marks order ready when all items stored', () async {
-      await seedTestOrder(orderId: 'ord-3', customerId: 'cust-3', totalPiastres: 10000);
-      await cubit.loadOrderDetail('ord-3');
+    test(
+      'storeItems stores items and marks order ready when all items stored',
+      () async {
+        await seedTestOrder(
+          orderId: 'ord-3',
+          customerId: 'cust-3',
+          totalPiastres: 10000,
+        );
+        await cubit.loadOrderDetail('ord-3');
 
-      expect(cubit.state.order!.status, OrderStatus.processing);
+        expect(cubit.state.order!.status, OrderStatus.processing);
 
-      // Store both items in loc-1
-      await cubit.storeItems(
-        orderItemIds: ['item-1-ord-3', 'item-2-ord-3'],
-        storageLocationId: 'loc-1',
-      );
+        // Store both items in loc-1
+        await cubit.storeItems(
+          orderItemIds: ['item-1-ord-3', 'item-2-ord-3'],
+          storageLocationId: 'loc-1',
+        );
 
-      expect(cubit.state.allItemsStored, isTrue);
-      expect(cubit.state.unstoredItems, isEmpty);
-      expect(cubit.state.activeStorageRecords.length, 2);
+        expect(cubit.state.allItemsStored, isTrue);
+        expect(cubit.state.unstoredItems, isEmpty);
+        expect(cubit.state.activeStorageRecords.length, 2);
 
-      // Verify order automatically became ready
-      expect(cubit.state.order!.status, OrderStatus.ready);
-    });
+        // Verify order automatically became ready
+        expect(cubit.state.order!.status, OrderStatus.ready);
+      },
+    );
 
-    test('completeOrder enforces ready status, remaining == 0, and handover confirmation', () async {
-      await seedTestOrder(orderId: 'ord-4', customerId: 'cust-4', totalPiastres: 10000);
-      await cubit.loadOrderDetail('ord-4');
+    test(
+      'completeOrder enforces ready status, remaining == 0, and handover confirmation',
+      () async {
+        await seedTestOrder(
+          orderId: 'ord-4',
+          customerId: 'cust-4',
+          totalPiastres: 10000,
+        );
+        await cubit.loadOrderDetail('ord-4');
 
-      // Attempt complete while processing and unpaid -> fails
-      await cubit.completeOrder(handoverConfirmed: true);
-      expect(cubit.state.errorMessage, contains('جاهز'));
+        // Attempt complete while processing and unpaid -> fails
+        await cubit.completeOrder(handoverConfirmed: true);
+        expect(cubit.state.errorMessage, contains('جاهز'));
 
-      // Store items to transition to ready
-      await cubit.storeItems(
-        orderItemIds: ['item-1-ord-4', 'item-2-ord-4'],
-        storageLocationId: 'loc-1',
-      );
-      expect(cubit.state.order!.status, OrderStatus.ready);
+        // Store items to transition to ready
+        await cubit.storeItems(
+          orderItemIds: ['item-1-ord-4', 'item-2-ord-4'],
+          storageLocationId: 'loc-1',
+        );
+        expect(cubit.state.order!.status, OrderStatus.ready);
 
-      // Attempt complete without full payment -> fails
-      await cubit.completeOrder(handoverConfirmed: true);
-      expect(cubit.state.errorMessage, contains('سداد كامل المبلغ'));
+        // Attempt complete without full payment -> fails
+        await cubit.completeOrder(handoverConfirmed: true);
+        expect(cubit.state.errorMessage, contains('سداد كامل المبلغ'));
 
-      // Pay remaining in full (100 EGP)
-      await cubit.recordPayment(
-        amount: const Money.fromPiastres(10000),
-        method: PaymentMethod.cash,
-      );
-      expect(cubit.state.remainingAmount, Money.zero);
+        // Pay remaining in full (100 EGP)
+        await cubit.recordPayment(
+          amount: const Money.fromPiastres(10000),
+          method: PaymentMethod.cash,
+        );
+        expect(cubit.state.remainingAmount, Money.zero);
 
-      // Attempt complete without handover confirmation -> fails
-      await cubit.completeOrder(handoverConfirmed: false);
-      expect(cubit.state.errorMessage, contains('تأكيد تسليم'));
+        // Attempt complete without handover confirmation -> fails
+        await cubit.completeOrder(handoverConfirmed: false);
+        expect(cubit.state.errorMessage, contains('تأكيد تسليم'));
 
-      // Valid completion!
-      await cubit.completeOrder(handoverConfirmed: true);
-      expect(cubit.state.order!.status, OrderStatus.completed);
-      expect(cubit.state.order!.completedAt, isNotNull);
+        // Valid completion!
+        await cubit.completeOrder(handoverConfirmed: true);
+        expect(cubit.state.order!.status, OrderStatus.completed);
+        expect(cubit.state.order!.completedAt, isNotNull);
 
-      // Verify storage records deactivated
-      final activeRecord = await storageRepository.getActiveRecordForOrderItem('item-1-ord-4');
-      expect(activeRecord, isNull);
-    });
+        // Verify storage records deactivated
+        final activeRecord = await storageRepository
+            .getActiveRecordForOrderItem('item-1-ord-4');
+        expect(activeRecord, isNull);
+      },
+    );
 
     test('cancelOrder requires reason and deactivates storage', () async {
-      await seedTestOrder(orderId: 'ord-5', customerId: 'cust-5', totalPiastres: 10000);
+      await seedTestOrder(
+        orderId: 'ord-5',
+        customerId: 'cust-5',
+        totalPiastres: 10000,
+      );
       await cubit.loadOrderDetail('ord-5');
 
       // Store item 1
@@ -379,12 +434,18 @@ void main() {
       expect(cubit.state.order!.cancellationReason, 'العميل تراجع عن الطلب');
 
       // Verify storage deactivated
-      final activeRecord = await storageRepository.getActiveRecordForOrderItem('item-1-ord-5');
+      final activeRecord = await storageRepository.getActiveRecordForOrderItem(
+        'item-1-ord-5',
+      );
       expect(activeRecord, isNull);
     });
 
     test('changeStatus blocks transitioning to completed directly', () async {
-      await seedTestOrder(orderId: 'ord-6', customerId: 'cust-6', totalPiastres: 10000);
+      await seedTestOrder(
+        orderId: 'ord-6',
+        customerId: 'cust-6',
+        totalPiastres: 10000,
+      );
       await cubit.loadOrderDetail('ord-6');
 
       await cubit.changeStatus(newStatus: OrderStatus.completed);

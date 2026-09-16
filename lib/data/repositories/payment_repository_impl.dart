@@ -22,16 +22,18 @@ class PaymentRepositoryImpl implements PaymentRepository {
     required OrdersDao ordersDao,
     required SyncOperationsDao syncOperationsDao,
     required app_db.AppDatabase db,
-  })  : _paymentsDao = paymentsDao,
-        _ordersDao = ordersDao,
-        _syncOperationsDao = syncOperationsDao,
-        _db = db;
+  }) : _paymentsDao = paymentsDao,
+       _ordersDao = ordersDao,
+       _syncOperationsDao = syncOperationsDao,
+       _db = db;
 
   @override
   Future<Payment> recordPayment(Payment payment) async {
     try {
       if (payment.amount.piastres <= 0) {
-        throw const ValidationFailure('Payment amount must be greater than zero');
+        throw const ValidationFailure(
+          'Payment amount must be greater than zero',
+        );
       }
 
       return await _db.transaction(() async {
@@ -41,16 +43,24 @@ class PaymentRepositoryImpl implements PaymentRepository {
         }
 
         if (order.status == 'completed') {
-          throw const BusinessRuleFailure('Cannot record payment for a completed order');
+          throw const BusinessRuleFailure(
+            'Cannot record payment for a completed order',
+          );
         }
         if (order.status == 'cancelled') {
-          throw const BusinessRuleFailure('Cannot record payment for a cancelled order');
+          throw const BusinessRuleFailure(
+            'Cannot record payment for a cancelled order',
+          );
         }
 
-        final paidPiastres = await _paymentsDao.getTotalPaidForOrder(payment.orderId);
+        final paidPiastres = await _paymentsDao.getTotalPaidForOrder(
+          payment.orderId,
+        );
         final remainingPiastres = order.total - paidPiastres;
         if (payment.amount.piastres > remainingPiastres) {
-          throw const BusinessRuleFailure('Payment amount exceeds remaining order balance');
+          throw const BusinessRuleFailure(
+            'Payment amount exceeds remaining order balance',
+          );
         }
 
         await _paymentsDao.insertPayment(
@@ -95,9 +105,9 @@ class PaymentRepositoryImpl implements PaymentRepository {
   @override
   Stream<List<Payment>> watchPaymentsForOrder(String orderId) {
     try {
-      return _paymentsDao.watchPaymentsForOrder(orderId).map(
-            (rows) => rows.map(_mapToDomain).toList(),
-          );
+      return _paymentsDao
+          .watchPaymentsForOrder(orderId)
+          .map((rows) => rows.map(_mapToDomain).toList());
     } catch (e) {
       if (e is Failure) rethrow;
       throw DatabaseFailure(e.toString());
@@ -132,7 +142,9 @@ class PaymentRepositoryImpl implements PaymentRepository {
   }
 
   @override
-  Future<Map<String, OrderPaymentSummary>> getPaymentSummariesForOrders(List<String> orderIds) async {
+  Future<Map<String, OrderPaymentSummary>> getPaymentSummariesForOrders(
+    List<String> orderIds,
+  ) async {
     try {
       if (orderIds.isEmpty) return {};
       final paidMap = await _paymentsDao.getTotalPaidForOrders(orderIds);
@@ -144,7 +156,9 @@ class PaymentRepositoryImpl implements PaymentRepository {
         final remainingPiastres = order.total - paidPiastres;
         summaries[order.id] = OrderPaymentSummary(
           totalPaid: Money.fromPiastres(paidPiastres),
-          remaining: Money.fromPiastres(remainingPiastres > 0 ? remainingPiastres : 0),
+          remaining: Money.fromPiastres(
+            remainingPiastres > 0 ? remainingPiastres : 0,
+          ),
         );
       }
       return summaries;

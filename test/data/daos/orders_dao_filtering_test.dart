@@ -4,7 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/data/local/daos/customers_dao.dart';
 import 'package:laundry_management/data/local/daos/orders_dao.dart';
 import 'package:laundry_management/data/local/daos/payments_dao.dart';
-import 'package:laundry_management/data/local/database/app_database.dart' as db_pkg;
+import 'package:laundry_management/data/local/database/app_database.dart'
+    as db_pkg;
 import 'package:laundry_management/domain/enums/order_status.dart';
 
 void main() {
@@ -144,15 +145,21 @@ void main() {
 
   group('OrdersDao Database-Level Filtering & Search', () {
     test('filters by status at SQL level', () async {
-      final readyOrders = await ordersDao.getOrders(status: OrderStatus.ready.value);
+      final readyOrders = await ordersDao.getOrders(
+        status: OrderStatus.ready.value,
+      );
       expect(readyOrders.length, 1);
       expect(readyOrders.first.id, 'ord-2');
 
-      final processingOrders = await ordersDao.getOrders(status: OrderStatus.processing.value);
+      final processingOrders = await ordersDao.getOrders(
+        status: OrderStatus.processing.value,
+      );
       expect(processingOrders.length, 1);
       expect(processingOrders.first.id, 'ord-1');
 
-      final completedOrders = await ordersDao.getOrders(status: OrderStatus.completed.value);
+      final completedOrders = await ordersDao.getOrders(
+        status: OrderStatus.completed.value,
+      );
       expect(completedOrders.length, 1);
       expect(completedOrders.first.id, 'ord-3');
     });
@@ -200,18 +207,21 @@ void main() {
       expect(ids, containsAll(['ord-1', 'ord-2']));
     });
 
-    test('orders by createdAt DESC (newest first) and supports limit/offset pagination', () async {
-      // Page 1 (limit 2, offset 0) -> should be ord-4 and ord-3
-      final page1 = await ordersDao.getOrders(limit: 2, offset: 0);
-      expect(page1.length, 2);
-      expect(page1[0].id, 'ord-4');
-      expect(page1[1].id, 'ord-3');
+    test(
+      'orders by createdAt DESC (newest first) and supports limit/offset pagination',
+      () async {
+        // Page 1 (limit 2, offset 0) -> should be ord-4 and ord-3
+        final page1 = await ordersDao.getOrders(limit: 2, offset: 0);
+        expect(page1.length, 2);
+        expect(page1[0].id, 'ord-4');
+        expect(page1[1].id, 'ord-3');
 
-      // Page 2 (limit 2, offset 2) -> should be ord-2 and ord-1
-      final page2 = await ordersDao.getOrders(limit: 2, offset: 2);
-      expect(page2.length, 2);
-      expect(page2[0].id, 'ord-2');
-      expect(page2[1].id, 'ord-1');
-    });
+        // Page 2 (limit 2, offset 2) -> should be ord-2 and ord-1
+        final page2 = await ordersDao.getOrders(limit: 2, offset: 2);
+        expect(page2.length, 2);
+        expect(page2[0].id, 'ord-2');
+        expect(page2[1].id, 'ord-1');
+      },
+    );
   });
 }

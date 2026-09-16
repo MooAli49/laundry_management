@@ -18,32 +18,38 @@ class CustomerDetailViewModel {
     Map<String, OrderPaymentSummary>? paymentSummaries,
     Map<String, Money>? remainingAmounts,
     Map<String, Money>? paidAmounts,
-  })  : aggregate = aggregate ??
-            CustomerOrderAggregate(
-              totalOrders: orders.length,
-              processingOrders:
-                  orders.where((o) => o.status == OrderStatus.processing).length,
-              readyOrders:
-                  orders.where((o) => o.status == OrderStatus.ready).length,
-              completedOrders:
-                  orders.where((o) => o.status == OrderStatus.completed).length,
-              cancelledOrders:
-                  orders.where((o) => o.status == OrderStatus.cancelled).length,
-              totalPaid: paidAmounts != null
-                  ? paidAmounts.values.fold(Money.zero, (sum, p) => sum + p)
-                  : Money.zero,
-              totalRemaining: remainingAmounts != null
-                  ? remainingAmounts.values.fold(Money.zero, (sum, r) => sum + r)
-                  : Money.zero,
-            ),
-        paymentSummaries = paymentSummaries ??
-            {
-              for (final order in orders)
-                order.id: OrderPaymentSummary(
-                  totalPaid: paidAmounts?[order.id] ?? Money.zero,
-                  remaining: remainingAmounts?[order.id] ?? Money.zero,
-                ),
-            };
+  }) : aggregate =
+           aggregate ??
+           CustomerOrderAggregate(
+             totalOrders: orders.length,
+             processingOrders: orders
+                 .where((o) => o.status == OrderStatus.processing)
+                 .length,
+             readyOrders: orders
+                 .where((o) => o.status == OrderStatus.ready)
+                 .length,
+             completedOrders: orders
+                 .where((o) => o.status == OrderStatus.completed)
+                 .length,
+             cancelledOrders: orders
+                 .where((o) => o.status == OrderStatus.cancelled)
+                 .length,
+             totalPaid: paidAmounts != null
+                 ? paidAmounts.values.fold(Money.zero, (sum, p) => sum + p)
+                 : Money.zero,
+             totalRemaining: remainingAmounts != null
+                 ? remainingAmounts.values.fold(Money.zero, (sum, r) => sum + r)
+                 : Money.zero,
+           ),
+       paymentSummaries =
+           paymentSummaries ??
+           {
+             for (final order in orders)
+               order.id: OrderPaymentSummary(
+                 totalPaid: paidAmounts?[order.id] ?? Money.zero,
+                 remaining: remainingAmounts?[order.id] ?? Money.zero,
+               ),
+           };
 
   int get totalOrdersCount => aggregate.totalOrders;
   int get activeOrdersCount => aggregate.activeOrders;
@@ -54,12 +60,14 @@ class CustomerDetailViewModel {
   Money get totalRemaining => aggregate.totalRemaining;
 
   Map<String, Money> get remainingAmounts => {
-        for (final entry in paymentSummaries.entries) entry.key: entry.value.remaining,
-      };
+    for (final entry in paymentSummaries.entries)
+      entry.key: entry.value.remaining,
+  };
 
   Map<String, Money> get paidAmounts => {
-        for (final entry in paymentSummaries.entries) entry.key: entry.value.totalPaid,
-      };
+    for (final entry in paymentSummaries.entries)
+      entry.key: entry.value.totalPaid,
+  };
 
   Order? get latestOrder => orders.isNotEmpty ? orders.first : null;
 

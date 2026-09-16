@@ -28,8 +28,9 @@ class ExpenseCategoriesManagementState {
       categories: categories ?? this.categories,
       isLoading: isLoading ?? this.isLoading,
       isActionInProgress: isActionInProgress ?? this.isActionInProgress,
-      errorMessage:
-          clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
       actionSuccessMessage: clearSuccessMessage
           ? null
           : (actionSuccessMessage ?? this.actionSuccessMessage),

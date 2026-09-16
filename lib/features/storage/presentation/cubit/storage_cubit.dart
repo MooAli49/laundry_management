@@ -39,14 +39,14 @@ class StorageCubit extends Cubit<StorageState> {
     required StoreOrderItemsUseCase storeOrderItemsUseCase,
     required MoveStoredItemUseCase moveStoredItemUseCase,
     required UnstoreItemUseCase unstoreItemUseCase,
-  })  : _storageRepository = storageRepository,
-        _storageLocationRepository = storageLocationRepository,
-        _itemTypeRepository = itemTypeRepository,
-        _serviceRepository = serviceRepository,
-        _storeOrderItemsUseCase = storeOrderItemsUseCase,
-        _moveStoredItemUseCase = moveStoredItemUseCase,
-        _unstoreItemUseCase = unstoreItemUseCase,
-        super(const StorageState());
+  }) : _storageRepository = storageRepository,
+       _storageLocationRepository = storageLocationRepository,
+       _itemTypeRepository = itemTypeRepository,
+       _serviceRepository = serviceRepository,
+       _storeOrderItemsUseCase = storeOrderItemsUseCase,
+       _moveStoredItemUseCase = moveStoredItemUseCase,
+       _unstoreItemUseCase = unstoreItemUseCase,
+       super(const StorageState());
 
   bool _isStaleLoadMore(int requestId) {
     if (requestId != _searchRequestId) {
@@ -69,35 +69,37 @@ class StorageCubit extends Cubit<StorageState> {
 
       final Map<String, List<StorageLocation>> compatibleByItemType = {};
       for (final type in itemTypes) {
-        final compatible =
-            await _storageLocationRepository.getCompatibleLocationsForItemType(type.id);
+        final compatible = await _storageLocationRepository
+            .getCompatibleLocationsForItemType(type.id);
         compatibleByItemType[type.id] = compatible;
       }
 
-      emit(state.copyWith(
-        availableLocations: locations,
-        compatibleLocationsByItemType: compatibleByItemType,
-        itemTypes: itemTypes,
-        services: services,
-        orderFilterId: initialOrderId,
-        searchQuery: initialOrderNumber ?? state.searchQuery,
-      ));
+      emit(
+        state.copyWith(
+          availableLocations: locations,
+          compatibleLocationsByItemType: compatibleByItemType,
+          itemTypes: itemTypes,
+          services: services,
+          orderFilterId: initialOrderId,
+          searchQuery: initialOrderNumber ?? state.searchQuery,
+        ),
+      );
 
       await loadStorageItems();
     } catch (_) {
-      emit(state.copyWith(
-        errorMessage: AppStrings.failedToLoadStorage,
-      ));
+      emit(state.copyWith(errorMessage: AppStrings.failedToLoadStorage));
     }
   }
 
   Future<void> loadStorageItems({bool refresh = false}) async {
     final requestId = ++_searchRequestId;
-    emit(state.copyWith(
-      isLoading: true,
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        isLoading: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
 
     try {
       final rawQuery = state.searchQuery.trim();
@@ -105,16 +107,17 @@ class StorageCubit extends Cubit<StorageState> {
       final f = state.filter;
 
       if (state.activeTab == StorageTab.requiringStorage) {
-        final items = await _storageRepository.getItemsRequiringStorageWithDetails(
-          query: query,
-          orderId: state.orderFilterId,
-          itemTypeId: f.itemTypeId,
-          serviceId: f.serviceId,
-          expectedPickupDate: f.expectedPickupDate,
-          orderReceivedDate: f.orderReceivedDate,
-          limit: _pageSize,
-          offset: 0,
-        );
+        final items = await _storageRepository
+            .getItemsRequiringStorageWithDetails(
+              query: query,
+              orderId: state.orderFilterId,
+              itemTypeId: f.itemTypeId,
+              serviceId: f.serviceId,
+              expectedPickupDate: f.expectedPickupDate,
+              orderReceivedDate: f.orderReceivedDate,
+              limit: _pageSize,
+              offset: 0,
+            );
 
         final totalCount = await _storageRepository.countItemsRequiringStorage(
           query: query,
@@ -128,13 +131,15 @@ class StorageCubit extends Cubit<StorageState> {
         if (isClosed || requestId != _searchRequestId) return;
 
         final hasMore = items.length == _pageSize && items.length < totalCount;
-        emit(state.copyWith(
-          items: items,
-          totalCount: totalCount,
-          hasMore: hasMore,
-          isLoading: false,
-          isLoadingMore: false,
-        ));
+        emit(
+          state.copyWith(
+            items: items,
+            totalCount: totalCount,
+            hasMore: hasMore,
+            isLoading: false,
+            isLoadingMore: false,
+          ),
+        );
       } else {
         final items = await _storageRepository.getCurrentStorageItems(
           query: query,
@@ -161,28 +166,34 @@ class StorageCubit extends Cubit<StorageState> {
         if (isClosed || requestId != _searchRequestId) return;
 
         final hasMore = items.length == _pageSize && items.length < totalCount;
-        emit(state.copyWith(
-          items: items,
-          totalCount: totalCount,
-          hasMore: hasMore,
-          isLoading: false,
-          isLoadingMore: false,
-        ));
+        emit(
+          state.copyWith(
+            items: items,
+            totalCount: totalCount,
+            hasMore: hasMore,
+            isLoading: false,
+            isLoadingMore: false,
+          ),
+        );
       }
     } on Failure catch (e) {
       if (isClosed || requestId != _searchRequestId) return;
-      emit(state.copyWith(
-        isLoading: false,
-        isLoadingMore: false,
-        errorMessage: e.message,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          isLoadingMore: false,
+          errorMessage: e.message,
+        ),
+      );
     } catch (_) {
       if (isClosed || requestId != _searchRequestId) return;
-      emit(state.copyWith(
-        isLoading: false,
-        isLoadingMore: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          isLoadingMore: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 
@@ -202,28 +213,32 @@ class StorageCubit extends Cubit<StorageState> {
       final f = state.filter;
 
       if (state.activeTab == StorageTab.requiringStorage) {
-        final nextItems = await _storageRepository.getItemsRequiringStorageWithDetails(
-          query: query,
-          orderId: state.orderFilterId,
-          itemTypeId: f.itemTypeId,
-          serviceId: f.serviceId,
-          expectedPickupDate: f.expectedPickupDate,
-          orderReceivedDate: f.orderReceivedDate,
-          limit: _pageSize,
-          offset: currentCount,
-        );
+        final nextItems = await _storageRepository
+            .getItemsRequiringStorageWithDetails(
+              query: query,
+              orderId: state.orderFilterId,
+              itemTypeId: f.itemTypeId,
+              serviceId: f.serviceId,
+              expectedPickupDate: f.expectedPickupDate,
+              orderReceivedDate: f.orderReceivedDate,
+              limit: _pageSize,
+              offset: currentCount,
+            );
 
         if (isClosed) return;
         if (_isStaleLoadMore(requestId)) return;
 
         final totalLoaded = currentCount + nextItems.length;
-        final hasMore = nextItems.length == _pageSize && totalLoaded < state.totalCount;
+        final hasMore =
+            nextItems.length == _pageSize && totalLoaded < state.totalCount;
 
-        emit(state.copyWith(
-          items: [...state.items, ...nextItems],
-          isLoadingMore: false,
-          hasMore: hasMore,
-        ));
+        emit(
+          state.copyWith(
+            items: [...state.items, ...nextItems],
+            isLoadingMore: false,
+            hasMore: hasMore,
+          ),
+        );
       } else {
         final nextItems = await _storageRepository.getCurrentStorageItems(
           query: query,
@@ -241,28 +256,30 @@ class StorageCubit extends Cubit<StorageState> {
         if (_isStaleLoadMore(requestId)) return;
 
         final totalLoaded = currentCount + nextItems.length;
-        final hasMore = nextItems.length == _pageSize && totalLoaded < state.totalCount;
+        final hasMore =
+            nextItems.length == _pageSize && totalLoaded < state.totalCount;
 
-        emit(state.copyWith(
-          items: [...state.items, ...nextItems],
-          isLoadingMore: false,
-          hasMore: hasMore,
-        ));
+        emit(
+          state.copyWith(
+            items: [...state.items, ...nextItems],
+            isLoadingMore: false,
+            hasMore: hasMore,
+          ),
+        );
       }
     } on Failure catch (e) {
       if (isClosed) return;
       if (_isStaleLoadMore(requestId)) return;
-      emit(state.copyWith(
-        isLoadingMore: false,
-        errorMessage: e.message,
-      ));
+      emit(state.copyWith(isLoadingMore: false, errorMessage: e.message));
     } catch (_) {
       if (isClosed) return;
       if (_isStaleLoadMore(requestId)) return;
-      emit(state.copyWith(
-        isLoadingMore: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isLoadingMore: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 
@@ -281,14 +298,16 @@ class StorageCubit extends Cubit<StorageState> {
     if (tab == state.activeTab) return;
     _debounceTimer?.cancel();
     _searchRequestId++;
-    emit(state.copyWith(
-      activeTab: tab,
-      selectedItemIds: {},
-      filter: StorageFilter.empty,
-      items: [],
-      totalCount: 0,
-      hasMore: false,
-    ));
+    emit(
+      state.copyWith(
+        activeTab: tab,
+        selectedItemIds: {},
+        filter: StorageFilter.empty,
+        items: [],
+        totalCount: 0,
+        hasMore: false,
+      ),
+    );
     loadStorageItems();
   }
 
@@ -302,11 +321,13 @@ class StorageCubit extends Cubit<StorageState> {
   void resetFilters() {
     _debounceTimer?.cancel();
     _searchRequestId++;
-    emit(state.copyWith(
-      filter: StorageFilter.empty,
-      searchQuery: '',
-      clearOrderFilterId: true,
-    ));
+    emit(
+      state.copyWith(
+        filter: StorageFilter.empty,
+        searchQuery: '',
+        clearOrderFilterId: true,
+      ),
+    );
     loadStorageItems();
   }
 
@@ -338,53 +359,81 @@ class StorageCubit extends Cubit<StorageState> {
     required String storageLocationId,
     String? orderId,
   }) async {
-    emit(state.copyWith(isActionInProgress: true, clearErrorMessage: true, clearSuccessMessage: true));
+    emit(
+      state.copyWith(
+        isActionInProgress: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
     try {
-      await _storeOrderItemsUseCase.execute(StoreOrderItemsInput(
-        orderId: orderId,
-        orderItemIds: [orderItemId],
-        storageLocationId: storageLocationId,
-      ));
+      await _storeOrderItemsUseCase.execute(
+        StoreOrderItemsInput(
+          orderId: orderId,
+          orderItemIds: [orderItemId],
+          storageLocationId: storageLocationId,
+        ),
+      );
 
       await loadStorageItems(refresh: true);
-      emit(state.copyWith(
-        isActionInProgress: false,
-        successMessage: AppStrings.storeItemSuccess,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          successMessage: AppStrings.storeItemSuccess,
+        ),
+      );
     } on Failure catch (e) {
       emit(state.copyWith(isActionInProgress: false, errorMessage: e.message));
       rethrow;
     } catch (_) {
-      emit(state.copyWith(isActionInProgress: false, errorMessage: AppStrings.unexpectedError));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
       rethrow;
     }
   }
 
-  Future<void> bulkStoreSelected({
-    required String storageLocationId,
-  }) async {
+  Future<void> bulkStoreSelected({required String storageLocationId}) async {
     if (state.selectedItemIds.isEmpty) {
       throw const ValidationFailure(AppStrings.selectAtLeastOneItem);
     }
 
-    emit(state.copyWith(isActionInProgress: true, clearErrorMessage: true, clearSuccessMessage: true));
+    emit(
+      state.copyWith(
+        isActionInProgress: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
     try {
-      await _storeOrderItemsUseCase.execute(StoreOrderItemsInput(
-        orderItemIds: state.selectedItemIds.toList(),
-        storageLocationId: storageLocationId,
-      ));
+      await _storeOrderItemsUseCase.execute(
+        StoreOrderItemsInput(
+          orderItemIds: state.selectedItemIds.toList(),
+          storageLocationId: storageLocationId,
+        ),
+      );
 
       await loadStorageItems(refresh: true);
-      emit(state.copyWith(
-        isActionInProgress: false,
-        selectedItemIds: {},
-        successMessage: AppStrings.storeItemsSuccess,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          selectedItemIds: {},
+          successMessage: AppStrings.storeItemsSuccess,
+        ),
+      );
     } on Failure catch (e) {
       emit(state.copyWith(isActionInProgress: false, errorMessage: e.message));
       rethrow;
     } catch (_) {
-      emit(state.copyWith(isActionInProgress: false, errorMessage: AppStrings.unexpectedError));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
       rethrow;
     }
   }
@@ -393,46 +442,72 @@ class StorageCubit extends Cubit<StorageState> {
     required String orderItemId,
     required String newStorageLocationId,
   }) async {
-    emit(state.copyWith(isActionInProgress: true, clearErrorMessage: true, clearSuccessMessage: true));
+    emit(
+      state.copyWith(
+        isActionInProgress: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
     try {
-      await _moveStoredItemUseCase.execute(MoveStoredItemInput(
-        orderItemId: orderItemId,
-        newStorageLocationId: newStorageLocationId,
-      ));
+      await _moveStoredItemUseCase.execute(
+        MoveStoredItemInput(
+          orderItemId: orderItemId,
+          newStorageLocationId: newStorageLocationId,
+        ),
+      );
 
       await loadStorageItems(refresh: true);
-      emit(state.copyWith(
-        isActionInProgress: false,
-        successMessage: AppStrings.moveItemSuccess,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          successMessage: AppStrings.moveItemSuccess,
+        ),
+      );
     } on Failure catch (e) {
       emit(state.copyWith(isActionInProgress: false, errorMessage: e.message));
       rethrow;
     } catch (_) {
-      emit(state.copyWith(isActionInProgress: false, errorMessage: AppStrings.unexpectedError));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
       rethrow;
     }
   }
 
-  Future<void> unstoreItem({
-    required String orderItemId,
-  }) async {
-    emit(state.copyWith(isActionInProgress: true, clearErrorMessage: true, clearSuccessMessage: true));
+  Future<void> unstoreItem({required String orderItemId}) async {
+    emit(
+      state.copyWith(
+        isActionInProgress: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
     try {
-      await _unstoreItemUseCase.execute(UnstoreItemInput(
-        orderItemId: orderItemId,
-      ));
+      await _unstoreItemUseCase.execute(
+        UnstoreItemInput(orderItemId: orderItemId),
+      );
 
       await loadStorageItems(refresh: true);
-      emit(state.copyWith(
-        isActionInProgress: false,
-        successMessage: AppStrings.unstoreItemSuccess,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          successMessage: AppStrings.unstoreItemSuccess,
+        ),
+      );
     } on Failure catch (e) {
       emit(state.copyWith(isActionInProgress: false, errorMessage: e.message));
       rethrow;
     } catch (_) {
-      emit(state.copyWith(isActionInProgress: false, errorMessage: AppStrings.unexpectedError));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
       rethrow;
     }
   }

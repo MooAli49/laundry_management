@@ -51,16 +51,15 @@ class _CustomersViewState extends State<_CustomersView> {
       context: context,
       builder: (dialogContext) {
         return CustomerFormDialog(
-          onSave: ({required name, required phone, notes}) => cubit.createCustomer(
-            name: name,
-            phone: phone,
-            notes: notes,
-          ),
+          onSave: ({required name, required phone, notes}) =>
+              cubit.createCustomer(name: name, phone: phone, notes: notes),
           onFindDuplicate: cubit.getCustomerByPhone,
           onViewExisting: (existingCustomer) {
-            context.push(AppRoutes.customerDetailPath(existingCustomer.id)).then((_) {
-              if (mounted) cubit.loadCustomers();
-            });
+            context
+                .push(AppRoutes.customerDetailPath(existingCustomer.id))
+                .then((_) {
+                  if (mounted) cubit.loadCustomers();
+                });
           },
         );
       },
@@ -85,7 +84,9 @@ class _CustomersViewState extends State<_CustomersView> {
               builder: (context, state) {
                 return PageHeader(
                   title: AppStrings.customers,
-                  subtitle: AppStrings.totalCustomersCount(state.totalCustomersCount),
+                  subtitle: AppStrings.totalCustomersCount(
+                    state.totalCustomersCount,
+                  ),
                   actions: [
                     AppButton(
                       label: AppStrings.addCustomer,
@@ -139,7 +140,9 @@ class _CustomersViewState extends State<_CustomersView> {
                   if (state.customers.isEmpty) {
                     final isSearching = state.searchQuery.isNotEmpty;
                     return EmptyState(
-                      icon: isSearching ? Icons.search_off : Icons.people_outline,
+                      icon: isSearching
+                          ? Icons.search_off
+                          : Icons.people_outline,
                       title: isSearching
                           ? AppStrings.noMatchingResults
                           : AppStrings.noCustomersYet,
@@ -177,34 +180,38 @@ class _CustomersViewState extends State<_CustomersView> {
                             SliverGrid(
                               gridDelegate:
                                   SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: crossAxisCount,
-                                crossAxisSpacing: AppSpacing.md,
-                                mainAxisSpacing: AppSpacing.sm,
-                                mainAxisExtent: 88,
-                              ),
-                              delegate: SliverChildBuilderDelegate(
-                                (context, index) {
-                                  final item = state.customers[index];
-                                  return CustomerCard(
-                                    item: item,
-                                    onTap: () {
-                                      context
-                                          .push(AppRoutes.customerDetailPath(
-                                              item.customer.id))
-                                          .then((_) {
-                                        if (mounted) cubit.loadCustomers();
-                                      });
-                                    },
-                                  );
-                                },
-                                childCount: state.customers.length,
-                              ),
+                                    crossAxisCount: crossAxisCount,
+                                    crossAxisSpacing: AppSpacing.md,
+                                    mainAxisSpacing: AppSpacing.sm,
+                                    mainAxisExtent: 88,
+                                  ),
+                              delegate: SliverChildBuilderDelegate((
+                                context,
+                                index,
+                              ) {
+                                final item = state.customers[index];
+                                return CustomerCard(
+                                  item: item,
+                                  onTap: () {
+                                    context
+                                        .push(
+                                          AppRoutes.customerDetailPath(
+                                            item.customer.id,
+                                          ),
+                                        )
+                                        .then((_) {
+                                          if (mounted) cubit.loadCustomers();
+                                        });
+                                  },
+                                );
+                              }, childCount: state.customers.length),
                             ),
                             if (state.hasMoreCustomers)
                               SliverToBoxAdapter(
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
-                                      vertical: AppSpacing.lg),
+                                    vertical: AppSpacing.lg,
+                                  ),
                                   child: Center(
                                     child: AppButton(
                                       label: AppStrings.loadMoreCustomers,

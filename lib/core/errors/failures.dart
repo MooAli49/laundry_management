@@ -53,9 +53,9 @@ class OrderNotFullyPaidFailure extends BusinessRuleFailure {
     required this.remainingAmount,
     String? message,
   }) : super(
-          message ??
-              'Order $orderId has remaining unpaid balance of $remainingAmount EGP',
-        );
+         message ??
+             'Order $orderId has remaining unpaid balance of $remainingAmount EGP',
+       );
 }
 
 class IncompatibleServiceFailure extends BusinessRuleFailure {
@@ -66,9 +66,7 @@ class IncompatibleServiceFailure extends BusinessRuleFailure {
     required this.serviceId,
     required this.itemTypeId,
     String? message,
-  }) : super(
-          message ?? 'الخدمة المحددة غير متوافقة مع نوع العنصر',
-        );
+  }) : super(message ?? 'الخدمة المحددة غير متوافقة مع نوع العنصر');
 }
 
 class IncompatibleStorageLocationFailure extends BusinessRuleFailure {
@@ -79,9 +77,7 @@ class IncompatibleStorageLocationFailure extends BusinessRuleFailure {
     required this.storageLocationId,
     required this.itemTypeId,
     String? message,
-  }) : super(
-          message ?? 'الموقع المحدد غير متوافق مع نوع العنصر',
-        );
+  }) : super(message ?? 'الموقع المحدد غير متوافق مع نوع العنصر');
 }
 
 class DuplicateCustomerPhoneFailure extends ValidationFailure {
@@ -96,4 +92,3 @@ class DuplicateCustomerPhoneFailure extends ValidationFailure {
 class UnexpectedFailure extends Failure {
   const UnexpectedFailure([super.message = AppStrings.unexpectedError]);
 }
-

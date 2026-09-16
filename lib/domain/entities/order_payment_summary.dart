@@ -4,10 +4,7 @@ class OrderPaymentSummary {
   final Money totalPaid;
   final Money remaining;
 
-  const OrderPaymentSummary({
-    required this.totalPaid,
-    required this.remaining,
-  });
+  const OrderPaymentSummary({required this.totalPaid, required this.remaining});
 
   static const zero = OrderPaymentSummary(
     totalPaid: Money.zero,

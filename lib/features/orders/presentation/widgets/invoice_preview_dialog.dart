@@ -75,7 +75,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final businessName = (widget.settings?.businessName != null && widget.settings!.businessName.trim().isNotEmpty)
+    final businessName =
+        (widget.settings?.businessName != null &&
+            widget.settings!.businessName.trim().isNotEmpty)
         ? widget.settings!.businessName
         : AppStrings.defaultBusinessName;
     final address = widget.settings?.address;
@@ -100,7 +102,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                 children: [
                   Text('معاينة الفاتورة', style: AppTextStyles.titleLarge),
                   IconButton(
-                    onPressed: _isPrinting ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isPrinting
+                        ? null
+                        : () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close),
                   ),
                 ],
@@ -129,7 +133,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                                 height: 48,
                                 decoration: BoxDecoration(
                                   color: AppColors.primaryLighter,
-                                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                                  borderRadius: BorderRadius.circular(
+                                    AppSpacing.radiusMd,
+                                  ),
                                 ),
                                 child: const Icon(
                                   Icons.local_laundry_service_outlined,
@@ -145,24 +151,32 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                                   color: AppColors.primary,
                                 ),
                               ),
-                              if (address != null && address.trim().isNotEmpty) ...[
+                              if (address != null &&
+                                  address.trim().isNotEmpty) ...[
                                 const SizedBox(height: 2),
                                 Text(
                                   address,
-                                  style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
+                                  style: AppTextStyles.labelSmall.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
                               ],
                               if (phone != null && phone.trim().isNotEmpty) ...[
                                 const SizedBox(height: 2),
                                 Text(
                                   'هاتف: $phone',
-                                  style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
+                                  style: AppTextStyles.labelSmall.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
                               ],
                             ],
                           ),
                         ),
-                        const Divider(height: AppSpacing.xxl, color: AppColors.divider),
+                        const Divider(
+                          height: AppSpacing.xxl,
+                          color: AppColors.divider,
+                        ),
 
                         // Order & Customer Meta
                         Row(
@@ -173,12 +187,16 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                               children: [
                                 Text(
                                   'فاتورة #${widget.order.orderNumber}',
-                                  style: AppTextStyles.titleLarge.copyWith(fontWeight: FontWeight.bold),
+                                  style: AppTextStyles.titleLarge.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                                 AppSpacing.gapXs,
                                 Text(
                                   'التاريخ: ${DateFormatter.formatArabicDate(widget.order.createdAt)}',
-                                  style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
+                                  style: AppTextStyles.labelSmall.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
                               ],
                             ),
@@ -191,7 +209,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           padding: const EdgeInsets.all(AppSpacing.md),
                           decoration: BoxDecoration(
                             color: AppColors.backgroundSecondary,
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusMd,
+                            ),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -201,20 +221,34 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                                 children: [
                                   Text(
                                     'بيانات العميل',
-                                    style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
+                                    style: AppTextStyles.labelSmall.copyWith(
+                                      color: AppColors.textTertiary,
+                                    ),
                                   ),
                                   Text(
                                     widget.order.customerNameSnapshot.isNotEmpty
                                         ? widget.order.customerNameSnapshot
-                                        : (widget.customer?.name ?? 'عميل غير مسجل'),
-                                    style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+                                        : (widget.customer?.name ??
+                                              'عميل غير مسجل'),
+                                    style: AppTextStyles.bodyMedium.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
-                                  if (widget.order.customerPhoneSnapshot.isNotEmpty || widget.customer?.phone != null)
+                                  if (widget
+                                          .order
+                                          .customerPhoneSnapshot
+                                          .isNotEmpty ||
+                                      widget.customer?.phone != null)
                                     Text(
-                                      widget.order.customerPhoneSnapshot.isNotEmpty
+                                      widget
+                                              .order
+                                              .customerPhoneSnapshot
+                                              .isNotEmpty
                                           ? widget.order.customerPhoneSnapshot
                                           : widget.customer!.phone,
-                                      style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
+                                      style: AppTextStyles.labelSmall.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
                                     ),
                                 ],
                               ),
@@ -223,11 +257,18 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                                 children: [
                                   Text(
                                     'موعد الاستلام',
-                                    style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
+                                    style: AppTextStyles.labelSmall.copyWith(
+                                      color: AppColors.textTertiary,
+                                    ),
                                   ),
                                   Text(
-                                    DateFormatter.formatArabicDate(widget.order.expectedPickupDate.toDateTime()),
-                                    style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+                                    DateFormatter.formatArabicDate(
+                                      widget.order.expectedPickupDate
+                                          .toDateTime(),
+                                    ),
+                                    style: AppTextStyles.bodyMedium.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -239,7 +280,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         // Itemized Table
                         Builder(
                           builder: (context) {
-                            final lines = InvoicePrinter.groupItems(widget.items);
+                            final lines = InvoicePrinter.groupItems(
+                              widget.items,
+                            );
                             return Table(
                               columnWidths: const {
                                 0: FlexColumnWidth(4),
@@ -250,39 +293,69 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                               children: [
                                 TableRow(
                                   decoration: const BoxDecoration(
-                                    border: Border(bottom: BorderSide(color: AppColors.border, width: 1.5)),
+                                    border: Border(
+                                      bottom: BorderSide(
+                                        color: AppColors.border,
+                                        width: 1.5,
+                                      ),
+                                    ),
                                   ),
                                   children: [
                                     _tableHeader('البند والخدمة'),
-                                    _tableHeader('الكمية', align: TextAlign.center),
-                                    _tableHeader('سعر الوحدة', align: TextAlign.end),
-                                    _tableHeader('الإجمالي', align: TextAlign.end),
+                                    _tableHeader(
+                                      'الكمية',
+                                      align: TextAlign.center,
+                                    ),
+                                    _tableHeader(
+                                      'سعر الوحدة',
+                                      align: TextAlign.end,
+                                    ),
+                                    _tableHeader(
+                                      'الإجمالي',
+                                      align: TextAlign.end,
+                                    ),
                                   ],
                                 ),
                                 ...lines.map((line) {
                                   return TableRow(
                                     children: [
                                       Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: AppSpacing.sm,
+                                        ),
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
-                                            Text(line.title, style: AppTextStyles.bodyMedium),
+                                            Text(
+                                              line.title,
+                                              style: AppTextStyles.bodyMedium,
+                                            ),
                                             if (line.dimensionsSubtext != null)
                                               Text(
                                                 line.dimensionsSubtext!,
-                                                style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
+                                                style: AppTextStyles.labelSmall
+                                                    .copyWith(
+                                                      color: AppColors
+                                                          .textTertiary,
+                                                    ),
                                               ),
                                             if (line.notes != null)
                                               Text(
                                                 'ملاحظة: ${line.notes!}',
-                                                style: AppTextStyles.labelSmall.copyWith(color: AppColors.textTertiary),
+                                                style: AppTextStyles.labelSmall
+                                                    .copyWith(
+                                                      color: AppColors
+                                                          .textTertiary,
+                                                    ),
                                               ),
                                           ],
                                         ),
                                       ),
                                       Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: AppSpacing.sm,
+                                        ),
                                         child: Text(
                                           line.quantityDisplay,
                                           style: AppTextStyles.bodyMedium,
@@ -290,7 +363,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                                         ),
                                       ),
                                       Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: AppSpacing.sm,
+                                        ),
                                         child: Text(
                                           '${line.unitPrice.toEgp.toStringAsFixed(2)} ج.م',
                                           style: AppTextStyles.bodyMedium,
@@ -298,10 +373,15 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                                         ),
                                       ),
                                       Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: AppSpacing.sm,
+                                        ),
                                         child: Text(
                                           '${line.calculatedTotal.toEgp.toStringAsFixed(2)} ج.م',
-                                          style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+                                          style: AppTextStyles.bodyMedium
+                                              .copyWith(
+                                                fontWeight: FontWeight.w600,
+                                              ),
                                           textAlign: TextAlign.end,
                                         ),
                                       ),
@@ -312,7 +392,10 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                             );
                           },
                         ),
-                        const Divider(height: AppSpacing.xl, color: AppColors.divider),
+                        const Divider(
+                          height: AppSpacing.xl,
+                          color: AppColors.divider,
+                        ),
 
                         // Financial Summary
                         Align(
@@ -321,23 +404,50 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                             width: 280,
                             child: Column(
                               children: [
-                                _summaryRow('المجموع الفرعي:', '${widget.order.subtotal.toEgp.toStringAsFixed(2)} ج.م'),
+                                _summaryRow(
+                                  'المجموع الفرعي:',
+                                  '${widget.order.subtotal.toEgp.toStringAsFixed(2)} ج.م',
+                                ),
                                 if (widget.order.discount.isPositive)
-                                  _summaryRow('الخصم:', '- ${widget.order.discount.toEgp.toStringAsFixed(2)} ج.م', isNegative: true),
-                                if (widget.order.customerPickupRequested && widget.order.customerPickupFee.isPositive)
-                                  _summaryRow('استلام من العميل:', '+ ${widget.order.customerPickupFee.toEgp.toStringAsFixed(2)} ج.م'),
-                                if (widget.order.customerDeliveryRequested && widget.order.customerDeliveryFee.isPositive)
-                                  _summaryRow('توصيل للعميل:', '+ ${widget.order.customerDeliveryFee.toEgp.toStringAsFixed(2)} ج.م'),
+                                  _summaryRow(
+                                    'الخصم:',
+                                    '- ${widget.order.discount.toEgp.toStringAsFixed(2)} ج.م',
+                                    isNegative: true,
+                                  ),
+                                if (widget.order.customerPickupRequested &&
+                                    widget.order.customerPickupFee.isPositive)
+                                  _summaryRow(
+                                    'استلام من العميل:',
+                                    '+ ${widget.order.customerPickupFee.toEgp.toStringAsFixed(2)} ج.م',
+                                  ),
+                                if (widget.order.customerDeliveryRequested &&
+                                    widget.order.customerDeliveryFee.isPositive)
+                                  _summaryRow(
+                                    'توصيل للعميل:',
+                                    '+ ${widget.order.customerDeliveryFee.toEgp.toStringAsFixed(2)} ج.م',
+                                  ),
                                 if (widget.order.tax.isPositive)
-                                  _summaryRow('الضريبة:', '+ ${widget.order.tax.toEgp.toStringAsFixed(2)} ج.م'),
+                                  _summaryRow(
+                                    'الضريبة:',
+                                    '+ ${widget.order.tax.toEgp.toStringAsFixed(2)} ج.م',
+                                  ),
                                 const Divider(height: AppSpacing.md),
-                                _summaryRow('الإجمالي:', '${widget.order.total.toEgp.toStringAsFixed(2)} ج.م', isBold: true),
-                                _summaryRow('المدفوع:', '${widget.totalPaid.toEgp.toStringAsFixed(2)} ج.م'),
+                                _summaryRow(
+                                  'الإجمالي:',
+                                  '${widget.order.total.toEgp.toStringAsFixed(2)} ج.م',
+                                  isBold: true,
+                                ),
+                                _summaryRow(
+                                  'المدفوع:',
+                                  '${widget.totalPaid.toEgp.toStringAsFixed(2)} ج.م',
+                                ),
                                 _summaryRow(
                                   'المتبقي:',
                                   '${widget.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
                                   isBold: true,
-                                  color: widget.remainingAmount.isZero ? AppColors.success : AppColors.warning,
+                                  color: widget.remainingAmount.isZero
+                                      ? AppColors.success
+                                      : AppColors.warning,
                                 ),
                               ],
                             ),
@@ -370,7 +480,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                   AppButton(
                     label: 'إغلاق',
                     variant: AppButtonVariant.secondary,
-                    onPressed: _isPrinting ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isPrinting
+                        ? null
+                        : () => Navigator.of(context).pop(),
                   ),
                   AppSpacing.gapHorizontalMd,
                   AppButton(
@@ -390,7 +502,10 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
 
   Widget _tableHeader(String text, {TextAlign align = TextAlign.start}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xs,
+        vertical: AppSpacing.sm,
+      ),
       child: Text(
         text,
         style: AppTextStyles.labelMedium.copyWith(fontWeight: FontWeight.bold),
@@ -399,7 +514,13 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     );
   }
 
-  Widget _summaryRow(String label, String value, {bool isBold = false, bool isNegative = false, Color? color}) {
+  Widget _summaryRow(
+    String label,
+    String value, {
+    bool isBold = false,
+    bool isNegative = false,
+    Color? color,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.0),
       child: Row(
@@ -409,17 +530,26 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
             child: Text(
               label,
               style: isBold
-                  ? AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold)
-                  : AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                  ? AppTextStyles.bodyMedium.copyWith(
+                      fontWeight: FontWeight.bold,
+                    )
+                  : AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
             ),
           ),
           Text(
             value,
             style: isBold
-                ? AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold, color: color ?? AppColors.primary)
+                ? AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: color ?? AppColors.primary,
+                  )
                 : AppTextStyles.bodySmall.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: isNegative ? AppColors.error : color ?? AppColors.textPrimary,
+                    color: isNegative
+                        ? AppColors.error
+                        : color ?? AppColors.textPrimary,
                   ),
           ),
         ],

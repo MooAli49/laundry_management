@@ -36,4 +36,3 @@ class DatabaseException extends AppException {
     super.cause,
   ]);
 }
-

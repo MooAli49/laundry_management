@@ -165,13 +165,15 @@ class CreateOrderState {
       itemDefinitions: itemDefinitions ?? this.itemDefinitions,
       carpetSizes: carpetSizes ?? this.carpetSizes,
       settings: settings ?? this.settings,
-      draftItemType:
-          clearDraftItemType ? null : (draftItemType ?? this.draftItemType),
+      draftItemType: clearDraftItemType
+          ? null
+          : (draftItemType ?? this.draftItemType),
       draftItemDefinition: clearDraftItemDefinition
           ? null
           : (draftItemDefinition ?? this.draftItemDefinition),
-      draftService:
-          clearDraftService ? null : (draftService ?? this.draftService),
+      draftService: clearDraftService
+          ? null
+          : (draftService ?? this.draftService),
       draftUnitPrice: draftUnitPrice ?? this.draftUnitPrice,
       draftQuantity: draftQuantity ?? this.draftQuantity,
       draftCarpetSize: clearDraftCarpetSize
@@ -179,8 +181,7 @@ class CreateOrderState {
           : (draftCarpetSize ?? this.draftCarpetSize),
       draftCarpetLength: draftCarpetLength ?? this.draftCarpetLength,
       draftCarpetWidth: draftCarpetWidth ?? this.draftCarpetWidth,
-      draftNotes:
-          clearDraftNotes ? null : (draftNotes ?? this.draftNotes),
+      draftNotes: clearDraftNotes ? null : (draftNotes ?? this.draftNotes),
       items: items ?? this.items,
       expectedPickupDate: expectedPickupDate ?? this.expectedPickupDate,
       discount: discount ?? this.discount,
@@ -192,8 +193,9 @@ class CreateOrderState {
           customerDeliveryRequested ?? this.customerDeliveryRequested,
       customerDeliveryFee: customerDeliveryFee ?? this.customerDeliveryFee,
       isSubmitting: isSubmitting ?? this.isSubmitting,
-      errorMessage:
-          clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
       createdOrder: createdOrder ?? this.createdOrder,
     );
   }

@@ -55,8 +55,12 @@ void main() {
   late pw.Font boldFont;
 
   setUpAll(() async {
-    final regularData = await rootBundle.load('assets/fonts/IBMPlexSansArabic-Regular.ttf');
-    final boldData = await rootBundle.load('assets/fonts/IBMPlexSansArabic-Bold.ttf');
+    final regularData = await rootBundle.load(
+      'assets/fonts/IBMPlexSansArabic-Regular.ttf',
+    );
+    final boldData = await rootBundle.load(
+      'assets/fonts/IBMPlexSansArabic-Bold.ttf',
+    );
     regularFont = pw.Font.ttf(regularData);
     boldFont = pw.Font.ttf(boldData);
   });
@@ -77,7 +81,8 @@ void main() {
     Money tax = Money.zero,
     Money total = const Money.fromPiastres(10000),
   }) {
-    final effectiveSubtotal = subtotal ??
+    final effectiveSubtotal =
+        subtotal ??
         (total + discount - customerPickupFee - customerDeliveryFee - tax);
 
     return Order(
@@ -143,125 +148,169 @@ void main() {
 
   group('InvoicePrinter Quantity Formatting Tests', () {
     test('Piece quantity formatting: integer count 1 -> "1 قطعة"', () {
-      final item = createTestItem(quantity: 1.0, pricingType: PricingType.perPiece);
+      final item = createTestItem(
+        quantity: 1.0,
+        pricingType: PricingType.perPiece,
+      );
       expect(InvoicePrinter.formatQuantity(item), '1 قطعة');
     });
 
     test('Piece quantity formatting: integer count 3 -> "3 قطع"', () {
-      final item = createTestItem(quantity: 3.0, pricingType: PricingType.perPiece);
+      final item = createTestItem(
+        quantity: 3.0,
+        pricingType: PricingType.perPiece,
+      );
       expect(InvoicePrinter.formatQuantity(item), '3 قطع');
     });
 
-    test('Piece quantity formatting: decimal 2.75 -> "2.75 قطعة" (never truncated to 2)', () {
-      final item = createTestItem(quantity: 2.75, pricingType: PricingType.perPiece);
-      expect(InvoicePrinter.formatQuantity(item), '2.75 قطعة');
-    });
+    test(
+      'Piece quantity formatting: decimal 2.75 -> "2.75 قطعة" (never truncated to 2)',
+      () {
+        final item = createTestItem(
+          quantity: 2.75,
+          pricingType: PricingType.perPiece,
+        );
+        expect(InvoicePrinter.formatQuantity(item), '2.75 قطعة');
+      },
+    );
 
-    test('Carpet quantity formatting: area 2.75 -> "1 قطعة" (piece count, not area)', () {
-      final carpet = CarpetItemData(
-        id: 'carpet-1',
-        orderItemId: 'item-test-1',
-        length: 2.0,
-        width: 1.375,
-        area: 2.75,
-        createdAt: testDate,
-        updatedAt: testDate,
-      );
-      final item = createTestItem(
-        pricingType: PricingType.perSquareMeter,
-        quantity: 1.0,
-        carpetData: carpet,
-      );
-      expect(InvoicePrinter.formatQuantity(item), '1 قطعة');
-    });
+    test(
+      'Carpet quantity formatting: area 2.75 -> "1 قطعة" (piece count, not area)',
+      () {
+        final carpet = CarpetItemData(
+          id: 'carpet-1',
+          orderItemId: 'item-test-1',
+          length: 2.0,
+          width: 1.375,
+          area: 2.75,
+          createdAt: testDate,
+          updatedAt: testDate,
+        );
+        final item = createTestItem(
+          pricingType: PricingType.perSquareMeter,
+          quantity: 1.0,
+          carpetData: carpet,
+        );
+        expect(InvoicePrinter.formatQuantity(item), '1 قطعة');
+      },
+    );
 
-    test('Carpet quantity formatting fallback to item.quantity when carpetData is null', () {
-      final item = createTestItem(
-        pricingType: PricingType.perSquareMeter,
-        quantity: 4.5,
-        carpetData: null,
-      );
-      expect(InvoicePrinter.formatQuantity(item), '4.5 قطعة');
-    });
+    test(
+      'Carpet quantity formatting fallback to item.quantity when carpetData is null',
+      () {
+        final item = createTestItem(
+          pricingType: PricingType.perSquareMeter,
+          quantity: 4.5,
+          carpetData: null,
+        );
+        expect(InvoicePrinter.formatQuantity(item), '4.5 قطعة');
+      },
+    );
 
-    test('formatNumber preserves exact precision and trims trailing zeroes', () {
-      expect(InvoicePrinter.formatNumber(1.0), '1');
-      expect(InvoicePrinter.formatNumber(2.5), '2.5');
-      expect(InvoicePrinter.formatNumber(2.75), '2.75');
-      expect(InvoicePrinter.formatNumber(3.00), '3');
-    });
+    test(
+      'formatNumber preserves exact precision and trims trailing zeroes',
+      () {
+        expect(InvoicePrinter.formatNumber(1.0), '1');
+        expect(InvoicePrinter.formatNumber(2.5), '2.5');
+        expect(InvoicePrinter.formatNumber(2.75), '2.75');
+        expect(InvoicePrinter.formatNumber(3.00), '3');
+      },
+    );
   });
 
   group('Invoice Line-Item Aggregation / Grouping Tests', () {
-    test('1. Three identical normal items become one grouped line with quantity 3 and sum total', () {
-      final items = [
-        createTestItem(itemTypeName: 'قميص', serviceName: 'غسيل', unitPrice: const Money.fromPiastres(2000), calculatedTotal: const Money.fromPiastres(2000)),
-        createTestItem(itemTypeName: 'قميص', serviceName: 'غسيل', unitPrice: const Money.fromPiastres(2000), calculatedTotal: const Money.fromPiastres(2000)),
-        createTestItem(itemTypeName: 'قميص', serviceName: 'غسيل', unitPrice: const Money.fromPiastres(2000), calculatedTotal: const Money.fromPiastres(2000)),
-      ];
+    test(
+      '1. Three identical normal items become one grouped line with quantity 3 and sum total',
+      () {
+        final items = [
+          createTestItem(
+            itemTypeName: 'قميص',
+            serviceName: 'غسيل',
+            unitPrice: const Money.fromPiastres(2000),
+            calculatedTotal: const Money.fromPiastres(2000),
+          ),
+          createTestItem(
+            itemTypeName: 'قميص',
+            serviceName: 'غسيل',
+            unitPrice: const Money.fromPiastres(2000),
+            calculatedTotal: const Money.fromPiastres(2000),
+          ),
+          createTestItem(
+            itemTypeName: 'قميص',
+            serviceName: 'غسيل',
+            unitPrice: const Money.fromPiastres(2000),
+            calculatedTotal: const Money.fromPiastres(2000),
+          ),
+        ];
 
-      final lines = InvoicePrinter.groupItems(items);
+        final lines = InvoicePrinter.groupItems(items);
 
-      expect(lines.length, 1);
-      expect(lines.first.quantityDisplay, '3 قطع');
-      expect(lines.first.unitPrice, const Money.fromPiastres(2000));
-      expect(lines.first.calculatedTotal, const Money.fromPiastres(6000));
-      expect(lines.first.dimensionsSubtext, isNull);
-    });
+        expect(lines.length, 1);
+        expect(lines.first.quantityDisplay, '3 قطع');
+        expect(lines.first.unitPrice, const Money.fromPiastres(2000));
+        expect(lines.first.calculatedTotal, const Money.fromPiastres(6000));
+        expect(lines.first.dimensionsSubtext, isNull);
+      },
+    );
 
-    test('2-5. Three identical carpets become one grouped line with quantity 3 pieces, piece unit price, and dimensions', () {
-      CarpetItemData makeCarpet(String id) => CarpetItemData(
-            id: id,
-            orderItemId: 'item-$id',
-            length: 2.0,
-            width: 3.0,
-            area: 6.0,
-            createdAt: testDate,
-            updatedAt: testDate,
-          );
+    test(
+      '2-5. Three identical carpets become one grouped line with quantity 3 pieces, piece unit price, and dimensions',
+      () {
+        CarpetItemData makeCarpet(String id) => CarpetItemData(
+          id: id,
+          orderItemId: 'item-$id',
+          length: 2.0,
+          width: 3.0,
+          area: 6.0,
+          createdAt: testDate,
+          updatedAt: testDate,
+        );
 
-      final items = [
-        createTestItem(
-          itemTypeName: 'سجاد',
-          itemDefinitionName: 'سجادة صوف',
-          serviceName: 'غسيل سجاد',
-          pricingType: PricingType.perSquareMeter,
-          unitPrice: const Money.fromPiastres(2000), // 20 EGP/m²
-          calculatedTotal: const Money.fromPiastres(12000), // 120 EGP for 1 piece (6m² * 20 EGP)
-          carpetData: makeCarpet('c1'),
-        ),
-        createTestItem(
-          itemTypeName: 'سجاد',
-          itemDefinitionName: 'سجادة صوف',
-          serviceName: 'غسيل سجاد',
-          pricingType: PricingType.perSquareMeter,
-          unitPrice: const Money.fromPiastres(2000),
-          calculatedTotal: const Money.fromPiastres(12000),
-          carpetData: makeCarpet('c2'),
-        ),
-        createTestItem(
-          itemTypeName: 'سجاد',
-          itemDefinitionName: 'سجادة صوف',
-          serviceName: 'غسيل سجاد',
-          pricingType: PricingType.perSquareMeter,
-          unitPrice: const Money.fromPiastres(2000),
-          calculatedTotal: const Money.fromPiastres(12000),
-          carpetData: makeCarpet('c3'),
-        ),
-      ];
+        final items = [
+          createTestItem(
+            itemTypeName: 'سجاد',
+            itemDefinitionName: 'سجادة صوف',
+            serviceName: 'غسيل سجاد',
+            pricingType: PricingType.perSquareMeter,
+            unitPrice: const Money.fromPiastres(2000), // 20 EGP/m²
+            calculatedTotal: const Money.fromPiastres(
+              12000,
+            ), // 120 EGP for 1 piece (6m² * 20 EGP)
+            carpetData: makeCarpet('c1'),
+          ),
+          createTestItem(
+            itemTypeName: 'سجاد',
+            itemDefinitionName: 'سجادة صوف',
+            serviceName: 'غسيل سجاد',
+            pricingType: PricingType.perSquareMeter,
+            unitPrice: const Money.fromPiastres(2000),
+            calculatedTotal: const Money.fromPiastres(12000),
+            carpetData: makeCarpet('c2'),
+          ),
+          createTestItem(
+            itemTypeName: 'سجاد',
+            itemDefinitionName: 'سجادة صوف',
+            serviceName: 'غسيل سجاد',
+            pricingType: PricingType.perSquareMeter,
+            unitPrice: const Money.fromPiastres(2000),
+            calculatedTotal: const Money.fromPiastres(12000),
+            carpetData: makeCarpet('c3'),
+          ),
+        ];
 
-      final lines = InvoicePrinter.groupItems(items);
+        final lines = InvoicePrinter.groupItems(items);
 
-      expect(lines.length, 1);
-      // 2. Quantity displays piece count: 3 قطع
-      expect(lines.first.quantityDisplay, '3 قطع');
-      // 3. Dimensions sub-text with area/piece: (2 × 3 م) — 6 م²/قطعة
-      expect(lines.first.dimensionsSubtext, '(2 × 3 م) — 6 م²/قطعة');
-      // 4. Unit price represents one piece: 120.00 EGP
-      expect(lines.first.unitPrice, const Money.fromPiastres(12000));
-      // 5. Grouped total is quantity * unit price = 360.00 EGP
-      expect(lines.first.calculatedTotal, const Money.fromPiastres(36000));
-    });
+        expect(lines.length, 1);
+        // 2. Quantity displays piece count: 3 قطع
+        expect(lines.first.quantityDisplay, '3 قطع');
+        // 3. Dimensions sub-text with area/piece: (2 × 3 م) — 6 م²/قطعة
+        expect(lines.first.dimensionsSubtext, '(2 × 3 م) — 6 م²/قطعة');
+        // 4. Unit price represents one piece: 120.00 EGP
+        expect(lines.first.unitPrice, const Money.fromPiastres(12000));
+        // 5. Grouped total is quantity * unit price = 360.00 EGP
+        expect(lines.first.calculatedTotal, const Money.fromPiastres(36000));
+      },
+    );
 
     test('6. Different carpet dimensions do NOT group', () {
       final carpet1 = CarpetItemData(
@@ -314,8 +363,14 @@ void main() {
 
     test('8. Different unit prices do NOT group', () {
       final items = [
-        createTestItem(itemTypeName: 'قميص', unitPrice: const Money.fromPiastres(2000)),
-        createTestItem(itemTypeName: 'قميص', unitPrice: const Money.fromPiastres(2500)),
+        createTestItem(
+          itemTypeName: 'قميص',
+          unitPrice: const Money.fromPiastres(2000),
+        ),
+        createTestItem(
+          itemTypeName: 'قميص',
+          unitPrice: const Money.fromPiastres(2500),
+        ),
       ];
 
       final lines = InvoicePrinter.groupItems(items);
@@ -334,7 +389,12 @@ void main() {
 
     test('10. Decimal quantity behavior continues to work in grouping', () {
       final items = [
-        createTestItem(itemTypeName: 'قماش', quantity: 2.75, unitPrice: const Money.fromPiastres(1000), calculatedTotal: const Money.fromPiastres(2750)),
+        createTestItem(
+          itemTypeName: 'قماش',
+          quantity: 2.75,
+          unitPrice: const Money.fromPiastres(1000),
+          calculatedTotal: const Money.fromPiastres(2750),
+        ),
       ];
 
       final lines = InvoicePrinter.groupItems(items);
@@ -342,78 +402,96 @@ void main() {
       expect(lines.first.quantityDisplay, '2.75 قطعة');
     });
 
-    test('11. Authoritative order.total remains unchanged when generating PDF with grouped lines', () async {
-      final order = createTestOrder(
-        subtotal: const Money.fromPiastres(36000),
-        total: const Money.fromPiastres(36000),
-      );
+    test(
+      '11. Authoritative order.total remains unchanged when generating PDF with grouped lines',
+      () async {
+        final order = createTestOrder(
+          subtotal: const Money.fromPiastres(36000),
+          total: const Money.fromPiastres(36000),
+        );
 
-      CarpetItemData makeCarpet(String id) => CarpetItemData(
-            id: id,
-            orderItemId: 'item-$id',
-            length: 2.0,
-            width: 3.0,
-            area: 6.0,
-            createdAt: testDate,
-            updatedAt: testDate,
-          );
+        CarpetItemData makeCarpet(String id) => CarpetItemData(
+          id: id,
+          orderItemId: 'item-$id',
+          length: 2.0,
+          width: 3.0,
+          area: 6.0,
+          createdAt: testDate,
+          updatedAt: testDate,
+        );
 
-      final items = [
-        createTestItem(pricingType: PricingType.perSquareMeter, carpetData: makeCarpet('1'), calculatedTotal: const Money.fromPiastres(12000)),
-        createTestItem(pricingType: PricingType.perSquareMeter, carpetData: makeCarpet('2'), calculatedTotal: const Money.fromPiastres(12000)),
-        createTestItem(pricingType: PricingType.perSquareMeter, carpetData: makeCarpet('3'), calculatedTotal: const Money.fromPiastres(12000)),
-      ];
-
-      final doc = await InvoicePrinter.generatePdfDocument(
-        order: order,
-        items: items,
-        totalPaid: const Money.fromPiastres(10000),
-        remainingAmount: const Money.fromPiastres(26000),
-        settings: defaultSettings,
-        regularFont: regularFont,
-        boldFont: boldFont,
-      );
-
-      final bytes = await doc.save();
-      expect(bytes.isNotEmpty, isTrue);
-      expect(order.total, const Money.fromPiastres(36000));
-    });
-
-    test('12. Table columns are defined in reverse logical order (0: total, 1: unit price, 2: qty, 3: item) for physical RTL paper', () async {
-      final order = createTestOrder();
-      final items = [
-        createTestItem(
-          itemTypeName: 'سجاد',
-          serviceName: 'غسيل سجاد',
-          pricingType: PricingType.perSquareMeter,
-          unitPrice: const Money.fromPiastres(2000),
-          calculatedTotal: const Money.fromPiastres(12000),
-          carpetData: CarpetItemData(
-            id: 'c-test',
-            orderItemId: 'i-test',
-            length: 2.0,
-            width: 3.0,
-            area: 6.0,
-            createdAt: testDate,
-            updatedAt: testDate,
+        final items = [
+          createTestItem(
+            pricingType: PricingType.perSquareMeter,
+            carpetData: makeCarpet('1'),
+            calculatedTotal: const Money.fromPiastres(12000),
           ),
-        ),
-      ];
+          createTestItem(
+            pricingType: PricingType.perSquareMeter,
+            carpetData: makeCarpet('2'),
+            calculatedTotal: const Money.fromPiastres(12000),
+          ),
+          createTestItem(
+            pricingType: PricingType.perSquareMeter,
+            carpetData: makeCarpet('3'),
+            calculatedTotal: const Money.fromPiastres(12000),
+          ),
+        ];
 
-      final doc = await InvoicePrinter.generatePdfDocument(
-        order: order,
-        items: items,
-        totalPaid: Money.zero,
-        remainingAmount: order.total,
-        settings: defaultSettings,
-        regularFont: regularFont,
-        boldFont: boldFont,
-      );
+        final doc = await InvoicePrinter.generatePdfDocument(
+          order: order,
+          items: items,
+          totalPaid: const Money.fromPiastres(10000),
+          remainingAmount: const Money.fromPiastres(26000),
+          settings: defaultSettings,
+          regularFont: regularFont,
+          boldFont: boldFont,
+        );
 
-      final bytes = await doc.save();
-      expect(bytes.isNotEmpty, isTrue);
-      expect(doc.document.pdfPageList.pages.length, 1);
-    });
+        final bytes = await doc.save();
+        expect(bytes.isNotEmpty, isTrue);
+        expect(order.total, const Money.fromPiastres(36000));
+      },
+    );
+
+    test(
+      '12. Table columns are defined in reverse logical order (0: total, 1: unit price, 2: qty, 3: item) for physical RTL paper',
+      () async {
+        final order = createTestOrder();
+        final items = [
+          createTestItem(
+            itemTypeName: 'سجاد',
+            serviceName: 'غسيل سجاد',
+            pricingType: PricingType.perSquareMeter,
+            unitPrice: const Money.fromPiastres(2000),
+            calculatedTotal: const Money.fromPiastres(12000),
+            carpetData: CarpetItemData(
+              id: 'c-test',
+              orderItemId: 'i-test',
+              length: 2.0,
+              width: 3.0,
+              area: 6.0,
+              createdAt: testDate,
+              updatedAt: testDate,
+            ),
+          ),
+        ];
+
+        final doc = await InvoicePrinter.generatePdfDocument(
+          order: order,
+          items: items,
+          totalPaid: Money.zero,
+          remainingAmount: order.total,
+          settings: defaultSettings,
+          regularFont: regularFont,
+          boldFont: boldFont,
+        );
+
+        final bytes = await doc.save();
+        expect(bytes.isNotEmpty, isTrue);
+        expect(doc.document.pdfPageList.pages.length, 1);
+      },
+    );
   });
 
   group('InvoicePrinter PDF Generation Permutations', () {
@@ -438,8 +516,14 @@ void main() {
 
     test('2. Multi-item order with diverse services', () async {
       final order = createTestOrder(total: const Money.fromPiastres(15000));
-      final item1 = createTestItem(itemTypeName: 'قميص', serviceName: 'غسيل وكي');
-      final item2 = createTestItem(itemTypeName: 'بنطلون', serviceName: 'تنظيف جاف');
+      final item1 = createTestItem(
+        itemTypeName: 'قميص',
+        serviceName: 'غسيل وكي',
+      );
+      final item2 = createTestItem(
+        itemTypeName: 'بنطلون',
+        serviceName: 'تنظيف جاف',
+      );
       final item3 = createTestItem(itemTypeName: 'بدلة', serviceName: 'كي فقط');
 
       final doc = await InvoicePrinter.generatePdfDocument(
@@ -686,7 +770,8 @@ void main() {
 
     test('13. Long Arabic customer name wraps without throwing', () async {
       final order = createTestOrder(
-        customerName: 'الأستاذ عبد الرحمن بن محمد بن إبراهيم الحسيني الإسكندراني',
+        customerName:
+            'الأستاذ عبد الرحمن بن محمد بن إبراهيم الحسيني الإسكندراني',
       );
 
       final doc = await InvoicePrinter.generatePdfDocument(
@@ -703,145 +788,169 @@ void main() {
       expect(bytes.isNotEmpty, isTrue);
     });
 
-    test('14. Long Arabic service name and item description wraps without throwing', () async {
-      final order = createTestOrder();
-      final item = createTestItem(
-        itemTypeName: 'مفرش سرير كبير مطرز تطريز يدوي فاخر',
-        itemDefinitionName: 'ثلاث طبقات حرير طبيعي',
-        serviceName: 'غسيل بخار مكثف ومعالجة بقع مستعصية وتعقيم بالأوزون',
-        notes: 'يرجى العناية الفائقة بالأطراف المذهبة وعدم استخدام درجات حرارة مرتفعة',
-      );
+    test(
+      '14. Long Arabic service name and item description wraps without throwing',
+      () async {
+        final order = createTestOrder();
+        final item = createTestItem(
+          itemTypeName: 'مفرش سرير كبير مطرز تطريز يدوي فاخر',
+          itemDefinitionName: 'ثلاث طبقات حرير طبيعي',
+          serviceName: 'غسيل بخار مكثف ومعالجة بقع مستعصية وتعقيم بالأوزون',
+          notes:
+              'يرجى العناية الفائقة بالأطراف المذهبة وعدم استخدام درجات حرارة مرتفعة',
+        );
 
-      final doc = await InvoicePrinter.generatePdfDocument(
-        order: order,
-        items: [item],
-        totalPaid: Money.zero,
-        remainingAmount: order.total,
-        settings: defaultSettings,
-        regularFont: regularFont,
-        boldFont: boldFont,
-      );
+        final doc = await InvoicePrinter.generatePdfDocument(
+          order: order,
+          items: [item],
+          totalPaid: Money.zero,
+          remainingAmount: order.total,
+          settings: defaultSettings,
+          regularFont: regularFont,
+          boldFont: boldFont,
+        );
 
-      final bytes = await doc.save();
-      expect(bytes.isNotEmpty, isTrue);
-    });
+        final bytes = await doc.save();
+        expect(bytes.isNotEmpty, isTrue);
+      },
+    );
 
-    test('15. Mixed Arabic and Western digits: order number 26-001, phone 01012345678', () async {
-      final order = createTestOrder(
-        orderNumber: '26-001',
-        customerPhone: '01012345678',
-      );
+    test(
+      '15. Mixed Arabic and Western digits: order number 26-001, phone 01012345678',
+      () async {
+        final order = createTestOrder(
+          orderNumber: '26-001',
+          customerPhone: '01012345678',
+        );
 
-      final doc = await InvoicePrinter.generatePdfDocument(
-        order: order,
-        items: [createTestItem()],
-        totalPaid: Money.zero,
-        remainingAmount: order.total,
-        settings: defaultSettings,
-        regularFont: regularFont,
-        boldFont: boldFont,
-      );
+        final doc = await InvoicePrinter.generatePdfDocument(
+          order: order,
+          items: [createTestItem()],
+          totalPaid: Money.zero,
+          remainingAmount: order.total,
+          settings: defaultSettings,
+          regularFont: regularFont,
+          boldFont: boldFont,
+        );
 
-      final bytes = await doc.save();
-      expect(bytes.isNotEmpty, isTrue);
-    });
+        final bytes = await doc.save();
+        expect(bytes.isNotEmpty, isTrue);
+      },
+    );
 
-    test('16. Arabic punctuation, test words (غسيل، مستعجل، بطانية، سجاد) and currency', () async {
-      final order = createTestOrder(orderNumber: '26-999');
-      final item1 = createTestItem(itemTypeName: 'سجاد', serviceName: 'غسيل مستعجل');
-      final item2 = createTestItem(itemTypeName: 'بطانية', serviceName: 'غسيل وكي');
+    test(
+      '16. Arabic punctuation, test words (غسيل، مستعجل، بطانية، سجاد) and currency',
+      () async {
+        final order = createTestOrder(orderNumber: '26-999');
+        final item1 = createTestItem(
+          itemTypeName: 'سجاد',
+          serviceName: 'غسيل مستعجل',
+        );
+        final item2 = createTestItem(
+          itemTypeName: 'بطانية',
+          serviceName: 'غسيل وكي',
+        );
 
-      final doc = await InvoicePrinter.generatePdfDocument(
-        order: order,
-        items: [item1, item2],
-        totalPaid: const Money.fromPiastres(5000),
-        remainingAmount: const Money.fromPiastres(5000),
-        settings: defaultSettings,
-        regularFont: regularFont,
-        boldFont: boldFont,
-      );
+        final doc = await InvoicePrinter.generatePdfDocument(
+          order: order,
+          items: [item1, item2],
+          totalPaid: const Money.fromPiastres(5000),
+          remainingAmount: const Money.fromPiastres(5000),
+          settings: defaultSettings,
+          regularFont: regularFont,
+          boldFont: boldFont,
+        );
 
-      final bytes = await doc.save();
-      expect(bytes.isNotEmpty, isTrue);
+        final bytes = await doc.save();
+        expect(bytes.isNotEmpty, isTrue);
 
-      try {
-        final scratchFile = File('C:/Users/Mohamed/.gemini/antigravity-ide/brain/7f24deee-8cc5-4543-a10a-5c843fe04534/scratch/sample_invoice.pdf');
-        await scratchFile.writeAsBytes(bytes);
-      } catch (_) {
-        // Ignore file system errors in restricted test environments
-      }
-    });
+        try {
+          final scratchFile = File(
+            'C:/Users/Mohamed/.gemini/antigravity-ide/brain/7f24deee-8cc5-4543-a10a-5c843fe04534/scratch/sample_invoice.pdf',
+          );
+          await scratchFile.writeAsBytes(bytes);
+        } catch (_) {
+          // Ignore file system errors in restricted test environments
+        }
+      },
+    );
   });
 
   group('InvoicePrinter Fallbacks & Edge Cases', () {
-    test('Uses customer entity as fallback if order customer snapshots are blank', () async {
-      final order = createTestOrder(
-        customerName: '',
-        customerPhone: '',
-      );
-      final customer = Customer(
-        id: 'cust-1',
-        name: 'عميل احتياطي',
-        phone: '01122334455',
-        createdAt: testDate,
-        updatedAt: testDate,
-      );
+    test(
+      'Uses customer entity as fallback if order customer snapshots are blank',
+      () async {
+        final order = createTestOrder(customerName: '', customerPhone: '');
+        final customer = Customer(
+          id: 'cust-1',
+          name: 'عميل احتياطي',
+          phone: '01122334455',
+          createdAt: testDate,
+          updatedAt: testDate,
+        );
 
-      final doc = await InvoicePrinter.generatePdfDocument(
-        order: order,
-        customer: customer,
-        items: [createTestItem()],
-        totalPaid: Money.zero,
-        remainingAmount: order.total,
-        settings: defaultSettings,
-        regularFont: regularFont,
-        boldFont: boldFont,
-      );
+        final doc = await InvoicePrinter.generatePdfDocument(
+          order: order,
+          customer: customer,
+          items: [createTestItem()],
+          totalPaid: Money.zero,
+          remainingAmount: order.total,
+          settings: defaultSettings,
+          regularFont: regularFont,
+          boldFont: boldFont,
+        );
 
-      final bytes = await doc.save();
-      expect(bytes.isNotEmpty, isTrue);
-    });
+        final bytes = await doc.save();
+        expect(bytes.isNotEmpty, isTrue);
+      },
+    );
 
-    test('Uses default business name and footer when settings is null', () async {
-      final order = createTestOrder();
+    test(
+      'Uses default business name and footer when settings is null',
+      () async {
+        final order = createTestOrder();
 
-      final doc = await InvoicePrinter.generatePdfDocument(
-        order: order,
-        items: [createTestItem()],
-        totalPaid: Money.zero,
-        remainingAmount: order.total,
-        settings: null,
-        regularFont: regularFont,
-        boldFont: boldFont,
-      );
+        final doc = await InvoicePrinter.generatePdfDocument(
+          order: order,
+          items: [createTestItem()],
+          totalPaid: Money.zero,
+          remainingAmount: order.total,
+          settings: null,
+          regularFont: regularFont,
+          boldFont: boldFont,
+        );
 
-      final bytes = await doc.save();
-      expect(bytes.isNotEmpty, isTrue);
-    });
+        final bytes = await doc.save();
+        expect(bytes.isNotEmpty, isTrue);
+      },
+    );
 
-    test('Uses fallback footer when invoiceFooterText is empty or whitespace', () async {
-      final order = createTestOrder();
-      final settings = BusinessSettings(
-        id: 'settings-ws',
-        businessName: 'مغسلة النقاء',
-        invoiceFooterText: '   ',
-        createdAt: testDate,
-        updatedAt: testDate,
-      );
+    test(
+      'Uses fallback footer when invoiceFooterText is empty or whitespace',
+      () async {
+        final order = createTestOrder();
+        final settings = BusinessSettings(
+          id: 'settings-ws',
+          businessName: 'مغسلة النقاء',
+          invoiceFooterText: '   ',
+          createdAt: testDate,
+          updatedAt: testDate,
+        );
 
-      final doc = await InvoicePrinter.generatePdfDocument(
-        order: order,
-        items: [createTestItem()],
-        totalPaid: Money.zero,
-        remainingAmount: order.total,
-        settings: settings,
-        regularFont: regularFont,
-        boldFont: boldFont,
-      );
+        final doc = await InvoicePrinter.generatePdfDocument(
+          order: order,
+          items: [createTestItem()],
+          totalPaid: Money.zero,
+          remainingAmount: order.total,
+          settings: settings,
+          regularFont: regularFont,
+          boldFont: boldFont,
+        );
 
-      final bytes = await doc.save();
-      expect(bytes.isNotEmpty, isTrue);
-    });
+        final bytes = await doc.save();
+        expect(bytes.isNotEmpty, isTrue);
+      },
+    );
   });
 
   group('InvoicePrinter.printInvoice Native OS Workflow', () {
@@ -858,22 +967,25 @@ void main() {
       PrintingPlatform.instance = originalPlatform;
     });
 
-    test('forces 80mm roll format (PdfPageFormat.roll80) and dynamicLayout: false', () async {
-      final order = createTestOrder(orderNumber: '26-099');
+    test(
+      'forces 80mm roll format (PdfPageFormat.roll80) and dynamicLayout: false',
+      () async {
+        final order = createTestOrder(orderNumber: '26-099');
 
-      final result = await InvoicePrinter.printInvoice(
-        order: order,
-        items: [createTestItem()],
-        totalPaid: Money.zero,
-        remainingAmount: order.total,
-        settings: defaultSettings,
-      );
+        final result = await InvoicePrinter.printInvoice(
+          order: order,
+          items: [createTestItem()],
+          totalPaid: Money.zero,
+          remainingAmount: order.total,
+          settings: defaultSettings,
+        );
 
-      expect(result, isTrue);
-      expect(mockPlatform.callCount, 1);
-      expect(mockPlatform.receivedFormat, PdfPageFormat.roll80);
-      expect(mockPlatform.receivedDynamicLayout, isFalse);
-      expect(mockPlatform.receivedName, 'invoice_26-099.pdf');
-    });
+        expect(result, isTrue);
+        expect(mockPlatform.callCount, 1);
+        expect(mockPlatform.receivedFormat, PdfPageFormat.roll80);
+        expect(mockPlatform.receivedDynamicLayout, isFalse);
+        expect(mockPlatform.receivedName, 'invoice_26-099.pdf');
+      },
+    );
   });
 }

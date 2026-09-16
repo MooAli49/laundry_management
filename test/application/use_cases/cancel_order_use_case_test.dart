@@ -65,7 +65,10 @@ void main() {
     orderRepo = FakeOrderRepository();
     useCase = CancelOrderUseCase(orderRepo);
 
-    orderRepo.orders['ord-proc'] = makeOrder('ord-proc', OrderStatus.processing);
+    orderRepo.orders['ord-proc'] = makeOrder(
+      'ord-proc',
+      OrderStatus.processing,
+    );
     orderRepo.orders['ord-ready'] = makeOrder('ord-ready', OrderStatus.ready);
     orderRepo.orders['ord-comp'] = makeOrder('ord-comp', OrderStatus.completed);
     orderRepo.orders['ord-canc'] = makeOrder('ord-canc', OrderStatus.cancelled);
@@ -135,18 +138,21 @@ void main() {
       );
     });
 
-    test('LOCKED RULE: already cancelled orders cannot be cancelled again', () async {
-      expect(
-        () => useCase.execute(
-          const CancelOrderInput(
-            orderId: 'ord-canc',
-            cancellationReason: 'إلغاء مكرر',
-            confirmed: true,
+    test(
+      'LOCKED RULE: already cancelled orders cannot be cancelled again',
+      () async {
+        expect(
+          () => useCase.execute(
+            const CancelOrderInput(
+              orderId: 'ord-canc',
+              cancellationReason: 'إلغاء مكرر',
+              confirmed: true,
+            ),
           ),
-        ),
-        throwsA(isA<BusinessRuleFailure>()),
-      );
-    });
+          throwsA(isA<BusinessRuleFailure>()),
+        );
+      },
+    );
 
     test('successfully cancels a processing order', () async {
       final result = await useCase.execute(

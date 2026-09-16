@@ -34,13 +34,18 @@ class OrderSummaryCard extends StatelessWidget {
         children: [
           Text(
             'ملخص الطلب',
-            style: AppTextStyles.titleLarge.copyWith(fontWeight: FontWeight.bold),
+            style: AppTextStyles.titleLarge.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           AppSpacing.gapLg,
 
           _buildRow('عدد القطع', '$totalPieces قطعة'),
           AppSpacing.gapSm,
-          _buildRow('المجموع الفرعي', '${state.subtotal.toEgp.toStringAsFixed(2)} ج.م'),
+          _buildRow(
+            'المجموع الفرعي',
+            '${state.subtotal.toEgp.toStringAsFixed(2)} ج.م',
+          ),
 
           if (state.discount.isPositive) ...[
             AppSpacing.gapSm,
@@ -74,7 +79,9 @@ class OrderSummaryCard extends StatelessWidget {
             children: [
               Text(
                 'الإجمالي',
-                style: AppTextStyles.titleLarge.copyWith(fontWeight: FontWeight.bold),
+                style: AppTextStyles.titleLarge.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               Text(
                 '${state.total.toEgp.toStringAsFixed(2)} ج.م',
@@ -113,7 +120,9 @@ class OrderSummaryCard extends StatelessWidget {
       children: [
         Text(
           label,
-          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.textSecondary,
+          ),
         ),
         Text(
           value,

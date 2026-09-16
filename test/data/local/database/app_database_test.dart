@@ -1867,34 +1867,63 @@ void main() {
   });
 
   group('17. Schema Migration v1 to v2 (Customer Snapshots)', () {
-    test('orders table physically contains customer_name_snapshot and customer_phone_snapshot columns', () async {
-      final pragmaRows = await db.customSelect('PRAGMA table_info(orders);').get();
-      final columnNames = pragmaRows.map((row) => row.read<String>('name')).toSet();
+    test(
+      'orders table physically contains customer_name_snapshot and customer_phone_snapshot columns',
+      () async {
+        final pragmaRows = await db
+            .customSelect('PRAGMA table_info(orders);')
+            .get();
+        final columnNames = pragmaRows
+            .map((row) => row.read<String>('name'))
+            .toSet();
 
-      expect(columnNames, contains('customer_name_snapshot'));
-      expect(columnNames, contains('customer_phone_snapshot'));
-    });
+        expect(columnNames, contains('customer_name_snapshot'));
+        expect(columnNames, contains('customer_phone_snapshot'));
+      },
+    );
 
-    test('migration safely backfills existing orders from customers without destroying data', () async {
-      final nowTimestamp = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+    test(
+      'migration safely backfills existing orders from customers without destroying data',
+      () async {
+        final nowTimestamp =
+            DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
 
-      // Insert customer
-      await db.customStatement(
-        'INSERT INTO customers (id, name, phone, created_at, updated_at) VALUES (?, ?, ?, ?, ?);',
-        ['cust-mig-1', 'عميل الترقية', '01019998888', nowTimestamp, nowTimestamp],
-      );
+        // Insert customer
+        await db.customStatement(
+          'INSERT INTO customers (id, name, phone, created_at, updated_at) VALUES (?, ?, ?, ?, ?);',
+          [
+            'cust-mig-1',
+            'عميل الترقية',
+            '01019998888',
+            nowTimestamp,
+            nowTimestamp,
+          ],
+        );
 
-      // Insert order simulating pre-migration row where snapshots are empty strings
-      await db.customStatement(
-        'INSERT INTO orders ('
-        'id, order_number, customer_id, customer_name_snapshot, customer_phone_snapshot, status, expected_pickup_date, '
-        'subtotal, discount, tax, total, created_at, updated_at'
-        ') VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?);',
-        ['ord-mig-1', '26-999', 'cust-mig-1', '', '', 'processing', nowTimestamp + 86400, 5000, 0, 5000, nowTimestamp, nowTimestamp],
-      );
+        // Insert order simulating pre-migration row where snapshots are empty strings
+        await db.customStatement(
+          'INSERT INTO orders ('
+          'id, order_number, customer_id, customer_name_snapshot, customer_phone_snapshot, status, expected_pickup_date, '
+          'subtotal, discount, tax, total, created_at, updated_at'
+          ') VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?);',
+          [
+            'ord-mig-1',
+            '26-999',
+            'cust-mig-1',
+            '',
+            '',
+            'processing',
+            nowTimestamp + 86400,
+            5000,
+            0,
+            5000,
+            nowTimestamp,
+            nowTimestamp,
+          ],
+        );
 
-      // Execute migration backfill query
-      await db.customStatement('''
+        // Execute migration backfill query
+        await db.customStatement('''
         UPDATE orders
         SET customer_name_snapshot =
               COALESCE(
@@ -1914,12 +1943,15 @@ void main() {
            OR customer_name_snapshot IS NULL;
       ''');
 
-      // Verify backfill succeeded and preserved order data
-      final row = await (db.select(db.orders)..where((t) => t.id.equals('ord-mig-1'))).getSingle();
-      expect(row.customerNameSnapshot, equals('عميل الترقية'));
-      expect(row.customerPhoneSnapshot, equals('01019998888'));
-      expect(row.orderNumber, equals('26-999'));
-      expect(row.total, equals(5000));
-    });
+        // Verify backfill succeeded and preserved order data
+        final row = await (db.select(
+          db.orders,
+        )..where((t) => t.id.equals('ord-mig-1'))).getSingle();
+        expect(row.customerNameSnapshot, equals('عميل الترقية'));
+        expect(row.customerPhoneSnapshot, equals('01019998888'));
+        expect(row.orderNumber, equals('26-999'));
+        expect(row.total, equals(5000));
+      },
+    );
   });
 }

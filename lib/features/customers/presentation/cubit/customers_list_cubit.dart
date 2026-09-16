@@ -33,9 +33,9 @@ class CustomersListCubit extends Cubit<CustomersListState> {
   CustomersListCubit({
     required CustomerRepository customerRepository,
     required OrderRepository orderRepository,
-  })  : _customerRepository = customerRepository,
-        _orderRepository = orderRepository,
-        super(const CustomersListState());
+  }) : _customerRepository = customerRepository,
+       _orderRepository = orderRepository,
+       super(const CustomersListState());
 
   Future<void> loadCustomers({bool refresh = false}) async {
     final requestId = ++_searchRequestId;
@@ -48,9 +48,13 @@ class CustomersListCubit extends Cubit<CustomersListState> {
         limit: _pageSize,
         offset: 0,
       );
-      final totalCount = await _customerRepository.getCustomersCount(query: query);
+      final totalCount = await _customerRepository.getCustomersCount(
+        query: query,
+      );
       final customerIds = customers.map((c) => c.id).toList();
-      final orderCounts = await _orderRepository.getOrderCountsByCustomerIds(customerIds);
+      final orderCounts = await _orderRepository.getOrderCountsByCustomerIds(
+        customerIds,
+      );
 
       if (isClosed || requestId != _searchRequestId) return;
 
@@ -61,34 +65,44 @@ class CustomersListCubit extends Cubit<CustomersListState> {
         );
       }).toList();
 
-      final hasMore = customers.length == _pageSize && customers.length < totalCount;
+      final hasMore =
+          customers.length == _pageSize && customers.length < totalCount;
 
-      emit(state.copyWith(
-        customers: viewModels,
-        totalCustomersCount: totalCount,
-        hasMoreCustomers: hasMore,
-        isLoading: false,
-        isLoadingMore: false,
-      ));
+      emit(
+        state.copyWith(
+          customers: viewModels,
+          totalCustomersCount: totalCount,
+          hasMoreCustomers: hasMore,
+          isLoading: false,
+          isLoadingMore: false,
+        ),
+      );
     } on Failure catch (e) {
       if (isClosed || requestId != _searchRequestId) return;
-      emit(state.copyWith(
-        isLoading: false,
-        isLoadingMore: false,
-        errorMessage: e.message,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          isLoadingMore: false,
+          errorMessage: e.message,
+        ),
+      );
     } catch (_) {
       if (isClosed || requestId != _searchRequestId) return;
-      emit(state.copyWith(
-        isLoading: false,
-        isLoadingMore: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          isLoadingMore: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 
   Future<void> loadMoreCustomers() async {
-    if (state.isLoading || state.isLoadingMore || !state.hasMoreCustomers || isClosed) {
+    if (state.isLoading ||
+        state.isLoadingMore ||
+        !state.hasMoreCustomers ||
+        isClosed) {
       return;
     }
     final requestId = ++_searchRequestId;
@@ -104,7 +118,8 @@ class CustomersListCubit extends Cubit<CustomersListState> {
         offset: currentCount,
       );
       final nextCustomerIds = nextCustomers.map((c) => c.id).toList();
-      final nextOrderCounts = await _orderRepository.getOrderCountsByCustomerIds(nextCustomerIds);
+      final nextOrderCounts = await _orderRepository
+          .getOrderCountsByCustomerIds(nextCustomerIds);
 
       if (isClosed) return;
       if (_isStaleLoadMore(requestId)) return;
@@ -117,27 +132,30 @@ class CustomersListCubit extends Cubit<CustomersListState> {
       }).toList();
 
       final totalLoaded = currentCount + nextCustomers.length;
-      final hasMore = nextCustomers.length == _pageSize && totalLoaded < state.totalCustomersCount;
+      final hasMore =
+          nextCustomers.length == _pageSize &&
+          totalLoaded < state.totalCustomersCount;
 
-      emit(state.copyWith(
-        customers: [...state.customers, ...nextViewModels],
-        isLoadingMore: false,
-        hasMoreCustomers: hasMore,
-      ));
+      emit(
+        state.copyWith(
+          customers: [...state.customers, ...nextViewModels],
+          isLoadingMore: false,
+          hasMoreCustomers: hasMore,
+        ),
+      );
     } on Failure catch (e) {
       if (isClosed) return;
       if (_isStaleLoadMore(requestId)) return;
-      emit(state.copyWith(
-        isLoadingMore: false,
-        errorMessage: e.message,
-      ));
+      emit(state.copyWith(isLoadingMore: false, errorMessage: e.message));
     } catch (_) {
       if (isClosed) return;
       if (_isStaleLoadMore(requestId)) return;
-      emit(state.copyWith(
-        isLoadingMore: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isLoadingMore: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 

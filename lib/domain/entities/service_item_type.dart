@@ -35,5 +35,6 @@ class ServiceItemType {
   int get hashCode => Object.hash(id, serviceId, itemTypeId, createdAt);
 
   @override
-  String toString() => 'ServiceItemType(service: $serviceId, itemType: $itemTypeId)';
+  String toString() =>
+      'ServiceItemType(service: $serviceId, itemType: $itemTypeId)';
 }

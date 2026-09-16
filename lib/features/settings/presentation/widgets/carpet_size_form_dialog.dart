@@ -151,7 +151,9 @@ class _CarpetSizeFormDialogState extends State<CarpetSizeFormDialog> {
               children: [
                 // Header matching Figma (no X button, no divider)
                 Text(
-                  isEditing ? AppStrings.editCarpetSize : AppStrings.addCarpetSize,
+                  isEditing
+                      ? AppStrings.editCarpetSize
+                      : AppStrings.addCarpetSize,
                   style: AppTextStyles.titleLarge.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -202,8 +204,9 @@ class _CarpetSizeFormDialogState extends State<CarpetSizeFormDialog> {
                           size: 20,
                           color: AppColors.textSecondary,
                         ),
-                        keyboardType:
-                            const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return AppStrings.carpetLengthRequired;
@@ -227,8 +230,9 @@ class _CarpetSizeFormDialogState extends State<CarpetSizeFormDialog> {
                           size: 20,
                           color: AppColors.textSecondary,
                         ),
-                        keyboardType:
-                            const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return AppStrings.carpetWidthRequired;
@@ -254,10 +258,7 @@ class _CarpetSizeFormDialogState extends State<CarpetSizeFormDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    AppButton(
-                      label: AppStrings.save,
-                      onPressed: _handleSubmit,
-                    ),
+                    AppButton(label: AppStrings.save, onPressed: _handleSubmit),
                     AppSpacing.gapHorizontalMd,
                     AppButton(
                       label: AppStrings.cancel,

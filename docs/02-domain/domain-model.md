@@ -598,7 +598,6 @@ A service that is not configured for Carpets should not be selectable for a Carp
 The domain supports these pricing types:
 
     PerPiece
-    PerKilogram
     PerSquareMeter
     FixedPrice
 
@@ -609,7 +608,7 @@ Typical V1 usage:
     Carpet Covers  → PerPiece
     Carpets        → PerSquareMeter
 
-The domain supports all four pricing types even when a particular UI flow only exposes a relevant subset.
+The domain supports all three pricing types even when a particular UI flow only exposes a relevant subset.
 
 ---
 

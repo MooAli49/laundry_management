@@ -384,7 +384,7 @@ services
 |---|---|---:|---|
 | id | UUID | Yes | Primary key |
 | name | String | Yes | Service name |
-| pricing_type | Enum/String | Yes | Per Piece / Per Kilogram / Per Square Meter / Fixed Price |
+| pricing_type | Enum/String | Yes | Per Piece / Per Square Meter / Fixed Price |
 | price | Decimal | Yes | Current service price |
 | is_active | Boolean | Yes | Availability for new orders |
 | created_at | DateTime | Yes | Creation timestamp |
@@ -810,7 +810,6 @@ The database must support:
 
 ```text
 per_piece
-per_kilogram
 per_square_meter
 fixed_price
 ```

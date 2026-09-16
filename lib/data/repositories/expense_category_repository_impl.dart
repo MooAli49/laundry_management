@@ -16,9 +16,9 @@ class ExpenseCategoryRepositoryImpl implements ExpenseCategoryRepository {
     required ExpenseCategoriesDao expenseCategoriesDao,
     required SyncOperationsDao syncOperationsDao,
     required app_db.AppDatabase db,
-  })  : _expenseCategoriesDao = expenseCategoriesDao,
-        _syncOperationsDao = syncOperationsDao,
-        _db = db;
+  }) : _expenseCategoriesDao = expenseCategoriesDao,
+       _syncOperationsDao = syncOperationsDao,
+       _db = db;
 
   @override
   Future<ExpenseCategory> createCategory(ExpenseCategory category) async {
@@ -54,7 +54,9 @@ class ExpenseCategoryRepositoryImpl implements ExpenseCategoryRepository {
   Future<ExpenseCategory> updateCategory(ExpenseCategory category) async {
     try {
       return await _db.transaction(() async {
-        final existing = await _expenseCategoriesDao.getCategoryById(category.id);
+        final existing = await _expenseCategoriesDao.getCategoryById(
+          category.id,
+        );
         if (existing == null) {
           throw ValidationFailure('Expense category not found');
         }

@@ -32,10 +32,7 @@ class PageHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  title,
-                  style: AppTextStyles.headlineLarge,
-                ),
+                Text(title, style: AppTextStyles.headlineLarge),
                 if (subtitle != null) ...[
                   AppSpacing.gapXs,
                   Text(

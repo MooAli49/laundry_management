@@ -76,14 +76,16 @@ class _StoreStorageDialogState extends State<StoreStorageDialog> {
   @override
   Widget build(BuildContext context) {
     final isBulk = widget.itemsToStore.length > 1;
-    final single = widget.itemsToStore.isNotEmpty ? widget.itemsToStore.first : null;
+    final single = widget.itemsToStore.isNotEmpty
+        ? widget.itemsToStore.first
+        : null;
     final hasLocations = widget.availableLocations.isNotEmpty;
 
     final summaryText = isBulk
         ? 'عدد العناصر: ${widget.itemsToStore.length}'
         : (single != null
-            ? 'العنصر: ${single.orderItem.itemTypeNameSnapshot} — الطلب #${single.orderNumber}'
-            : '');
+              ? 'العنصر: ${single.orderItem.itemTypeNameSnapshot} — الطلب #${single.orderNumber}'
+              : '');
 
     return Dialog(
       shape: RoundedRectangleBorder(
@@ -111,8 +113,14 @@ class _StoreStorageDialogState extends State<StoreStorageDialog> {
                     ),
                   ),
                   IconButton(
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, size: 20, color: AppColors.textTertiary),
+                    onPressed: _isLoading
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.close,
+                      size: 20,
+                      color: AppColors.textTertiary,
+                    ),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
@@ -123,14 +131,21 @@ class _StoreStorageDialogState extends State<StoreStorageDialog> {
               // Error banner if any
               if (_errorMessage != null) ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.errorLight,
                     borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline, color: AppColors.error, size: 18),
+                      const Icon(
+                        Icons.error_outline,
+                        color: AppColors.error,
+                        size: 18,
+                      ),
                       AppSpacing.gapHorizontalSm,
                       Expanded(
                         child: Text(
@@ -150,7 +165,10 @@ class _StoreStorageDialogState extends State<StoreStorageDialog> {
               // Summary Banner (Figma: rounded-xl bg-secondary px-4 py-3 text-[14px] text-text-secondary)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.secondary,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
@@ -169,7 +187,10 @@ class _StoreStorageDialogState extends State<StoreStorageDialog> {
               if (!hasLocations) ...[
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.warningLight,
                     borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
@@ -222,7 +243,10 @@ class _StoreStorageDialogState extends State<StoreStorageDialog> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                      borderSide: const BorderSide(
+                        color: AppColors.primary,
+                        width: 1.5,
+                      ),
                     ),
                     filled: true,
                     fillColor: AppColors.surface,
@@ -272,7 +296,9 @@ class _StoreStorageDialogState extends State<StoreStorageDialog> {
                   AppButton(
                     label: AppStrings.cancel,
                     variant: AppButtonVariant.secondary,
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isLoading
+                        ? null
+                        : () => Navigator.of(context).pop(),
                   ),
                 ],
               ),

@@ -16,7 +16,8 @@ class CustomerFormDialog extends StatefulWidget {
     required String name,
     required String phone,
     String? notes,
-  }) onSave;
+  })
+  onSave;
   final Future<Customer?> Function(String phone)? onFindDuplicate;
   final void Function(Customer existingCustomer)? onViewExisting;
 
@@ -47,8 +48,12 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.customer?.name ?? '');
-    _phoneController = TextEditingController(text: widget.customer?.phone ?? '');
-    _notesController = TextEditingController(text: widget.customer?.notes ?? '');
+    _phoneController = TextEditingController(
+      text: widget.customer?.phone ?? '',
+    );
+    _notesController = TextEditingController(
+      text: widget.customer?.notes ?? '',
+    );
   }
 
   @override
@@ -153,7 +158,9 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    _isEditing ? AppStrings.editCustomerTitle : AppStrings.addCustomerTitle,
+                    _isEditing
+                        ? AppStrings.editCustomerTitle
+                        : AppStrings.addCustomerTitle,
                     style: AppTextStyles.titleLarge,
                   ),
                   IconButton(
@@ -176,7 +183,10 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.error_outline, color: AppColors.error),
+                          const Icon(
+                            Icons.error_outline,
+                            color: AppColors.error,
+                          ),
                           AppSpacing.gapHorizontalSm,
                           Expanded(
                             child: Text(
@@ -188,7 +198,8 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
                           ),
                         ],
                       ),
-                      if (_duplicateCustomer != null && widget.onViewExisting != null) ...[
+                      if (_duplicateCustomer != null &&
+                          widget.onViewExisting != null) ...[
                         AppSpacing.gapSm,
                         Align(
                           alignment: AlignmentDirectional.centerEnd,
@@ -198,7 +209,10 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
                               Navigator.of(context).pop();
                               widget.onViewExisting!(existing);
                             },
-                            icon: const Icon(Icons.visibility_outlined, size: 16),
+                            icon: const Icon(
+                              Icons.visibility_outlined,
+                              size: 16,
+                            ),
                             label: const Text(AppStrings.viewCustomer),
                             style: TextButton.styleFrom(
                               foregroundColor: AppColors.primary,
@@ -241,11 +255,15 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
                   AppButton(
                     label: AppStrings.cancel,
                     variant: AppButtonVariant.secondary,
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isLoading
+                        ? null
+                        : () => Navigator.of(context).pop(),
                   ),
                   AppSpacing.gapHorizontalMd,
                   AppButton(
-                    label: _isEditing ? AppStrings.saveChanges : AppStrings.saveCustomer,
+                    label: _isEditing
+                        ? AppStrings.saveChanges
+                        : AppStrings.saveCustomer,
                     isLoading: _isLoading,
                     onPressed: _handleSave,
                   ),

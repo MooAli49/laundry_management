@@ -41,7 +41,9 @@ void main() {
           await initialDb.customStatement(
             'DROP INDEX IF EXISTS idx_sync_operations_status_next_retry;',
           );
-          await initialDb.customStatement('DROP TABLE IF EXISTS sync_operations;');
+          await initialDb.customStatement(
+            'DROP TABLE IF EXISTS sync_operations;',
+          );
           await initialDb.customStatement('''
             CREATE TABLE sync_operations (
               id TEXT NOT NULL PRIMARY KEY,
@@ -123,9 +125,9 @@ void main() {
 
         try {
           // Trigger migration by opening the database with a query
-          final operations = await (migratedDb.select(migratedDb.syncOperations)
-                ..orderBy([(t) => OrderingTerm.asc(t.id)]))
-              .get();
+          final operations = await (migratedDb.select(
+            migratedDb.syncOperations,
+          )..orderBy([(t) => OrderingTerm.asc(t.id)])).get();
 
           // 1. Verify rows survived without data loss
           expect(operations.length, 2);
@@ -181,14 +183,17 @@ void main() {
           );
 
           // Verify schema version is now 3
-          final versionRow =
-              await migratedDb.customSelect('PRAGMA user_version;').getSingle();
+          final versionRow = await migratedDb
+              .customSelect('PRAGMA user_version;')
+              .getSingle();
           expect(versionRow.read<int>('user_version'), equals(3));
           expect(migratedDb.schemaVersion, equals(3));
 
           // 8. Verify inserting a record with nextRetryAt works on migrated schema
           final retryTime = DateTime.now().add(const Duration(minutes: 5));
-          await migratedDb.into(migratedDb.syncOperations).insert(
+          await migratedDb
+              .into(migratedDb.syncOperations)
+              .insert(
                 SyncOperationsCompanion.insert(
                   id: 'op-v3-new-retry',
                   entityType: 'customer',
@@ -200,9 +205,9 @@ void main() {
                 ),
               );
 
-          final insertedRow = await (migratedDb.select(migratedDb.syncOperations)
-                ..where((t) => t.id.equals('op-v3-new-retry')))
-              .getSingle();
+          final insertedRow = await (migratedDb.select(
+            migratedDb.syncOperations,
+          )..where((t) => t.id.equals('op-v3-new-retry'))).getSingle();
           expect(insertedRow.nextRetryAt, isNotNull);
           expect(insertedRow.status, equals('pending'));
         } finally {

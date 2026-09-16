@@ -19,10 +19,10 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
     required StorageRecordsDao storageRecordsDao,
     required SyncOperationsDao syncOperationsDao,
     required app_db.AppDatabase db,
-  })  : _storageLocationsDao = storageLocationsDao,
-        _storageRecordsDao = storageRecordsDao,
-        _syncOperationsDao = syncOperationsDao,
-        _db = db;
+  }) : _storageLocationsDao = storageLocationsDao,
+       _storageRecordsDao = storageRecordsDao,
+       _syncOperationsDao = syncOperationsDao,
+       _db = db;
 
   @override
   Future<StorageLocation> createStorageLocation(
@@ -71,7 +71,9 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
   }) async {
     try {
       return await _db.transaction(() async {
-        final existing = await _storageLocationsDao.getLocationById(location.id);
+        final existing = await _storageLocationsDao.getLocationById(
+          location.id,
+        );
         if (existing == null) {
           throw ValidationFailure('Storage location not found');
         }
@@ -143,9 +145,13 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
   }
 
   @override
-  Future<List<StorageLocation>> getCompatibleLocationsForItemType(String itemTypeId) async {
+  Future<List<StorageLocation>> getCompatibleLocationsForItemType(
+    String itemTypeId,
+  ) async {
     try {
-      final rows = await _storageLocationsDao.getCompatibleLocationsForItemType(itemTypeId);
+      final rows = await _storageLocationsDao.getCompatibleLocationsForItemType(
+        itemTypeId,
+      );
       return rows.map(_mapToDomain).toList();
     } catch (e) {
       if (e is Failure) rethrow;
@@ -184,7 +190,8 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
           throw ValidationFailure('Storage location not found');
         }
 
-        final activeStored = await _storageRecordsDao.getActiveRecordsForLocation(id);
+        final activeStored = await _storageRecordsDao
+            .getActiveRecordsForLocation(id);
         if (activeStored.isNotEmpty) {
           throw BusinessRuleFailure(
             'Cannot deactivate storage location while items are stored in it',
@@ -207,7 +214,9 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
   @override
   Future<List<String>> getSupportedItemTypeIds(String storageLocationId) async {
     try {
-      return await _storageLocationsDao.getSupportedItemTypeIds(storageLocationId);
+      return await _storageLocationsDao.getSupportedItemTypeIds(
+        storageLocationId,
+      );
     } catch (e) {
       if (e is Failure) rethrow;
       throw DatabaseFailure(e.toString());

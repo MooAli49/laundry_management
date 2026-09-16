@@ -54,33 +54,36 @@ void main() {
   });
 
   group('CustomersDao', () {
-    test('inserts, gets, searches customers, and checks order history', () async {
-      final now = DateTime.now();
-      await customersDao.insertCustomer(
-        CustomersCompanion(
-          id: const Value('cust-1'),
-          name: const Value('أحمد محمد'),
-          phone: const Value('01012345678'),
-          notes: const Value('عميل مميز'),
-          createdAt: Value(now),
-          updatedAt: Value(now),
-        ),
-      );
+    test(
+      'inserts, gets, searches customers, and checks order history',
+      () async {
+        final now = DateTime.now();
+        await customersDao.insertCustomer(
+          CustomersCompanion(
+            id: const Value('cust-1'),
+            name: const Value('أحمد محمد'),
+            phone: const Value('01012345678'),
+            notes: const Value('عميل مميز'),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
 
-      final customer = await customersDao.getCustomerById('cust-1');
-      expect(customer, isNotNull);
-      expect(customer!.name, 'أحمد محمد');
+        final customer = await customersDao.getCustomerById('cust-1');
+        expect(customer, isNotNull);
+        expect(customer!.name, 'أحمد محمد');
 
-      final byPhone = await customersDao.getCustomerByPhone('01012345678');
-      expect(byPhone, isNotNull);
-      expect(byPhone!.id, 'cust-1');
+        final byPhone = await customersDao.getCustomerByPhone('01012345678');
+        expect(byPhone, isNotNull);
+        expect(byPhone!.id, 'cust-1');
 
-      final searchResults = await customersDao.searchCustomers(query: 'أحمد');
-      expect(searchResults.length, 1);
+        final searchResults = await customersDao.searchCustomers(query: 'أحمد');
+        expect(searchResults.length, 1);
 
-      final hasHistory = await customersDao.hasOrderHistory('cust-1');
-      expect(hasHistory, isFalse);
-    });
+        final hasHistory = await customersDao.hasOrderHistory('cust-1');
+        expect(hasHistory, isFalse);
+      },
+    );
   });
 
   group('OrdersDao', () {
@@ -117,81 +120,86 @@ void main() {
       expect(orderNumber2, '$year-002');
     });
 
-    test('inserts order with items and carpet details and queries them', () async {
-      final now = DateTime.now();
-      await customersDao.insertCustomer(
-        CustomersCompanion(
-          id: const Value('cust-1'),
-          name: const Value('خالد'),
-          phone: const Value('01011112222'),
-          createdAt: Value(now),
-          updatedAt: Value(now),
-        ),
-      );
+    test(
+      'inserts order with items and carpet details and queries them',
+      () async {
+        final now = DateTime.now();
+        await customersDao.insertCustomer(
+          CustomersCompanion(
+            id: const Value('cust-1'),
+            name: const Value('خالد'),
+            phone: const Value('01011112222'),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
 
-      // Get seeded item type and create service
-      final itemTypes = await itemTypesDao.getAllItemTypes();
-      final carpetType = itemTypes.firstWhere((t) => t.name == 'سجاد');
+        // Get seeded item type and create service
+        final itemTypes = await itemTypesDao.getAllItemTypes();
+        final carpetType = itemTypes.firstWhere((t) => t.name == 'سجاد');
 
-      await servicesDao.insertService(
-        ServicesCompanion(
-          id: const Value('srv-1'),
-          name: const Value('غسيل سجاد'),
-          pricingType: const Value('perSquareMeter'),
-          price: const Value(3000),
-          createdAt: Value(now),
-          updatedAt: Value(now),
-        ),
-      );
+        await servicesDao.insertService(
+          ServicesCompanion(
+            id: const Value('srv-1'),
+            name: const Value('غسيل سجاد'),
+            pricingType: const Value('perSquareMeter'),
+            price: const Value(3000),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
 
-      await ordersDao.insertOrder(
-        OrdersCompanion(
-          id: const Value('ord-1'),
-          orderNumber: const Value('26-001'),
-          customerId: const Value('cust-1'),
-          expectedPickupDate: Value(now),
-          subtotal: const Value(18000),
-          total: const Value(18000),
-          createdAt: Value(now),
-          updatedAt: Value(now),
-        ),
-      );
+        await ordersDao.insertOrder(
+          OrdersCompanion(
+            id: const Value('ord-1'),
+            orderNumber: const Value('26-001'),
+            customerId: const Value('cust-1'),
+            expectedPickupDate: Value(now),
+            subtotal: const Value(18000),
+            total: const Value(18000),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
 
-      await ordersDao.insertOrderItem(
-        OrderItemsCompanion(
-          id: const Value('item-1'),
-          orderId: const Value('ord-1'),
-          itemTypeId: Value(carpetType.id),
-          serviceId: const Value('srv-1'),
-          itemTypeNameSnapshot: const Value('سجاد'),
-          serviceNameSnapshot: const Value('غسيل سجاد'),
-          pricingType: const Value('perSquareMeter'),
-          quantity: const Value(6.0),
-          unitPrice: const Value(3000),
-          calculatedTotal: const Value(18000),
-          createdAt: Value(now),
-          updatedAt: Value(now),
-        ),
-      );
+        await ordersDao.insertOrderItem(
+          OrderItemsCompanion(
+            id: const Value('item-1'),
+            orderId: const Value('ord-1'),
+            itemTypeId: Value(carpetType.id),
+            serviceId: const Value('srv-1'),
+            itemTypeNameSnapshot: const Value('سجاد'),
+            serviceNameSnapshot: const Value('غسيل سجاد'),
+            pricingType: const Value('perSquareMeter'),
+            quantity: const Value(6.0),
+            unitPrice: const Value(3000),
+            calculatedTotal: const Value(18000),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
 
-      await ordersDao.insertOrderItemCarpet(
-        OrderItemCarpetsCompanion(
-          id: const Value('carpet-1'),
-          orderItemId: const Value('item-1'),
-          length: const Value(2.0),
-          width: const Value(3.0),
-          area: const Value(6.0),
-          createdAt: Value(now),
-          updatedAt: Value(now),
-        ),
-      );
+        await ordersDao.insertOrderItemCarpet(
+          OrderItemCarpetsCompanion(
+            id: const Value('carpet-1'),
+            orderItemId: const Value('item-1'),
+            length: const Value(2.0),
+            width: const Value(3.0),
+            area: const Value(6.0),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
 
-      final itemsWithCarpets = await ordersDao.getOrderItemsWithCarpets('ord-1');
-      expect(itemsWithCarpets.length, 1);
-      expect(itemsWithCarpets.first.item.id, 'item-1');
-      expect(itemsWithCarpets.first.carpet, isNotNull);
-      expect(itemsWithCarpets.first.carpet!.area, 6.0);
-    });
+        final itemsWithCarpets = await ordersDao.getOrderItemsWithCarpets(
+          'ord-1',
+        );
+        expect(itemsWithCarpets.length, 1);
+        expect(itemsWithCarpets.first.item.id, 'item-1');
+        expect(itemsWithCarpets.first.carpet, isNotNull);
+        expect(itemsWithCarpets.first.carpet!.area, 6.0);
+      },
+    );
   });
 
   group('PaymentsDao', () {
@@ -252,96 +260,107 @@ void main() {
   });
 
   group('StorageRecordsDao & StorageLocationsDao', () {
-    test('enforces storage location links and active record tracking', () async {
-      final now = DateTime.now();
-      await storageLocationsDao.insertLocation(
-        StorageLocationsCompanion(
-          id: const Value('loc-1'),
-          name: const Value('رف 1'),
-          isActive: const Value(true),
-          createdAt: Value(now),
-          updatedAt: Value(now),
-        ),
-      );
+    test(
+      'enforces storage location links and active record tracking',
+      () async {
+        final now = DateTime.now();
+        await storageLocationsDao.insertLocation(
+          StorageLocationsCompanion(
+            id: const Value('loc-1'),
+            name: const Value('رف 1'),
+            isActive: const Value(true),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
 
-      final locations = await storageLocationsDao.getActiveLocations();
-      expect(locations.length, 1);
-      expect(locations.first.name, 'رف 1');
+        final locations = await storageLocationsDao.getActiveLocations();
+        expect(locations.length, 1);
+        expect(locations.first.name, 'رف 1');
 
-      // Setup customer, order, and item for storage
-      await customersDao.insertCustomer(
-        CustomersCompanion(
-          id: const Value('cust-1'),
-          name: const Value('سعيد'),
-          phone: const Value('01033334444'),
-          createdAt: Value(now),
-          updatedAt: Value(now),
-        ),
-      );
-      final itemTypes = await itemTypesDao.getAllItemTypes();
-      await servicesDao.insertService(
-        ServicesCompanion(
-          id: const Value('srv-1'),
-          name: const Value('غسيل'),
-          pricingType: const Value('perPiece'),
-          price: const Value(1000),
-          createdAt: Value(now),
-          updatedAt: Value(now),
-        ),
-      );
-      await ordersDao.insertOrder(
-        OrdersCompanion(
-          id: const Value('ord-1'),
-          orderNumber: const Value('26-001'),
-          customerId: const Value('cust-1'),
-          expectedPickupDate: Value(now),
-          subtotal: const Value(1000),
-          total: const Value(1000),
-          createdAt: Value(now),
-          updatedAt: Value(now),
-        ),
-      );
-      await ordersDao.insertOrderItem(
-        OrderItemsCompanion(
-          id: const Value('item-1'),
-          orderId: const Value('ord-1'),
-          itemTypeId: Value(itemTypes.first.id),
-          serviceId: const Value('srv-1'),
-          itemTypeNameSnapshot: const Value('ملابس'),
-          serviceNameSnapshot: const Value('غسيل'),
-          pricingType: const Value('perPiece'),
-          quantity: const Value(1.0),
-          unitPrice: const Value(1000),
-          calculatedTotal: const Value(1000),
-          createdAt: Value(now),
-          updatedAt: Value(now),
-        ),
-      );
+        // Setup customer, order, and item for storage
+        await customersDao.insertCustomer(
+          CustomersCompanion(
+            id: const Value('cust-1'),
+            name: const Value('سعيد'),
+            phone: const Value('01033334444'),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
+        final itemTypes = await itemTypesDao.getAllItemTypes();
+        await servicesDao.insertService(
+          ServicesCompanion(
+            id: const Value('srv-1'),
+            name: const Value('غسيل'),
+            pricingType: const Value('perPiece'),
+            price: const Value(1000),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
+        await ordersDao.insertOrder(
+          OrdersCompanion(
+            id: const Value('ord-1'),
+            orderNumber: const Value('26-001'),
+            customerId: const Value('cust-1'),
+            expectedPickupDate: Value(now),
+            subtotal: const Value(1000),
+            total: const Value(1000),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
+        await ordersDao.insertOrderItem(
+          OrderItemsCompanion(
+            id: const Value('item-1'),
+            orderId: const Value('ord-1'),
+            itemTypeId: Value(itemTypes.first.id),
+            serviceId: const Value('srv-1'),
+            itemTypeNameSnapshot: const Value('ملابس'),
+            serviceNameSnapshot: const Value('غسيل'),
+            pricingType: const Value('perPiece'),
+            quantity: const Value(1.0),
+            unitPrice: const Value(1000),
+            calculatedTotal: const Value(1000),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
 
-      // Store item
-      await storageRecordsDao.insertRecord(
-        StorageRecordsCompanion(
-          id: const Value('rec-1'),
-          orderItemId: const Value('item-1'),
-          storageLocationId: const Value('loc-1'),
-          isActive: const Value(true),
-          createdAt: Value(now),
-          updatedAt: Value(now),
-        ),
-      );
+        // Store item
+        await storageRecordsDao.insertRecord(
+          StorageRecordsCompanion(
+            id: const Value('rec-1'),
+            orderItemId: const Value('item-1'),
+            storageLocationId: const Value('loc-1'),
+            isActive: const Value(true),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
 
-      final activeRec = await storageRecordsDao.getActiveRecordForOrderItem('item-1');
-      expect(activeRec, isNotNull);
-      expect(activeRec!.storageLocationId, 'loc-1');
+        final activeRec = await storageRecordsDao.getActiveRecordForOrderItem(
+          'item-1',
+        );
+        expect(activeRec, isNotNull);
+        expect(activeRec!.storageLocationId, 'loc-1');
 
-      final allStored = await storageRecordsDao.areAllOrderItemsStored('ord-1');
-      expect(allStored, isTrue);
+        final allStored = await storageRecordsDao.areAllOrderItemsStored(
+          'ord-1',
+        );
+        expect(allStored, isTrue);
 
-      // Deactivate record
-      await storageRecordsDao.deactivateActiveRecord('item-1', DateTime.now());
-      final afterDeactivation = await storageRecordsDao.getActiveRecordForOrderItem('item-1');
-      expect(afterDeactivation, isNull);
-    });
+        // Deactivate record
+        await storageRecordsDao.deactivateActiveRecord(
+          'item-1',
+          DateTime.now(),
+        );
+        final afterDeactivation = await storageRecordsDao
+            .getActiveRecordForOrderItem('item-1');
+        expect(afterDeactivation, isNull);
+      },
+    );
   });
 
   group('ItemDefinitionsDao & CarpetSizesDao & ExpenseCategoriesDao', () {
@@ -359,7 +378,9 @@ void main() {
         ),
       );
 
-      final defs = await itemDefinitionsDao.getDefinitionsForItemType(itemTypes.first.id);
+      final defs = await itemDefinitionsDao.getDefinitionsForItemType(
+        itemTypes.first.id,
+      );
       expect(defs.length, 1);
       expect(defs.first.name, 'قميص حرير');
 
@@ -425,10 +446,13 @@ void main() {
       expect(pending.first.status, 'pending');
 
       await syncOperationsDao.markOperationSynced(pending.first.id);
-      final pendingAfterComplete = await syncOperationsDao.getPendingOperations();
+      final pendingAfterComplete = await syncOperationsDao
+          .getPendingOperations();
       expect(pendingAfterComplete.isEmpty, isTrue);
 
-      final row = await (db.select(db.syncOperations)..where((t) => t.id.equals(pending.first.id))).getSingle();
+      final row = await (db.select(
+        db.syncOperations,
+      )..where((t) => t.id.equals(pending.first.id))).getSingle();
       expect(row.status, 'synced');
     });
   });

@@ -90,7 +90,6 @@ class _OrderItemFormState extends State<OrderItemForm> {
   String _pricingTypeLabel(PricingType type) {
     return switch (type) {
       PricingType.perPiece => 'بالقطعة',
-      PricingType.perKilogram => 'بالكيلوجرام',
       PricingType.perSquareMeter => 'بالمتر المربع',
       PricingType.fixedPrice => 'سعر ثابت',
     };

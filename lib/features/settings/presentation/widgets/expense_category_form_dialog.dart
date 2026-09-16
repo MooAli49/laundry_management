@@ -39,8 +39,7 @@ class _ExpenseCategoryFormDialogState extends State<ExpenseCategoryFormDialog> {
   @override
   void initState() {
     super.initState();
-    _nameController =
-        TextEditingController(text: widget.category?.name ?? '');
+    _nameController = TextEditingController(text: widget.category?.name ?? '');
   }
 
   @override
@@ -59,8 +58,9 @@ class _ExpenseCategoryFormDialogState extends State<ExpenseCategoryFormDialog> {
     if (widget.category == null) {
       success = await cubit.createCategory(_nameController.text.trim());
     } else {
-      final updated =
-          widget.category!.copyWith(name: _nameController.text.trim());
+      final updated = widget.category!.copyWith(
+        name: _nameController.text.trim(),
+      );
       success = await cubit.updateCategory(updated);
     }
 
@@ -109,8 +109,7 @@ class _ExpenseCategoryFormDialogState extends State<ExpenseCategoryFormDialog> {
                     padding: const EdgeInsets.all(AppSpacing.md),
                     decoration: BoxDecoration(
                       color: AppColors.errorLight,
-                      borderRadius:
-                          BorderRadius.circular(AppSpacing.radiusMd),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                       border: Border.all(
                         color: AppColors.error.withValues(alpha: 0.3),
                       ),
@@ -152,10 +151,7 @@ class _ExpenseCategoryFormDialogState extends State<ExpenseCategoryFormDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    AppButton(
-                      label: AppStrings.save,
-                      onPressed: _handleSubmit,
-                    ),
+                    AppButton(label: AppStrings.save, onPressed: _handleSubmit),
                     AppSpacing.gapHorizontalMd,
                     AppButton(
                       label: AppStrings.cancel,

@@ -239,6 +239,7 @@ class RemoteApiDispatcher {
         return _storageApi.updateStorageRecord(opId, entityId, payload);
       case 'unstore':
         return _storageApi.updateStorageRecord(opId, entityId, {
+          'is_active': false,
           'isActive': false,
           ...payload,
         });
@@ -280,11 +281,13 @@ class RemoteApiDispatcher {
         return _masterDataApi.updateExpenseCategory(opId, entityId, payload);
       case 'activate':
         return _masterDataApi.updateExpenseCategory(opId, entityId, {
+          'is_active': true,
           'isActive': true,
           ...payload,
         });
       case 'deactivate':
         return _masterDataApi.updateExpenseCategory(opId, entityId, {
+          'is_active': false,
           'isActive': false,
           ...payload,
         });
@@ -308,11 +311,13 @@ class RemoteApiDispatcher {
         return _masterDataApi.updateService(opId, entityId, payload);
       case 'activate':
         return _masterDataApi.updateService(opId, entityId, {
+          'is_active': true,
           'isActive': true,
           ...payload,
         });
       case 'deactivate':
         return _masterDataApi.updateService(opId, entityId, {
+          'is_active': false,
           'isActive': false,
           ...payload,
         });

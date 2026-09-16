@@ -92,4 +92,3 @@ class PaymentsDao extends DatabaseAccessor<app_db.AppDatabase> {
     return map;
   }
 }
-

@@ -20,13 +20,13 @@ class CustomerOrderAggregate {
   });
 
   const CustomerOrderAggregate.empty()
-      : totalOrders = 0,
-        processingOrders = 0,
-        readyOrders = 0,
-        completedOrders = 0,
-        cancelledOrders = 0,
-        totalPaid = Money.zero,
-        totalRemaining = Money.zero;
+    : totalOrders = 0,
+      processingOrders = 0,
+      readyOrders = 0,
+      completedOrders = 0,
+      cancelledOrders = 0,
+      totalPaid = Money.zero,
+      totalRemaining = Money.zero;
 
   int get activeOrders => processingOrders + readyOrders;
 }

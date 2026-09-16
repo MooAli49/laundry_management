@@ -23,15 +23,13 @@ import '../widgets/customer_form_dialog.dart';
 class CustomerDetailScreen extends StatelessWidget {
   final String customerId;
 
-  const CustomerDetailScreen({
-    super.key,
-    required this.customerId,
-  });
+  const CustomerDetailScreen({super.key, required this.customerId});
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => getIt<CustomerDetailCubit>()..loadCustomerDetail(customerId),
+      create: (_) =>
+          getIt<CustomerDetailCubit>()..loadCustomerDetail(customerId),
       child: _CustomerDetailView(customerId: customerId),
     );
   }
@@ -42,7 +40,10 @@ class _CustomerDetailView extends StatelessWidget {
 
   const _CustomerDetailView({required this.customerId});
 
-  void _showEditCustomerDialog(BuildContext context, CustomerDetailState state) {
+  void _showEditCustomerDialog(
+    BuildContext context,
+    CustomerDetailState state,
+  ) {
     if (state.data == null) return;
     final cubit = context.read<CustomerDetailCubit>();
     final customer = state.data!.customer;
@@ -165,8 +166,12 @@ class _CustomerDetailView extends StatelessWidget {
                         icon: Icons.add,
                         onPressed: () {
                           context
-                              .push('${AppRoutes.ordersNew}?customerId=${customer.id}')
-                              .then((_) => cubit.loadCustomerDetail(customerId));
+                              .push(
+                                '${AppRoutes.ordersNew}?customerId=${customer.id}',
+                              )
+                              .then(
+                                (_) => cubit.loadCustomerDetail(customerId),
+                              );
                         },
                       ),
                       AppSpacing.gapHorizontalSm,
@@ -174,19 +179,23 @@ class _CustomerDetailView extends StatelessWidget {
                         label: AppStrings.editCustomer,
                         variant: AppButtonVariant.secondary,
                         icon: Icons.edit_outlined,
-                        onPressed: () => _showEditCustomerDialog(context, state),
+                        onPressed: () =>
+                            _showEditCustomerDialog(context, state),
                       ),
                     ],
                   ),
 
-                  if (customer.notes != null && customer.notes!.trim().isNotEmpty) ...[
+                  if (customer.notes != null &&
+                      customer.notes!.trim().isNotEmpty) ...[
                     AppSpacing.gapMd,
                     Container(
                       width: double.infinity,
                       padding: AppSpacing.paddingMd,
                       decoration: BoxDecoration(
                         color: AppColors.backgroundSecondary,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMd,
+                        ),
                         border: Border.all(color: AppColors.border),
                       ),
                       child: Row(
@@ -255,7 +264,8 @@ class _CustomerDetailView extends StatelessWidget {
                       Expanded(
                         child: _KpiCard(
                           title: AppStrings.totalPaid,
-                          value: '${data.totalPaid.toEgp.toStringAsFixed(2)} ${AppStrings.currency}',
+                          value:
+                              '${data.totalPaid.toEgp.toStringAsFixed(2)} ${AppStrings.currency}',
                           icon: Icons.payments_outlined,
                           color: AppColors.success,
                           backgroundColor: AppColors.successLight,
@@ -266,7 +276,8 @@ class _CustomerDetailView extends StatelessWidget {
                       Expanded(
                         child: _KpiCard(
                           title: AppStrings.totalRemaining,
-                          value: '${data.totalRemaining.toEgp.toStringAsFixed(2)} ${AppStrings.currency}',
+                          value:
+                              '${data.totalRemaining.toEgp.toStringAsFixed(2)} ${AppStrings.currency}',
                           icon: Icons.account_balance_wallet_outlined,
                           color: data.totalRemaining.isZero
                               ? AppColors.textSecondary
@@ -302,8 +313,12 @@ class _CustomerDetailView extends StatelessWidget {
                         icon: Icons.add,
                         onPressed: () {
                           context
-                              .push('${AppRoutes.ordersNew}?customerId=${customer.id}')
-                              .then((_) => cubit.loadCustomerDetail(customerId));
+                              .push(
+                                '${AppRoutes.ordersNew}?customerId=${customer.id}',
+                              )
+                              .then(
+                                (_) => cubit.loadCustomerDetail(customerId),
+                              );
                         },
                       ),
                     )
@@ -317,13 +332,16 @@ class _CustomerDetailView extends StatelessWidget {
                         final order = data.orders[index];
                         final remaining = data.remainingAmounts[order.id];
                         final paid = data.paidAmounts[order.id] ?? Money.zero;
-                        final isFullyPaid = remaining == null || remaining.isZero;
+                        final isFullyPaid =
+                            remaining == null || remaining.isZero;
 
                         return AppCard(
                           onTap: () {
                             context
                                 .push(AppRoutes.orderDetailPath(order.id))
-                                .then((_) => cubit.loadCustomerDetail(customerId));
+                                .then(
+                                  (_) => cubit.loadCustomerDetail(customerId),
+                                );
                           },
                           padding: AppSpacing.paddingMd,
                           child: Row(
@@ -334,8 +352,9 @@ class _CustomerDetailView extends StatelessWidget {
                                 height: 40,
                                 decoration: BoxDecoration(
                                   color: AppColors.primaryLighter,
-                                  borderRadius:
-                                      BorderRadius.circular(AppSpacing.radiusSm),
+                                  borderRadius: BorderRadius.circular(
+                                    AppSpacing.radiusSm,
+                                  ),
                                 ),
                                 alignment: Alignment.center,
                                 child: const Icon(
@@ -355,9 +374,10 @@ class _CustomerDetailView extends StatelessWidget {
                                       children: [
                                         Text(
                                           order.orderNumber,
-                                          style: AppTextStyles.titleMedium.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                          style: AppTextStyles.titleMedium
+                                              .copyWith(
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                         ),
                                         AppSpacing.gapHorizontalSm,
                                         OrderStatusBadge(status: order.status),
@@ -387,7 +407,9 @@ class _CustomerDetailView extends StatelessWidget {
                                   ),
                                   AppSpacing.gapXs,
                                   Text(
-                                    AppStrings.paidAmount(paid.toEgp.toStringAsFixed(2)),
+                                    AppStrings.paidAmount(
+                                      paid.toEgp.toStringAsFixed(2),
+                                    ),
                                     style: AppTextStyles.bodySmall.copyWith(
                                       color: AppColors.textSecondary,
                                     ),
@@ -396,7 +418,9 @@ class _CustomerDetailView extends StatelessWidget {
                                   Text(
                                     isFullyPaid
                                         ? AppStrings.fullyPaid
-                                        : AppStrings.remainingAmount(remaining.toEgp.toStringAsFixed(2)),
+                                        : AppStrings.remainingAmount(
+                                            remaining.toEgp.toStringAsFixed(2),
+                                          ),
                                     style: AppTextStyles.bodySmall.copyWith(
                                       color: isFullyPaid
                                           ? AppColors.success

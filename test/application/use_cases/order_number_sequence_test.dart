@@ -37,45 +37,49 @@ void main() {
     expect(nextNumber, '$yearPrefix-001');
   });
 
-  test('increments sequentially beyond 999 without lexical sorting bug (e.g. 999 -> 1000 -> 1001)', () async {
-    // Insert order with sequence 999
-    await ordersDao.insertOrder(
-      OrdersCompanion.insert(
-        id: 'ord-999',
-        orderNumber: '$yearPrefix-999',
-        customerId: 'cust-seq',
-        expectedPickupDate: now,
-        subtotal: 1000,
-        total: 1000,
-        createdAt: now,
-        updatedAt: now,
-      ),
-    );
+  test(
+    'increments sequentially beyond 999 without lexical sorting bug (e.g. 999 -> 1000 -> 1001)',
+    () async {
+      // Insert order with sequence 999
+      await ordersDao.insertOrder(
+        OrdersCompanion.insert(
+          id: 'ord-999',
+          orderNumber: '$yearPrefix-999',
+          customerId: 'cust-seq',
+          expectedPickupDate: now,
+          subtotal: 1000,
+          total: 1000,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
 
-    // Next number should be 1000
-    final nextNumber1000 = await ordersDao.generateNextOrderNumber();
-    expect(nextNumber1000, '$yearPrefix-1000');
+      // Next number should be 1000
+      final nextNumber1000 = await ordersDao.generateNextOrderNumber();
+      expect(nextNumber1000, '$yearPrefix-1000');
 
-    // Insert order with sequence 1000
-    await ordersDao.insertOrder(
-      OrdersCompanion.insert(
-        id: 'ord-1000',
-        orderNumber: '$yearPrefix-1000',
-        customerId: 'cust-seq',
-        expectedPickupDate: now,
-        subtotal: 1000,
-        total: 1000,
-        createdAt: now,
-        updatedAt: now,
-      ),
-    );
+      // Insert order with sequence 1000
+      await ordersDao.insertOrder(
+        OrdersCompanion.insert(
+          id: 'ord-1000',
+          orderNumber: '$yearPrefix-1000',
+          customerId: 'cust-seq',
+          expectedPickupDate: now,
+          subtotal: 1000,
+          total: 1000,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
 
-    // Next number must be 1001, NOT duplicate 1000 due to '26-999' > '26-1000' lexical sort
-    final nextNumber1001 = await ordersDao.generateNextOrderNumber();
-    expect(
-      nextNumber1001,
-      '$yearPrefix-1001',
-      reason: 'Length-aware sorting ensures 26-1000 takes precedence over 26-999',
-    );
-  });
+      // Next number must be 1001, NOT duplicate 1000 due to '26-999' > '26-1000' lexical sort
+      final nextNumber1001 = await ordersDao.generateNextOrderNumber();
+      expect(
+        nextNumber1001,
+        '$yearPrefix-1001',
+        reason:
+            'Length-aware sorting ensures 26-1000 takes precedence over 26-999',
+      );
+    },
+  );
 }

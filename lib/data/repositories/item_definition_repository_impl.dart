@@ -16,12 +16,14 @@ class ItemDefinitionRepositoryImpl implements ItemDefinitionRepository {
     required ItemDefinitionsDao itemDefinitionsDao,
     required SyncOperationsDao syncOperationsDao,
     required app_db.AppDatabase db,
-  })  : _itemDefinitionsDao = itemDefinitionsDao,
-        _syncOperationsDao = syncOperationsDao,
-        _db = db;
+  }) : _itemDefinitionsDao = itemDefinitionsDao,
+       _syncOperationsDao = syncOperationsDao,
+       _db = db;
 
   @override
-  Future<ItemDefinition> createItemDefinition(ItemDefinition itemDefinition) async {
+  Future<ItemDefinition> createItemDefinition(
+    ItemDefinition itemDefinition,
+  ) async {
     try {
       return await _db.transaction(() async {
         await _itemDefinitionsDao.insertItemDefinition(
@@ -52,10 +54,14 @@ class ItemDefinitionRepositoryImpl implements ItemDefinitionRepository {
   }
 
   @override
-  Future<ItemDefinition> updateItemDefinition(ItemDefinition itemDefinition) async {
+  Future<ItemDefinition> updateItemDefinition(
+    ItemDefinition itemDefinition,
+  ) async {
     try {
       return await _db.transaction(() async {
-        final existing = await _itemDefinitionsDao.getItemDefinitionById(itemDefinition.id);
+        final existing = await _itemDefinitionsDao.getItemDefinitionById(
+          itemDefinition.id,
+        );
         if (existing == null) {
           throw ValidationFailure('ItemDefinition not found');
         }

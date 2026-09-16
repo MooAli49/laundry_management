@@ -704,8 +704,6 @@ Represents an operation performed on an OrderItem.
 
 PerPiece
 
-PerKilogram
-
 PerSquareMeter
 
 FixedPrice
@@ -763,8 +761,6 @@ ServiceItemType
 ## Values
 
 PerPiece
-
-PerKilogram
 
 PerSquareMeter
 

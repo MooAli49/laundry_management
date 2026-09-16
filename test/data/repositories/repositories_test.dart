@@ -9,7 +9,8 @@ import 'package:laundry_management/data/local/daos/services_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_locations_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
-import 'package:laundry_management/data/local/database/app_database.dart' as db_pkg;
+import 'package:laundry_management/data/local/database/app_database.dart'
+    as db_pkg;
 import 'package:laundry_management/data/repositories/customer_repository_impl.dart';
 import 'package:laundry_management/data/repositories/order_repository_impl.dart';
 import 'package:laundry_management/data/repositories/payment_repository_impl.dart';
@@ -99,603 +100,656 @@ void main() {
   });
 
   group('OrderRepositoryImpl Workflow & Business Invariants', () {
-    test('creates order atomically with items, carpet data, and sync operation', () async {
-      final now = DateTime.now();
+    test(
+      'creates order atomically with items, carpet data, and sync operation',
+      () async {
+        final now = DateTime.now();
 
-      // Create customer
-      final customer = await customerRepository.createCustomer(
-        Customer(
-          id: 'cust-1',
-          name: 'علي حسن',
-          phone: '01001122334',
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      expect(customer.id, 'cust-1');
-
-      // Setup service
-      final itemTypes = await db.select(db.itemTypes).get();
-      final carpetType = itemTypes.firstWhere((t) => t.name == 'سجاد');
-
-      await servicesDao.insertService(
-        db_pkg.ServicesCompanion.insert(
-          id: 'srv-1',
-          name: 'غسيل سجاد يدوي',
-          pricingType: 'perSquareMeter',
-          price: 2500, // 25 EGP / m2
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-
-      final carpetData = CarpetItemData(
-        id: 'carp-1',
-        orderItemId: 'item-1',
-        length: 2.0,
-        width: 3.0,
-        area: 6.0,
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      final item = OrderItem(
-        id: 'item-1',
-        orderId: 'ord-1',
-        itemTypeId: carpetType.id,
-        serviceId: 'srv-1',
-        itemTypeNameSnapshot: 'سجاد',
-        serviceNameSnapshot: 'غسيل سجاد يدوي',
-        pricingType: PricingType.perSquareMeter,
-        quantity: 6.0,
-        unitPrice: const Money.fromPiastres(2500),
-        calculatedTotal: const Money.fromPiastres(15000), // 150 EGP
-        carpetData: carpetData,
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      final order = Order(
-        id: 'ord-1',
-        orderNumber: '26-001',
-        customerId: 'cust-1',
-        customerNameSnapshot: 'أحمد',
-        customerPhoneSnapshot: '01012345678',
-        status: OrderStatus.processing,
-        expectedPickupDate: OrderDate(2026, 9, 15),
-        subtotal: const Money.fromPiastres(15000),
-        total: const Money.fromPiastres(15000),
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      final createdOrder = await orderRepository.createOrder(
-        order: order,
-        items: [item],
-      );
-
-      expect(createdOrder.id, 'ord-1');
-
-      // Verify items were persisted
-      final items = await orderRepository.getOrderItems('ord-1');
-      expect(items.length, 1);
-      expect(items.first.carpetData, isNotNull);
-      expect(items.first.carpetData!.area, 6.0);
-
-      // Verify sync operation was recorded atomically
-      final pendingSync = await syncOperationsDao.getPendingOperations();
-      expect(pendingSync.any((op) => op.entityType == 'order' && op.entityId == 'ord-1'), isTrue);
-    });
-
-    test('completeOrder strictly requires handoverConfirmed and deactivates storage', () async {
-      final now = DateTime.now();
-      await customerRepository.createCustomer(
-        Customer(
-          id: 'cust-1',
-          name: 'سمير',
-          phone: '01055556666',
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      final itemTypes = await db.select(db.itemTypes).get();
-      await servicesDao.insertService(
-        db_pkg.ServicesCompanion.insert(
-          id: 'srv-1',
-          name: 'مكواة',
-          pricingType: 'perPiece',
-          price: 1000,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-
-      final order = Order(
-        id: 'ord-2',
-        orderNumber: '26-002',
-        customerId: 'cust-1',
-        customerNameSnapshot: 'سمير',
-        customerPhoneSnapshot: '01055556666',
-        expectedPickupDate: OrderDate(2026, 9, 10),
-        subtotal: const Money.fromPiastres(1000),
-        total: const Money.fromPiastres(1000),
-        createdAt: now,
-        updatedAt: now,
-      );
-      final item = OrderItem(
-        id: 'item-2',
-        orderId: 'ord-2',
-        itemTypeId: itemTypes.first.id,
-        serviceId: 'srv-1',
-        itemTypeNameSnapshot: 'قميص',
-        serviceNameSnapshot: 'مكواة',
-        pricingType: PricingType.perPiece,
-        quantity: 1.0,
-        unitPrice: const Money.fromPiastres(1000),
-        calculatedTotal: const Money.fromPiastres(1000),
-        createdAt: now,
-        updatedAt: now,
-      );
-      await orderRepository.createOrder(order: order, items: [item]);
-
-      // Create storage location and store item
-      final location = await storageLocationRepository.createStorageLocation(
-        StorageLocation(
-          id: 'loc-1',
-          name: 'مكان 1',
-          createdAt: now,
-          updatedAt: now,
-        ),
-        supportedItemTypeIds: [item.itemTypeId],
-      );
-      await storageRepository.storeItem(
-        orderItemId: 'item-2',
-        storageLocationId: location.id,
-      );
-
-      // Verify active storage record exists
-      final activeBefore = await storageRepository.getActiveRecordForOrderItem('item-2');
-      expect(activeBefore, isNotNull);
-
-      // Attempt completeOrder directly on Processing order -> rejected
-      expect(
-        () => orderRepository.completeOrder(
-          orderId: 'ord-2',
-          handoverConfirmed: true,
-        ),
-        throwsA(
-          isA<BusinessRuleFailure>().having(
-            (e) => e.message,
-            'message',
-            contains('Only Ready orders can be completed'),
+        // Create customer
+        final customer = await customerRepository.createCustomer(
+          Customer(
+            id: 'cust-1',
+            name: 'علي حسن',
+            phone: '01001122334',
+            createdAt: now,
+            updatedAt: now,
           ),
-        ),
-      );
+        );
+        expect(customer.id, 'cust-1');
 
-      // Move order to Ready before completion
-      await orderRepository.markOrderReady('ord-2');
+        // Setup service
+        final itemTypes = await db.select(db.itemTypes).get();
+        final carpetType = itemTypes.firstWhere((t) => t.name == 'سجاد');
 
-      // Attempt completeOrder without handover confirmation
-      expect(
-        () => orderRepository.completeOrder(
-          orderId: 'ord-2',
-          handoverConfirmed: false,
-        ),
-        throwsA(isA<BusinessRuleFailure>()),
-      );
-
-      // Attempt completeOrder without paying remaining balance -> rejected
-      expect(
-        () => orderRepository.completeOrder(
-          orderId: 'ord-2',
-          handoverConfirmed: true,
-        ),
-        throwsA(
-          isA<BusinessRuleFailure>().having(
-            (e) => e.message,
-            'message',
-            contains('remaining balance'),
+        await servicesDao.insertService(
+          db_pkg.ServicesCompanion.insert(
+            id: 'srv-1',
+            name: 'غسيل سجاد يدوي',
+            pricingType: 'perSquareMeter',
+            price: 2500, // 25 EGP / m2
+            createdAt: now,
+            updatedAt: now,
           ),
-        ),
-      );
+        );
 
-      // Pay remaining balance
-      await paymentRepository.recordPayment(
-        Payment(
-          id: 'pay-2',
-          orderId: 'ord-2',
-          amount: const Money.fromPiastres(1000),
-          paymentMethod: PaymentMethod.cash,
-          paidAt: now,
+        final carpetData = CarpetItemData(
+          id: 'carp-1',
+          orderItemId: 'item-1',
+          length: 2.0,
+          width: 3.0,
+          area: 6.0,
           createdAt: now,
           updatedAt: now,
-        ),
-      );
+        );
 
-      // Complete order with handover confirmed -> allowed
-      final completedOrder = await orderRepository.completeOrder(
-        orderId: 'ord-2',
-        handoverConfirmed: true,
-      );
+        final item = OrderItem(
+          id: 'item-1',
+          orderId: 'ord-1',
+          itemTypeId: carpetType.id,
+          serviceId: 'srv-1',
+          itemTypeNameSnapshot: 'سجاد',
+          serviceNameSnapshot: 'غسيل سجاد يدوي',
+          pricingType: PricingType.perSquareMeter,
+          quantity: 6.0,
+          unitPrice: const Money.fromPiastres(2500),
+          calculatedTotal: const Money.fromPiastres(15000), // 150 EGP
+          carpetData: carpetData,
+          createdAt: now,
+          updatedAt: now,
+        );
 
-      expect(completedOrder.status, OrderStatus.completed);
-      expect(completedOrder.completedAt, isNotNull);
-      expect(completedOrder.customerHandoverConfirmedAt, completedOrder.completedAt);
+        final order = Order(
+          id: 'ord-1',
+          orderNumber: '26-001',
+          customerId: 'cust-1',
+          customerNameSnapshot: 'أحمد',
+          customerPhoneSnapshot: '01012345678',
+          status: OrderStatus.processing,
+          expectedPickupDate: OrderDate(2026, 9, 15),
+          subtotal: const Money.fromPiastres(15000),
+          total: const Money.fromPiastres(15000),
+          createdAt: now,
+          updatedAt: now,
+        );
 
-      // Attempt completeOrder on already Completed order -> rejected
-      expect(
-        () => orderRepository.completeOrder(
-          orderId: 'ord-2',
-          handoverConfirmed: true,
-        ),
-        throwsA(
-          isA<BusinessRuleFailure>().having(
-            (e) => e.message,
-            'message',
-            contains('already completed'),
+        final createdOrder = await orderRepository.createOrder(
+          order: order,
+          items: [item],
+        );
+
+        expect(createdOrder.id, 'ord-1');
+
+        // Verify items were persisted
+        final items = await orderRepository.getOrderItems('ord-1');
+        expect(items.length, 1);
+        expect(items.first.carpetData, isNotNull);
+        expect(items.first.carpetData!.area, 6.0);
+
+        // Verify sync operation was recorded atomically
+        final pendingSync = await syncOperationsDao.getPendingOperations();
+        expect(
+          pendingSync.any(
+            (op) => op.entityType == 'order' && op.entityId == 'ord-1',
           ),
-        ),
-      );
+          isTrue,
+        );
+      },
+    );
 
-      // Active storage record should be deactivated
-      final activeAfter = await storageRepository.getActiveRecordForOrderItem('item-2');
-      expect(activeAfter, isNull);
-    });
-
-    test('cancelOrder requires cancellation reason and releases active storage', () async {
-      final now = DateTime.now();
-      await customerRepository.createCustomer(
-        Customer(
-          id: 'cust-1',
-          name: 'ياسر',
-          phone: '01077778888',
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      final itemTypes = await db.select(db.itemTypes).get();
-      await servicesDao.insertService(
-        db_pkg.ServicesCompanion.insert(
-          id: 'srv-1',
-          name: 'غسيل',
-          pricingType: 'perPiece',
-          price: 2000,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-
-      final order = Order(
-        id: 'ord-3',
-        orderNumber: '26-003',
-        customerId: 'cust-1',
-        customerNameSnapshot: 'عميل التجربة',
-        customerPhoneSnapshot: '01012345678',
-        expectedPickupDate: OrderDate(2026, 9, 10),
-        subtotal: const Money.fromPiastres(2000),
-        total: const Money.fromPiastres(2000),
-        createdAt: now,
-        updatedAt: now,
-      );
-      final item = OrderItem(
-        id: 'item-3',
-        orderId: 'ord-3',
-        itemTypeId: itemTypes.first.id,
-        serviceId: 'srv-1',
-        itemTypeNameSnapshot: 'بنطلون',
-        serviceNameSnapshot: 'غسيل',
-        pricingType: PricingType.perPiece,
-        quantity: 1.0,
-        unitPrice: const Money.fromPiastres(2000),
-        calculatedTotal: const Money.fromPiastres(2000),
-        createdAt: now,
-        updatedAt: now,
-      );
-      await orderRepository.createOrder(order: order, items: [item]);
-
-      // Attempt cancel with empty reason
-      expect(
-        () => orderRepository.cancelOrder(
-          orderId: 'ord-3',
-          cancellationReason: '   ',
-        ),
-        throwsA(isA<ValidationFailure>()),
-      );
-
-      // Cancel with valid reason
-      final cancelledOrder = await orderRepository.cancelOrder(
-        orderId: 'ord-3',
-        cancellationReason: 'طلب العميل إلغاء الطلب',
-      );
-
-      expect(cancelledOrder.status, OrderStatus.cancelled);
-      expect(cancelledOrder.cancelledAt, isNotNull);
-      expect(cancelledOrder.cancellationReason, 'طلب العميل إلغاء الطلب');
-
-      // Attempt completeOrder on Cancelled order -> rejected
-      expect(
-        () => orderRepository.completeOrder(
-          orderId: 'ord-3',
-          handoverConfirmed: true,
-        ),
-        throwsA(
-          isA<BusinessRuleFailure>().having(
-            (e) => e.message,
-            'message',
-            contains('Cannot complete a cancelled order'),
+    test(
+      'completeOrder strictly requires handoverConfirmed and deactivates storage',
+      () async {
+        final now = DateTime.now();
+        await customerRepository.createCustomer(
+          Customer(
+            id: 'cust-1',
+            name: 'سمير',
+            phone: '01055556666',
+            createdAt: now,
+            updatedAt: now,
           ),
-        ),
-      );
-    });
+        );
+        final itemTypes = await db.select(db.itemTypes).get();
+        await servicesDao.insertService(
+          db_pkg.ServicesCompanion.insert(
+            id: 'srv-1',
+            name: 'مكواة',
+            pricingType: 'perPiece',
+            price: 1000,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
 
-    test('correctOrderStatus moves from completed to processing without reactivating storage (BR-034)', () async {
-      final now = DateTime.now();
-      await customerRepository.createCustomer(
-        Customer(
-          id: 'cust-1',
-          name: 'طارق',
-          phone: '01066667777',
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      final itemTypes = await db.select(db.itemTypes).get();
-      await servicesDao.insertService(
-        db_pkg.ServicesCompanion.insert(
-          id: 'srv-1',
-          name: 'غسيل',
-          pricingType: 'perPiece',
-          price: 2000,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-
-      final order = Order(
-        id: 'ord-4',
-        orderNumber: '26-004',
-        customerId: 'cust-1',
-        customerNameSnapshot: 'طارق',
-        customerPhoneSnapshot: '01066667777',
-        expectedPickupDate: OrderDate(2026, 9, 10),
-        subtotal: const Money.fromPiastres(2000),
-        total: const Money.fromPiastres(2000),
-        createdAt: now,
-        updatedAt: now,
-      );
-      final item = OrderItem(
-        id: 'item-4',
-        orderId: 'ord-4',
-        itemTypeId: itemTypes.first.id,
-        serviceId: 'srv-1',
-        itemTypeNameSnapshot: 'جاكيت',
-        serviceNameSnapshot: 'غسيل',
-        pricingType: PricingType.perPiece,
-        quantity: 1.0,
-        unitPrice: const Money.fromPiastres(2000),
-        calculatedTotal: const Money.fromPiastres(2000),
-        createdAt: now,
-        updatedAt: now,
-      );
-      await orderRepository.createOrder(order: order, items: [item]);
-      await orderRepository.markOrderReady('ord-4');
-      await paymentRepository.recordPayment(
-        Payment(
-          id: 'pay-4',
-          orderId: 'ord-4',
-          amount: const Money.fromPiastres(2000),
-          paymentMethod: PaymentMethod.cash,
-          paidAt: now,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      await orderRepository.completeOrder(orderId: 'ord-4', handoverConfirmed: true);
-
-      // Correct order status back to processing
-      final corrected = await orderRepository.correctOrderStatus(
-        orderId: 'ord-4',
-        newStatus: OrderStatus.processing,
-        reason: 'تم اكتمال الطلب بالخطأ',
-      );
-
-      expect(corrected.status, OrderStatus.processing);
-      expect(corrected.completedAt, isNull);
-
-      // Verify storage was NOT reactivated (BR-034)
-      final activeRecord = await storageRepository.getActiveRecordForOrderItem('item-4');
-      expect(activeRecord, isNull);
-    });
-  });
-
-  group('PaymentRepositoryImpl & Remaining Amount', () {
-    test('records payments and accurately computes remaining balance', () async {
-      final now = DateTime.now();
-      await customerRepository.createCustomer(
-        Customer(
-          id: 'cust-1',
-          name: 'منير',
-          phone: '01088889999',
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      final itemTypes = await db.select(db.itemTypes).get();
-      await servicesDao.insertService(
-        db_pkg.ServicesCompanion.insert(
-          id: 'srv-1',
-          name: 'غسيل',
-          pricingType: 'perPiece',
-          price: 5000,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-
-      final order = Order(
-        id: 'ord-5',
-        orderNumber: '26-005',
-        customerId: 'cust-1',
-        customerNameSnapshot: 'عميل الدفع',
-        customerPhoneSnapshot: '01012345678',
-        expectedPickupDate: OrderDate(2026, 9, 10),
-        subtotal: const Money.fromPiastres(5000), // 50 EGP
-        total: const Money.fromPiastres(5000),
-        createdAt: now,
-        updatedAt: now,
-      );
-      final item = OrderItem(
-        id: 'item-5',
-        orderId: 'ord-5',
-        itemTypeId: itemTypes.first.id,
-        serviceId: 'srv-1',
-        itemTypeNameSnapshot: 'بدلة',
-        serviceNameSnapshot: 'غسيل',
-        pricingType: PricingType.perPiece,
-        quantity: 1.0,
-        unitPrice: const Money.fromPiastres(5000),
-        calculatedTotal: const Money.fromPiastres(5000),
-        createdAt: now,
-        updatedAt: now,
-      );
-      await orderRepository.createOrder(order: order, items: [item]);
-
-      // Initial remaining amount
-      var remaining = await paymentRepository.getRemainingAmountForOrder('ord-5');
-      expect(remaining, const Money.fromPiastres(5000));
-
-      // Partial payment: 20 EGP (2000 piastres)
-      await paymentRepository.recordPayment(
-        Payment(
-          id: 'pay-1',
-          orderId: 'ord-5',
-          amount: const Money.fromPiastres(2000),
-          paymentMethod: PaymentMethod.cash,
-          paidAt: now,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-
-      var totalPaid = await paymentRepository.getTotalPaidForOrder('ord-5');
-      expect(totalPaid, const Money.fromPiastres(2000));
-
-      remaining = await paymentRepository.getRemainingAmountForOrder('ord-5');
-      expect(remaining, const Money.fromPiastres(3000));
-
-      // Second payment: 30 EGP (3000 piastres via InstaPay)
-      await paymentRepository.recordPayment(
-        Payment(
-          id: 'pay-2',
-          orderId: 'ord-5',
-          amount: const Money.fromPiastres(3000),
-          paymentMethod: PaymentMethod.instapay,
-          paidAt: now,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-
-      totalPaid = await paymentRepository.getTotalPaidForOrder('ord-5');
-      expect(totalPaid, const Money.fromPiastres(5000));
-
-      remaining = await paymentRepository.getRemainingAmountForOrder('ord-5');
-      expect(remaining, Money.zero);
-    });
-  });
-
-  group('StorageRepositoryImpl Move and Bulk Store', () {
-    test('moveItem deactivates old location and activates new location', () async {
-      final now = DateTime.now();
-      final itemTypes = await db.select(db.itemTypes).get();
-      await storageLocationRepository.createStorageLocation(
-        StorageLocation(id: 'loc-A', name: 'رف A', createdAt: now, updatedAt: now),
-        supportedItemTypeIds: [itemTypes.first.id],
-      );
-      await storageLocationRepository.createStorageLocation(
-        StorageLocation(id: 'loc-B', name: 'رف B', createdAt: now, updatedAt: now),
-        supportedItemTypeIds: [itemTypes.first.id],
-      );
-
-      // Create prerequisite customer, order, and item
-      await customerRepository.createCustomer(
-        Customer(
-          id: 'cust-100',
-          name: 'عميل التخزين',
-          phone: '01000000000',
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      await servicesDao.insertService(
-        db_pkg.ServicesCompanion.insert(
-          id: 'srv-100',
-          name: 'غسيل',
-          pricingType: 'perPiece',
-          price: 1000,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      await orderRepository.createOrder(
-        order: Order(
-          id: 'ord-100',
-          orderNumber: '26-100',
-          customerId: 'cust-100',
-          customerNameSnapshot: 'عميل التخزين',
-          customerPhoneSnapshot: '01000000000',
+        final order = Order(
+          id: 'ord-2',
+          orderNumber: '26-002',
+          customerId: 'cust-1',
+          customerNameSnapshot: 'سمير',
+          customerPhoneSnapshot: '01055556666',
           expectedPickupDate: OrderDate(2026, 9, 10),
           subtotal: const Money.fromPiastres(1000),
           total: const Money.fromPiastres(1000),
           createdAt: now,
           updatedAt: now,
-        ),
-        items: [
-          OrderItem(
-            id: 'item-100',
-            orderId: 'ord-100',
-            itemTypeId: itemTypes.first.id,
-            serviceId: 'srv-100',
-            itemTypeNameSnapshot: 'ملابس',
-            serviceNameSnapshot: 'غسيل',
-            pricingType: PricingType.perPiece,
-            quantity: 1.0,
-            unitPrice: const Money.fromPiastres(1000),
-            calculatedTotal: const Money.fromPiastres(1000),
+        );
+        final item = OrderItem(
+          id: 'item-2',
+          orderId: 'ord-2',
+          itemTypeId: itemTypes.first.id,
+          serviceId: 'srv-1',
+          itemTypeNameSnapshot: 'قميص',
+          serviceNameSnapshot: 'مكواة',
+          pricingType: PricingType.perPiece,
+          quantity: 1.0,
+          unitPrice: const Money.fromPiastres(1000),
+          calculatedTotal: const Money.fromPiastres(1000),
+          createdAt: now,
+          updatedAt: now,
+        );
+        await orderRepository.createOrder(order: order, items: [item]);
+
+        // Create storage location and store item
+        final location = await storageLocationRepository.createStorageLocation(
+          StorageLocation(
+            id: 'loc-1',
+            name: 'مكان 1',
             createdAt: now,
             updatedAt: now,
           ),
-        ],
-      );
+          supportedItemTypeIds: [item.itemTypeId],
+        );
+        await storageRepository.storeItem(
+          orderItemId: 'item-2',
+          storageLocationId: location.id,
+        );
 
-      // Store in loc-A
-      await storageRepository.storeItem(
-        orderItemId: 'item-100',
-        storageLocationId: 'loc-A',
-      );
+        // Verify active storage record exists
+        final activeBefore = await storageRepository
+            .getActiveRecordForOrderItem('item-2');
+        expect(activeBefore, isNotNull);
 
-      var record = await storageRepository.getActiveRecordForOrderItem('item-100');
-      expect(record!.storageLocationId, 'loc-A');
+        // Attempt completeOrder directly on Processing order -> rejected
+        expect(
+          () => orderRepository.completeOrder(
+            orderId: 'ord-2',
+            handoverConfirmed: true,
+          ),
+          throwsA(
+            isA<BusinessRuleFailure>().having(
+              (e) => e.message,
+              'message',
+              contains('Only Ready orders can be completed'),
+            ),
+          ),
+        );
 
-      // Move to loc-B
-      final moved = await storageRepository.moveItem(
-        orderItemId: 'item-100',
-        newStorageLocationId: 'loc-B',
-      );
-      expect(moved.storageLocationId, 'loc-B');
+        // Move order to Ready before completion
+        await orderRepository.markOrderReady('ord-2');
 
-      // Verify active record is now loc-B
-      record = await storageRepository.getActiveRecordForOrderItem('item-100');
-      expect(record!.storageLocationId, 'loc-B');
+        // Attempt completeOrder without handover confirmation
+        expect(
+          () => orderRepository.completeOrder(
+            orderId: 'ord-2',
+            handoverConfirmed: false,
+          ),
+          throwsA(isA<BusinessRuleFailure>()),
+        );
 
-      // Loc-A should now have 0 active records
-      final locARecords = await storageRepository.getActiveRecordsForLocation('loc-A');
-      expect(locARecords.isEmpty, isTrue);
+        // Attempt completeOrder without paying remaining balance -> rejected
+        expect(
+          () => orderRepository.completeOrder(
+            orderId: 'ord-2',
+            handoverConfirmed: true,
+          ),
+          throwsA(
+            isA<BusinessRuleFailure>().having(
+              (e) => e.message,
+              'message',
+              contains('remaining balance'),
+            ),
+          ),
+        );
 
-      // Loc-B should have 1 active record
-      final locBRecords = await storageRepository.getActiveRecordsForLocation('loc-B');
-      expect(locBRecords.length, 1);
-    });
+        // Pay remaining balance
+        await paymentRepository.recordPayment(
+          Payment(
+            id: 'pay-2',
+            orderId: 'ord-2',
+            amount: const Money.fromPiastres(1000),
+            paymentMethod: PaymentMethod.cash,
+            paidAt: now,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+        // Complete order with handover confirmed -> allowed
+        final completedOrder = await orderRepository.completeOrder(
+          orderId: 'ord-2',
+          handoverConfirmed: true,
+        );
+
+        expect(completedOrder.status, OrderStatus.completed);
+        expect(completedOrder.completedAt, isNotNull);
+        expect(
+          completedOrder.customerHandoverConfirmedAt,
+          completedOrder.completedAt,
+        );
+
+        // Attempt completeOrder on already Completed order -> rejected
+        expect(
+          () => orderRepository.completeOrder(
+            orderId: 'ord-2',
+            handoverConfirmed: true,
+          ),
+          throwsA(
+            isA<BusinessRuleFailure>().having(
+              (e) => e.message,
+              'message',
+              contains('already completed'),
+            ),
+          ),
+        );
+
+        // Active storage record should be deactivated
+        final activeAfter = await storageRepository.getActiveRecordForOrderItem(
+          'item-2',
+        );
+        expect(activeAfter, isNull);
+      },
+    );
+
+    test(
+      'cancelOrder requires cancellation reason and releases active storage',
+      () async {
+        final now = DateTime.now();
+        await customerRepository.createCustomer(
+          Customer(
+            id: 'cust-1',
+            name: 'ياسر',
+            phone: '01077778888',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        final itemTypes = await db.select(db.itemTypes).get();
+        await servicesDao.insertService(
+          db_pkg.ServicesCompanion.insert(
+            id: 'srv-1',
+            name: 'غسيل',
+            pricingType: 'perPiece',
+            price: 2000,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+        final order = Order(
+          id: 'ord-3',
+          orderNumber: '26-003',
+          customerId: 'cust-1',
+          customerNameSnapshot: 'عميل التجربة',
+          customerPhoneSnapshot: '01012345678',
+          expectedPickupDate: OrderDate(2026, 9, 10),
+          subtotal: const Money.fromPiastres(2000),
+          total: const Money.fromPiastres(2000),
+          createdAt: now,
+          updatedAt: now,
+        );
+        final item = OrderItem(
+          id: 'item-3',
+          orderId: 'ord-3',
+          itemTypeId: itemTypes.first.id,
+          serviceId: 'srv-1',
+          itemTypeNameSnapshot: 'بنطلون',
+          serviceNameSnapshot: 'غسيل',
+          pricingType: PricingType.perPiece,
+          quantity: 1.0,
+          unitPrice: const Money.fromPiastres(2000),
+          calculatedTotal: const Money.fromPiastres(2000),
+          createdAt: now,
+          updatedAt: now,
+        );
+        await orderRepository.createOrder(order: order, items: [item]);
+
+        // Attempt cancel with empty reason
+        expect(
+          () => orderRepository.cancelOrder(
+            orderId: 'ord-3',
+            cancellationReason: '   ',
+          ),
+          throwsA(isA<ValidationFailure>()),
+        );
+
+        // Cancel with valid reason
+        final cancelledOrder = await orderRepository.cancelOrder(
+          orderId: 'ord-3',
+          cancellationReason: 'طلب العميل إلغاء الطلب',
+        );
+
+        expect(cancelledOrder.status, OrderStatus.cancelled);
+        expect(cancelledOrder.cancelledAt, isNotNull);
+        expect(cancelledOrder.cancellationReason, 'طلب العميل إلغاء الطلب');
+
+        // Attempt completeOrder on Cancelled order -> rejected
+        expect(
+          () => orderRepository.completeOrder(
+            orderId: 'ord-3',
+            handoverConfirmed: true,
+          ),
+          throwsA(
+            isA<BusinessRuleFailure>().having(
+              (e) => e.message,
+              'message',
+              contains('Cannot complete a cancelled order'),
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'correctOrderStatus moves from completed to processing without reactivating storage (BR-034)',
+      () async {
+        final now = DateTime.now();
+        await customerRepository.createCustomer(
+          Customer(
+            id: 'cust-1',
+            name: 'طارق',
+            phone: '01066667777',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        final itemTypes = await db.select(db.itemTypes).get();
+        await servicesDao.insertService(
+          db_pkg.ServicesCompanion.insert(
+            id: 'srv-1',
+            name: 'غسيل',
+            pricingType: 'perPiece',
+            price: 2000,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+        final order = Order(
+          id: 'ord-4',
+          orderNumber: '26-004',
+          customerId: 'cust-1',
+          customerNameSnapshot: 'طارق',
+          customerPhoneSnapshot: '01066667777',
+          expectedPickupDate: OrderDate(2026, 9, 10),
+          subtotal: const Money.fromPiastres(2000),
+          total: const Money.fromPiastres(2000),
+          createdAt: now,
+          updatedAt: now,
+        );
+        final item = OrderItem(
+          id: 'item-4',
+          orderId: 'ord-4',
+          itemTypeId: itemTypes.first.id,
+          serviceId: 'srv-1',
+          itemTypeNameSnapshot: 'جاكيت',
+          serviceNameSnapshot: 'غسيل',
+          pricingType: PricingType.perPiece,
+          quantity: 1.0,
+          unitPrice: const Money.fromPiastres(2000),
+          calculatedTotal: const Money.fromPiastres(2000),
+          createdAt: now,
+          updatedAt: now,
+        );
+        await orderRepository.createOrder(order: order, items: [item]);
+        await orderRepository.markOrderReady('ord-4');
+        await paymentRepository.recordPayment(
+          Payment(
+            id: 'pay-4',
+            orderId: 'ord-4',
+            amount: const Money.fromPiastres(2000),
+            paymentMethod: PaymentMethod.cash,
+            paidAt: now,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        await orderRepository.completeOrder(
+          orderId: 'ord-4',
+          handoverConfirmed: true,
+        );
+
+        // Correct order status back to processing
+        final corrected = await orderRepository.correctOrderStatus(
+          orderId: 'ord-4',
+          newStatus: OrderStatus.processing,
+          reason: 'تم اكتمال الطلب بالخطأ',
+        );
+
+        expect(corrected.status, OrderStatus.processing);
+        expect(corrected.completedAt, isNull);
+
+        // Verify storage was NOT reactivated (BR-034)
+        final activeRecord = await storageRepository
+            .getActiveRecordForOrderItem('item-4');
+        expect(activeRecord, isNull);
+      },
+    );
+  });
+
+  group('PaymentRepositoryImpl & Remaining Amount', () {
+    test(
+      'records payments and accurately computes remaining balance',
+      () async {
+        final now = DateTime.now();
+        await customerRepository.createCustomer(
+          Customer(
+            id: 'cust-1',
+            name: 'منير',
+            phone: '01088889999',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        final itemTypes = await db.select(db.itemTypes).get();
+        await servicesDao.insertService(
+          db_pkg.ServicesCompanion.insert(
+            id: 'srv-1',
+            name: 'غسيل',
+            pricingType: 'perPiece',
+            price: 5000,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+        final order = Order(
+          id: 'ord-5',
+          orderNumber: '26-005',
+          customerId: 'cust-1',
+          customerNameSnapshot: 'عميل الدفع',
+          customerPhoneSnapshot: '01012345678',
+          expectedPickupDate: OrderDate(2026, 9, 10),
+          subtotal: const Money.fromPiastres(5000), // 50 EGP
+          total: const Money.fromPiastres(5000),
+          createdAt: now,
+          updatedAt: now,
+        );
+        final item = OrderItem(
+          id: 'item-5',
+          orderId: 'ord-5',
+          itemTypeId: itemTypes.first.id,
+          serviceId: 'srv-1',
+          itemTypeNameSnapshot: 'بدلة',
+          serviceNameSnapshot: 'غسيل',
+          pricingType: PricingType.perPiece,
+          quantity: 1.0,
+          unitPrice: const Money.fromPiastres(5000),
+          calculatedTotal: const Money.fromPiastres(5000),
+          createdAt: now,
+          updatedAt: now,
+        );
+        await orderRepository.createOrder(order: order, items: [item]);
+
+        // Initial remaining amount
+        var remaining = await paymentRepository.getRemainingAmountForOrder(
+          'ord-5',
+        );
+        expect(remaining, const Money.fromPiastres(5000));
+
+        // Partial payment: 20 EGP (2000 piastres)
+        await paymentRepository.recordPayment(
+          Payment(
+            id: 'pay-1',
+            orderId: 'ord-5',
+            amount: const Money.fromPiastres(2000),
+            paymentMethod: PaymentMethod.cash,
+            paidAt: now,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+        var totalPaid = await paymentRepository.getTotalPaidForOrder('ord-5');
+        expect(totalPaid, const Money.fromPiastres(2000));
+
+        remaining = await paymentRepository.getRemainingAmountForOrder('ord-5');
+        expect(remaining, const Money.fromPiastres(3000));
+
+        // Second payment: 30 EGP (3000 piastres via InstaPay)
+        await paymentRepository.recordPayment(
+          Payment(
+            id: 'pay-2',
+            orderId: 'ord-5',
+            amount: const Money.fromPiastres(3000),
+            paymentMethod: PaymentMethod.instapay,
+            paidAt: now,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+        totalPaid = await paymentRepository.getTotalPaidForOrder('ord-5');
+        expect(totalPaid, const Money.fromPiastres(5000));
+
+        remaining = await paymentRepository.getRemainingAmountForOrder('ord-5');
+        expect(remaining, Money.zero);
+      },
+    );
+  });
+
+  group('StorageRepositoryImpl Move and Bulk Store', () {
+    test(
+      'moveItem deactivates old location and activates new location',
+      () async {
+        final now = DateTime.now();
+        final itemTypes = await db.select(db.itemTypes).get();
+        await storageLocationRepository.createStorageLocation(
+          StorageLocation(
+            id: 'loc-A',
+            name: 'رف A',
+            createdAt: now,
+            updatedAt: now,
+          ),
+          supportedItemTypeIds: [itemTypes.first.id],
+        );
+        await storageLocationRepository.createStorageLocation(
+          StorageLocation(
+            id: 'loc-B',
+            name: 'رف B',
+            createdAt: now,
+            updatedAt: now,
+          ),
+          supportedItemTypeIds: [itemTypes.first.id],
+        );
+
+        // Create prerequisite customer, order, and item
+        await customerRepository.createCustomer(
+          Customer(
+            id: 'cust-100',
+            name: 'عميل التخزين',
+            phone: '01000000000',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        await servicesDao.insertService(
+          db_pkg.ServicesCompanion.insert(
+            id: 'srv-100',
+            name: 'غسيل',
+            pricingType: 'perPiece',
+            price: 1000,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        await orderRepository.createOrder(
+          order: Order(
+            id: 'ord-100',
+            orderNumber: '26-100',
+            customerId: 'cust-100',
+            customerNameSnapshot: 'عميل التخزين',
+            customerPhoneSnapshot: '01000000000',
+            expectedPickupDate: OrderDate(2026, 9, 10),
+            subtotal: const Money.fromPiastres(1000),
+            total: const Money.fromPiastres(1000),
+            createdAt: now,
+            updatedAt: now,
+          ),
+          items: [
+            OrderItem(
+              id: 'item-100',
+              orderId: 'ord-100',
+              itemTypeId: itemTypes.first.id,
+              serviceId: 'srv-100',
+              itemTypeNameSnapshot: 'ملابس',
+              serviceNameSnapshot: 'غسيل',
+              pricingType: PricingType.perPiece,
+              quantity: 1.0,
+              unitPrice: const Money.fromPiastres(1000),
+              calculatedTotal: const Money.fromPiastres(1000),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          ],
+        );
+
+        // Store in loc-A
+        await storageRepository.storeItem(
+          orderItemId: 'item-100',
+          storageLocationId: 'loc-A',
+        );
+
+        var record = await storageRepository.getActiveRecordForOrderItem(
+          'item-100',
+        );
+        expect(record!.storageLocationId, 'loc-A');
+
+        // Move to loc-B
+        final moved = await storageRepository.moveItem(
+          orderItemId: 'item-100',
+          newStorageLocationId: 'loc-B',
+        );
+        expect(moved.storageLocationId, 'loc-B');
+
+        // Verify active record is now loc-B
+        record = await storageRepository.getActiveRecordForOrderItem(
+          'item-100',
+        );
+        expect(record!.storageLocationId, 'loc-B');
+
+        // Loc-A should now have 0 active records
+        final locARecords = await storageRepository.getActiveRecordsForLocation(
+          'loc-A',
+        );
+        expect(locARecords.isEmpty, isTrue);
+
+        // Loc-B should have 1 active record
+        final locBRecords = await storageRepository.getActiveRecordsForLocation(
+          'loc-B',
+        );
+        expect(locBRecords.length, 1);
+      },
+    );
   });
 
   group('SettingsRepositoryImpl', () {

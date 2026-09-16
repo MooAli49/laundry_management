@@ -17,42 +17,42 @@ class ServicesManagementCubit extends Cubit<ServicesManagementState> {
   ServicesManagementCubit({
     required ServiceRepository serviceRepository,
     required ItemTypeRepository itemTypeRepository,
-  })  : _serviceRepository = serviceRepository,
-        _itemTypeRepository = itemTypeRepository,
-        super(const ServicesManagementState());
+  }) : _serviceRepository = serviceRepository,
+       _itemTypeRepository = itemTypeRepository,
+       super(const ServicesManagementState());
 
   void clearMessages() {
-    emit(state.copyWith(
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(state.copyWith(clearErrorMessage: true, clearSuccessMessage: true));
   }
 
   Future<void> loadServices() async {
-    emit(state.copyWith(
-      isLoading: true,
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        isLoading: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
 
     try {
       final services = await _serviceRepository.getAllServices();
       final itemTypes = await _itemTypeRepository.getActiveItemTypes();
-      emit(state.copyWith(
-        isLoading: false,
-        services: services,
-        itemTypes: itemTypes,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          services: services,
+          itemTypes: itemTypes,
+        ),
+      );
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isLoading: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isLoading: false, errorMessage: f.message));
     } catch (e) {
-      emit(state.copyWith(
-        isLoading: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 
@@ -85,18 +85,22 @@ class ServicesManagementCubit extends Cubit<ServicesManagementState> {
       return false;
     }
 
-    emit(state.copyWith(
-      isActionInProgress: true,
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        isActionInProgress: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
 
     try {
       final now = DateTime.now();
       final service = Service(
         id: const Uuid().v4(),
         name: trimmedName,
-        description: description?.trim().isEmpty == true ? null : description?.trim(),
+        description: description?.trim().isEmpty == true
+            ? null
+            : description?.trim(),
         pricingType: pricingType,
         price: price,
         isActive: true,
@@ -110,23 +114,19 @@ class ServicesManagementCubit extends Cubit<ServicesManagementState> {
       );
 
       final services = await _serviceRepository.getAllServices();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        services: services,
-      ));
+      emit(state.copyWith(isActionInProgress: false, services: services));
       return true;
     } on Failure catch (f) {
       final msg = _normalizeError(f.message);
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: msg,
-      ));
+      emit(state.copyWith(isActionInProgress: false, errorMessage: msg));
       return false;
     } catch (e) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
       return false;
     }
   }
@@ -149,11 +149,13 @@ class ServicesManagementCubit extends Cubit<ServicesManagementState> {
       return false;
     }
 
-    emit(state.copyWith(
-      isActionInProgress: true,
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        isActionInProgress: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
 
     try {
       final updated = service.copyWith(
@@ -167,23 +169,19 @@ class ServicesManagementCubit extends Cubit<ServicesManagementState> {
       );
 
       final services = await _serviceRepository.getAllServices();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        services: services,
-      ));
+      emit(state.copyWith(isActionInProgress: false, services: services));
       return true;
     } on Failure catch (f) {
       final msg = _normalizeError(f.message);
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: msg,
-      ));
+      emit(state.copyWith(isActionInProgress: false, errorMessage: msg));
       return false;
     } catch (e) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
       return false;
     }
   }
@@ -193,20 +191,16 @@ class ServicesManagementCubit extends Cubit<ServicesManagementState> {
     try {
       await _serviceRepository.activateService(id);
       final services = await _serviceRepository.getAllServices();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        services: services,
-      ));
+      emit(state.copyWith(isActionInProgress: false, services: services));
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isActionInProgress: false, errorMessage: f.message));
     } catch (e) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 
@@ -215,26 +209,24 @@ class ServicesManagementCubit extends Cubit<ServicesManagementState> {
     try {
       await _serviceRepository.deactivateService(id);
       final services = await _serviceRepository.getAllServices();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        services: services,
-      ));
+      emit(state.copyWith(isActionInProgress: false, services: services));
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isActionInProgress: false, errorMessage: f.message));
     } catch (e) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 
   String _normalizeError(String message) {
     final lower = message.toLowerCase();
-    if (lower.contains('unique') || lower.contains('constraint') || lower.contains('duplicate')) {
+    if (lower.contains('unique') ||
+        lower.contains('constraint') ||
+        lower.contains('duplicate')) {
       return AppStrings.duplicateNameError;
     }
     return message;

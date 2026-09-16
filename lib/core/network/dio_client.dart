@@ -30,7 +30,11 @@ class DioClient {
   }) : _dio = dio ?? Dio() {
     final effectiveBaseUrl =
         baseUrl ??
-        const String.fromEnvironment('SUPABASE_URL', defaultValue: '');
+        const String.fromEnvironment(
+          'SUPABASE_URL',
+          defaultValue:
+              'https://dyhfgnbhijukbdptreto.supabase.co/functions/v1/api',
+        );
 
     _dio.options = BaseOptions(
       baseUrl: effectiveBaseUrl,

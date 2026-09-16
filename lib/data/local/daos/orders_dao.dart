@@ -46,12 +46,16 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     await into(db.orderItems).insert(item);
   }
 
-  Future<void> insertOrderItemCarpet(app_db.OrderItemCarpetsCompanion carpet) async {
+  Future<void> insertOrderItemCarpet(
+    app_db.OrderItemCarpetsCompanion carpet,
+  ) async {
     await into(db.orderItemCarpets).insert(carpet);
   }
 
   Future<void> updateOrder(app_db.OrdersCompanion order) async {
-    await (update(db.orders)..where((t) => t.id.equals(order.id.value))).write(order);
+    await (update(
+      db.orders,
+    )..where((t) => t.id.equals(order.id.value))).write(order);
   }
 
   Future<app_db.Order?> getOrderById(String id) async {
@@ -59,16 +63,19 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
   }
 
   Future<app_db.Order?> getOrderByNumber(String orderNumber) async {
-    return (select(db.orders)..where((t) => t.orderNumber.equals(orderNumber))).getSingleOrNull();
+    return (select(
+      db.orders,
+    )..where((t) => t.orderNumber.equals(orderNumber))).getSingleOrNull();
   }
 
   Future<List<app_db.OrderItem>> getOrderItemsRaw(String orderId) async {
-    return (select(db.orderItems)..where((t) => t.orderId.equals(orderId))).get();
+    return (select(
+      db.orderItems,
+    )..where((t) => t.orderId.equals(orderId))).get();
   }
 
-  Future<List<({app_db.OrderItem item, app_db.OrderItemCarpet? carpet})>> getOrderItemsWithCarpets(
-    String orderId,
-  ) async {
+  Future<List<({app_db.OrderItem item, app_db.OrderItemCarpet? carpet})>>
+  getOrderItemsWithCarpets(String orderId) async {
     final query = select(db.orderItems).join([
       leftOuterJoin(
         db.orderItemCarpets,
@@ -85,9 +92,8 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     }).toList();
   }
 
-  Future<({app_db.OrderItem item, app_db.OrderItemCarpet? carpet})?> getOrderItemWithCarpetById(
-    String id,
-  ) async {
+  Future<({app_db.OrderItem item, app_db.OrderItemCarpet? carpet})?>
+  getOrderItemWithCarpetById(String id) async {
     final query = select(db.orderItems).join([
       leftOuterJoin(
         db.orderItemCarpets,
@@ -121,7 +127,10 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
 
     if (hasSearchQuery) {
       final selectQuery = select(db.orders).join([
-        innerJoin(db.customers, db.customers.id.equalsExp(db.orders.customerId)),
+        innerJoin(
+          db.customers,
+          db.customers.id.equalsExp(db.orders.customerId),
+        ),
       ]);
 
       final orderNumberQuery = sanitizedQuery.startsWith('#')
@@ -141,7 +150,9 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
         selectQuery.where(db.orders.status.isNotIn(excludedStatuses));
       }
       if (expectedPickupDate != null) {
-        selectQuery.where(db.orders.expectedPickupDate.equals(expectedPickupDate));
+        selectQuery.where(
+          db.orders.expectedPickupDate.equals(expectedPickupDate),
+        );
       }
       if (isOverdue == true) {
         final now = DateTime.now();
@@ -152,7 +163,9 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
         );
       }
       if (createdFrom != null) {
-        selectQuery.where(db.orders.createdAt.isBiggerOrEqualValue(createdFrom));
+        selectQuery.where(
+          db.orders.createdAt.isBiggerOrEqualValue(createdFrom),
+        );
       }
       if (createdTo != null) {
         selectQuery.where(db.orders.createdAt.isSmallerOrEqualValue(createdTo));
@@ -190,14 +203,18 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
         selectQuery.where((t) => t.status.isNotIn(excludedStatuses));
       }
       if (expectedPickupDate != null) {
-        selectQuery.where((t) => t.expectedPickupDate.equals(expectedPickupDate));
+        selectQuery.where(
+          (t) => t.expectedPickupDate.equals(expectedPickupDate),
+        );
       }
       if (isOverdue == true) {
         final now = DateTime.now();
         final todayDate = DateTime.utc(now.year, now.month, now.day);
-        selectQuery.where((t) =>
-            t.expectedPickupDate.isSmallerThanValue(todayDate) &
-            t.status.isNotIn(const ['completed', 'cancelled']));
+        selectQuery.where(
+          (t) =>
+              t.expectedPickupDate.isSmallerThanValue(todayDate) &
+              t.status.isNotIn(const ['completed', 'cancelled']),
+        );
       }
       if (createdFrom != null) {
         selectQuery.where((t) => t.createdAt.isBiggerOrEqualValue(createdFrom));
@@ -246,7 +263,9 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
   }
 
   Stream<app_db.Order?> watchOrderById(String id) {
-    return (select(db.orders)..where((t) => t.id.equals(id))).watchSingleOrNull();
+    return (select(
+      db.orders,
+    )..where((t) => t.id.equals(id))).watchSingleOrNull();
   }
 
   Future<void> updateOrderStatus({
@@ -277,7 +296,9 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     return result ?? 0;
   }
 
-  Future<Map<String, int>> getOrderCountsGroupedByCustomer({List<String>? customerIds}) async {
+  Future<Map<String, int>> getOrderCountsGroupedByCustomer({
+    List<String>? customerIds,
+  }) async {
     if (customerIds != null && customerIds.isEmpty) return {};
     final countExp = db.orders.id.count();
     final query = selectOnly(db.orders)
@@ -294,7 +315,9 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     };
   }
 
-  Future<Map<String, int>> getOrderCountsByCustomerIds(List<String> customerIds) async {
+  Future<Map<String, int>> getOrderCountsByCustomerIds(
+    List<String> customerIds,
+  ) async {
     if (customerIds.isEmpty) return {};
     return getOrderCountsGroupedByCustomer(customerIds: customerIds);
   }
@@ -304,7 +327,9 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     return (select(db.orders)..where((t) => t.id.isIn(orderIds))).get();
   }
 
-  Future<CustomerOrderAggregateQueryResult> getCustomerOrderAggregate(String customerId) async {
+  Future<CustomerOrderAggregateQueryResult> getCustomerOrderAggregate(
+    String customerId,
+  ) async {
     final query = db.customSelect(
       '''
       SELECT 

@@ -18,9 +18,9 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
     required ExpensesDao expensesDao,
     required SyncOperationsDao syncOperationsDao,
     required app_db.AppDatabase db,
-  })  : _expensesDao = expensesDao,
-        _syncOperationsDao = syncOperationsDao,
-        _db = db;
+  }) : _expensesDao = expensesDao,
+       _syncOperationsDao = syncOperationsDao,
+       _db = db;
 
   @override
   Future<Expense> createExpense(Expense expense) async {
@@ -132,9 +132,9 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
   @override
   Stream<List<Expense>> watchExpensesForDate(OrderDate date) {
     try {
-      return _expensesDao.watchExpensesForDate(date.toDateTime()).map(
-            (rows) => rows.map(_mapToDomain).toList(),
-          );
+      return _expensesDao
+          .watchExpensesForDate(date.toDateTime())
+          .map((rows) => rows.map(_mapToDomain).toList());
     } catch (e) {
       if (e is Failure) rethrow;
       throw DatabaseFailure(e.toString());
@@ -168,7 +168,9 @@ class ExpenseRepositoryImpl implements ExpenseRepository {
         startDate: startDate.toDateTime(),
         endDate: endDate.toDateTime(),
       );
-      return rawMap.map((key, value) => MapEntry(key, Money.fromPiastres(value)));
+      return rawMap.map(
+        (key, value) => MapEntry(key, Money.fromPiastres(value)),
+      );
     } catch (e) {
       if (e is Failure) rethrow;
       throw DatabaseFailure(e.toString());

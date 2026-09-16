@@ -340,7 +340,9 @@ void main() {
                       context: context,
                       builder: (dialogCtx) => Dialog(
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusXl,
+                          ),
                         ),
                         backgroundColor: AppColors.surface,
                         surfaceTintColor: Colors.transparent,
@@ -382,7 +384,8 @@ void main() {
                                     AppButton(
                                       label: 'إلغاء',
                                       variant: AppButtonVariant.secondary,
-                                      onPressed: () => Navigator.of(dialogCtx).pop(),
+                                      onPressed: () =>
+                                          Navigator.of(dialogCtx).pop(),
                                     ),
                                   ],
                                 ),

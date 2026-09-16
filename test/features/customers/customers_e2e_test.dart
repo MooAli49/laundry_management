@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/core/di/injection.dart';
 import 'package:laundry_management/core/theme/app_theme.dart';
-import 'package:laundry_management/data/local/database/app_database.dart' as db_pkg;
+import 'package:laundry_management/data/local/database/app_database.dart'
+    as db_pkg;
 import 'package:laundry_management/data/local/database/dev_test_data.dart';
 import 'package:laundry_management/domain/entities/customer.dart';
 import 'package:laundry_management/domain/enums/order_status.dart';
@@ -80,9 +81,9 @@ void main() {
         // -------------------------------------------------------------
         // STEP 3: View Customer Details Screen (0 Orders initial)
         // -------------------------------------------------------------
-        await tester.pumpWidget(testBoilerplate(
-          CustomerDetailScreen(customerId: customer.id),
-        ));
+        await tester.pumpWidget(
+          testBoilerplate(CustomerDetailScreen(customerId: customer.id)),
+        );
         await tester.pumpAndSettle();
 
         expect(find.text('عمر المختار'), findsOneWidget);
@@ -105,8 +106,14 @@ void main() {
 
         // Verify that the customer was preselected
         expect(createOrderCubit.state.selectedCustomer, isNotNull);
-        expect(createOrderCubit.state.selectedCustomer!.id, equals(customer.id));
-        expect(createOrderCubit.state.selectedCustomer!.name, equals('عمر المختار'));
+        expect(
+          createOrderCubit.state.selectedCustomer!.id,
+          equals(customer.id),
+        );
+        expect(
+          createOrderCubit.state.selectedCustomer!.name,
+          equals('عمر المختار'),
+        );
 
         // Add an item to the order
         final itemType = createOrderCubit.state.itemTypes.first;
@@ -131,12 +138,14 @@ void main() {
         // -------------------------------------------------------------
         // STEP 5: Re-render Customer Details Screen & Verify History
         // -------------------------------------------------------------
-        await tester.pumpWidget(testBoilerplate(
-          CustomerDetailScreen(
-            key: const ValueKey('customer-detail-reloaded'),
-            customerId: customer.id,
+        await tester.pumpWidget(
+          testBoilerplate(
+            CustomerDetailScreen(
+              key: const ValueKey('customer-detail-reloaded'),
+              customerId: customer.id,
+            ),
           ),
-        ));
+        );
         await tester.pumpAndSettle();
 
         // Empty state is now gone
@@ -148,7 +157,7 @@ void main() {
 
         // Verify KPI stats: 1 total, 1 active, 0 completed
         expect(find.text('1'), findsNWidgets(2)); // Total = 1, Active = 1
-        expect(find.text('0'), findsOneWidget);   // Completed = 0
+        expect(find.text('0'), findsOneWidget); // Completed = 0
       },
     );
   });

@@ -119,7 +119,9 @@ class AppSidebar extends StatelessWidget {
           return SingleChildScrollView(
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                minHeight: constraints.maxHeight.isFinite ? constraints.maxHeight : 0.0,
+                minHeight: constraints.maxHeight.isFinite
+                    ? constraints.maxHeight
+                    : 0.0,
               ),
               child: IntrinsicHeight(
                 child: Column(

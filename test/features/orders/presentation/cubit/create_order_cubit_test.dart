@@ -10,7 +10,8 @@ import 'package:laundry_management/data/local/daos/orders_dao.dart';
 import 'package:laundry_management/data/local/daos/services_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
-import 'package:laundry_management/data/local/database/app_database.dart' as db_pkg;
+import 'package:laundry_management/data/local/database/app_database.dart'
+    as db_pkg;
 import 'package:laundry_management/data/repositories/carpet_size_repository_impl.dart';
 import 'package:laundry_management/data/repositories/customer_repository_impl.dart';
 import 'package:laundry_management/data/repositories/item_definition_repository_impl.dart';
@@ -147,226 +148,272 @@ void main() {
       expect(cubit.state.selectedCustomer, customer);
     });
 
-    test('Fixed Price quantity expansion produces subtotal = unitPrice * quantity', () async {
-      await cubit.initialize();
+    test(
+      'Fixed Price quantity expansion produces subtotal = unitPrice * quantity',
+      () async {
+        await cubit.initialize();
 
-      // Seed a service with fixed price
-      final now = DateTime.now();
-      final itemType = cubit.state.itemTypes.first;
-      final service = Service(
-        id: 'srv-fixed',
-        name: 'تنظيف خاص',
-        pricingType: PricingType.perPiece,
-        price: const Money.fromPiastres(50000), // 500 EGP
-        isActive: true,
-        createdAt: now,
-        updatedAt: now,
-      );
-      await serviceRepository.createService(service, supportedItemTypeIds: [itemType.id]);
+        // Seed a service with fixed price
+        final now = DateTime.now();
+        final itemType = cubit.state.itemTypes.first;
+        final service = Service(
+          id: 'srv-fixed',
+          name: 'تنظيف خاص',
+          pricingType: PricingType.perPiece,
+          price: const Money.fromPiastres(50000), // 500 EGP
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        );
+        await serviceRepository.createService(
+          service,
+          supportedItemTypeIds: [itemType.id],
+        );
 
-      // Select item type & service
-      await cubit.selectItemType(itemType);
-      cubit.selectService(service);
-      cubit.updateQuantity(5); // 5 pieces
+        // Select item type & service
+        await cubit.selectItemType(itemType);
+        cubit.selectService(service);
+        cubit.updateQuantity(5); // 5 pieces
 
-      expect(cubit.state.draftQuantity, 5);
-      expect(cubit.state.draftUnitPrice, const Money.fromPiastres(50000));
+        expect(cubit.state.draftQuantity, 5);
+        expect(cubit.state.draftUnitPrice, const Money.fromPiastres(50000));
 
-      // Add to order
-      cubit.addItemDraftToOrder();
+        // Add to order
+        cubit.addItemDraftToOrder();
 
-      expect(cubit.state.items.length, 1);
-      final draft = cubit.state.items.first;
-      expect(draft.physicalQuantity, 5);
-      expect(draft.unitPrice, const Money.fromPiastres(50000));
-      expect(draft.calculatedTotal, const Money.fromPiastres(250000)); // 2500 EGP (500 * 5)
-      expect(cubit.state.subtotal, const Money.fromPiastres(250000));
-    });
+        expect(cubit.state.items.length, 1);
+        final draft = cubit.state.items.first;
+        expect(draft.physicalQuantity, 5);
+        expect(draft.unitPrice, const Money.fromPiastres(50000));
+        expect(
+          draft.calculatedTotal,
+          const Money.fromPiastres(250000),
+        ); // 2500 EGP (500 * 5)
+        expect(cubit.state.subtotal, const Money.fromPiastres(250000));
+      },
+    );
 
-    test('updates delivery options, discount, and calculates final total', () async {
-      await cubit.initialize();
+    test(
+      'updates delivery options, discount, and calculates final total',
+      () async {
+        await cubit.initialize();
 
-      final now = DateTime.now();
-      final itemType = cubit.state.itemTypes.first;
-      final service = Service(
-        id: 'srv-1',
-        name: 'غسيل عادي',
-        pricingType: PricingType.perPiece,
-        price: const Money.fromPiastres(10000), // 100 EGP
-        isActive: true,
-        createdAt: now,
-        updatedAt: now,
-      );
-      await serviceRepository.createService(service, supportedItemTypeIds: [itemType.id]);
+        final now = DateTime.now();
+        final itemType = cubit.state.itemTypes.first;
+        final service = Service(
+          id: 'srv-1',
+          name: 'غسيل عادي',
+          pricingType: PricingType.perPiece,
+          price: const Money.fromPiastres(10000), // 100 EGP
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        );
+        await serviceRepository.createService(
+          service,
+          supportedItemTypeIds: [itemType.id],
+        );
 
-      await cubit.selectItemType(itemType);
-      cubit.selectService(service);
-      cubit.updateQuantity(2); // 2 * 100 = 200 EGP (20000 piastres)
-      cubit.addItemDraftToOrder();
+        await cubit.selectItemType(itemType);
+        cubit.selectService(service);
+        cubit.updateQuantity(2); // 2 * 100 = 200 EGP (20000 piastres)
+        cubit.addItemDraftToOrder();
 
-      expect(cubit.state.subtotal, const Money.fromPiastres(20000));
+        expect(cubit.state.subtotal, const Money.fromPiastres(20000));
 
-      // Enable delivery with 30 EGP fee
-      cubit.updateDelivery(
-        deliveryRequested: true,
-        deliveryFee: const Money.fromPiastres(3000),
-      );
+        // Enable delivery with 30 EGP fee
+        cubit.updateDelivery(
+          deliveryRequested: true,
+          deliveryFee: const Money.fromPiastres(3000),
+        );
 
-      // Apply 20 EGP discount
-      cubit.updateDiscount(const Money.fromPiastres(2000));
+        // Apply 20 EGP discount
+        cubit.updateDiscount(const Money.fromPiastres(2000));
 
-      // Total = subtotal (200) + delivery (30) - discount (20) = 210 EGP (21000 piastres)
-      expect(cubit.state.total, const Money.fromPiastres(21000));
-    });
+        // Total = subtotal (200) + delivery (30) - discount (20) = 210 EGP (21000 piastres)
+        expect(cubit.state.total, const Money.fromPiastres(21000));
+      },
+    );
 
-    test('submitOrder creates discrete physical OrderItems via usecase', () async {
-      await cubit.initialize();
+    test(
+      'submitOrder creates discrete physical OrderItems via usecase',
+      () async {
+        await cubit.initialize();
 
-      final now = DateTime.now();
-      final customer = Customer(
-        id: 'cust-real',
-        name: 'طارق حسام',
-        phone: '01099998888',
-        createdAt: now,
-        updatedAt: now,
-      );
-      await customerRepository.createCustomer(customer);
-      cubit.selectCustomer(customer);
+        final now = DateTime.now();
+        final customer = Customer(
+          id: 'cust-real',
+          name: 'طارق حسام',
+          phone: '01099998888',
+          createdAt: now,
+          updatedAt: now,
+        );
+        await customerRepository.createCustomer(customer);
+        cubit.selectCustomer(customer);
 
-      final itemType = cubit.state.itemTypes.first;
-      final service = Service(
-        id: 'srv-suite',
-        name: 'تنظيف بدلة',
-        pricingType: PricingType.perPiece,
-        price: const Money.fromPiastres(5000), // 50 EGP
-        isActive: true,
-        createdAt: now,
-        updatedAt: now,
-      );
-      await serviceRepository.createService(service, supportedItemTypeIds: [itemType.id]);
+        final itemType = cubit.state.itemTypes.first;
+        final service = Service(
+          id: 'srv-suite',
+          name: 'تنظيف بدلة',
+          pricingType: PricingType.perPiece,
+          price: const Money.fromPiastres(5000), // 50 EGP
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        );
+        await serviceRepository.createService(
+          service,
+          supportedItemTypeIds: [itemType.id],
+        );
 
-      await cubit.selectItemType(itemType);
-      cubit.selectService(service);
-      cubit.updateQuantity(3); // 3 physical items!
-      cubit.addItemDraftToOrder();
+        await cubit.selectItemType(itemType);
+        cubit.selectService(service);
+        cubit.updateQuantity(3); // 3 physical items!
+        cubit.addItemDraftToOrder();
 
-      // Submit
-      await cubit.submitOrder();
+        // Submit
+        await cubit.submitOrder();
 
-      final createdOrder = cubit.state.createdOrder;
-      expect(createdOrder, isNotNull);
-      expect(createdOrder!.orderNumber, startsWith('26-'));
-      expect(createdOrder.total, const Money.fromPiastres(15000)); // 150 EGP
+        final createdOrder = cubit.state.createdOrder;
+        expect(createdOrder, isNotNull);
+        expect(createdOrder!.orderNumber, startsWith('26-'));
+        expect(createdOrder.total, const Money.fromPiastres(15000)); // 150 EGP
 
-      // Verify discrete physical items in database
-      final physicalItems = await orderRepository.getOrderItems(createdOrder.id);
-      expect(physicalItems.length, 3);
-      for (final item in physicalItems) {
-        expect(item.quantity, 1.0);
-        expect(item.unitPrice, const Money.fromPiastres(5000));
-        expect(item.calculatedTotal, const Money.fromPiastres(5000));
-      }
-    });
+        // Verify discrete physical items in database
+        final physicalItems = await orderRepository.getOrderItems(
+          createdOrder.id,
+        );
+        expect(physicalItems.length, 3);
+        for (final item in physicalItems) {
+          expect(item.quantity, 1.0);
+          expect(item.unitPrice, const Money.fromPiastres(5000));
+          expect(item.calculatedTotal, const Money.fromPiastres(5000));
+        }
+      },
+    );
 
-    test('CreateOrderState.copyWith clearDraftNotes explicitly resets draftNotes to null', () {
-      final stateWithNotes = cubit.state.copyWith(draftNotes: 'بقعة حبر قديمة');
-      expect(stateWithNotes.draftNotes, 'بقعة حبر قديمة');
+    test(
+      'CreateOrderState.copyWith clearDraftNotes explicitly resets draftNotes to null',
+      () {
+        final stateWithNotes = cubit.state.copyWith(
+          draftNotes: 'بقعة حبر قديمة',
+        );
+        expect(stateWithNotes.draftNotes, 'بقعة حبر قديمة');
 
-      // Without clearDraftNotes flag, passing draftNotes: null retains previous value
-      final untouched = stateWithNotes.copyWith(draftNotes: null);
-      expect(untouched.draftNotes, 'بقعة حبر قديمة');
+        // Without clearDraftNotes flag, passing draftNotes: null retains previous value
+        final untouched = stateWithNotes.copyWith(draftNotes: null);
+        expect(untouched.draftNotes, 'بقعة حبر قديمة');
 
-      // With clearDraftNotes: true, draftNotes is explicitly reset to null
-      final cleared = stateWithNotes.copyWith(clearDraftNotes: true);
-      expect(cleared.draftNotes, isNull);
-    });
+        // With clearDraftNotes: true, draftNotes is explicitly reset to null
+        final cleared = stateWithNotes.copyWith(clearDraftNotes: true);
+        expect(cleared.draftNotes, isNull);
+      },
+    );
 
-    test('updateDraftNotes with null explicitly resets draftNotes via clearDraftNotes', () {
-      cubit.updateDraftNotes('ملاحظة أولية');
-      expect(cubit.state.draftNotes, 'ملاحظة أولية');
+    test(
+      'updateDraftNotes with null explicitly resets draftNotes via clearDraftNotes',
+      () {
+        cubit.updateDraftNotes('ملاحظة أولية');
+        expect(cubit.state.draftNotes, 'ملاحظة أولية');
 
-      cubit.updateDraftNotes(null);
-      expect(cubit.state.draftNotes, isNull);
-    });
+        cubit.updateDraftNotes(null);
+        expect(cubit.state.draftNotes, isNull);
+      },
+    );
 
-    test('addItemDraftToOrder persists notes on added item and resets draftNotes in state', () async {
-      await cubit.initialize();
-      final itemType = cubit.state.itemTypes.first;
-      final service = Service(
-        id: 'srv-notes-1',
-        name: 'كي بالبخار',
-        pricingType: PricingType.perPiece,
-        price: const Money.fromPiastres(3000),
-        isActive: true,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-      await serviceRepository.createService(service, supportedItemTypeIds: [itemType.id]);
+    test(
+      'addItemDraftToOrder persists notes on added item and resets draftNotes in state',
+      () async {
+        await cubit.initialize();
+        final itemType = cubit.state.itemTypes.first;
+        final service = Service(
+          id: 'srv-notes-1',
+          name: 'كي بالبخار',
+          pricingType: PricingType.perPiece,
+          price: const Money.fromPiastres(3000),
+          isActive: true,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+        await serviceRepository.createService(
+          service,
+          supportedItemTypeIds: [itemType.id],
+        );
 
-      await cubit.selectItemType(itemType);
-      cubit.selectService(service);
-      cubit.updateDraftNotes('بقعة زيت على الكم الأيمن');
+        await cubit.selectItemType(itemType);
+        cubit.selectService(service);
+        cubit.updateDraftNotes('بقعة زيت على الكم الأيمن');
 
-      expect(cubit.state.draftNotes, 'بقعة زيت على الكم الأيمن');
+        expect(cubit.state.draftNotes, 'بقعة زيت على الكم الأيمن');
 
-      cubit.addItemDraftToOrder();
+        cubit.addItemDraftToOrder();
 
-      expect(cubit.state.items.length, 1);
-      final addedItem = cubit.state.items.first;
-      // Notes on the saved draft item remain intact
-      expect(addedItem.notes, 'بقعة زيت على الكم الأيمن');
-      // Draft notes in cubit state are cleared for the next item
-      expect(cubit.state.draftNotes, isNull);
-    });
+        expect(cubit.state.items.length, 1);
+        final addedItem = cubit.state.items.first;
+        // Notes on the saved draft item remain intact
+        expect(addedItem.notes, 'بقعة زيت على الكم الأيمن');
+        // Draft notes in cubit state are cleared for the next item
+        expect(cubit.state.draftNotes, isNull);
+      },
+    );
 
-    test('addItemDraftToOrder prevents note leakage to subsequent items', () async {
-      await cubit.initialize();
-      final itemType = cubit.state.itemTypes.first;
-      final service1 = Service(
-        id: 'srv-leak-1',
-        name: 'غسيل خاص',
-        pricingType: PricingType.perPiece,
-        price: const Money.fromPiastres(4000),
-        isActive: true,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-      final service2 = Service(
-        id: 'srv-leak-2',
-        name: 'تنظيف جاف',
-        pricingType: PricingType.perPiece,
-        price: const Money.fromPiastres(6000),
-        isActive: true,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-      await serviceRepository.createService(service1, supportedItemTypeIds: [itemType.id]);
-      await serviceRepository.createService(service2, supportedItemTypeIds: [itemType.id]);
+    test(
+      'addItemDraftToOrder prevents note leakage to subsequent items',
+      () async {
+        await cubit.initialize();
+        final itemType = cubit.state.itemTypes.first;
+        final service1 = Service(
+          id: 'srv-leak-1',
+          name: 'غسيل خاص',
+          pricingType: PricingType.perPiece,
+          price: const Money.fromPiastres(4000),
+          isActive: true,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+        final service2 = Service(
+          id: 'srv-leak-2',
+          name: 'تنظيف جاف',
+          pricingType: PricingType.perPiece,
+          price: const Money.fromPiastres(6000),
+          isActive: true,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+        await serviceRepository.createService(
+          service1,
+          supportedItemTypeIds: [itemType.id],
+        );
+        await serviceRepository.createService(
+          service2,
+          supportedItemTypeIds: [itemType.id],
+        );
 
-      // Add First Item with a specific note
-      await cubit.selectItemType(itemType);
-      cubit.selectService(service1);
-      cubit.updateDraftNotes('ملاحظة خاصة بالقطعة الأولى فقط');
-      cubit.addItemDraftToOrder();
+        // Add First Item with a specific note
+        await cubit.selectItemType(itemType);
+        cubit.selectService(service1);
+        cubit.updateDraftNotes('ملاحظة خاصة بالقطعة الأولى فقط');
+        cubit.addItemDraftToOrder();
 
-      expect(cubit.state.items.length, 1);
-      expect(cubit.state.items[0].notes, 'ملاحظة خاصة بالقطعة الأولى فقط');
-      expect(cubit.state.draftNotes, isNull);
+        expect(cubit.state.items.length, 1);
+        expect(cubit.state.items[0].notes, 'ملاحظة خاصة بالقطعة الأولى فقط');
+        expect(cubit.state.draftNotes, isNull);
 
-      // Add Second Item WITHOUT providing notes
-      await cubit.selectItemType(itemType);
-      cubit.selectService(service2);
-      // Ensure we do not set any draft notes for the second item
-      expect(cubit.state.draftNotes, isNull);
-      cubit.addItemDraftToOrder();
+        // Add Second Item WITHOUT providing notes
+        await cubit.selectItemType(itemType);
+        cubit.selectService(service2);
+        // Ensure we do not set any draft notes for the second item
+        expect(cubit.state.draftNotes, isNull);
+        cubit.addItemDraftToOrder();
 
-      expect(cubit.state.items.length, 2);
-      // First item notes must stay intact
-      expect(cubit.state.items[0].notes, 'ملاحظة خاصة بالقطعة الأولى فقط');
-      // Second item must NOT inherit any notes from the first item
-      expect(cubit.state.items[1].notes, isNull);
-      // State draft notes remains null
-      expect(cubit.state.draftNotes, isNull);
-    });
+        expect(cubit.state.items.length, 2);
+        // First item notes must stay intact
+        expect(cubit.state.items[0].notes, 'ملاحظة خاصة بالقطعة الأولى فقط');
+        // Second item must NOT inherit any notes from the first item
+        expect(cubit.state.items[1].notes, isNull);
+        // State draft notes remains null
+        expect(cubit.state.draftNotes, isNull);
+      },
+    );
   });
 }

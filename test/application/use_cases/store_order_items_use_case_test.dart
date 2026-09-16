@@ -21,7 +21,8 @@ class FakeOrderRepository implements OrderRepository {
   Future<Order?> getOrderById(String id) async => orders[id];
 
   @override
-  Future<List<OrderItem>> getOrderItems(String orderId) async => orderItems[orderId] ?? [];
+  Future<List<OrderItem>> getOrderItems(String orderId) async =>
+      orderItems[orderId] ?? [];
 
   @override
   Future<Order> markOrderReady(String orderId) async {
@@ -60,11 +61,13 @@ class FakeStorageLocationRepository implements StorageLocationRepository {
   final Map<String, List<StorageLocation>> compatibleByItemType = {};
 
   @override
-  Future<StorageLocation?> getStorageLocationById(String id) async => locations[id];
+  Future<StorageLocation?> getStorageLocationById(String id) async =>
+      locations[id];
 
   @override
-  Future<List<StorageLocation>> getCompatibleLocationsForItemType(String itemTypeId) async =>
-      compatibleByItemType[itemTypeId] ?? [];
+  Future<List<StorageLocation>> getCompatibleLocationsForItemType(
+    String itemTypeId,
+  ) async => compatibleByItemType[itemTypeId] ?? [];
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -265,21 +268,27 @@ void main() {
       );
     });
 
-    test('rejects storage location incompatible with item type with Arabic user message', () async {
-      expect(
-        () => useCase.execute(
-          const StoreOrderItemsInput(
-            orderId: 'ord-1',
-            orderItemIds: ['item-1'],
-            storageLocationId: 'loc-carpet-only',
+    test(
+      'rejects storage location incompatible with item type with Arabic user message',
+      () async {
+        expect(
+          () => useCase.execute(
+            const StoreOrderItemsInput(
+              orderId: 'ord-1',
+              orderItemIds: ['item-1'],
+              storageLocationId: 'loc-carpet-only',
+            ),
           ),
-        ),
-        throwsA(
-          isA<IncompatibleStorageLocationFailure>()
-              .having((e) => e.message, 'message', equals('الموقع المحدد غير متوافق مع نوع العنصر')),
-        ),
-      );
-    });
+          throwsA(
+            isA<IncompatibleStorageLocationFailure>().having(
+              (e) => e.message,
+              'message',
+              equals('الموقع المحدد غير متوافق مع نوع العنصر'),
+            ),
+          ),
+        );
+      },
+    );
 
     test('LOCKED RULE: partial storage leaves order in Processing', () async {
       storageRepo.allStored = false; // Only 1 of 2 stored
@@ -298,21 +307,24 @@ void main() {
       expect(storageRepo.storedItemIds, contains('item-1'));
     });
 
-    test('LOCKED RULE: all items stored automatically transitions order to Ready', () async {
-      storageRepo.allStored = true; // All 2 items stored
+    test(
+      'LOCKED RULE: all items stored automatically transitions order to Ready',
+      () async {
+        storageRepo.allStored = true; // All 2 items stored
 
-      final result = await useCase.execute(
-        const StoreOrderItemsInput(
-          orderId: 'ord-1',
-          orderItemIds: ['item-1', 'item-2'],
-          storageLocationId: 'loc-active',
-        ),
-      );
+        final result = await useCase.execute(
+          const StoreOrderItemsInput(
+            orderId: 'ord-1',
+            orderItemIds: ['item-1', 'item-2'],
+            storageLocationId: 'loc-active',
+          ),
+        );
 
-      expect(result.allStored, true);
-      expect(result.order.status, OrderStatus.ready);
-      expect(orderRepo.markReadyCalled, true);
-      expect(storageRepo.storedItemIds, containsAll(['item-1', 'item-2']));
-    });
+        expect(result.allStored, true);
+        expect(result.order.status, OrderStatus.ready);
+        expect(orderRepo.markReadyCalled, true);
+        expect(storageRepo.storedItemIds, containsAll(['item-1', 'item-2']));
+      },
+    );
   });
 }

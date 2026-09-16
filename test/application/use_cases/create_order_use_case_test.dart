@@ -22,7 +22,10 @@ class FakeOrderRepository implements OrderRepository {
   List<OrderItem>? lastCreatedItems;
 
   @override
-  Future<Order> createOrder({required Order order, required List<OrderItem> items}) async {
+  Future<Order> createOrder({
+    required Order order,
+    required List<OrderItem> items,
+  }) async {
     lastCreatedOrder = order.copyWith(orderNumber: '26-001');
     lastCreatedItems = items;
     return lastCreatedOrder!;
@@ -71,7 +74,8 @@ class FakeItemDefinitionRepository implements ItemDefinitionRepository {
   final Map<String, ItemDefinition> itemDefinitions = {};
 
   @override
-  Future<ItemDefinition?> getItemDefinitionById(String id) async => itemDefinitions[id];
+  Future<ItemDefinition?> getItemDefinitionById(String id) async =>
+      itemDefinitions[id];
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -173,7 +177,10 @@ void main() {
       updatedAt: now,
     );
     serviceRepo.services['srv-fixed'] = fixedService;
-    serviceRepo.servicesByItemType['type-clothes'] = [washIronService, fixedService];
+    serviceRepo.servicesByItemType['type-clothes'] = [
+      washIronService,
+      fixedService,
+    ];
 
     final carpetService = Service(
       id: 'srv-carpet',
@@ -197,18 +204,6 @@ void main() {
       updatedAt: now,
     );
     serviceRepo.services['srv-inactive'] = inactiveService;
-
-    final perKgService = Service(
-      id: 'srv-kg',
-      name: 'خدمة بالكيلو',
-      pricingType: PricingType.perKilogram,
-      price: const Money.fromPiastres(2000),
-      isActive: true,
-      createdAt: now,
-      updatedAt: now,
-    );
-    serviceRepo.services['srv-kg'] = perKgService;
-    serviceRepo.servicesByItemType['type-clothes']?.add(perKgService);
   });
 
   group('CreateOrderUseCase', () {
@@ -403,101 +398,92 @@ void main() {
       );
     });
 
-    test('LOCKED RULE: rejects PerKilogram pricing in V1', () async {
-      expect(
-        () => useCase.execute(
-          CreateOrderInput(
-            customerId: 'cust-1',
-            expectedPickupDate: OrderDate.today(),
-            items: [
-              const CreateOrderItemInput(
-                itemTypeId: 'type-clothes',
-                serviceId: 'srv-kg',
-                physicalQuantity: 1,
-              ),
-            ],
-          ),
-        ),
-        throwsA(isA<BusinessRuleFailure>()),
-      );
-    });
-
-    test('LOCKED RULE: strictly rejects zero price and negative price', () async {
-      // Zero custom price
-      expect(
-        () => useCase.execute(
-          CreateOrderInput(
-            customerId: 'cust-1',
-            expectedPickupDate: OrderDate.today(),
-            items: [
-              const CreateOrderItemInput(
-                itemTypeId: 'type-clothes',
-                serviceId: 'srv-wash-iron',
-                customUnitPrice: Money.zero,
-                physicalQuantity: 1,
-              ),
-            ],
-          ),
-        ),
-        throwsA(isA<ValidationFailure>()),
-      );
-
-      // Negative custom price
-      expect(
-        () => useCase.execute(
-          CreateOrderInput(
-            customerId: 'cust-1',
-            expectedPickupDate: OrderDate.today(),
-            items: [
-              const CreateOrderItemInput(
-                itemTypeId: 'type-clothes',
-                serviceId: 'srv-wash-iron',
-                customUnitPrice: Money.fromPiastres(-500),
-                physicalQuantity: 1,
-              ),
-            ],
-          ),
-        ),
-        throwsA(isA<ValidationFailure>()),
-      );
-    });
-
-    test('expands physical quantity N into N distinct OrderItems with unique IDs', () async {
-      final result = await useCase.execute(
-        CreateOrderInput(
-          customerId: 'cust-1',
-          expectedPickupDate: OrderDate.today(),
-          items: [
-            const CreateOrderItemInput(
-              itemTypeId: 'type-clothes',
-              itemDefinitionId: 'def-shirt',
-              serviceId: 'srv-wash-iron',
-              physicalQuantity: 3,
+    test(
+      'LOCKED RULE: strictly rejects zero price and negative price',
+      () async {
+        // Zero custom price
+        expect(
+          () => useCase.execute(
+            CreateOrderInput(
+              customerId: 'cust-1',
+              expectedPickupDate: OrderDate.today(),
+              items: [
+                const CreateOrderItemInput(
+                  itemTypeId: 'type-clothes',
+                  serviceId: 'srv-wash-iron',
+                  customUnitPrice: Money.zero,
+                  physicalQuantity: 1,
+                ),
+              ],
             ),
-          ],
-        ),
-      );
+          ),
+          throwsA(isA<ValidationFailure>()),
+        );
 
-      expect(result.status, OrderStatus.processing);
-      expect(orderRepo.lastCreatedItems, isNotNull);
-      expect(orderRepo.lastCreatedItems!.length, 3);
+        // Negative custom price
+        expect(
+          () => useCase.execute(
+            CreateOrderInput(
+              customerId: 'cust-1',
+              expectedPickupDate: OrderDate.today(),
+              items: [
+                const CreateOrderItemInput(
+                  itemTypeId: 'type-clothes',
+                  serviceId: 'srv-wash-iron',
+                  customUnitPrice: Money.fromPiastres(-500),
+                  physicalQuantity: 1,
+                ),
+              ],
+            ),
+          ),
+          throwsA(isA<ValidationFailure>()),
+        );
+      },
+    );
 
-      final itemIds = orderRepo.lastCreatedItems!.map((i) => i.id).toSet();
-      expect(itemIds.length, 3, reason: 'Every physical item must have a unique UUID');
+    test(
+      'expands physical quantity N into N distinct OrderItems with unique IDs',
+      () async {
+        final result = await useCase.execute(
+          CreateOrderInput(
+            customerId: 'cust-1',
+            expectedPickupDate: OrderDate.today(),
+            items: [
+              const CreateOrderItemInput(
+                itemTypeId: 'type-clothes',
+                itemDefinitionId: 'def-shirt',
+                serviceId: 'srv-wash-iron',
+                physicalQuantity: 3,
+              ),
+            ],
+          ),
+        );
 
-      for (final item in orderRepo.lastCreatedItems!) {
-        expect(item.quantity, 1.0);
-        expect(item.unitPrice, const Money.fromPiastres(1500));
-        expect(item.calculatedTotal, const Money.fromPiastres(1500));
-        expect(item.itemTypeNameSnapshot, 'ملابس');
-        expect(item.itemDefinitionNameSnapshot, 'قميص رجالي');
-        expect(item.serviceNameSnapshot, 'غسيل ومكواة');
-      }
+        expect(result.status, OrderStatus.processing);
+        expect(orderRepo.lastCreatedItems, isNotNull);
+        expect(orderRepo.lastCreatedItems!.length, 3);
 
-      // 3 items * 1500 = 4500 piastres (45 EGP)
-      expect(result.subtotal, const Money.fromPiastres(4500));
-      expect(result.total, const Money.fromPiastres(4500));
-    });
+        final itemIds = orderRepo.lastCreatedItems!.map((i) => i.id).toSet();
+        expect(
+          itemIds.length,
+          3,
+          reason: 'Every physical item must have a unique UUID',
+        );
+
+        for (final item in orderRepo.lastCreatedItems!) {
+          expect(item.quantity, 1.0);
+          expect(item.unitPrice, const Money.fromPiastres(1500));
+          expect(item.calculatedTotal, const Money.fromPiastres(1500));
+          expect(item.itemTypeNameSnapshot, 'ملابس');
+          expect(item.itemDefinitionNameSnapshot, 'قميص رجالي');
+          expect(item.serviceNameSnapshot, 'غسيل ومكواة');
+        }
+
+        // 3 items * 1500 = 4500 piastres (45 EGP)
+        expect(result.subtotal, const Money.fromPiastres(4500));
+        expect(result.total, const Money.fromPiastres(4500));
+      },
+    );
 
     test('supports custom price override', () async {
       final result = await useCase.execute(
@@ -508,7 +494,9 @@ void main() {
             const CreateOrderItemInput(
               itemTypeId: 'type-clothes',
               serviceId: 'srv-wash-iron',
-              customUnitPrice: Money.fromPiastres(2000), // Override 15 EGP -> 20 EGP
+              customUnitPrice: Money.fromPiastres(
+                2000,
+              ), // Override 15 EGP -> 20 EGP
               physicalQuantity: 1,
             ),
           ],
@@ -516,38 +504,44 @@ void main() {
       );
 
       expect(result.subtotal, const Money.fromPiastres(2000));
-      expect(orderRepo.lastCreatedItems!.first.unitPrice, const Money.fromPiastres(2000));
-      expect(orderRepo.lastCreatedItems!.first.calculatedTotal, const Money.fromPiastres(2000));
-    });
-
-    test('calculates carpet per-square-meter area and total accurately', () async {
-      final result = await useCase.execute(
-        CreateOrderInput(
-          customerId: 'cust-1',
-          expectedPickupDate: OrderDate.today(),
-          items: [
-            const CreateOrderItemInput(
-              itemTypeId: 'type-carpet',
-              serviceId: 'srv-carpet',
-              physicalQuantity: 1,
-              carpetData: CarpetItemInput(
-                length: 3.0,
-                width: 2.0,
-              ),
-            ),
-          ],
-        ),
+      expect(
+        orderRepo.lastCreatedItems!.first.unitPrice,
+        const Money.fromPiastres(2000),
       );
-
-      expect(orderRepo.lastCreatedItems!.length, 1);
-      final carpetItem = orderRepo.lastCreatedItems!.first;
-      expect(carpetItem.carpetData, isNotNull);
-      expect(carpetItem.carpetData!.area, 6.0); // 3 * 2 = 6 m2
-      // 3000 piastres/m2 * 6 m2 = 18000 piastres (180 EGP)
-      expect(carpetItem.calculatedTotal, const Money.fromPiastres(18000));
-      expect(result.subtotal, const Money.fromPiastres(18000));
-      expect(result.total, const Money.fromPiastres(18000));
+      expect(
+        orderRepo.lastCreatedItems!.first.calculatedTotal,
+        const Money.fromPiastres(2000),
+      );
     });
+
+    test(
+      'calculates carpet per-square-meter area and total accurately',
+      () async {
+        final result = await useCase.execute(
+          CreateOrderInput(
+            customerId: 'cust-1',
+            expectedPickupDate: OrderDate.today(),
+            items: [
+              const CreateOrderItemInput(
+                itemTypeId: 'type-carpet',
+                serviceId: 'srv-carpet',
+                physicalQuantity: 1,
+                carpetData: CarpetItemInput(length: 3.0, width: 2.0),
+              ),
+            ],
+          ),
+        );
+
+        expect(orderRepo.lastCreatedItems!.length, 1);
+        final carpetItem = orderRepo.lastCreatedItems!.first;
+        expect(carpetItem.carpetData, isNotNull);
+        expect(carpetItem.carpetData!.area, 6.0); // 3 * 2 = 6 m2
+        // 3000 piastres/m2 * 6 m2 = 18000 piastres (180 EGP)
+        expect(carpetItem.calculatedTotal, const Money.fromPiastres(18000));
+        expect(result.subtotal, const Money.fromPiastres(18000));
+        expect(result.total, const Money.fromPiastres(18000));
+      },
+    );
 
     test('rejects carpetData for perPiece pricing', () async {
       expect(
@@ -560,10 +554,7 @@ void main() {
                 itemTypeId: 'type-clothes',
                 serviceId: 'srv-wash-iron',
                 physicalQuantity: 1,
-                carpetData: CarpetItemInput(
-                  length: 2.0,
-                  width: 3.0,
-                ),
+                carpetData: CarpetItemInput(length: 2.0, width: 3.0),
               ),
             ],
           ),
@@ -589,10 +580,7 @@ void main() {
                 itemTypeId: 'type-clothes',
                 serviceId: 'srv-fixed',
                 physicalQuantity: 1,
-                carpetData: CarpetItemInput(
-                  length: 2.0,
-                  width: 3.0,
-                ),
+                carpetData: CarpetItemInput(length: 2.0, width: 3.0),
               ),
             ],
           ),
@@ -633,39 +621,42 @@ void main() {
       );
     });
 
-    test('enforces complete order total formula with discount and delivery fees', () async {
-      final result = await useCase.execute(
-        CreateOrderInput(
-          customerId: 'cust-1',
-          expectedPickupDate: OrderDate.today(),
-          customerPickupRequested: true,
-          customerPickupFee: const Money.fromPiastres(2000), // 20 EGP
-          customerDeliveryRequested: true,
-          customerDeliveryFee: const Money.fromPiastres(2500), // 25 EGP
-          discount: const Money.fromPiastres(1000), // 10 EGP discount
-          items: [
-            const CreateOrderItemInput(
-              itemTypeId: 'type-clothes',
-              serviceId: 'srv-wash-iron',
-              physicalQuantity: 2, // 2 * 1500 = 3000 piastres
-            ),
-          ],
-        ),
-      );
+    test(
+      'enforces complete order total formula with discount and delivery fees',
+      () async {
+        final result = await useCase.execute(
+          CreateOrderInput(
+            customerId: 'cust-1',
+            expectedPickupDate: OrderDate.today(),
+            customerPickupRequested: true,
+            customerPickupFee: const Money.fromPiastres(2000), // 20 EGP
+            customerDeliveryRequested: true,
+            customerDeliveryFee: const Money.fromPiastres(2500), // 25 EGP
+            discount: const Money.fromPiastres(1000), // 10 EGP discount
+            items: [
+              const CreateOrderItemInput(
+                itemTypeId: 'type-clothes',
+                serviceId: 'srv-wash-iron',
+                physicalQuantity: 2, // 2 * 1500 = 3000 piastres
+              ),
+            ],
+          ),
+        );
 
-      // Subtotal = 3000
-      // Discount = 1000
-      // PickupFee = 2000
-      // DeliveryFee = 2500
-      // Tax = 0
-      // Total = 3000 - 1000 + 2000 + 2500 = 6500 piastres (65 EGP)
-      expect(result.subtotal, const Money.fromPiastres(3000));
-      expect(result.discount, const Money.fromPiastres(1000));
-      expect(result.customerPickupFee, const Money.fromPiastres(2000));
-      expect(result.customerDeliveryFee, const Money.fromPiastres(2500));
-      expect(result.tax, Money.zero);
-      expect(result.total, const Money.fromPiastres(6500));
-    });
+        // Subtotal = 3000
+        // Discount = 1000
+        // PickupFee = 2000
+        // DeliveryFee = 2500
+        // Tax = 0
+        // Total = 3000 - 1000 + 2000 + 2500 = 6500 piastres (65 EGP)
+        expect(result.subtotal, const Money.fromPiastres(3000));
+        expect(result.discount, const Money.fromPiastres(1000));
+        expect(result.customerPickupFee, const Money.fromPiastres(2000));
+        expect(result.customerDeliveryFee, const Money.fromPiastres(2500));
+        expect(result.tax, Money.zero);
+        expect(result.total, const Money.fromPiastres(6500));
+      },
+    );
 
     test('rejects discount exceeding subtotal', () async {
       expect(

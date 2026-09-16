@@ -11,7 +11,11 @@ class ApiKeyInterceptor extends Interceptor {
   ApiKeyInterceptor({String? apiKey})
     : _apiKey =
           apiKey ??
-          const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+          const String.fromEnvironment(
+            'SUPABASE_ANON_KEY',
+            defaultValue:
+                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5aGZnbmJoaWp1a2JkcHRyZXRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NjcxNDcsImV4cCI6MjEwNDA0MzE0N30.gInc0tuzZiWq8EeEqbNBYa_Ay4liCcB4iGGOjUMnOBw',
+          );
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {

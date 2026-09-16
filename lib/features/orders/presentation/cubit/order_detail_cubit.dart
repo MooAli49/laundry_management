@@ -45,43 +45,47 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
     required CompleteOrderUseCase completeOrderUseCase,
     required CancelOrderUseCase cancelOrderUseCase,
     Uuid? uuid,
-  })  : _orderRepository = orderRepository,
-        _customerRepository = customerRepository,
-        _paymentRepository = paymentRepository,
-        _storageRepository = storageRepository,
-        _storageLocationRepository = storageLocationRepository,
-        _settingsRepository = settingsRepository,
-        _storeOrderItemsUseCase = storeOrderItemsUseCase,
-        _changeOrderStatusUseCase = changeOrderStatusUseCase,
-        _completeOrderUseCase = completeOrderUseCase,
-        _cancelOrderUseCase = cancelOrderUseCase,
-        _uuid = uuid ?? const Uuid(),
-        super(const OrderDetailState());
+  }) : _orderRepository = orderRepository,
+       _customerRepository = customerRepository,
+       _paymentRepository = paymentRepository,
+       _storageRepository = storageRepository,
+       _storageLocationRepository = storageLocationRepository,
+       _settingsRepository = settingsRepository,
+       _storeOrderItemsUseCase = storeOrderItemsUseCase,
+       _changeOrderStatusUseCase = changeOrderStatusUseCase,
+       _completeOrderUseCase = completeOrderUseCase,
+       _cancelOrderUseCase = cancelOrderUseCase,
+       _uuid = uuid ?? const Uuid(),
+       super(const OrderDetailState());
 
   Future<void> loadOrderDetail(String orderId) async {
-    emit(state.copyWith(
-      isLoading: true,
-      clearErrorMessage: true,
-      clearActionSuccessMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        isLoading: true,
+        clearErrorMessage: true,
+        clearActionSuccessMessage: true,
+      ),
+    );
 
     try {
       final order = await _orderRepository.getOrderById(orderId);
       if (order == null) {
-        emit(state.copyWith(
-          isLoading: false,
-          errorMessage: 'الطلب غير موجود',
-        ));
+        emit(state.copyWith(isLoading: false, errorMessage: 'الطلب غير موجود'));
         return;
       }
 
-      final customer = await _customerRepository.getCustomerById(order.customerId);
+      final customer = await _customerRepository.getCustomerById(
+        order.customerId,
+      );
       final items = await _orderRepository.getOrderItems(orderId);
       final payments = await _paymentRepository.getPaymentsForOrder(orderId);
       final totalPaid = await _paymentRepository.getTotalPaidForOrder(orderId);
-      final remaining = await _paymentRepository.getRemainingAmountForOrder(orderId);
+      final remaining = await _paymentRepository.getRemainingAmountForOrder(
+        orderId,
+      );
       final settings = await _settingsRepository.getSettings();
-      final allActiveLocations = await _storageLocationRepository.getActiveLocations();
+      final allActiveLocations = await _storageLocationRepository
+          .getActiveLocations();
 
       final activeStorageRecords = <String, StorageRecord>{};
       final locationMap = <String, StorageLocation>{};
@@ -91,11 +95,15 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
       }
 
       for (final item in items) {
-        final record = await _storageRepository.getActiveRecordForOrderItem(item.id);
+        final record = await _storageRepository.getActiveRecordForOrderItem(
+          item.id,
+        );
         if (record != null) {
           activeStorageRecords[item.id] = record;
           if (!locationMap.containsKey(record.storageLocationId)) {
-            final loc = await _storageLocationRepository.getStorageLocationById(record.storageLocationId);
+            final loc = await _storageLocationRepository.getStorageLocationById(
+              record.storageLocationId,
+            );
             if (loc != null) {
               locationMap[loc.id] = loc;
             }
@@ -106,30 +114,30 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
       final compatibleMap = <String, List<StorageLocation>>{};
       for (final item in items) {
         if (!compatibleMap.containsKey(item.itemTypeId)) {
-          final compatible = await _storageLocationRepository.getCompatibleLocationsForItemType(item.itemTypeId);
+          final compatible = await _storageLocationRepository
+              .getCompatibleLocationsForItemType(item.itemTypeId);
           compatibleMap[item.itemTypeId] = compatible;
         }
       }
 
-      emit(state.copyWith(
-        isLoading: false,
-        order: order,
-        customer: customer,
-        items: items,
-        activeStorageRecords: activeStorageRecords,
-        storageLocations: locationMap,
-        allActiveLocations: allActiveLocations,
-        compatibleLocationsByItemType: compatibleMap,
-        payments: payments,
-        totalPaid: totalPaid,
-        remainingAmount: remaining,
-        settings: settings,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          order: order,
+          customer: customer,
+          items: items,
+          activeStorageRecords: activeStorageRecords,
+          storageLocations: locationMap,
+          allActiveLocations: allActiveLocations,
+          compatibleLocationsByItemType: compatibleMap,
+          payments: payments,
+          totalPaid: totalPaid,
+          remainingAmount: remaining,
+          settings: settings,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        isLoading: false,
-        errorMessage: e.toString(),
-      ));
+      emit(state.copyWith(isLoading: false, errorMessage: e.toString()));
     }
   }
 
@@ -141,15 +149,27 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
     if (order == null) return;
 
     if (amount <= Money.zero) {
-      emit(state.copyWith(errorMessage: 'مبلغ الدفعة يجب أن يكون أكبر من الصفر'));
+      emit(
+        state.copyWith(errorMessage: 'مبلغ الدفعة يجب أن يكون أكبر من الصفر'),
+      );
       return;
     }
     if (amount > state.remainingAmount) {
-      emit(state.copyWith(errorMessage: 'مبلغ الدفعة يتجاوز المبلغ المتبقي على الطلب'));
+      emit(
+        state.copyWith(
+          errorMessage: 'مبلغ الدفعة يتجاوز المبلغ المتبقي على الطلب',
+        ),
+      );
       return;
     }
 
-    emit(state.copyWith(isActionLoading: true, clearErrorMessage: true, clearActionSuccessMessage: true));
+    emit(
+      state.copyWith(
+        isActionLoading: true,
+        clearErrorMessage: true,
+        clearActionSuccessMessage: true,
+      ),
+    );
 
     try {
       final now = DateTime.now();
@@ -165,10 +185,12 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
 
       await _paymentRepository.recordPayment(payment);
       await loadOrderDetail(order.id);
-      emit(state.copyWith(
-        isActionLoading: false,
-        actionSuccessMessage: 'تم تسجيل الدفعة بنجاح',
-      ));
+      emit(
+        state.copyWith(
+          isActionLoading: false,
+          actionSuccessMessage: 'تم تسجيل الدفعة بنجاح',
+        ),
+      );
     } on Failure catch (f) {
       emit(state.copyWith(isActionLoading: false, errorMessage: f.message));
     } catch (e) {
@@ -184,11 +206,19 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
     if (order == null) return;
 
     if (orderItemIds.isEmpty) {
-      emit(state.copyWith(errorMessage: 'يرجى تحديد قطعة واحدة على الأقل للتخزين'));
+      emit(
+        state.copyWith(errorMessage: 'يرجى تحديد قطعة واحدة على الأقل للتخزين'),
+      );
       return;
     }
 
-    emit(state.copyWith(isActionLoading: true, clearErrorMessage: true, clearActionSuccessMessage: true));
+    emit(
+      state.copyWith(
+        isActionLoading: true,
+        clearErrorMessage: true,
+        clearActionSuccessMessage: true,
+      ),
+    );
 
     try {
       await _storeOrderItemsUseCase.execute(
@@ -200,10 +230,12 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
       );
 
       await loadOrderDetail(order.id);
-      emit(state.copyWith(
-        isActionLoading: false,
-        actionSuccessMessage: 'تم تخزين العناصر بنجاح',
-      ));
+      emit(
+        state.copyWith(
+          isActionLoading: false,
+          actionSuccessMessage: 'تم تخزين العناصر بنجاح',
+        ),
+      );
     } on Failure catch (f) {
       emit(state.copyWith(isActionLoading: false, errorMessage: f.message));
     } catch (e) {
@@ -219,13 +251,22 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
     if (order == null) return;
 
     if (newStatus == OrderStatus.completed) {
-      emit(state.copyWith(
-        errorMessage: 'إكمال الطلب يتطلب التحقق من الدفع والاستلام. يرجى استخدام زر "إكمال الطلب".',
-      ));
+      emit(
+        state.copyWith(
+          errorMessage:
+              'إكمال الطلب يتطلب التحقق من الدفع والاستلام. يرجى استخدام زر "إكمال الطلب".',
+        ),
+      );
       return;
     }
 
-    emit(state.copyWith(isActionLoading: true, clearErrorMessage: true, clearActionSuccessMessage: true));
+    emit(
+      state.copyWith(
+        isActionLoading: true,
+        clearErrorMessage: true,
+        clearActionSuccessMessage: true,
+      ),
+    );
 
     try {
       await _changeOrderStatusUseCase.execute(
@@ -237,10 +278,12 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
       );
 
       await loadOrderDetail(order.id);
-      emit(state.copyWith(
-        isActionLoading: false,
-        actionSuccessMessage: 'تم تحديث حالة الطلب بنجاح',
-      ));
+      emit(
+        state.copyWith(
+          isActionLoading: false,
+          actionSuccessMessage: 'تم تحديث حالة الطلب بنجاح',
+        ),
+      );
     } on Failure catch (f) {
       emit(state.copyWith(isActionLoading: false, errorMessage: f.message));
     } catch (e) {
@@ -253,21 +296,34 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
     if (order == null) return;
 
     if (!handoverConfirmed) {
-      emit(state.copyWith(errorMessage: 'يجب تأكيد تسليم الملابس للعميل أولاً'));
+      emit(
+        state.copyWith(errorMessage: 'يجب تأكيد تسليم الملابس للعميل أولاً'),
+      );
       return;
     }
     if (order.status != OrderStatus.ready) {
-      emit(state.copyWith(errorMessage: 'يمكن إكمال الطلبات في حالة "جاهز" فقط'));
+      emit(
+        state.copyWith(errorMessage: 'يمكن إكمال الطلبات في حالة "جاهز" فقط'),
+      );
       return;
     }
     if (state.remainingAmount > Money.zero) {
-      emit(state.copyWith(
-        errorMessage: 'لا يمكن إكمال الطلب قبل سداد كامل المبلغ المتبقي (${state.remainingAmount.toEgp} ج.م)',
-      ));
+      emit(
+        state.copyWith(
+          errorMessage:
+              'لا يمكن إكمال الطلب قبل سداد كامل المبلغ المتبقي (${state.remainingAmount.toEgp} ج.م)',
+        ),
+      );
       return;
     }
 
-    emit(state.copyWith(isActionLoading: true, clearErrorMessage: true, clearActionSuccessMessage: true));
+    emit(
+      state.copyWith(
+        isActionLoading: true,
+        clearErrorMessage: true,
+        clearActionSuccessMessage: true,
+      ),
+    );
 
     try {
       await _completeOrderUseCase.execute(
@@ -278,10 +334,12 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
       );
 
       await loadOrderDetail(order.id);
-      emit(state.copyWith(
-        isActionLoading: false,
-        actionSuccessMessage: 'تم إكمال الطلب وتسليمه للعميل بنجاح',
-      ));
+      emit(
+        state.copyWith(
+          isActionLoading: false,
+          actionSuccessMessage: 'تم إكمال الطلب وتسليمه للعميل بنجاح',
+        ),
+      );
     } on Failure catch (f) {
       emit(state.copyWith(isActionLoading: false, errorMessage: f.message));
     } catch (e) {
@@ -299,7 +357,13 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
       return;
     }
 
-    emit(state.copyWith(isActionLoading: true, clearErrorMessage: true, clearActionSuccessMessage: true));
+    emit(
+      state.copyWith(
+        isActionLoading: true,
+        clearErrorMessage: true,
+        clearActionSuccessMessage: true,
+      ),
+    );
 
     try {
       await _cancelOrderUseCase.execute(
@@ -311,10 +375,12 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
       );
 
       await loadOrderDetail(order.id);
-      emit(state.copyWith(
-        isActionLoading: false,
-        actionSuccessMessage: 'تم إلغاء الطلب بنجاح',
-      ));
+      emit(
+        state.copyWith(
+          isActionLoading: false,
+          actionSuccessMessage: 'تم إلغاء الطلب بنجاح',
+        ),
+      );
     } on Failure catch (f) {
       emit(state.copyWith(isActionLoading: false, errorMessage: f.message));
     } catch (e) {

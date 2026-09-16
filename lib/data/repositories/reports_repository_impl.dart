@@ -24,10 +24,10 @@ class ReportsRepositoryImpl implements ReportsRepository {
     required PaymentsDao paymentsDao,
     required ExpensesDao expensesDao,
     required ExpenseRepository expenseRepository,
-  })  : _ordersDao = ordersDao,
-        _paymentsDao = paymentsDao,
-        _expensesDao = expensesDao,
-        _expenseRepository = expenseRepository;
+  }) : _ordersDao = ordersDao,
+       _paymentsDao = paymentsDao,
+       _expensesDao = expensesDao,
+       _expenseRepository = expenseRepository;
 
   @override
   Future<OrdersReportData> getOrdersReport({
@@ -71,8 +71,12 @@ class ReportsRepositoryImpl implements ReportsRepository {
         endDate: endDate,
         overdueCutoff: now,
       );
-      final totalSales = Money.fromPiastres(orderAggregate.totalOrderValuePiastres);
-      final totalDiscounts = Money.fromPiastres(orderAggregate.totalDiscountsPiastres);
+      final totalSales = Money.fromPiastres(
+        orderAggregate.totalOrderValuePiastres,
+      );
+      final totalDiscounts = Money.fromPiastres(
+        orderAggregate.totalDiscountsPiastres,
+      );
 
       // 2. Payments in period (by Payment.paidAt)
       final totalPaymentsPiastres = await _paymentsDao.getTotalPayments(
@@ -88,7 +92,8 @@ class ReportsRepositoryImpl implements ReportsRepository {
 
       final paymentMethodsBreakdown = <PaymentMethodBreakdownItem>[];
       for (final method in PaymentMethod.values) {
-        final record = paymentsByMethodRaw[method.value] ??
+        final record =
+            paymentsByMethodRaw[method.value] ??
             paymentsByMethodRaw[method.name];
         final amountPiastres = record?.total ?? 0;
         final count = record?.count ?? 0;
@@ -113,11 +118,11 @@ class ReportsRepositoryImpl implements ReportsRepository {
       );
       final totalOperatingExpenses = Money.fromPiastres(totalExpensesPiastres);
 
-      final expensesByCategoryRaw =
-          await _expensesDao.getExpensesGroupedByCategorySnapshot(
-        startDate: startDate,
-        endDate: endDate,
-      );
+      final expensesByCategoryRaw = await _expensesDao
+          .getExpensesGroupedByCategorySnapshot(
+            startDate: startDate,
+            endDate: endDate,
+          );
 
       final expenseCategoriesBreakdown = <ExpenseCategoryBreakdownItem>[];
       expensesByCategoryRaw.forEach((categoryName, stats) {
@@ -133,7 +138,9 @@ class ReportsRepositoryImpl implements ReportsRepository {
           ),
         );
       });
-      expenseCategoriesBreakdown.sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
+      expenseCategoriesBreakdown.sort(
+        (a, b) => b.totalAmount.compareTo(a.totalAmount),
+      );
 
       // Detailed expense transactions for the period
       final expenseTransactions = await _expenseRepository.getExpenses(

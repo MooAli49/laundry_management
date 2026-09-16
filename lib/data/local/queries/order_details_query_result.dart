@@ -8,10 +8,7 @@ class OrderItemWithCarpetData {
   final OrderItem orderItem;
   final CarpetItemData? carpetData;
 
-  const OrderItemWithCarpetData({
-    required this.orderItem,
-    this.carpetData,
-  });
+  const OrderItemWithCarpetData({required this.orderItem, this.carpetData});
 }
 
 class OrderDetailsQueryResult {

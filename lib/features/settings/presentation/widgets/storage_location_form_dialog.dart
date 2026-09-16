@@ -85,8 +85,9 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
         supportedItemTypeIds: _selectedTypeIds.toList(),
       );
     } else {
-      final updated =
-          widget.location!.copyWith(name: _nameController.text.trim());
+      final updated = widget.location!.copyWith(
+        name: _nameController.text.trim(),
+      );
       success = await cubit.updateStorageLocation(
         location: updated,
         supportedItemTypeIds: _selectedTypeIds.toList(),
@@ -143,8 +144,9 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
                             padding: const EdgeInsets.all(AppSpacing.md),
                             decoration: BoxDecoration(
                               color: AppColors.errorLight,
-                              borderRadius:
-                                  BorderRadius.circular(AppSpacing.radiusMd),
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusMd,
+                              ),
                               border: Border.all(
                                 color: AppColors.error.withValues(alpha: 0.3),
                               ),
@@ -202,8 +204,9 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
                             spacing: AppSpacing.sm,
                             runSpacing: AppSpacing.sm,
                             children: widget.availableItemTypes.map((type) {
-                              final isSelected =
-                                  _selectedTypeIds.contains(type.id);
+                              final isSelected = _selectedTypeIds.contains(
+                                type.id,
+                              );
                               return FilterChip(
                                 label: Text(type.name),
                                 selected: isSelected,
@@ -227,8 +230,9 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
                                       : FontWeight.normal,
                                 ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppSpacing.radiusMd),
+                                  borderRadius: BorderRadius.circular(
+                                    AppSpacing.radiusMd,
+                                  ),
                                   side: BorderSide(
                                     color: isSelected
                                         ? AppColors.primary
@@ -247,10 +251,7 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    AppButton(
-                      label: AppStrings.save,
-                      onPressed: _handleSubmit,
-                    ),
+                    AppButton(label: AppStrings.save, onPressed: _handleSubmit),
                     AppSpacing.gapHorizontalMd,
                     AppButton(
                       label: AppStrings.cancel,

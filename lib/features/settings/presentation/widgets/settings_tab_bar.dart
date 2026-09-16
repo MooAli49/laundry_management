@@ -51,7 +51,9 @@ class SettingsTabBar extends StatelessWidget {
                 child: InkWell(
                   onTap: () => onTabSelected(index),
                   borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  hoverColor: isSelected ? null : Colors.white.withValues(alpha: 0.5),
+                  hoverColor: isSelected
+                      ? null
+                      : Colors.white.withValues(alpha: 0.5),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
                     padding: const EdgeInsets.symmetric(
@@ -62,7 +64,10 @@ class SettingsTabBar extends StatelessWidget {
                       color: isSelected ? Colors.white : Colors.transparent,
                       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                       border: isSelected
-                          ? Border.all(color: const Color(0xFFE2E8F0), width: 0.8)
+                          ? Border.all(
+                              color: const Color(0xFFE2E8F0),
+                              width: 0.8,
+                            )
                           : null,
                       boxShadow: isSelected
                           ? const [
@@ -80,8 +85,9 @@ class SettingsTabBar extends StatelessWidget {
                         color: isSelected
                             ? AppColors.primary
                             : AppColors.textSecondary,
-                        fontWeight:
-                            isSelected ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
                       ),
                     ),
                   ),

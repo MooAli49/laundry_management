@@ -26,7 +26,11 @@ class Payment {
       throw ArgumentError('Payment orderId cannot be empty');
     }
     if (!amount.isPositive) {
-      throw ArgumentError.value(amount, 'amount', 'Payment amount must be greater than 0');
+      throw ArgumentError.value(
+        amount,
+        'amount',
+        'Payment amount must be greater than 0',
+      );
     }
   }
 
@@ -64,8 +68,17 @@ class Payment {
           updatedAt == other.updatedAt;
 
   @override
-  int get hashCode => Object.hash(id, orderId, amount, paymentMethod, paidAt, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    orderId,
+    amount,
+    paymentMethod,
+    paidAt,
+    createdAt,
+    updatedAt,
+  );
 
   @override
-  String toString() => 'Payment(id: $id, orderId: $orderId, amount: $amount, method: $paymentMethod)';
+  String toString() =>
+      'Payment(id: $id, orderId: $orderId, amount: $amount, method: $paymentMethod)';
 }

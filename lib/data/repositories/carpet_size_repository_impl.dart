@@ -16,9 +16,9 @@ class CarpetSizeRepositoryImpl implements CarpetSizeRepository {
     required CarpetSizesDao carpetSizesDao,
     required SyncOperationsDao syncOperationsDao,
     required app_db.AppDatabase db,
-  })  : _carpetSizesDao = carpetSizesDao,
-        _syncOperationsDao = syncOperationsDao,
-        _db = db;
+  }) : _carpetSizesDao = carpetSizesDao,
+       _syncOperationsDao = syncOperationsDao,
+       _db = db;
 
   @override
   Future<CarpetSize> createCarpetSize(CarpetSize carpetSize) async {

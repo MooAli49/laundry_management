@@ -16,9 +16,9 @@ class ItemTypeRepositoryImpl implements ItemTypeRepository {
     required ItemTypesDao itemTypesDao,
     required SyncOperationsDao syncOperationsDao,
     required app_db.AppDatabase db,
-  })  : _itemTypesDao = itemTypesDao,
-        _syncOperationsDao = syncOperationsDao,
-        _db = db;
+  }) : _itemTypesDao = itemTypesDao,
+       _syncOperationsDao = syncOperationsDao,
+       _db = db;
 
   @override
   Future<ItemType> createItemType(ItemType itemType) async {

@@ -84,7 +84,10 @@ class _CancelOrderDialogState extends State<CancelOrderDialog> {
                 ),
                 child: Text(
                   'هل أنت متأكد من رغبتك في إلغاء هذا الطلب؟ سيتم تحويل حالة الطلب إلى ملغي وإلغاء حجز أماكن التخزين. الطلبات الملغاة تصبح للقراءة فقط ولا يمكن التراجع عنها.',
-                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.error, fontSize: 13),
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.error,
+                    fontSize: 13,
+                  ),
                 ),
               ),
               AppSpacing.gapLg,
@@ -92,7 +95,9 @@ class _CancelOrderDialogState extends State<CancelOrderDialog> {
               if (_errorMessage != null) ...[
                 Text(
                   _errorMessage!,
-                  style: AppTextStyles.labelMedium.copyWith(color: AppColors.error),
+                  style: AppTextStyles.labelMedium.copyWith(
+                    color: AppColors.error,
+                  ),
                 ),
                 AppSpacing.gapSm,
               ],
@@ -118,7 +123,9 @@ class _CancelOrderDialogState extends State<CancelOrderDialog> {
                   AppButton(
                     label: 'تراجع',
                     variant: AppButtonVariant.secondary,
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isLoading
+                        ? null
+                        : () => Navigator.of(context).pop(),
                   ),
                 ],
               ),

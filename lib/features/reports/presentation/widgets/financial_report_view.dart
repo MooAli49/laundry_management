@@ -58,7 +58,9 @@ class FinancialReportView extends StatelessWidget {
             final columns = constraints.maxWidth < 650
                 ? 1
                 : (constraints.maxWidth < 950 ? 2 : 3);
-            final cardWidth = (constraints.maxWidth - (AppSpacing.md * (columns - 1))) / columns;
+            final cardWidth =
+                (constraints.maxWidth - (AppSpacing.md * (columns - 1))) /
+                columns;
 
             return Wrap(
               spacing: AppSpacing.md,
@@ -88,7 +90,8 @@ class FinancialReportView extends StatelessWidget {
                   width: cardWidth,
                   child: ReportMetricCard(
                     title: 'إجمالي المصروفات',
-                    value: '${data.totalOperatingExpenses.toEgp.toStringAsFixed(2)} ج.م',
+                    value:
+                        '${data.totalOperatingExpenses.toEgp.toStringAsFixed(2)} ج.م',
                     icon: Icons.shopping_bag_outlined,
                     iconColor: AppColors.error,
                     iconBackground: AppColors.errorLight,
@@ -110,11 +113,18 @@ class FinancialReportView extends StatelessWidget {
                   width: cardWidth,
                   child: ReportMetricCard(
                     title: 'المبالغ المتبقية',
-                    value: '${data.outstandingAmount.toEgp.toStringAsFixed(2)} ج.م',
+                    value:
+                        '${data.outstandingAmount.toEgp.toStringAsFixed(2)} ج.م',
                     icon: Icons.hourglass_bottom,
-                    iconColor: data.outstandingAmount > Money.zero ? AppColors.warning : AppColors.textSecondary,
-                    iconBackground: data.outstandingAmount > Money.zero ? AppColors.warningLight : AppColors.backgroundSecondary,
-                    valueColor: data.outstandingAmount > Money.zero ? AppColors.warning : null,
+                    iconColor: data.outstandingAmount > Money.zero
+                        ? AppColors.warning
+                        : AppColors.textSecondary,
+                    iconBackground: data.outstandingAmount > Money.zero
+                        ? AppColors.warningLight
+                        : AppColors.backgroundSecondary,
+                    valueColor: data.outstandingAmount > Money.zero
+                        ? AppColors.warning
+                        : null,
                     subtitle: 'مبالغ غير مسددة على طلبات الفترة',
                   ),
                 ),
@@ -122,7 +132,8 @@ class FinancialReportView extends StatelessWidget {
                   width: cardWidth,
                   child: ReportMetricCard(
                     title: 'إجمالي الخصومات',
-                    value: '${data.totalDiscounts.toEgp.toStringAsFixed(2)} ج.م',
+                    value:
+                        '${data.totalDiscounts.toEgp.toStringAsFixed(2)} ج.م',
                     icon: Icons.local_offer_outlined,
                     iconColor: AppColors.textSecondary,
                     iconBackground: AppColors.backgroundSecondary,
@@ -185,7 +196,12 @@ class FinancialReportView extends StatelessWidget {
             children: [
               const Icon(Icons.payment, size: 20, color: AppColors.primary),
               AppSpacing.gapHorizontalSm,
-              Text('طرق الدفع', style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                'طرق الدفع',
+                style: AppTextStyles.titleMedium.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           AppSpacing.gapMd,
@@ -209,8 +225,12 @@ class FinancialReportView extends StatelessWidget {
                   children: data.paymentMethodsBreakdown.map((item) {
                     if (item.percentage <= 0) return const SizedBox.shrink();
                     Color barColor = AppColors.primary;
-                    if (item.method.name == 'instapay') barColor = AppColors.info;
-                    if (item.method.name == 'ewallet') barColor = AppColors.warning;
+                    if (item.method.name == 'instapay') {
+                      barColor = AppColors.info;
+                    }
+                    if (item.method.name == 'ewallet') {
+                      barColor = AppColors.warning;
+                    }
 
                     return Expanded(
                       flex: (item.percentage * 10).round().clamp(1, 1000),
@@ -235,19 +255,26 @@ class FinancialReportView extends StatelessWidget {
                     Container(
                       width: 10,
                       height: 10,
-                      decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                      decoration: BoxDecoration(
+                        color: dotColor,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                     AppSpacing.gapHorizontalSm,
                     Text(item.arabicName, style: AppTextStyles.bodyMedium),
                     const Spacer(),
                     Text(
                       '${item.count} معاملة',
-                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     AppSpacing.gapHorizontalMd,
                     Text(
                       '${item.totalAmount.toEgp.toStringAsFixed(2)} ج.م',
-                      style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold),
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     AppSpacing.gapHorizontalSm,
                     SizedBox(
@@ -255,7 +282,9 @@ class FinancialReportView extends StatelessWidget {
                       child: Text(
                         '(${item.percentage.toStringAsFixed(1)}%)',
                         textAlign: TextAlign.left,
-                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.textTertiary),
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textTertiary,
+                        ),
                       ),
                     ),
                   ],
@@ -281,13 +310,23 @@ class FinancialReportView extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.category_outlined, size: 20, color: AppColors.primary),
+              const Icon(
+                Icons.category_outlined,
+                size: 20,
+                color: AppColors.primary,
+              ),
               AppSpacing.gapHorizontalSm,
-              Text('المصروفات حسب التصنيف', style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                'المصروفات حسب التصنيف',
+                style: AppTextStyles.titleMedium.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           AppSpacing.gapMd,
-          if (data.totalOperatingExpenses.isZero || data.expenseCategoriesBreakdown.isEmpty)
+          if (data.totalOperatingExpenses.isZero ||
+              data.expenseCategoriesBreakdown.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
               child: Center(
@@ -306,16 +345,23 @@ class FinancialReportView extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text(item.categoryName, style: AppTextStyles.bodyMedium),
+                        Text(
+                          item.categoryName,
+                          style: AppTextStyles.bodyMedium,
+                        ),
                         const Spacer(),
                         Text(
                           '${item.count} مصروف',
-                          style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                         AppSpacing.gapHorizontalMd,
                         Text(
                           '${item.totalAmount.toEgp.toStringAsFixed(2)} ج.م',
-                          style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         AppSpacing.gapHorizontalSm,
                         SizedBox(
@@ -323,7 +369,9 @@ class FinancialReportView extends StatelessWidget {
                           child: Text(
                             '(${item.percentage.toStringAsFixed(1)}%)',
                             textAlign: TextAlign.left,
-                            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textTertiary),
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textTertiary,
+                            ),
                           ),
                         ),
                       ],
@@ -335,7 +383,9 @@ class FinancialReportView extends StatelessWidget {
                         value: (item.percentage / 100.0).clamp(0.0, 1.0),
                         minHeight: 6,
                         backgroundColor: AppColors.backgroundSecondary,
-                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.error),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          AppColors.error,
+                        ),
                       ),
                     ),
                   ],
@@ -360,16 +410,24 @@ class FinancialReportView extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.warning_amber_rounded, size: 20, color: AppColors.warning),
+              const Icon(
+                Icons.warning_amber_rounded,
+                size: 20,
+                color: AppColors.warning,
+              ),
               AppSpacing.gapHorizontalSm,
               Text(
                 'طلبات عليها مبالغ متبقية',
-                style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
+                style: AppTextStyles.titleMedium.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const Spacer(),
               Text(
                 '${data.outstandingOrders.length} طلبات',
-                style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
             ],
           ),
@@ -388,7 +446,9 @@ class FinancialReportView extends StatelessWidget {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
-                headingRowColor: WidgetStateProperty.all(AppColors.backgroundSecondary),
+                headingRowColor: WidgetStateProperty.all(
+                  AppColors.backgroundSecondary,
+                ),
                 columns: const [
                   DataColumn(label: Text('رقم الطلب')),
                   DataColumn(label: Text('التاريخ')),
@@ -400,15 +460,33 @@ class FinancialReportView extends StatelessWidget {
                 rows: data.outstandingOrders.map((ord) {
                   return DataRow(
                     cells: [
-                      DataCell(Text(ord.orderNumber, style: const TextStyle(fontWeight: FontWeight.bold))),
-                      DataCell(Text(DateFormatter.formatArabicDate(ord.createdAt))),
-                      DataCell(Text(ord.customerName.isNotEmpty ? ord.customerName : '—')),
-                      DataCell(Text('${ord.totalAmount.toEgp.toStringAsFixed(2)} ج.م')),
-                      DataCell(Text('${ord.paidAmount.toEgp.toStringAsFixed(2)} ج.م')),
+                      DataCell(
+                        Text(
+                          ord.orderNumber,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      DataCell(
+                        Text(DateFormatter.formatArabicDate(ord.createdAt)),
+                      ),
+                      DataCell(
+                        Text(
+                          ord.customerName.isNotEmpty ? ord.customerName : '—',
+                        ),
+                      ),
+                      DataCell(
+                        Text('${ord.totalAmount.toEgp.toStringAsFixed(2)} ج.م'),
+                      ),
+                      DataCell(
+                        Text('${ord.paidAmount.toEgp.toStringAsFixed(2)} ج.م'),
+                      ),
                       DataCell(
                         Text(
                           '${ord.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
-                          style: const TextStyle(color: AppColors.warning, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            color: AppColors.warning,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
@@ -434,16 +512,24 @@ class FinancialReportView extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.receipt_long_outlined, size: 20, color: AppColors.primary),
+              const Icon(
+                Icons.receipt_long_outlined,
+                size: 20,
+                color: AppColors.primary,
+              ),
               AppSpacing.gapHorizontalSm,
               Text(
                 'سجل المصروفات',
-                style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
+                style: AppTextStyles.titleMedium.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const Spacer(),
               Text(
                 '${data.expenseTransactions.length} مصروف',
-                style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
             ],
           ),
@@ -462,7 +548,9 @@ class FinancialReportView extends StatelessWidget {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
-                headingRowColor: WidgetStateProperty.all(AppColors.backgroundSecondary),
+                headingRowColor: WidgetStateProperty.all(
+                  AppColors.backgroundSecondary,
+                ),
                 columns: const [
                   DataColumn(label: Text('التاريخ')),
                   DataColumn(label: Text('التصنيف')),
@@ -473,7 +561,13 @@ class FinancialReportView extends StatelessWidget {
                   final details = exp.expenseName ?? exp.notes ?? '—';
                   return DataRow(
                     cells: [
-                      DataCell(Text(DateFormatter.formatArabicDate(exp.expenseDate.toDateTime()))),
+                      DataCell(
+                        Text(
+                          DateFormatter.formatArabicDate(
+                            exp.expenseDate.toDateTime(),
+                          ),
+                        ),
+                      ),
                       DataCell(Text(exp.categoryNameSnapshot)),
                       DataCell(Text(details)),
                       DataCell(

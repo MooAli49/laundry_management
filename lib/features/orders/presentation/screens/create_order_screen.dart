@@ -29,8 +29,9 @@ class CreateOrderScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => getIt<CreateOrderCubit>()
-        ..initialize(initialCustomerId: initialCustomerId),
+      create: (_) =>
+          getIt<CreateOrderCubit>()
+            ..initialize(initialCustomerId: initialCustomerId),
       child: const _CreateOrderView(),
     );
   }
@@ -328,7 +329,8 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                               ),
                                             ),
                                             Text(
-                                              item.pricingType == PricingType.perSquareMeter
+                                              item.pricingType ==
+                                                      PricingType.perSquareMeter
                                                   ? '${item.physicalQuantity} × ${(item.unitPrice.toEgp * item.carpetArea).toStringAsFixed(2)} ج.م'
                                                   : '${item.physicalQuantity} × ${item.unitPrice.toEgp.toStringAsFixed(2)} ج.م',
                                               style: AppTextStyles.bodyMedium
@@ -427,8 +429,7 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                                               .spaceBetween,
                                                       children: [
                                                         Text(
-                                                          DateFormatter
-                                                              .formatArabicDate(
+                                                          DateFormatter.formatArabicDate(
                                                             state
                                                                 .expectedPickupDate
                                                                 .toDateTime(),
@@ -516,13 +517,13 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                           children: [
                                             InkWell(
                                               onTap: () => cubit.updateDelivery(
-                                                pickupRequested:
-                                                    !state.customerPickupRequested,
+                                                pickupRequested: !state
+                                                    .customerPickupRequested,
                                               ),
                                               borderRadius:
                                                   BorderRadius.circular(
-                                                AppSpacing.radiusMd,
-                                              ),
+                                                    AppSpacing.radiusMd,
+                                                  ),
                                               child: Row(
                                                 children: [
                                                   Checkbox(
@@ -532,15 +533,15 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                                         AppColors.primary,
                                                     onChanged: (val) =>
                                                         cubit.updateDelivery(
-                                                      pickupRequested:
-                                                          val ?? false,
-                                                    ),
+                                                          pickupRequested:
+                                                              val ?? false,
+                                                        ),
                                                   ),
                                                   const Icon(
                                                     Icons.local_shipping,
                                                     size: 20,
-                                                    color: AppColors
-                                                        .textTertiary,
+                                                    color:
+                                                        AppColors.textTertiary,
                                                   ),
                                                   AppSpacing.gapHorizontalSm,
                                                   Text(
@@ -562,8 +563,9 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                               AppSpacing.gapSm,
                                               Padding(
                                                 padding:
-                                                    const EdgeInsetsDirectional
-                                                        .only(start: 40.0),
+                                                    const EdgeInsetsDirectional.only(
+                                                      start: 40.0,
+                                                    ),
                                                 child: SizedBox(
                                                   width: 180,
                                                   child: AppTextField(
@@ -573,8 +575,7 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                                         'رسوم الاستلام (ج.م)',
                                                     hintText: '0.00',
                                                     keyboardType:
-                                                        const TextInputType
-                                                            .numberWithOptions(
+                                                        const TextInputType.numberWithOptions(
                                                           decimal: true,
                                                         ),
                                                     onChanged: (val) {
@@ -603,20 +604,19 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                           AppSpacing.md,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: state
-                                                  .customerDeliveryRequested
+                                          color: state.customerDeliveryRequested
                                               ? AppColors.primaryLighter
                                               : AppColors.surface,
                                           borderRadius: BorderRadius.circular(
                                             AppSpacing.radiusLg,
                                           ),
                                           border: Border.all(
-                                            color: state
-                                                    .customerDeliveryRequested
+                                            color:
+                                                state.customerDeliveryRequested
                                                 ? AppColors.primary
                                                 : AppColors.border,
-                                            width: state
-                                                    .customerDeliveryRequested
+                                            width:
+                                                state.customerDeliveryRequested
                                                 ? 1.5
                                                 : 1.0,
                                           ),
@@ -627,13 +627,13 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                           children: [
                                             InkWell(
                                               onTap: () => cubit.updateDelivery(
-                                                deliveryRequested:
-                                                    !state.customerDeliveryRequested,
+                                                deliveryRequested: !state
+                                                    .customerDeliveryRequested,
                                               ),
                                               borderRadius:
                                                   BorderRadius.circular(
-                                                AppSpacing.radiusMd,
-                                              ),
+                                                    AppSpacing.radiusMd,
+                                                  ),
                                               child: Row(
                                                 children: [
                                                   Checkbox(
@@ -643,15 +643,15 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                                         AppColors.primary,
                                                     onChanged: (val) =>
                                                         cubit.updateDelivery(
-                                                      deliveryRequested:
-                                                          val ?? false,
-                                                    ),
+                                                          deliveryRequested:
+                                                              val ?? false,
+                                                        ),
                                                   ),
                                                   const Icon(
                                                     Icons.local_shipping,
                                                     size: 20,
-                                                    color: AppColors
-                                                        .textTertiary,
+                                                    color:
+                                                        AppColors.textTertiary,
                                                   ),
                                                   AppSpacing.gapHorizontalSm,
                                                   Text(
@@ -673,19 +673,18 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                                               AppSpacing.gapSm,
                                               Padding(
                                                 padding:
-                                                    const EdgeInsetsDirectional
-                                                        .only(start: 40.0),
+                                                    const EdgeInsetsDirectional.only(
+                                                      start: 40.0,
+                                                    ),
                                                 child: SizedBox(
                                                   width: 180,
                                                   child: AppTextField(
                                                     controller:
                                                         _deliveryFeeController,
-                                                    label:
-                                                        'رسوم التوصيل (ج.م)',
+                                                    label: 'رسوم التوصيل (ج.م)',
                                                     hintText: '0.00',
                                                     keyboardType:
-                                                        const TextInputType
-                                                            .numberWithOptions(
+                                                        const TextInputType.numberWithOptions(
                                                           decimal: true,
                                                         ),
                                                     onChanged: (val) {

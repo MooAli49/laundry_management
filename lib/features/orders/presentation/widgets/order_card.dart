@@ -18,11 +18,13 @@ class OrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final order = item.order;
     final customer = item.customer;
-    final customerName = customer?.name ??
+    final customerName =
+        customer?.name ??
         (order.customerNameSnapshot.isNotEmpty
             ? order.customerNameSnapshot
             : 'عميل غير مسجل');
-    final customerPhone = customer?.phone ??
+    final customerPhone =
+        customer?.phone ??
         (order.customerPhoneSnapshot.isNotEmpty
             ? order.customerPhoneSnapshot
             : null);

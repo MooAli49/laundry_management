@@ -66,7 +66,9 @@ abstract class OrderRepository {
 
   Future<Map<String, int>> getOrderCountsByCustomer();
 
-  Future<Map<String, int>> getOrderCountsByCustomerIds(List<String> customerIds);
+  Future<Map<String, int>> getOrderCountsByCustomerIds(
+    List<String> customerIds,
+  );
 
   Future<CustomerOrderAggregate> getCustomerOrderAggregate(String customerId);
 }

@@ -16,9 +16,9 @@ class SettingsRepositoryImpl implements SettingsRepository {
     required BusinessSettingsDao settingsDao,
     required SyncOperationsDao syncOperationsDao,
     required app_db.AppDatabase db,
-  })  : _settingsDao = settingsDao,
-        _syncOperationsDao = syncOperationsDao,
-        _db = db;
+  }) : _settingsDao = settingsDao,
+       _syncOperationsDao = syncOperationsDao,
+       _db = db;
 
   @override
   Future<BusinessSettings> getSettings() async {

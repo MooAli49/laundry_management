@@ -51,8 +51,12 @@ class ReportMetricCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.bodyMedium.copyWith(
-                    color: isProminent ? AppColors.selectionContent : AppColors.textSecondary,
-                    fontWeight: isProminent ? FontWeight.w600 : FontWeight.normal,
+                    color: isProminent
+                        ? AppColors.selectionContent
+                        : AppColors.textSecondary,
+                    fontWeight: isProminent
+                        ? FontWeight.w600
+                        : FontWeight.normal,
                   ),
                 ),
               ),
@@ -84,7 +88,9 @@ class ReportMetricCard extends StatelessWidget {
             AppSpacing.gapXs,
             Text(
               subtitle!,
-              style: AppTextStyles.bodySmall.copyWith(color: AppColors.textTertiary),
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textTertiary,
+              ),
             ),
           ],
         ],

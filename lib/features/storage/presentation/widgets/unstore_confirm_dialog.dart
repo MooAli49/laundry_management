@@ -97,7 +97,10 @@ class _UnstoreConfirmDialogState extends State<UnstoreConfirmDialog> {
 
               if (_errorMessage != null) ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.errorLight,
                     borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
@@ -125,7 +128,10 @@ class _UnstoreConfirmDialogState extends State<UnstoreConfirmDialog> {
               // Item details banner
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.secondary,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
@@ -167,7 +173,9 @@ class _UnstoreConfirmDialogState extends State<UnstoreConfirmDialog> {
                   AppButton(
                     label: AppStrings.cancel,
                     variant: AppButtonVariant.secondary,
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isLoading
+                        ? null
+                        : () => Navigator.of(context).pop(),
                   ),
                 ],
               ),
