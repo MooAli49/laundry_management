@@ -78,28 +78,29 @@ The local SQLite/Drift database remains the operational source of truth for each
         ↓
     UI Updates Immediately
         ↓
-    SyncEngine
+    SyncEngine (Single-flight loop)
         ↓
-    Remote API (X-Operation-ID + base_version)
+    Remote API (X-Operation-ID)
         ↓
     Remote PostgreSQL Transaction (ACID)
         ├── Idempotency check (sync_idempotency_log)
-        ├── Concurrency check (server_version vs base_version)
         ├── Business rule validation
         ├── Apply remote business mutation
-        ├── Increment server_version where applicable
+        ├── Increment server_version where applicable (backend OCC)
         ├── Append to sync_changes (monotonically increasing sequence)
         └── Commit
 
+*Note: Backend supports server_version checks, but Flutter client local storage of server_version and propagation of base_version is a known deferred V1 limitation.*
+
 ### PULL Flow:
 
-    Realtime signal / periodic foreground pull / startup / resume / connectivity
+    Realtime wake-up signal / periodic foreground pull (15 min) / startup / resume / connectivity / manual
         ↓
-    SyncEngine
+    SyncEngine.pull() (Single-flight coalescing guard)
         ↓
-    Cursor-based Pull API (GET /sync/changes?after=<last_applied_sequence>)
+    Cursor-based Pull API (GET /sync/changes?after=<last_applied_sequence>&limit=<limit>)
         ↓
-    Remote changes retrieved in deterministic sequence order
+    Remote changes retrieved in deterministic sequence order (bounded pagination)
         ↓
     RemoteChangeApplier
         ↓
@@ -109,15 +110,14 @@ The local SQLite/Drift database remains the operational source of truth for each
         ↓
     Reactive Drift Queries (db.tableUpdates) update UI automatically
 
-### Critical Rule for Realtime:
+### Critical Rules for Realtime & Pull:
 
-Realtime is ONLY a wake-up / notification mechanism (`sync_available` signal).
-
-Realtime payloads must NOT be treated as the authoritative synchronization source.
-
-The actual remote changes must be retrieved through the cursor-based pull API.
-
-There must be no raw WebSocket infrastructure exposed to feature code. Supabase Realtime remains behind an infrastructure adapter.
+1. **Realtime is ONLY a wake-up signal**: Supabase Realtime Broadcast on topic `laundry:sync` (`sync_available` event) is strictly an ephemeral wake-up notification adapter.
+2. **No Authoritative Data in Realtime**: Realtime payloads do NOT contain authoritative business data.
+3. **Pull API is Authoritative**: The actual remote changes must be retrieved through the cursor-based Pull API (`GET /sync/changes?after=<sequence>&limit=<limit>`).
+4. **Adapter Isolation**: There is no raw WebSocket infrastructure exposed to feature code. Supabase Realtime remains behind an infrastructure adapter (`RealtimeSyncAdapter`).
+5. **Dormant Publication**: The Supabase Realtime CDC publication migration on `sync_changes` exists as dormant/redundant infrastructure; Broadcast is the active mechanism.
+6. **Two-Device Verified**: Bidirectional synchronization has been verified end-to-end between two independent local SQLite devices sharing the live Supabase backend (Device A: Customer + Order → Supabase → Device B; Device B: Payment + Storage → Supabase → Device A).
 
 ---
 
@@ -341,41 +341,41 @@ Temporary failures should be retried.
 
 Examples:
 
-\- No Internet
-
-\- Timeout
-
-\- Temporary server error
-
-\- Connection reset
+- No Internet
+- Timeout
+- Temporary server error
+- Connection reset
 
 Permanent validation failures should not be retried indefinitely.
 
 Examples:
 
-\- Invalid request
+- Invalid request
+- Invalid entity state
+- Rejected business rule
+- Unauthorized operation
 
-\- Invalid entity state
+The synchronization layer distinguishes retryable failures from permanent failures.
 
-\- Rejected business rule
+---
 
-\- Unauthorized operation
+**# 12. Approved Retry Policy**
 
-The synchronization layer should distinguish retryable failures from permanent failures.
+Each `SyncOperation` maintains:
 
-\---
+    retry_count
 
-**# 12. Retry Count**
+The value increments when an attempted synchronization fails due to a retryable error.
 
-Each SyncOperation maintains:
+The approved retry policy is:
 
-retry\_count
+- **Initial delay**: 5 seconds
+- **Multiplier**: 2 (exponential backoff)
+- **Maximum delay**: 300 seconds
+- **Maximum retries**: 5 retries after the initial attempt (6 total attempts maximum)
+- **Jitter**: Bounded additive jitter from 0 to 1 second
 
-The value increases when an attempted synchronization fails.
-
-The system should use controlled retry behavior.
-
-The exact maximum retry policy belongs to the synchronization implementation and may use exponential backoff.
+Permanent failures (e.g., business rule violation, invalid payload) transition the operation to `Failed` immediately without retry.
 
 \---
 
@@ -985,10 +985,12 @@ Different domain entities require specific conflict and concurrency models:
 For mutable entities where concurrent edits can occur (Orders, Customers, Expenses, Expense Categories, Master Data, Business Settings):
 
 - The remote table maintains an integer `server_version`, incremented upon each accepted mutation.
-- The client includes `base_version` in push requests.
-- The remote transaction verifies `server_version == base_version`.
+- The remote transaction verifies `server_version == base_version` where `base_version` is supplied.
 - If versions do not match, the transaction rejects the push with `CONCURRENCY_CONFLICT`.
 - The `SyncEngine` isolates the conflict without blocking unrelated queue operations.
+
+> **Known Deferred Limitation (Flutter Client OCC)**:
+> While the remote PostgreSQL backend and RPCs fully support integer `server_version` optimistic concurrency checks, the Flutter client currently does NOT maintain local `server_version` columns and does NOT propagate `base_version` through the normal `SyncOperation` flow. This is explicitly documented as a deferred V1 limitation.
 
 ---
 
@@ -2141,29 +2143,32 @@ Incremental synchronization uses a server-assigned, monotonically increasing seq
 
 Rules:
 
-- The client sends `GET /sync/changes?after=<last_applied_sequence>&limit=100`.
+- The client sends `GET /sync/changes?after=<last_applied_sequence>&limit=<limit>` (paginated with bounded pages).
 - The server returns matching changes ordered by `sequence ASC`.
+- The sequence represents committed remote change ordering; it is NOT a Last-Write-Wins mechanism.
 - Wall-clock timestamps (`updated_at`, `last_sync_timestamp`) must NEVER be used as the authoritative synchronization cursor.
-- The client advances `sync_state.last_applied_sequence` atomically with each applied batch.
+- The client advances `sync_state.last_applied_sequence` atomically with each applied batch in the same SQLite transaction.
 
 ---
 
 **# 93. Bootstrap & CURSOR_TOO_OLD Recovery Contract**
 
-The system supports two initialization/recovery flows:
+If a device cursor falls behind the retained change history in `sync_changes`:
 
-### Initial Device Bootstrap:
-When a new device connects:
-1. It requests an initial bootstrap snapshot from the backend.
-2. It establishes its baseline `sync_state.last_applied_sequence` from the snapshot point.
-3. It transitions to normal incremental pull and push operation.
-
-### CURSOR_TOO_OLD Recovery:
-If a device has been offline so long that its `last_applied_sequence` is older than the oldest retained change in `sync_changes`:
 1. The server returns HTTP 410 with error code `CURSOR_TOO_OLD`.
-2. The client initiates a controlled full resync flow.
+2. The Flutter client detects this response and raises a `CursorTooOldException`.
 3. **CRITICAL INVARIANT**: A full resync or bootstrap must **NEVER delete or overwrite locally pending unsynced business data** stored in `sync_operations`.
-4. Locally pending operations remain preserved and are drained through normal push after the baseline is refreshed.
+4. Locally pending operations remain preserved in `sync_operations` and are drained through normal push after the baseline is refreshed.
+
+> **Known Deferred Limitation (Automatic Resync / Bootstrap)**:
+> Full automatic device bootstrap and automated `CURSOR_TOO_OLD` resync recovery are **deferred** in V1. The detection and safety contracts exist, but automatic reconciliation is not implemented in this phase.
+
+---
+
+**# 93.1. Sync Operations Retention**
+
+- Successfully synchronized operations in `sync_operations` (`status = 'synced'`) are retained for **90 days**.
+- Automatic background purge of historical sync operations is NOT implemented in V1; retention cleanup is manual.
 
 ---
 
@@ -2395,33 +2400,34 @@ The approved V1 synchronization architecture is:
         ↓
     Immediate UI Update (Reactive Queries)
         ↓
-    SyncEngine
+    SyncEngine (Single-flight loop)
         ↓
-    RemoteApiDispatcher (X-Operation-ID + base_version)
+    RemoteApiDispatcher (X-Operation-ID)
         ↓
     Supabase Edge Function (/api/v1/...)
         ↓
     PostgreSQL Transactional RPC
         ├── Idempotency check (sync_idempotency_log)
-        ├── Optimistic concurrency check (server_version)
         ├── Business mutation
         ├── sync_changes append (sequence)
         └── Commit
 
+*Note: Backend supports server_version checks, but Flutter client propagation of base_version is a known deferred V1 limitation.*
+
 ### Pull Path:
 
-    Realtime Signal (sync_available) OR App Resume / Connectivity / Periodic
+    Realtime Signal (sync_available) OR App Resume / Connectivity / 15-min Periodic / Startup / Manual
         ↓
-    SyncEngine.pull()
+    SyncEngine.pull() (Single-flight coalescing guard)
         ↓
-    Edge Function (GET /api/v1/sync/changes?after=<cursor>)
+    Edge Function (GET /api/v1/sync/changes?after=<cursor>&limit=<limit>)
         ↓
-    sync_changes records returned in sequence order
+    sync_changes records returned in sequence order (bounded pages)
         ↓
     RemoteChangeApplier
         ↓
     Local Drift Transaction (ACID)
-        ├── Upsert local table (via DAOs, no SyncOperation generated)
+        ├── Upsert local table (via DAOs, zero SyncOperations generated)
         └── Advance sync_state.last_applied_sequence
         ↓
     Reactive Drift Streams (db.tableUpdates)

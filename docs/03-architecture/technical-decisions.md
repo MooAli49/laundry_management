@@ -579,7 +579,7 @@ Conflict handling status:
     Generic / Automated Last-Write-Wins: Strictly Prohibited
     Complex distributed merge algorithms / CRDTs: Deferred
 
-For the active Offline / Sync Integration phase:
+For the completed Offline / Sync Integration phase (Task #15):
 
 - Synchronization is **bidirectional** across two terminal devices sharing a remote Supabase instance.
 - Conflict resolution must be **deterministic**, **domain-aware**, and **entity-specific**.
@@ -588,7 +588,7 @@ For the active Offline / Sync Integration phase:
 - **Payments**: Append-only, immutable financial transactions. Concurrency is guarded by `SELECT ... FOR UPDATE` row locks on `orders` during server RPC execution, authoritative balance checking, and stable client-generated UUID idempotency. Payments are never overwritten.
 - **Storage Moves**: `sync_changes.sequence` provides **committed ordering only**; it is NOT a generic LWW conflict resolver. A stale concurrent Storage Move attempting to move an item from a superseded location will receive `CONCURRENCY_CONFLICT` on the server. The winning committed change is then propagated to all devices through the normal pull mechanism.
 - **Orders**: Status lifecycle (`Processing → Ready → Completed` or `Cancelled`) is domain-authoritative. Stale remote pulls must never resurrect cancelled or completed orders. Order Creation is synchronized as an aggregate; subsequent mutations are entity-specific.
-- **Optimistic Concurrency**: Entities that support concurrent updates (Orders, Customers, Expenses, Expense Categories, Master Data, Business Settings) use an integer `server_version`. The client sends `base_version` with push mutations. A mismatch produces `CONCURRENCY_CONFLICT`.
+- **Optimistic Concurrency (OCC)**: The remote backend supports integer `server_version` checks on versioned entities (Orders, Customers, Expenses, Expense Categories, Master Data, Business Settings). *Known Deferred Limitation*: The Flutter client currently does NOT maintain local `server_version` columns and does NOT propagate `base_version` through the normal `SyncOperation` flow. This is explicitly documented as a deferred V1 limitation.
 - **Structured Error Responses**: The remote API returns structured semantic error codes (`DUPLICATE_ENTITY`, `CONCURRENCY_CONFLICT`, `BUSINESS_RULE_VIOLATION`, `INVALID_REFERENCE`, `PAYMENT_BALANCE_EXCEEDED`, `INVALID_LIFECYCLE_TRANSITION`).
 - **Conflict Isolation**: `SyncEngine` isolates failed operations. A conflict on one entity transitions that operation to `Failed` without freezing or blocking unrelated operations in the synchronization queue.
 
@@ -596,7 +596,9 @@ The following remain deferred:
 
 - Complex distributed merge algorithms
 - CRDTs
-- Real-time collaborative document editing
+- Raw WebSocket / full real-time collaborative document editing
+- Full automatic CURSOR_TOO_OLD resync/bootstrap recovery
+- Flutter client OCC (server_version/base_version) propagation
 - Distributed locking
 - Multi-tenant / SaaS conflict administration
 
@@ -610,17 +612,20 @@ Background synchronization:
 
 Status:
 
-    Deferred
+    Deferred (OS-level background synchronization)
 
 The system must not depend exclusively on background execution.
 
-Synchronization must also be triggered through:
+Synchronization orchestration is handled by `SyncEngine` using single-flight coalescing across multiple triggers:
 
-- Application startup
-- App resume
-- Connectivity restoration
 - Manual synchronization
-- Post-write synchronization attempts
+- Application startup / initial synchronization
+- Application resume
+- Connectivity restoration
+- Realtime wake-up signal (Broadcast: `laundry:sync` / `sync_available`)
+- Periodic foreground safety pull (15-minute interval)
+
+OS-level background platform execution remains deferred.
 
 ---
 
@@ -1190,21 +1195,19 @@ Implementation convenience must not override approved business requirements.
 
 ---
 
-## 55. Offline / Sync Integration — Approved / Active Implementation Phase
+## 55. Offline / Sync Integration — Completed / Locked Phase (Task #15)
 
 Status:
 
-    Approved / Active
+    Completed / Locked (Validated through C1–C4-C)
 
 ### 55.1 Phase Description
 
-Offline / Sync Integration is now the **active** implementation phase.
-
-It is not a new V1 business feature.
+Offline / Sync Integration (Task #15) is **completed and locked**.
 
 It is an infrastructure / integration phase that connects the existing Local-First application to the approved Supabase remote backend while preserving all existing business rules.
 
-The Orders module has completed its Local-First implementation and final E2E verification.
+C1 through C4-C verified and validated bidirectional synchronization across two independent local SQLite terminals operating against a shared live Supabase instance.
 
 ### 55.2 Remote Backend Platform
 
@@ -1328,8 +1331,9 @@ Do NOT introduce tenants, branches, roles, permissions, subscription management,
 
 The active synchronization architecture supports two devices operating against the same Supabase remote backend:
 
-- **Push**: Local business mutation commits atomically with `sync_operations` entry in SQLite. `SyncEngine` dispatches operations sequentially to Supabase Edge Functions with `X-Operation-ID` and `base_version`. PostgreSQL transactional RPCs apply mutations, increment entity `server_version` where applicable, append to remote `sync_changes`, and log idempotency.
-- **Pull**: Incoming changes from `sync_changes` are pulled via `GET /sync/changes?after=<sequence>`. `RemoteChangeApplier` applies changes directly to local DAOs without creating outgoing `SyncOperations` (echo loop prevention) and updates `sync_state.last_applied_sequence` in the **same local transaction**.
+- **Push**: Local business mutation commits atomically with `sync_operations` entry in SQLite. `SyncEngine` dispatches operations sequentially to Supabase Edge Functions with `X-Operation-ID`. PostgreSQL transactional RPCs apply mutations, append to remote `sync_changes`, and log idempotency.
+- **Pull**: Incoming changes from `sync_changes` are pulled via cursor-based pagination `GET /sync/changes?after=<sequence>&limit=<limit>`. `RemoteChangeApplier` applies changes directly to local DAOs without creating outgoing `SyncOperations` (echo loop prevention) and updates `sync_state.last_applied_sequence` in the **same local transaction**.
+- **Two-Device E2E Validation (C4-C)**: Verified end-to-end between two independent local SQLite devices synchronizing bidirectionally through live Supabase backend (Device A: Customer + Order → Supabase → Device B; Device B: Payment + Storage → Supabase → Device A).
 - **Operational Invariant**: Local Drift/SQLite database remains the primary operational source of truth for the UI on both devices.
 
 #### 55.3.13 Global Sequence Cursor vs. Entity Server Version
@@ -1337,13 +1341,14 @@ The active synchronization architecture supports two devices operating against t
 There are two distinct versioning concepts that must never be confused:
 
 1. **Entity `server_version`**:
-   - Monotonically incremented integer on mutable synchronizable entities (`orders`, `customers`, `expenses`, `expense_categories`, `business_settings`, and master data).
-   - Used for optimistic concurrency control (`base_version` vs current `server_version`).
+   - Monotonically incremented integer on mutable synchronizable entities (`orders`, `customers`, `expenses`, `expense_categories`, `business_settings`, and master data) supported on the remote backend for optimistic concurrency.
+   - *Known Deferred Limitation*: The Flutter client currently does NOT maintain local `server_version` columns and does NOT propagate `base_version` through the normal `SyncOperation` flow. This is explicitly documented as a deferred V1 limitation.
    - Append-only immutable records (`payments`, `storage_records`) do NOT maintain a `server_version`.
 2. **Global `sync_changes.sequence`**:
    - Monotonically increasing synchronization sequence (`BIGINT`), logically scoped per shop/tenant.
-   - Authoritative cursor used by `SyncEngine.pull()` (`GET /sync/changes?after=<sequence>`).
+   - Authoritative cursor used by `SyncEngine.pull()` (`GET /sync/changes?after=<sequence>&limit=<limit>`).
    - Timestamps (`updated_at`, `last_sync_at`) must NEVER be used as the authoritative synchronization cursor.
+   - Sequence represents committed remote change ordering; it is NOT a Last-Write-Wins mechanism.
 
 #### 55.3.14 Local Sync State & Crash-Safe Ingestion
 
@@ -1353,16 +1358,36 @@ There are two distinct versioning concepts that must never be confused:
 
 #### 55.3.15 Realtime Wake-Up Signal Adapter
 
-- Supabase Realtime is approved strictly as an **ephemeral wake-up notification adapter** (`sync_available` event).
+- Supabase Realtime is approved strictly as an **ephemeral wake-up notification adapter** using Broadcast on topic `laundry:sync` (`sync_available` event).
 - Realtime signals wake up `SyncEngine` to trigger a pull.
 - Realtime payloads are NOT authoritative data. All remote data is retrieved via the cursor-based pull API.
 - No raw WebSocket infrastructure is exposed to feature code.
+- *Note*: Supabase Realtime publication migration on `sync_changes` exists as dormant/redundant infrastructure; active mechanism is Broadcast.
 
 #### 55.3.16 Recovery & Bootstrap Protection
 
-- A new device initializes via an **Initial Device Bootstrap** flow that establishes a consistent baseline and cursor before normal incremental pull starts.
-- If a client cursor falls behind retained change history, the server returns `CURSOR_TOO_OLD`, initiating a controlled full resync.
-- Invariant: A full resync or bootstrap must **NEVER delete or overwrite locally pending unsynced business data** stored in `sync_operations`.
+- If a client cursor falls behind retained change history, the server returns HTTP 410 with error code `CURSOR_TOO_OLD` (detected locally as `CursorTooOldException`).
+- *Known Deferred Limitation*: Full automatic bootstrap / resync recovery is deferred in V1.
+- Invariant: Recovery must **NEVER delete or overwrite locally pending unsynced business data** stored in `sync_operations`.
+
+#### 55.3.17 Approved Retry Policy
+
+- **Initial delay**: 5 seconds
+- **Multiplier**: 2
+- **Maximum delay**: 300 seconds
+- **Maximum retries**: 5 retries after the initial attempt (6 total attempts maximum)
+- **Jitter**: Bounded additive jitter from 0 to 1 second
+
+#### 55.3.18 Sync Operations Retention
+
+- Synced operations in `sync_operations` are retained for **90 days**.
+- Automatic background purge is NOT implemented in V1; retention maintenance is manual.
+
+#### 55.3.19 Orchestration & Single-Flight Coalescing
+
+- `SyncEngine` maintains a single-flight synchronization model.
+- Concurrent Push and Pull triggers are coalesced while a synchronization cycle is active.
+- Periodic foreground safety pull runs every 15 minutes while the application is active.
 
 ---
 
@@ -1459,8 +1484,9 @@ The following technical decisions are intentionally not finalized yet:
 The following were previously TBD and are now resolved:
 
     Entity ID Generation Strategy    →  Client-generated stable UUID (UUIDv4)
-    Sync Retry Architecture           →  Exponential backoff + max retry count + permanent failure state
-                                         (exact numeric values remain implementation-level config)
+    Sync Retry Architecture           →  Exponential backoff: initial delay 5s, multiplier 2,
+                                         max delay 300s, max 5 retries (6 attempts max),
+                                         0–1s jitter (Approved)
     Sync Idempotency Architecture     →  Stable operation ID, same ID preserved across retries,
                                          backend uses ID to prevent duplicate effects via sync_idempotency_log
     API Idempotency Transport         →  X-Operation-ID HTTP header (Approved)
@@ -1481,8 +1507,11 @@ The following are intentionally deferred from V1:
 
     Complex Distributed Merge Algorithms & CRDTs
     Raw WebSocket / Full Real-time Collaborative Document Sync
+    Full Automatic CURSOR_TOO_OLD Bootstrap / Resync Recovery
+    Flutter Client OCC (server_version/base_version) Propagation
+    Automatic Background Sync Operations Purge (retention is 90 days, manual purge)
     Multi-tenant / SaaS / Multi-branch Administration
-    Complex Platform Background Synchronization
+    Complex Platform Background Synchronization (OS-level background execution)
     Distributed Locking
     Event Sourcing
     Advanced Caching Architecture

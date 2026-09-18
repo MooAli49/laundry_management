@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:laundry_management/app.dart';
 import 'package:laundry_management/core/di/injection.dart';
@@ -42,7 +42,7 @@ void main() async {
     return false;
   };
 
-  await initDependencies(enableDevTestData: true);
+  await initDependencies(enableDevTestData: kDebugMode);
 
   // Initialize foreground synchronization infrastructure (non-blocking)
   final syncEngine = getIt<SyncEngine>();

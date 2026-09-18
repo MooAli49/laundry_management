@@ -3395,6 +3395,12 @@ Timestamp of the latest synchronization attempt.
 
 ---
 
+### Retention
+
+Synced operations (`status = 'synced'`) are retained for **90 days**. Automatic background deletion is deferred in V1; retention maintenance is manual.
+
+---
+
 # 21. sync_state
 
 ## Purpose
@@ -3522,7 +3528,7 @@ For optimistic concurrency control across devices, entities are classified by wh
 - `storage_records`: Immutable physical movement logs. Protected by locking `order_item_id` and ensuring at most one active record.
 - `order_items`: Created within the Order Creation aggregate; subsequent edits are governed by Order concurrency or dedicated domain workflows.
 
-*Note: This classification specifies the synchronization contract without modifying the existing local Drift V1 code in this documentation task.*
+*Note: While the remote PostgreSQL backend RPCs maintain `server_version` for optimistic concurrency on these entities, the local Flutter Drift database currently does NOT maintain local `server_version` columns and does NOT propagate `base_version` through the normal `SyncOperation` flow. This is a known deferred V1 limitation.*
 
 ---
 

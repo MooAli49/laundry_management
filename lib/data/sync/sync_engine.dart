@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../core/errors/app_exception.dart';
 import '../../core/network/network_info.dart';
@@ -43,6 +45,8 @@ class SyncEngine {
   final SyncStateDao? _syncStateDao;
   final RealtimeSyncAdapter? _realtimeAdapter;
   final DateTime Function() _clock;
+  final void Function(String message, [Object? error, StackTrace? stackTrace])?
+  _logHandler;
 
   bool _isSynchronizing = false;
   bool _pendingNeedsPush = false;
@@ -69,6 +73,8 @@ class SyncEngine {
     SyncStateDao? syncStateDao,
     RealtimeSyncAdapter? realtimeAdapter,
     DateTime Function()? clock,
+    void Function(String message, [Object? error, StackTrace? stackTrace])?
+    logHandler,
   }) : _syncOperationsDao = syncOperationsDao,
        _remoteApiDispatcher = remoteApiDispatcher,
        _networkInfo = networkInfo,
@@ -78,7 +84,8 @@ class SyncEngine {
        _remoteChangeApplier = remoteChangeApplier,
        _syncStateDao = syncStateDao,
        _realtimeAdapter = realtimeAdapter,
-       _clock = clock ?? DateTime.now;
+       _clock = clock ?? DateTime.now,
+       _logHandler = logHandler;
 
   /// Current lifecycle state of the synchronization engine.
   SyncEngineState get state => _state;
@@ -283,7 +290,8 @@ class SyncEngine {
         cursor = response.changes.last.sequence;
         hasMore = response.hasMore;
       }
-    } on CursorTooOldException catch (e) {
+    } on CursorTooOldException catch (e, stack) {
+      _log('CURSOR_TOO_OLD encountered during pull: ${e.message}', e, stack);
       final remainingOps = await _syncOperationsDao.getEligibleOperations(
         asOf: _clock(),
       );
@@ -294,10 +302,30 @@ class SyncEngine {
           pendingOperationsCount: remainingOps.length,
         ),
       );
-    } catch (_) {
+    } catch (e, stack) {
       // Partial pagination safety: if an error occurs mid-pagination,
       // all previously committed pages remain committed with updated cursor.
       // Next pull will resume from the persisted cursor.
+      _log('Unexpected pull failure: $e', e, stack);
+
+      int remainingCount = _state.pendingOperationsCount;
+      try {
+        final remainingOps = await _syncOperationsDao.getEligibleOperations(
+          asOf: _clock(),
+        );
+        remainingCount = remainingOps.length;
+      } catch (_) {
+        // Defensive: preserve last known count if DAO query fails during double-fault
+      }
+
+      final errorMessage = _mapPullErrorMessage(e);
+      _updateState(
+        SyncEngineState.failed(
+          error: errorMessage,
+          lastSyncTime: _state.lastSyncTime,
+          pendingOperationsCount: remainingCount,
+        ),
+      );
     }
   }
 
@@ -426,7 +454,8 @@ class SyncEngine {
           pendingOperationsCount: remainingOps.length,
         ),
       );
-    } catch (unexpectedError) {
+    } catch (unexpectedError, stack) {
+      _log('Unexpected push failure: $unexpectedError', unexpectedError, stack);
       int remainingCount = _state.pendingOperationsCount;
       try {
         final remainingOps = await _syncOperationsDao.getEligibleOperations(
@@ -444,6 +473,35 @@ class SyncEngine {
         ),
       );
     }
+  }
+
+  void _log(String message, [Object? error, StackTrace? stackTrace]) {
+    if (_logHandler != null) {
+      _logHandler(message, error, stackTrace);
+      return;
+    }
+    developer.log(
+      message,
+      name: 'SyncEngine',
+      error: error,
+      stackTrace: stackTrace,
+    );
+    debugPrint('[SyncEngine] $message');
+  }
+
+  String _mapPullErrorMessage(Object error) {
+    if (error is CursorTooOldException) {
+      return 'CURSOR_TOO_OLD: ${error.message}';
+    }
+    if (error is AppException) {
+      return 'PULL_ERROR: [${error.runtimeType}] ${error.message}';
+    }
+    if (error is DioException) {
+      final code = error.response?.statusCode;
+      final codeStr = code != null ? ' (HTTP $code)' : '';
+      return 'PULL_ERROR: DioException$codeStr: ${error.message ?? error.toString()}';
+    }
+    return 'PULL_ERROR: $error';
   }
 
   void _updateState(SyncEngineState newState) {

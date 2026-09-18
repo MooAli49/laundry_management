@@ -589,5 +589,200 @@ void main() {
         expect(remaining.first.status, equals('pending'));
       },
     );
+
+    // =========================================================================
+    // Phase C4-B: Pull Error Handling & Observability
+    // =========================================================================
+    group('Phase C4-B — Pull Error Handling & Observability', () {
+      test(
+        '1. CursorTooOldException retains dedicated handling and surfaces distinctly',
+        () async {
+          String? capturedLog;
+          final customEngine = SyncEngine(
+            syncOperationsDao: syncOperationsDao,
+            remoteApiDispatcher: dispatcher,
+            networkInfo: networkInfo,
+            retryPolicy: retryPolicy,
+            errorClassifier: errorClassifier,
+            syncRemoteDataSource: remoteDataSource,
+            remoteChangeApplier: remoteChangeApplier,
+            syncStateDao: syncStateDao,
+            realtimeAdapter: realtimeAdapter,
+            clock: () => fixedTime,
+            logHandler: (msg, [err, stack]) {
+              capturedLog = msg;
+            },
+          );
+
+          remoteDataSource.onGetChanges = ({required int after, int? limit}) async {
+            throw const CursorTooOldException(
+              message: 'Retention expired at sequence 42',
+              oldestAvailableSequence: 42,
+            );
+          };
+
+          await customEngine.pull();
+
+          expect(customEngine.state.status, equals(SyncEngineStatus.failed));
+          expect(customEngine.state.lastError, startsWith('CURSOR_TOO_OLD:'));
+          expect(customEngine.state.lastError, contains('Retention expired at sequence 42'));
+          expect(capturedLog, contains('CURSOR_TOO_OLD encountered during pull'));
+        },
+      );
+
+      test(
+        '2. Expected offline/connectivity condition leaves state unchanged without marking engine as failed',
+        () async {
+          String? capturedLog;
+          final customEngine = SyncEngine(
+            syncOperationsDao: syncOperationsDao,
+            remoteApiDispatcher: dispatcher,
+            networkInfo: networkInfo,
+            retryPolicy: retryPolicy,
+            errorClassifier: errorClassifier,
+            syncRemoteDataSource: remoteDataSource,
+            remoteChangeApplier: remoteChangeApplier,
+            syncStateDao: syncStateDao,
+            realtimeAdapter: realtimeAdapter,
+            clock: () => fixedTime,
+            logHandler: (msg, [err, stack]) {
+              capturedLog = msg;
+            },
+          );
+
+          networkInfo.setConnected(false);
+
+          await customEngine.pull();
+
+          expect(customEngine.state.status, equals(SyncEngineStatus.idle));
+          expect(customEngine.state.lastError, isNull);
+          expect(remoteDataSource.getChangesCallCount, equals(0));
+          expect(capturedLog, isNull);
+        },
+      );
+
+      test(
+        '3. Unexpected pull exception (ServerException) is not swallowed, logs error, and updates state to failed',
+        () async {
+          String? capturedLog;
+          Object? capturedError;
+          final customEngine = SyncEngine(
+            syncOperationsDao: syncOperationsDao,
+            remoteApiDispatcher: dispatcher,
+            networkInfo: networkInfo,
+            retryPolicy: retryPolicy,
+            errorClassifier: errorClassifier,
+            syncRemoteDataSource: remoteDataSource,
+            remoteChangeApplier: remoteChangeApplier,
+            syncStateDao: syncStateDao,
+            realtimeAdapter: realtimeAdapter,
+            clock: () => fixedTime,
+            logHandler: (msg, [err, stack]) {
+              capturedLog = msg;
+              capturedError = err;
+            },
+          );
+
+          remoteDataSource.onGetChanges = ({required int after, int? limit}) async {
+            throw const ServerException('500 Service Unavailable from proxy');
+          };
+
+          await customEngine.pull();
+
+          expect(customEngine.state.status, equals(SyncEngineStatus.failed));
+          expect(customEngine.state.lastError, startsWith('PULL_ERROR: [ServerException]'));
+          expect(customEngine.state.lastError, contains('500 Service Unavailable from proxy'));
+          expect(capturedLog, contains('Unexpected pull failure'));
+          expect(capturedError, isA<ServerException>());
+        },
+      );
+
+      test(
+        '4. Pull state remains internally consistent after unexpected failure: cursor not advanced, unapplied changes rolled back, pending ops preserved, zero outgoing sync ops',
+        () async {
+          // Set initial cursor to 10
+          await syncStateDao.updateLastAppliedSequence(10);
+          expect(await syncStateDao.getLastAppliedSequence(), equals(10));
+
+          // Enqueue a local pending business operation
+          await syncOperationsDao.recordOperation(
+            entityType: 'customer',
+            entityId: 'cust-local-preserve',
+            operationType: 'create',
+            payload: '{"name":"Local Preserved Cust"}',
+          );
+          final initialOps = await syncOperationsDao.getEligibleOperations(asOf: fixedTime);
+          expect(initialOps.length, equals(1));
+
+          // Remote throws unexpected exception during getChanges
+          remoteDataSource.onGetChanges = ({required int after, int? limit}) async {
+            throw Exception('Database connection dropped unexpectedly');
+          };
+
+          await syncEngine.pull();
+
+          // 1. Cursor did not advance
+          expect(await syncStateDao.getLastAppliedSequence(), equals(10));
+
+          // 2. State is failed
+          expect(syncEngine.state.status, equals(SyncEngineStatus.failed));
+          expect(syncEngine.state.lastError, contains('PULL_ERROR: Exception: Database connection dropped unexpectedly'));
+
+          // 3. Pending operations count is preserved
+          expect(syncEngine.state.pendingOperationsCount, equals(1));
+
+          // 4. Pending local operation is untouched and still pending
+          final remainingOps = await syncOperationsDao.getEligibleOperations(asOf: fixedTime);
+          expect(remainingOps.length, equals(1));
+          expect(remainingOps.first.entityId, equals('cust-local-preserve'));
+          expect(remainingOps.first.status, equals('pending'));
+
+          // 5. Zero outgoing SyncOperations were created
+          final allOps = await db.select(db.syncOperations).get();
+          expect(allOps.length, equals(1));
+        },
+      );
+
+      test(
+        '5. Unexpected DioException (HTTP 502) during pull formats status details and updates state to failed',
+        () async {
+          String? capturedLog;
+          final customEngine = SyncEngine(
+            syncOperationsDao: syncOperationsDao,
+            remoteApiDispatcher: dispatcher,
+            networkInfo: networkInfo,
+            retryPolicy: retryPolicy,
+            errorClassifier: errorClassifier,
+            syncRemoteDataSource: remoteDataSource,
+            remoteChangeApplier: remoteChangeApplier,
+            syncStateDao: syncStateDao,
+            realtimeAdapter: realtimeAdapter,
+            clock: () => fixedTime,
+            logHandler: (msg, [err, stack]) {
+              capturedLog = msg;
+            },
+          );
+
+          remoteDataSource.onGetChanges = ({required int after, int? limit}) async {
+            throw DioException(
+              requestOptions: RequestOptions(path: '/sync/changes'),
+              response: Response(
+                requestOptions: RequestOptions(path: '/sync/changes'),
+                statusCode: 502,
+                statusMessage: 'Bad Gateway',
+              ),
+              type: DioExceptionType.badResponse,
+              message: 'Bad Gateway',
+            );
+          };
+
+          await customEngine.pull();
+
+          expect(customEngine.state.status, equals(SyncEngineStatus.failed));
+          expect(customEngine.state.lastError, startsWith('PULL_ERROR: DioException (HTTP 502): Bad Gateway'));
+          expect(capturedLog, contains('Unexpected pull failure'));
+        },
+      );
+    });
   });
 }

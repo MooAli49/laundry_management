@@ -182,8 +182,12 @@ This represents application/business configuration.
     SyncState
 
 Infrastructure entities support bidirectional synchronization and application behavior but do not represent core business concepts:
-- `SyncOperation` (`sync_operations`): Durable queue of outgoing local mutations waiting to be pushed.
-- `SyncState` (`sync_state`): Durable local cursor tracking incoming synchronization progress (`last_applied_sequence`).
+- `SyncOperation` (`sync_operations`): Local durable queue of outgoing local mutations waiting to be pushed to the remote backend.
+- `SyncState` (`sync_state`): Local durable singleton cursor tracking incoming pull synchronization progress (`last_applied_sequence`).
+- *Remote Change Log*: `sync_changes` exists on the remote PostgreSQL backend as the authoritative, append-only change log ordered by monotonically increasing `sequence`. It is not a local table.
+
+> **Note on Optimistic Concurrency**:
+> Remote database tables maintain integer `server_version` for optimistic concurrency control. However, local Drift tables in V1 do not store `server_version`, and propagation of `base_version` from Flutter is a known deferred V1 limitation.
 
 ---
 
@@ -208,12 +212,12 @@ The V1 logical database consists of the following main tables:
     storage_location_item_types
     business_settings
 
-The bidirectional synchronization mechanism uses internal infrastructure tables:
+The bidirectional synchronization mechanism uses internal local infrastructure tables:
 
-    sync_operations
-    sync_state
+    sync_operations (local outgoing mutation queue)
+    sync_state (local pull cursor: last_applied_sequence)
 
-These infrastructure tables are part of the Data Layer and do not represent business entities.
+These local infrastructure tables are part of the Data Layer and do not represent business entities. The remote change log (`sync_changes`) resides exclusively on the remote Supabase PostgreSQL database.
 
 ---
 

@@ -116,6 +116,24 @@ void main() {
         );
       },
     );
+
+    test('Run-scoped identifiers generate distinct non-colliding operation IDs and valid UUIDs', () {
+      final run1 = (DateTime.now().millisecondsSinceEpoch - 1000).toRadixString(16).padLeft(12, '0');
+      final run2 = DateTime.now().millisecondsSinceEpoch.toRadixString(16).padLeft(12, '0');
+
+      final opId1 = 'op-step9-cust-create-$run1';
+      final opId2 = 'op-step9-cust-create-$run2';
+
+      expect(opId1, isNot(equals(opId2)));
+      expect(opId1, startsWith('op-step9-cust-create-'));
+      expect(opId2, startsWith('op-step9-cust-create-'));
+
+      final uuid1 = 'c0000001-0001-4001-8001-$run1';
+      final uuid2 = 'c0000001-0001-4001-8001-$run2';
+      expect(uuid1.length, equals(36));
+      expect(uuid2.length, equals(36));
+      expect(uuid1, isNot(equals(uuid2)));
+    });
   });
 
   group('Step 9 — Live Supabase Edge Function & PostgreSQL Integration Tests', () {
@@ -123,9 +141,74 @@ void main() {
     late Dio dio;
     bool isNetworkAvailable = true;
 
+    // Unique per-run hex ID to guarantee test idempotency and isolation across repeated runs
+    final runId = DateTime.now().millisecondsSinceEpoch
+        .toRadixString(16)
+        .padLeft(12, '0');
+
+    late final String rejectServiceId;
+    late final String rejectOpId;
+    late final String custId;
+    late final String custPhone;
+    late final String custCreateOpId;
+    late final String custUpdateOpId;
+    late final String srvId;
+    late final String srvOpId;
+    late final String orderFailId;
+    late final String orderFailOpId;
+    late final String orderId;
+    late final String orderNumber;
+    late final String itemId;
+    late final String carpetId;
+    late final String orderOpId;
+    late final String rec1Id;
+    late final String rec2Id;
+    late final String storeOpId;
+    late final String moveOpId;
+    late final String unstoreOpId;
+    late final String occConflict1OpId;
+    late final String occConflict2OpId;
+    late final String occSuccessOpId;
+    late final String storeRecId;
+    late final String moveRecId;
+    late final String smStoreOpId;
+    late final String smConflictOpId;
+    late final String smSuccessOpId;
+    late final String orderStatusUpdateOpId;
+
     setUpAll(() async {
       client = DioClient();
       dio = client.dio;
+
+      rejectServiceId = 'b8888888-8888-4888-8888-$runId';
+      rejectOpId = 'op-step9-reject-kg-$runId';
+      custId = 'c0000001-0001-4001-8001-$runId';
+      custPhone = '010${DateTime.now().millisecondsSinceEpoch % 100000000}'.padRight(11, '1');
+      custCreateOpId = 'op-step9-cust-create-$runId';
+      custUpdateOpId = 'op-step9-cust-update-$runId';
+      srvId = 'b0000001-0001-4001-8001-$runId';
+      srvOpId = 'op-step9-srv-create-carpet-$runId';
+      orderFailId = 'd9999999-9999-4999-8999-$runId';
+      orderFailOpId = 'op-step9-order-fail-$runId';
+      orderId = 'd0000001-0001-4001-8001-$runId';
+      orderNumber = 'ORD-S9-$runId';
+      itemId = 'e0000001-0001-4001-8001-$runId';
+      carpetId = 'f0000001-0001-4001-8001-$runId';
+      orderOpId = 'op-step9-order-atomic-create-$runId';
+      rec1Id = '90000001-0001-4001-8001-$runId';
+      rec2Id = '90000002-0002-4002-8002-$runId';
+      storeOpId = 'op-step9-store-$runId';
+      moveOpId = 'op-step9-move-$runId';
+      unstoreOpId = 'op-step9-unstore-$runId';
+      occConflict1OpId = 'op-step9-cust-occ-conflict1-$runId';
+      occConflict2OpId = 'op-step9-cust-occ-conflict2-$runId';
+      occSuccessOpId = 'op-step9-cust-occ-success-$runId';
+      storeRecId = '90000005-0005-4005-8005-$runId';
+      moveRecId = '90000006-0006-4006-8006-$runId';
+      smStoreOpId = 'op-step9-sm-store-$runId';
+      smConflictOpId = 'op-step9-sm-conflict-$runId';
+      smSuccessOpId = 'op-step9-sm-success-$runId';
+      orderStatusUpdateOpId = 'op-step9-order-status-update-$runId';
 
       try {
         final res = await dio.get('/customers', queryParameters: {'limit': 1});
@@ -145,13 +228,13 @@ void main() {
         final res = await dio.post(
           '/services',
           data: {
-            'id': 'b8888888-8888-4888-8888-888888888888',
+            'id': rejectServiceId,
             'name': 'Rejected Per Kg Service',
             'pricing_type': 'per_kilogram',
             'price': 1000,
           },
           options: Options(
-            headers: {'X-Operation-ID': 'op-reject-kg-1'},
+            headers: {'X-Operation-ID': rejectOpId},
             validateStatus: (_) => true,
           ),
         );
@@ -167,20 +250,17 @@ void main() {
       () async {
         if (!isNetworkAvailable) return;
 
-        final custId = 'c0000001-0001-4001-8001-000000000001';
-        final custOpId = 'op-cust-create-1';
-
         // 1. Create
         final createRes = await dio.post(
           '/customers',
           data: {
             'id': custId,
             'name': 'Live Customer Test',
-            'phone': '01099990001',
+            'phone': custPhone,
             'notes': 'Initial note',
           },
           options: Options(
-            headers: {'X-Operation-ID': custOpId},
+            headers: {'X-Operation-ID': custCreateOpId},
             validateStatus: (_) => true,
           ),
         );
@@ -194,11 +274,11 @@ void main() {
           data: {
             'id': custId,
             'name': 'Live Customer Test',
-            'phone': '01099990001',
+            'phone': custPhone,
             'notes': 'Initial note',
           },
           options: Options(
-            headers: {'X-Operation-ID': custOpId},
+            headers: {'X-Operation-ID': custCreateOpId},
             validateStatus: (_) => true,
           ),
         );
@@ -211,7 +291,7 @@ void main() {
           '/customers/$custId',
           data: {'name': 'Live Customer Updated', 'notes': 'Updated note'},
           options: Options(
-            headers: {'X-Operation-ID': 'op-cust-update-1'},
+            headers: {'X-Operation-ID': custUpdateOpId},
             validateStatus: (_) => true,
           ),
         );
@@ -226,9 +306,6 @@ void main() {
       () async {
         if (!isNetworkAvailable) return;
 
-        final custId = 'c0000001-0001-4001-8001-000000000001';
-        final srvId = 'b0000001-0001-4001-8001-000000000001';
-
         // Ensure service exists first
         await dio.post(
           '/services',
@@ -240,7 +317,7 @@ void main() {
             'is_active': true,
           },
           options: Options(
-            headers: {'X-Operation-ID': 'op-srv-create-carpet-1'},
+            headers: {'X-Operation-ID': srvOpId},
             validateStatus: (_) => true,
           ),
         );
@@ -249,7 +326,7 @@ void main() {
         final failRes = await dio.post(
           '/orders',
           data: {
-            'id': 'd9999999-9999-4999-8999-999999999999',
+            'id': orderFailId,
             'order_number': 'ORD-FAIL-ROLLBACK',
             'customer_id': '00000000-0000-0000-0000-000000000000',
             'status': 'processing',
@@ -259,7 +336,7 @@ void main() {
             'items': [],
           },
           options: Options(
-            headers: {'X-Operation-ID': 'op-order-fail-1'},
+            headers: {'X-Operation-ID': orderFailOpId},
             validateStatus: (_) => true,
           ),
         );
@@ -267,19 +344,14 @@ void main() {
         expect(failRes.statusCode, isIn([400, 422]));
 
         // B. Success aggregate with carpet data
-        final orderId = 'd0000001-0001-4001-8001-000000000001';
-        final itemId = 'e0000001-0001-4001-8001-000000000001';
-        final carpetId = 'f0000001-0001-4001-8001-000000000001';
-        final orderOpId = 'op-order-atomic-create-1';
-
         final successRes = await dio.post(
           '/orders',
           data: {
             'id': orderId,
-            'order_number': 'ORD-LIVE-ATOMIC-01',
+            'order_number': orderNumber,
             'customer_id': custId,
             'customer_name_snapshot': 'Live Customer Updated',
-            'customer_phone_snapshot': '01099990001',
+            'customer_phone_snapshot': custPhone,
             'status': 'processing',
             'expected_pickup_date': '2026-09-25T00:00:00.000',
             'subtotal': 24000,
@@ -319,7 +391,7 @@ void main() {
           '/orders',
           data: {
             'id': orderId,
-            'order_number': 'ORD-LIVE-ATOMIC-01',
+            'order_number': orderNumber,
             'customer_id': custId,
             'status': 'processing',
             'expected_pickup_date': '2026-09-25T00:00:00.000',
@@ -336,7 +408,7 @@ void main() {
         expect(retryOrderRes.statusCode, isIn([200, 201]));
         expect(
           retryOrderRes.data['order_number'],
-          equals('ORD-LIVE-ATOMIC-01'),
+          equals(orderNumber),
         );
       },
     );
@@ -345,10 +417,6 @@ void main() {
       'Storage invariant: store, move, unstore enforces at most 1 active storage record',
       () async {
         if (!isNetworkAvailable) return;
-
-        final itemId = 'e0000001-0001-4001-8001-000000000001';
-        final rec1Id = '90000001-0001-4001-8001-000000000001';
-        final rec2Id = '90000002-0002-4002-8002-000000000002';
 
         // 1. Store at Rack 1
         final storeRes = await dio.post(
@@ -360,7 +428,7 @@ void main() {
             'is_active': true,
           },
           options: Options(
-            headers: {'X-Operation-ID': 'op-store-1'},
+            headers: {'X-Operation-ID': storeOpId},
             validateStatus: (_) => true,
           ),
         );
@@ -376,7 +444,7 @@ void main() {
             'is_active': true,
           },
           options: Options(
-            headers: {'X-Operation-ID': 'op-move-1'},
+            headers: {'X-Operation-ID': moveOpId},
             validateStatus: (_) => true,
           ),
         );
@@ -387,7 +455,7 @@ void main() {
           '/storage/$rec2Id',
           data: {'is_active': false},
           options: Options(
-            headers: {'X-Operation-ID': 'op-unstore-1'},
+            headers: {'X-Operation-ID': unstoreOpId},
             validateStatus: (_) => true,
           ),
         );
@@ -400,8 +468,6 @@ void main() {
       'Optimistic Concurrency Control: valid base_version increments server_version, stale base_version returns 409 CONCURRENCY_CONFLICT',
       () async {
         if (!isNetworkAvailable) return;
-
-        final custId = 'c0000001-0001-4001-8001-000000000001';
 
         // 1. Fetch current customer to get server_version
         final getRes = await dio.get('/customers/$custId');
@@ -416,7 +482,7 @@ void main() {
             'base_version': currentVersion - 1,
           },
           options: Options(
-            headers: {'X-Operation-ID': 'op-cust-occ-conflict-1'},
+            headers: {'X-Operation-ID': occConflict1OpId},
             validateStatus: (_) => true,
           ),
         );
@@ -429,7 +495,7 @@ void main() {
           data: {'name': 'Header Stale Name'},
           options: Options(
             headers: {
-              'X-Operation-ID': 'op-cust-occ-conflict-2',
+              'X-Operation-ID': occConflict2OpId,
               'X-Base-Version': '${currentVersion + 99}',
             },
             validateStatus: (_) => true,
@@ -444,7 +510,7 @@ void main() {
           data: {'name': 'Valid Versioned Customer'},
           options: Options(
             headers: {
-              'X-Operation-ID': 'op-cust-occ-success-1',
+              'X-Operation-ID': occSuccessOpId,
               'X-Base-Version': '$currentVersion',
             },
             validateStatus: (_) => true,
@@ -460,10 +526,6 @@ void main() {
       () async {
         if (!isNetworkAvailable) return;
 
-        final itemId = 'e0000001-0001-4001-8001-000000000001';
-        final storeRecId = '90000005-0005-4005-8005-000000000005';
-        final moveRecId = '90000006-0006-4006-8006-000000000006';
-
         // 1. Store at Rack 1
         final storeRes = await dio.post(
           '/storage',
@@ -474,7 +536,7 @@ void main() {
             'is_active': true,
           },
           options: Options(
-            headers: {'X-Operation-ID': 'op-sm-store-1'},
+            headers: {'X-Operation-ID': smStoreOpId},
             validateStatus: (_) => true,
           ),
         );
@@ -491,7 +553,7 @@ void main() {
           },
           options: Options(
             headers: {
-              'X-Operation-ID': 'op-sm-conflict-1',
+              'X-Operation-ID': smConflictOpId,
               'X-Previous-Storage-Location-Id': 'rack-99',
             },
             validateStatus: (_) => true,
@@ -512,7 +574,7 @@ void main() {
           },
           options: Options(
             headers: {
-              'X-Operation-ID': 'op-sm-success-1',
+              'X-Operation-ID': smSuccessOpId,
               'X-Previous-Storage-Location-Id': 'rack-1',
             },
             validateStatus: (_) => true,
@@ -573,18 +635,27 @@ void main() {
       () async {
         if (!isNetworkAvailable) return;
 
-        final pullRes = await dio.get(
-          '/sync/changes',
-          queryParameters: {'after': 0, 'limit': 100},
-        );
-        expect(pullRes.statusCode, equals(200));
-        final changes = (pullRes.data as Map<String, dynamic>)['changes'] as List;
+        // Fetch changes paging until orderCreateChange is found
+        dynamic orderCreateChange;
+        int currentCursor = 0;
+        bool hasMore = true;
+        while (hasMore && orderCreateChange == null) {
+          final pullRes = await dio.get(
+            '/sync/changes',
+            queryParameters: {'after': currentCursor, 'limit': 100},
+          );
+          expect(pullRes.statusCode, equals(200));
+          final data = pullRes.data as Map<String, dynamic>;
+          final changes = data['changes'] as List;
+          if (changes.isEmpty) break;
+          orderCreateChange = changes.firstWhere(
+            (c) => c['operation_id'] == orderOpId,
+            orElse: () => null,
+          );
+          currentCursor = changes.last['sequence'] as int;
+          hasMore = data['has_more'] == true;
+        }
 
-        // Find the order creation entry
-        final orderCreateChange = changes.firstWhere(
-          (c) => c['operation_id'] == 'op-order-atomic-create-1',
-          orElse: () => null,
-        );
         expect(orderCreateChange, isNotNull);
         expect(orderCreateChange['entity_type'], equals('order'));
         expect(orderCreateChange['operation_type'], equals('create'));
@@ -596,29 +667,29 @@ void main() {
         expect(items, isNotEmpty);
         expect(items.first['carpet_data'], isNotNull);
 
+        final orderCreateSeq = orderCreateChange['sequence'] as int;
+
         // Update the order status
-        final orderId = 'd0000001-0001-4001-8001-000000000001';
         final updateRes = await dio.patch(
           '/orders/$orderId',
           data: {'status': 'completed'},
           options: Options(
-            headers: {'X-Operation-ID': 'op-order-status-update-1'},
+            headers: {'X-Operation-ID': orderStatusUpdateOpId},
             validateStatus: (_) => true,
           ),
         );
         expect(updateRes.statusCode, equals(200));
 
-        // Pull changes after the latest sequence
-        final latestSeq = (pullRes.data as Map<String, dynamic>)['latest_sequence'] as int;
+        // Pull changes after the order create sequence
         final postUpdateRes = await dio.get(
           '/sync/changes',
-          queryParameters: {'after': latestSeq, 'limit': 10},
+          queryParameters: {'after': orderCreateSeq, 'limit': 50},
         );
         expect(postUpdateRes.statusCode, equals(200));
         final newChanges = (postUpdateRes.data as Map<String, dynamic>)['changes'] as List;
 
         final orderUpdateChange = newChanges.firstWhere(
-          (c) => c['operation_id'] == 'op-order-status-update-1',
+          (c) => c['operation_id'] == orderStatusUpdateOpId,
           orElse: () => null,
         );
         expect(orderUpdateChange, isNotNull);
@@ -662,19 +733,16 @@ void main() {
         final latestSeqBefore = (beforeRes.data as Map<String, dynamic>)['latest_sequence'] as int;
 
         // Replay customer creation with same operation ID
-        final custId = 'c0000001-0001-4001-8001-000000000001';
-        final custOpId = 'op-cust-create-1';
-
         final replayRes = await dio.post(
           '/customers',
           data: {
             'id': custId,
             'name': 'Live Customer Test',
-            'phone': '01099990001',
+            'phone': custPhone,
             'notes': 'Initial note',
           },
           options: Options(
-            headers: {'X-Operation-ID': custOpId},
+            headers: {'X-Operation-ID': custCreateOpId},
             validateStatus: (_) => true,
           ),
         );

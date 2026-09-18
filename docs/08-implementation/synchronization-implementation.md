@@ -25,18 +25,19 @@ The approved architecture is **Bidirectional Push + Pull Synchronization**:
     SyncEngine
     ↓
     RemoteApiDispatcher (Retrofit + Dio)
-    ├── Header: X-Operation-ID (idempotency)
-    └── Body: base_version (optimistic concurrency where required)
+    └── Header: X-Operation-ID (idempotency)
     ↓
     Supabase Edge Functions (/api/v1/...)
     ↓
     PostgreSQL Transactional RPCs (ACID)
     ├── Check sync_idempotency_log
-    ├── Validate server_version == base_version
+    ├── Business rule validation
     ├── Execute business mutation
-    ├── Increment server_version where applicable
+    ├── Increment server_version where applicable (backend OCC)
     ├── Append to sync_changes (monotonically increasing sequence)
     └── Commit
+
+*Note: Backend RPCs support server_version optimistic concurrency checks, but Flutter client propagation of base_version is a known deferred V1 limitation.*
 
 ### PULL Flow:
 
@@ -71,31 +72,36 @@ The most important principles are:
 
 ## 2. Current Implementation Status
 
-> **ACTIVE IMPLEMENTATION PHASE**
+> **COMPLETED / LOCKED (Task #15)**
 
-Offline / Sync Integration is now the **active** implementation phase.
+Offline / Sync Integration (Task #15) has completed implementation and verification through:
+- C1 Remote Sync Foundation
+- C1.5 Forensic Audit
+- C1.6 Migration Hardening
+- C2 Local Pull Foundation
+- C3 Sync Orchestration
+- C3.1 Realtime Broadcast
+- C4-A Release Safety
+- C4-B Pull/Test Hardening
+- C4-C Two-Device Bidirectional Sync E2E
 
-The Orders module has completed its Local-First implementation and final E2E verification.
+The system has been verified end-to-end with two independent local SQLite devices operating bidirectionally against a live Supabase backend.
 
-The project is now connecting the existing Local-First application to the approved Supabase remote backend.
+This phase was an **infrastructure / integration** phase. Existing V1 business rules, domain entities, and lifecycle states remained completely intact.
 
-This phase is an **infrastructure / integration** phase.
+### Verified & Completed Capabilities:
 
-It is not a new V1 business feature.
-
-Existing V1 business rules, domain entities, and lifecycle states remain unchanged.
-
-### What must be implemented in this phase:
-
-- Durable Sync Queue (local database, persisted).
-- Atomic local mutation + sync operation enqueue.
-- Stable operation IDs preserved across retries.
-- Sync Engine with retry, ordering, failure classification, and crash recovery.
+- Durable Sync Queue (`sync_operations` in local SQLite/Drift).
+- Atomic local mutation + sync operation enqueue within a single SQLite transaction.
+- Stable operation IDs preserved across retries (`X-Operation-ID`).
+- Sync Engine with exponential backoff, jitter, single-flight coalescing, error isolation, and crash recovery.
 - Remote Data Sources communicating with Supabase via Retrofit + Dio.
-- Idempotent remote processing.
-- Dependency-aware synchronization ordering.
-- Conflict handling per the approved entity-specific strategy.
-- Financial record protection.
+- Idempotent remote processing with PostgreSQL transactional RPCs and `sync_idempotency_log`.
+- Remote append-oriented change log (`sync_changes`) with monotonically increasing `sequence` cursor.
+- Local pull cursor persisted in `sync_state` (`last_applied_sequence`).
+- `RemoteChangeApplier` applying remote changes directly via DAOs and updating `sync_state` in ONE atomic SQLite transaction (zero echo).
+- Supabase Realtime Broadcast wake-up signal adapter (`laundry:sync` / `sync_available`).
+- Two-Device Bidirectional E2E verification (Device A: Customer + Order → Supabase → Device B; Device B: Payment + Storage → Supabase → Device A).
 
 ### What remains unchanged from the Local-First phase:
 
@@ -1153,7 +1159,7 @@ Key architectural requirements for two-device synchronization:
    - Generic Last-Write-Wins is strictly prohibited.
    - Payments are append-only; balance validation is authoritative on the server.
    - Storage moves enforce at most one active record per `OrderItem`. `sync_changes.sequence` provides committed ordering only; it is not a generic LWW conflict resolver. A stale concurrent move receives `CONCURRENCY_CONFLICT`, and the winning committed change is pulled by both terminals.
-   - Mutable entities use entity `server_version` checked against `base_version`.
+   - Mutable entities: The backend supports entity `server_version` checked against `base_version` (Flutter client propagation of `base_version` is a known deferred V1 limitation).
 5. **Crash Safety**: Applying pulled changes and advancing `sync_state.last_applied_sequence` occur within the **same local transaction**.
 6. **Preservation of Local Pending Operations**: An initial bootstrap or full resync after `CURSOR_TOO_OLD` must NEVER delete locally pending unsynced records in `sync_operations`.
 
@@ -1940,8 +1946,9 @@ The remote PostgreSQL database maintains a durable, append-only synchronization 
   ```
 
 ### 68.4 Recovery & Bootstrap Invariant
-- When `CURSOR_TOO_OLD` is received, the client triggers a controlled full resync/bootstrap.
-- **CRITICAL INVARIANT**: Locally pending operations in `sync_operations` must **NEVER be deleted**. Pending local changes remain queued and are pushed to the server after the baseline snapshot is re-established.
+- If a client cursor falls behind retained history in `sync_changes`, the server returns HTTP 410 `CURSOR_TOO_OLD`, detected locally as `CursorTooOldException`.
+- *Known Deferred Limitation*: Full automated bootstrap resync is deferred in V1.
+- **CRITICAL INVARIANT**: Any resync or recovery must **NEVER delete or overwrite locally pending unsynced business data** stored in `sync_operations`. Pending local changes remain queued and are pushed after baseline synchronization.
 
 ---
 
@@ -1988,3 +1995,100 @@ Standard codes:
   - The operation's status in `sync_operations` is marked `failed` with the structured error details.
   - The `SyncEngine` isolates the failed operation and **continues processing independent, unrelated operations** in the queue.
   - Unrelated orders, payments, expenses, or master data are not blocked by a single isolated failure.
+
+---
+
+## 71. Actual Implemented Components Catalog
+
+### 71.1 Local Components (Flutter / Drift)
+- **`SyncOperation`**: Infrastructure model representing an outgoing synchronizable mutation in `sync_operations` with status (`pending`, `in_progress`, `synced`, `failed`), entity type, entity ID, retry count, and non-null JSON payload.
+- **`SyncOperationsDao`**: Drift DAO managing atomic enqueueing, next-operation querying, status transitions, and failed operation isolation.
+- **`SyncState`**: Infrastructure model and table (`sync_state`) storing singleton device synchronization state (`id = 'singleton'`) with `last_applied_sequence`.
+- **`SyncStateDao`**: Drift DAO managing reading and updating `last_applied_sequence`.
+- **`SyncEngine`**: Central orchestrator managing:
+  - Single-flight push and pull loops with trigger coalescing.
+  - Triggers: manual sync, startup sync, app resume, connectivity restoration, Realtime wake-up signal, 15-minute periodic foreground safety timer.
+  - Exponential backoff retry policy with jitter.
+  - Failure classification (retryable vs permanent).
+- **`RemoteChangeApplier`**: Direct DAO ingestion engine that:
+  - Applies pulled remote changes directly to Drift DAOs (`OrdersDao`, `CustomersDao`, `PaymentsDao`, `StorageRecordsDao`, `ExpensesDao`, `ExpenseCategoriesDao`, `MasterDataDao`, `SettingsDao`).
+  - Advances `sync_state.last_applied_sequence` in the **same local SQLite transaction**.
+  - Enforces strict ascending sequence validation (`change.sequence == expectedSequence`).
+  - Guarantees zero `SyncOperation` echo.
+
+### 71.2 Remote Components (Supabase / PostgreSQL)
+- **`sync_changes`**: Durable append-only change log storing committed changes with monotonically increasing `sequence` cursor (`BIGINT`), `operation_id`, `entity_type`, `entity_id`, `operation_type`, `payload`, `server_version`, and `created_at`.
+- **`sync_idempotency_log`**: Deduplication table recording processed `operation_id` values and cached responses.
+- **Edge Functions**: REST API endpoints proxying push mutations to PostgreSQL RPCs and serving paginated pull requests (`GET /api/v1/sync/changes?after=<seq>&limit=<limit>`).
+- **PostgreSQL Transactional RPCs**: Atomic functions executing business mutations, appending to `sync_changes`, and recording idempotency within a single ACID transaction.
+- **Realtime Broadcast**: Supabase Realtime channel on topic `laundry:sync` broadcasting `sync_available`. (CDC publication migration on `sync_changes` exists as dormant infrastructure).
+
+### 71.3 Adapter Layer
+- **`RealtimeSyncAdapter`**: Abstract interface decoupling `SyncEngine` from third-party Realtime mechanisms.
+- **`SupabaseRealtimeSyncAdapter`**: Concrete adapter implementing `RealtimeSyncAdapter` using Supabase Realtime Broadcast.
+
+---
+
+## 72. Execution Sequences
+
+### 72.1 Push Execution Sequence
+1. User action triggers a Repository mutation.
+2. Repository begins a local SQLite transaction via Drift.
+3. Repository persists local entity write via DAO.
+4. Repository enqueues corresponding `SyncOperation` via `SyncOperationsDao` within the same transaction.
+5. Transaction commits; UI reactive queries update immediately.
+6. `SyncEngine` is notified or triggers on its loop.
+7. `SyncEngine` takes the next pending operation and marks it `in_progress`.
+8. `RemoteApiDispatcher` dispatches request to Supabase Edge Function with `X-Operation-ID` header.
+9. Edge Function invokes PostgreSQL transactional RPC.
+10. RPC checks `sync_idempotency_log`, validates domain rules, mutates tables, appends to `sync_changes`, and commits.
+11. On `200 OK`, `SyncEngine` marks operation as `synced`.
+
+### 72.2 Pull Execution Sequence
+1. Pull trigger fires (Realtime Broadcast, 15-min periodic timer, app resume, startup, connectivity, or manual).
+2. `SyncEngine.pull()` is called; single-flight guard coalesces overlapping calls.
+3. `SyncEngine` reads `last_applied_sequence` from `SyncStateDao`.
+4. `SyncEngine` calls `GET /api/v1/sync/changes?after=<last_applied_sequence>&limit=100`.
+5. Edge Function queries `sync_changes WHERE sequence > after ORDER BY sequence ASC LIMIT limit`.
+6. `SyncEngine` passes change batch to `RemoteChangeApplier.applyBatch()`.
+7. `RemoteChangeApplier` opens a single local Drift transaction:
+   - Verifies strict ascending sequence order.
+   - Applies entity snapshot updates directly via DAOs (never creating `SyncOperation` rows).
+   - Calls `SyncStateDao.updateLastAppliedSequence(latestSequence)`.
+8. Transaction commits atomically; Drift reactive streams notify UI automatically.
+9. If more changes exist (`has_more == true`), `SyncEngine` continues pulling until caught up.
+
+---
+
+## 73. Approved Policies
+
+### 73.1 Retry Policy
+- **Initial delay**: 5 seconds
+- **Multiplier**: 2
+- **Maximum delay**: 300 seconds
+- **Maximum retries**: 5 retries after the initial attempt (6 total attempts maximum)
+- **Jitter**: Bounded additive jitter from 0 to 1 second
+
+### 73.2 Sync Operations Retention
+- Synced operations in `sync_operations` (`status = 'synced'`) are retained for **90 days**.
+- Automatic background deletion is NOT implemented in V1; retention maintenance is manual.
+
+---
+
+## 74. Known Deferred Limitations
+
+1. **Flutter Client Optimistic Concurrency Propagation**: While the backend RPCs support integer `server_version` checks, the Flutter client currently does NOT maintain local `server_version` columns and does NOT propagate `base_version` through `SyncOperation`.
+2. **Automated CURSOR_TOO_OLD Bootstrap / Resync Recovery**: When `CursorTooOldException` occurs, automatic snapshot reconstruction is deferred in V1. Local pending operations in `sync_operations` are strictly protected and never deleted.
+3. **Automatic Sync Operation Purge**: Automated deletion of expired `synced` operations is deferred.
+4. **OS-Level Platform Background Sync**: Platform-specific background execution (e.g. WorkManager) is deferred; foreground triggers provide reliable coverage.
+5. **Multi-Tenant / Multi-Branch SaaS Administration**: Deferred from V1.
+
+---
+
+## 75. Known Implementation Findings
+
+### 75.1 OrderItem PricingType Mapper Serialization Finding
+- **Location**: `OrderRepositoryImpl._mapOrderItemToDomain`
+- **Issue**: The method uses `PricingType.values.byName(item.pricingType)` instead of `PricingType.fromValue(item.pricingType)`.
+- **Effect**: When remote `OrderItems` contain pricing types such as `per_square_meter` (serialized as `'per_square_meter'`), `byName` throws an `ArgumentError` because the Dart enum identifier is `perSquareMeter`. `PricingType.fromValue` correctly handles serialized string conversion.
+- **Status**: Discovered during C4-C testing. Documented as a known implementation finding. In accordance with C4-D scope rules, production code is NOT modified in this documentation phase.

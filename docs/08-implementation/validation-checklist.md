@@ -230,13 +230,13 @@ Validate that dependencies do not point upward into Presentation.
 
 ### 11.2 Sync Integration Phase
 
-- [ ] Offline / Sync Integration implementation follows the approved decisions in `synchronization-implementation.md` and `technical-decisions.md` §55.
-- [ ] Synchronization infrastructure (Sync Engine, Sync Queue, Remote Data Sources) is implemented in the Data / Infrastructure layer only.
-- [ ] Local workflows remain fully operational without network access after sync infrastructure is added.
-- [ ] Sync state is kept separate from business entity state.
-- [ ] Cubits and Widgets remain free from sync engine logic.
-- [ ] Supabase is accessed only through the approved Remote Data Source boundary.
-- [ ] Multi-tenant / SaaS functionality was not introduced prematurely.
+- [x] Offline / Sync Integration implementation follows the approved decisions in `synchronization-implementation.md` and `technical-decisions.md` §55.
+- [x] Synchronization infrastructure (Sync Engine, Sync Queue, Remote Data Sources) is implemented in the Data / Infrastructure layer only.
+- [x] Local workflows remain fully operational without network access after sync infrastructure is added.
+- [x] Sync state is kept separate from business entity state.
+- [x] Cubits and Widgets remain free from sync engine logic.
+- [x] Supabase is accessed only through the approved Remote Data Source boundary.
+- [x] Multi-tenant / SaaS functionality was not introduced prematurely.
 
 ### 11.3 Future Compatibility
 
@@ -709,7 +709,7 @@ For each important Repository:
 The following must remain outside the implementation unless explicitly approved:
 
 - [ ] Advanced multi-device / distributed conflict resolution.
-- [ ] Real-time synchronization.
+- [ ] Raw WebSocket / full real-time collaborative document editing (note: Supabase Realtime Broadcast wake-up signal adapter is approved and implemented; raw real-time data streaming remains deferred).
 - [ ] Complex background synchronization.
 - [ ] CRDTs / Event Sourcing.
 - [ ] Advanced offline synchronization UI.
@@ -719,7 +719,7 @@ The following must remain outside the implementation unless explicitly approved:
 
 Deferred functionality must not be partially implemented in a way that creates architectural confusion.
 
-Sync infrastructure (Sync Engine, Sync Queue, Remote Data Sources) is part of the approved active Offline / Sync Integration phase and is not in scope of this check.
+Sync infrastructure (Sync Engine, Sync Queue, Remote Data Sources, RemoteChangeApplier, RealtimeSyncAdapter) is part of the approved, completed, and locked Offline / Sync Integration phase (Task #15) and is validated under §55.
 
 ---
 
@@ -1095,7 +1095,7 @@ Explicitly confirm:
 
 Explicitly confirm:
 
-**Offline / Sync Integration is the active implementation phase. Synchronization infrastructure is being implemented according to the approved decisions. Local-First operation remains intact. Cubits and Widgets remain unaware of sync mechanics. Supabase is behind the approved remote boundary. Multi-tenant / SaaS features are not implemented.**
+**Offline / Sync Integration (Task #15) is completed and locked. Synchronization infrastructure (Push + Pull + Realtime Wake-up Signal) is implemented and verified end-to-end across two independent devices. Local-First operation remains intact. Cubits and Widgets remain unaware of sync mechanics. Supabase is behind the approved remote boundary. Multi-tenant / SaaS features are not implemented.**
 
 ### Testing
 
@@ -1199,174 +1199,170 @@ Never silently invent a new rule during implementation.
 
 ## 55. Offline / Sync Integration Validation
 
-> **Note**: This section covers requirements for the Offline / Sync Integration implementation phase.
->
-> These items are **requirements for upcoming implementation** and must not be marked PASS merely because this documentation has been written.
->
-> Each item must be validated against the actual implementation when the phase is complete.
+> **Note**: This section covers requirements and completed validation for the Offline / Sync Integration implementation phase (Task #15, C1 through C4-C).
 
 ---
 
 ### 55.1 Local-First Operation
 
-- [ ] All approved V1 workflows remain fully functional without network access after sync infrastructure is added.
-- [ ] The UI continues to reflect successful local writes immediately, without waiting for remote acknowledgment.
-- [ ] Application startup does not require a network connection or remote backend availability.
-- [ ] Local database continues to operate as the primary operational source of truth.
-- [ ] Connectivity loss does not disable normal approved business operations.
+- [x] All approved V1 workflows remain fully functional without network access after sync infrastructure is added.
+- [x] The UI continues to reflect successful local writes immediately, without waiting for remote acknowledgment.
+- [x] Application startup does not require a network connection or remote backend availability.
+- [x] Local database continues to operate as the primary operational source of truth.
+- [x] Connectivity loss does not disable normal approved business operations.
 
 ---
 
 ### 55.2 Atomic Local Mutation + Sync Enqueue
 
-- [ ] For every synchronizable mutation, the local business change and its corresponding sync queue operation are created in the same database transaction.
-- [ ] If the local entity write fails, no orphaned sync operation is left in the queue.
-- [ ] If the sync queue insert fails, the local entity write is rolled back.
-- [ ] Partial states (business change without sync operation, or sync operation without business change) cannot exist after a failed transaction.
+- [x] For every synchronizable mutation, the local business change and its corresponding sync queue operation are created in the same database transaction.
+- [x] If the local entity write fails, no orphaned sync operation is left in the queue.
+- [x] If the sync queue insert fails, the local entity write is rolled back.
+- [x] Partial states (business change without sync operation, or sync operation without business change) cannot exist after a failed transaction.
 
 ---
 
 ### 55.3 Stable Entity UUIDs
 
-- [ ] All synchronizable business entities use stable UUIDs.
-- [ ] The same entity UUID is used in both local storage and remote storage.
-- [ ] The Sync Engine does not replace a local entity UUID with a newly generated remote ID.
-- [ ] A retry does not generate a new entity UUID.
+- [x] All synchronizable business entities use stable UUIDs.
+- [x] The same entity UUID is used in both local storage and remote storage.
+- [x] The Sync Engine does not replace a local entity UUID with a newly generated remote ID.
+- [x] A retry does not generate a new entity UUID.
 
 ---
 
 ### 55.4 Stable Operation IDs
 
-- [ ] Every sync queue operation has a stable, unique operation ID.
-- [ ] The operation ID remains unchanged across retries.
-- [ ] A timeout does not cause the client to create a new logical operation ID.
-- [ ] All retry attempts for the same logical operation use the same operation ID.
+- [x] Every sync queue operation has a stable, unique operation ID.
+- [x] The operation ID remains unchanged across retries.
+- [x] A timeout does not cause the client to create a new logical operation ID.
+- [x] All retry attempts for the same logical operation use the same operation ID.
 
 ---
 
 ### 55.5 Idempotent Retries
 
-- [ ] Retrying the same operation with the same operation ID does not create a duplicate business record remotely.
-- [ ] The backend (Supabase) recognizes repeated delivery of the same operation and processes it exactly once.
-- [ ] Idempotency is verified for: Customer creation, Order creation, Payment recording, Expense creation, Storage operations, and any other synchronizable mutation.
+- [x] Retrying the same operation with the same operation ID does not create a duplicate business record remotely.
+- [x] The backend (Supabase) recognizes repeated delivery of the same operation and processes it exactly once.
+- [x] Idempotency is verified for: Customer creation, Order creation, Payment recording, Expense creation, Storage operations, and any other synchronizable mutation.
 
 ---
 
 ### 55.6 Retryable vs Permanent Failures
 
-- [ ] The Sync Engine distinguishes between retryable failures (connectivity, timeout, temporary server error) and permanent failures (invalid data, unsupported operation, permanent conflict).
-- [ ] Retryable failures are retried according to the approved exponential backoff strategy.
-- [ ] Permanent failures are not retried indefinitely.
-- [ ] Permanent failures remain identifiable and do not silently disappear.
-- [ ] Retryable failures do not block or corrupt permanently failed operations.
+- [x] The Sync Engine distinguishes between retryable failures (connectivity, timeout, temporary server error) and permanent failures (invalid data, unsupported operation, permanent conflict).
+- [x] Retryable failures are retried according to the approved exponential backoff strategy.
+- [x] Permanent failures are not retried indefinitely.
+- [x] Permanent failures remain identifiable and do not silently disappear.
+- [x] Retryable failures do not block or corrupt permanently failed operations.
 
 ---
 
 ### 55.7 Interrupted Sync Recovery
 
-- [ ] If the application is terminated while an operation is in the Processing state, the next sync run can identify and recover it.
-- [ ] Interrupted operations do not remain permanently locked in the Processing state.
-- [ ] Recovery preserves idempotency: recovering a previously sent operation does not duplicate a backend record.
-- [ ] Crash recovery is verified by testing application restart during active sync.
+- [x] If the application is terminated while an operation is in the Processing state, the next sync run can identify and recover it.
+- [x] Interrupted operations do not remain permanently locked in the Processing state.
+- [x] Recovery preserves idempotency: recovering a previously sent operation does not duplicate a backend record.
+- [x] Crash recovery is verified by testing application restart during active sync.
 
 ---
 
 ### 55.8 Dependency-Aware Ordering
 
-- [ ] Synchronization ordering respects entity dependencies.
-- [ ] A Customer sync operation is processed before dependent Order operations when the backend requires that relationship.
-- [ ] An Order sync operation is processed before dependent OrderItem, Payment, and StorageRecord operations when required.
-- [ ] The Sync Engine does not process a child operation before its parent entity is confirmed remotely.
+- [x] Synchronization ordering respects entity dependencies.
+- [x] A Customer sync operation is processed before dependent Order operations when the backend requires that relationship.
+- [x] An Order sync operation is processed before dependent OrderItem, Payment, and StorageRecord operations when required.
+- [x] The Sync Engine does not process a child operation before its parent entity is confirmed remotely.
 
 ---
 
 ### 55.9 Conflict Handling
 
-- [ ] Conflict resolution strategy is defined at the entity / business-rule level.
-- [ ] Conflict resolution is deterministic (same inputs produce same output).
-- [ ] Generic last-write-wins is not used as a universal strategy.
-- [ ] Conflict handling is not delegated to UI behavior.
-- [ ] Conflicts that cannot be automatically resolved are identified explicitly and do not silently corrupt data.
+- [x] Conflict resolution strategy is defined at the entity / business-rule level.
+- [x] Conflict resolution is deterministic (same inputs produce same output).
+- [x] Generic last-write-wins is not used as a universal strategy.
+- [x] Conflict handling is not delegated to UI behavior.
+- [x] Conflicts that cannot be automatically resolved are identified explicitly and do not silently corrupt data.
 
 ---
 
 ### 55.10 Financial Record Protection
 
-- [ ] Payment records are never silently overwritten, duplicated, or lost during synchronization.
-- [ ] Expense records are never silently overwritten, duplicated, or lost during synchronization.
-- [ ] Financial values preserve integer minor-unit representation (no floating-point conversion introduced by sync).
-- [ ] Synchronization does not recalculate or alter historical order totals.
-- [ ] Financial data is auditable after synchronization.
+- [x] Payment records are never silently overwritten, duplicated, or lost during synchronization.
+- [x] Expense records are never silently overwritten, duplicated, or lost during synchronization.
+- [x] Financial values preserve integer minor-unit representation (no floating-point conversion introduced by sync).
+- [x] Synchronization does not recalculate or alter historical order totals.
+- [x] Financial data is auditable after synchronization.
 
 ---
 
 ### 55.11 Remote Changes Do Not Produce Outgoing Sync Operations
 
-- [ ] When the Sync Engine applies a remote change to local storage (e.g., incoming data from the backend), this does not create an outgoing sync operation that re-sends the data back to the backend.
-- [ ] Read-path and incoming data paths are clearly separated from the outgoing sync queue path.
+- [x] When the Sync Engine applies a remote change to local storage (e.g., incoming data from the backend), this does not create an outgoing sync operation that re-sends the data back to the backend.
+- [x] Read-path and incoming data paths are clearly separated from the outgoing sync queue path.
 
 ---
 
 ### 55.12 Sync State Separate from Business State
 
-- [ ] Sync queue state (Pending, Processing, Synced, Failed) does not appear in business entity state.
-- [ ] Order statuses remain exactly: Processing, Ready, Completed, Cancelled.
-- [ ] No additional business status (PendingSync, Syncing, SyncFailed, etc.) was introduced.
-- [ ] Sync status is represented only in the sync queue layer, not in domain entities.
+- [x] Sync queue state (Pending, Processing, Synced, Failed) does not appear in business entity state.
+- [x] Order statuses remain exactly: Processing, Ready, Completed, Cancelled.
+- [x] No additional business status (PendingSync, Syncing, SyncFailed, etc.) was introduced.
+- [x] Sync status is represented only in the sync queue layer, not in domain entities.
 
 ---
 
 ### 55.13 Cubits Free from Sync Engine Logic
 
-- [ ] No Feature Cubit contains sync queue management logic.
-- [ ] No Feature Cubit manages retries or retry scheduling.
-- [ ] No Feature Cubit directly interacts with the Sync Engine.
-- [ ] No Feature Cubit monitors connectivity for the purpose of triggering synchronization.
-- [ ] No Feature Cubit resolves conflicts.
+- [x] No Feature Cubit contains sync queue management logic.
+- [x] No Feature Cubit manages retries or retry scheduling.
+- [x] No Feature Cubit directly interacts with the Sync Engine.
+- [x] No Feature Cubit monitors connectivity for the purpose of triggering synchronization.
+- [x] No Feature Cubit resolves conflicts.
 
 ---
 
 ### 55.14 Widgets Free from Sync Execution Logic
 
-- [ ] No Widget directly calls the Sync Engine.
-- [ ] No Widget directly manages the sync queue.
-- [ ] No Widget triggers retry processing.
-- [ ] Optional user-facing sync status indicators (if present) are driven only through the approved repository / application boundary, not through direct Sync Engine or DAO calls inside widgets.
+- [x] No Widget directly calls the Sync Engine.
+- [x] No Widget directly manages the sync queue.
+- [x] No Widget triggers retry processing.
+- [x] Optional user-facing sync status indicators (if present) are driven only through the approved repository / application boundary, not through direct Sync Engine or DAO calls inside widgets.
 
 ---
 
 ### 55.15 Supabase Behind Approved Remote/Data Boundary
 
-- [ ] Feature-level Cubits do not directly call Supabase.
-- [ ] Feature-level Widgets do not directly call Supabase.
-- [ ] Supabase is accessed only through the Remote Data Source layer.
-- [ ] Supabase connection details do not appear in Domain or Presentation layers.
-- [ ] A second network client was not introduced; the approved Dio + Retrofit infrastructure is used.
+- [x] Feature-level Cubits do not directly call Supabase.
+- [x] Feature-level Widgets do not directly call Supabase.
+- [x] Supabase is accessed only through the Remote Data Source layer.
+- [x] Supabase connection details do not appear in Domain or Presentation layers.
+- [x] A second network client was not introduced; the approved Dio + Retrofit infrastructure is used.
 
 ---
 
 ### 55.16 Offline Operation Without Network
 
-- [ ] After sync infrastructure is added, all pre-existing offline validation tests still pass.
-- [ ] Application can start without any network access.
-- [ ] Customers can be created without network access.
-- [ ] Orders can be created without network access.
+- [x] After sync infrastructure is added, all pre-existing offline validation tests still pass.
+- [x] Application can start without any network access.
+- [x] Customers can be created without network access.
+- [x] Orders can be created without network access.
 - [x] Payments can be recorded without network access.
-- [ ] Storage operations work without network access.
+- [x] Storage operations work without network access.
 - [x] Expenses can be created without network access.
-- [ ] Dashboard loads from local data without network access.
-- [ ] Reports load from local data without network access.
-- [ ] Sync queue accumulates operations locally when offline and processes them when connectivity is restored.
+- [x] Dashboard loads from local data without network access.
+- [x] Reports load from local data without network access.
+- [x] Sync queue accumulates operations locally when offline and processes them when connectivity is restored.
 
 ---
 
 ### 55.17 Future SaaS Readiness Without Implementing SaaS Features
 
-- [ ] The architecture uses stable entity UUIDs suitable for future multi-device or multi-tenant scenarios.
-- [ ] No tenant ID, branch ID, user ID, or role system was introduced in this phase.
-- [ ] No multi-tenant UI was introduced in this phase.
-- [ ] No subscription management was introduced in this phase.
-- [ ] The synchronization boundary (Sync Engine behind Remote Data Source) is structured so that future multi-tenant backend support can be added without rewriting Presentation or Domain layers.
+- [x] The architecture uses stable entity UUIDs suitable for future multi-device or multi-tenant scenarios.
+- [x] No tenant ID, branch ID, user ID, or role system was introduced in this phase.
+- [x] No multi-tenant UI was introduced in this phase.
+- [x] No subscription management was introduced in this phase.
+- [x] The synchronization boundary (Sync Engine behind Remote Data Source) is structured so that future multi-tenant backend support can be added without rewriting Presentation or Domain layers.
 
 ---
 
@@ -1501,3 +1497,31 @@ Never silently invent a new rule during implementation.
   - Full Flutter test suite: 735/735 passing (100%).
   - `flutter analyze`: 0 issues found.
   - `git diff --check`: clean (0 trailing whitespace or format issues).
+
+---
+
+### 55.22 Task #15 — Two-Device Bidirectional Synchronization Validation (C1–C4-C)
+
+- [x] Bidirectional Push + Pull synchronization implemented and operational across two independent devices.
+- [x] Two independent local SQLite/Drift databases (Device A and Device B) operating concurrently against the shared live Supabase backend.
+- [x] Independent local sync cursors maintained in `sync_state` (`last_applied_sequence`) for each device.
+- [x] Independent local `SyncOperation` queues (`sync_operations`) maintained per device.
+- [x] Ephemeral Realtime wake-up signal (`laundry:sync` / `sync_available`) received by adapter and triggers `SyncEngine.pull()`.
+- [x] Authoritative data retrieval strictly via cursor-based Pull API (`GET /api/v1/sync/changes?after=<sequence>&limit=<limit>`), NOT from Realtime payloads.
+- [x] Zero remote-apply echo: `RemoteChangeApplier` writes directly to Drift DAOs without enqueueing outgoing `SyncOperation` records.
+- [x] Order aggregate synchronization: initial order creation creates an aggregate change in `sync_changes` containing Order header, all OrderItems, and Carpet data, ensuring complete relational integrity on pull.
+- [x] Payment synchronization: append-oriented, idempotent financial transaction applied cleanly on remote device without duplicate balance manipulation.
+- [x] Storage synchronization: physical storage state applied cleanly, maintaining invariant of at most one active `StorageRecord` per `OrderItem`, with competing moves rejected via server concurrency checks.
+- [x] Strict sequence semantics: `RemoteChangeApplier` strictly validates sequence monotonicity (`change.sequence == expectedSequence`) and rejects out-of-order or duplicate sequences.
+- [x] Transactional remote apply: applying remote change batch and advancing local cursor (`sync_state.last_applied_sequence`) execute within ONE atomic local SQLite transaction.
+- [x] Rollback safety: simulated failures during batch application roll back all entity mutations and leave cursor unadvanced.
+- [x] Replay safety: crash before cursor advance safely allows re-pulling and re-applying uncommitted changes without data corruption.
+- [x] Single-flight coalescing: `SyncEngine` collapses overlapping triggers into a single active sync loop.
+- [x] Test verification:
+  - Dedicated C4-C Two-Device Bidirectional Sync Test (`test/data/sync/two_device_bidirectional_sync_integration_test.dart`): 1/1 passed (1 test passed).
+  - Step 13 SyncEngine Integration Suite (`test/data/sync/step13_sync_engine_integration_test.dart`): 4/4 passed (4 tests passed).
+  - Step 9 Live Supabase Integration Suite (`test/data/sync/step9_live_supabase_integration_test.dart`): 14/14 passed (14 tests passed).
+  - Master Live Supabase Integration Suite (`test/data/sync/live_supabase_integration_suite_test.dart`): 78/78 passed (78 tests passed).
+  - SyncEngine Unit Tests (`test/data/sync/sync_engine_test.dart`): 28/28 passed (28 tests passed).
+  - RemoteChangeApplier Unit Tests (`test/data/sync/remote_change_applier_test.dart`): 14/14 passed (14 tests passed).
+  - Static Analysis (`flutter analyze`): 0 issues.

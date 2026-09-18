@@ -137,10 +137,23 @@ void main() {
       },
     );
 
+    Future<int> fastForwardCursor() async {
+      final probe = await remoteDataSource.getChanges(
+        after: 0,
+        limit: 1,
+      );
+      final currentMaxSeq = probe.latestSequence;
+      await syncStateDao.updateLastAppliedSequence(currentMaxSeq);
+      return currentMaxSeq;
+    }
+
     test(
       '2. Remote mutation emits real Supabase Broadcast wake-up signal which triggers authoritative Pull, applies locally, advances cursor, and creates zero echo SyncOperations',
       () async {
         if (!isLiveBackendAvailable) return;
+
+        // Fast-forward local cursor to current latest remote sequence before subscribing
+        final currentMaxSeq = await fastForwardCursor();
 
         // a. Subscribe to the Broadcast channel via SyncEngine initialization
         await syncEngine.initialize(triggerInitialSync: false);
@@ -152,22 +165,6 @@ void main() {
             (s) => s.status != SyncEngineStatus.syncing,
           );
         }
-
-        // Fast-forward local cursor to current latest remote sequence
-        int currentMaxSeq = 0;
-        var probe = await remoteDataSource.getChanges(
-          after: currentMaxSeq,
-          limit: 100,
-        );
-        while (probe.changes.isNotEmpty) {
-          currentMaxSeq = probe.changes.last.sequence;
-          if (!probe.hasMore) break;
-          probe = await remoteDataSource.getChanges(
-            after: currentMaxSeq,
-            limit: 100,
-          );
-        }
-        await syncStateDao.updateLastAppliedSequence(currentMaxSeq);
 
         // d. Register a mutation-specific signal listener BEFORE performing mutation
         final signalCompleter = Completer<void>();
@@ -203,7 +200,7 @@ void main() {
             ),
           );
 
-          // h & i. Allow authoritative Pull to persist the entity locally into SQLite
+          // h & i. Allow Realtime-triggered authoritative Pull to persist the entity locally into SQLite
           Customer? localCustomer;
           final deadline = DateTime.now().add(const Duration(seconds: 10));
           while (DateTime.now().isBefore(deadline)) {
@@ -211,7 +208,6 @@ void main() {
                   ..where((tbl) => tbl.id.equals(testCustomerId)))
                 .getSingleOrNull();
             if (localCustomer != null) break;
-            await syncEngine.pull();
             await Future<void>.delayed(const Duration(milliseconds: 200));
           }
 
@@ -239,27 +235,14 @@ void main() {
       () async {
         if (!isLiveBackendAvailable) return;
 
-        // Ensure realtime adapter is completely unsubscribed
-        await realtimeAdapter.unsubscribe();
-        expect(realtimeAdapter.isSubscribed, isFalse);
+        // Fast-forward local cursor to current latest remote sequence before pull
+        final currentMaxSeq = await fastForwardCursor();
 
         await syncEngine.initialize(triggerInitialSync: false);
 
-        // Fast-forward local cursor to current latest remote sequence
-        int currentMaxSeq = 0;
-        var probe = await remoteDataSource.getChanges(
-          after: currentMaxSeq,
-          limit: 100,
-        );
-        while (probe.changes.isNotEmpty) {
-          currentMaxSeq = probe.changes.last.sequence;
-          if (!probe.hasMore) break;
-          probe = await remoteDataSource.getChanges(
-            after: currentMaxSeq,
-            limit: 100,
-          );
-        }
-        await syncStateDao.updateLastAppliedSequence(currentMaxSeq);
+        // Ensure realtime adapter is completely unsubscribed
+        await realtimeAdapter.unsubscribe();
+        expect(realtimeAdapter.isSubscribed, isFalse);
 
         // Perform remote mutation with no realtime listener
         final postRes = await dio.post(
@@ -308,6 +291,9 @@ void main() {
       '4. Full sync cycle: Push then Pull executes sequentially with single-flight guard',
       () async {
         if (!isLiveBackendAvailable) return;
+
+        // Fast-forward local cursor to current latest remote sequence
+        await fastForwardCursor();
 
         await syncEngine.initialize(triggerInitialSync: false);
 

@@ -30,8 +30,8 @@ The implementation workflow remains:
 | Task #12 | Dashboard | Implement the operational Dashboard using real data from the completed workflows. | Completed / Locked |
 | Task #13 | Reports | *(Merged into Task #10 — Expenses & Reports)* | Merged into Task #10 |
 | Task #14 | Invoice / Receipt | Implement invoice/receipt viewing and printing using historical Order information. | Completed / Locked |
-| Task #15 | Offline / Sync Integration | Integrate and verify bidirectional synchronization (Push + Pull + Realtime Signal) for 2-device terminal operation. | Active |
-| Task #16 | Full Integration / QA / Hardening | Perform end-to-end verification, business-rule audit, offline testing, UI/RTL/responsive checks, and release hardening. | Planned (Current Next Task) |
+| Task #15 | Offline / Sync Integration | Integrate and verify bidirectional synchronization (Push + Pull + Realtime Signal) for 2-device terminal operation. | Completed / Locked |
+| Task #16 | Full Integration / QA / Hardening | Perform end-to-end verification, business-rule audit, offline testing, UI/RTL/responsive checks, and release hardening. | Active / Next |
 
 ---
 
@@ -236,21 +236,28 @@ Historical Order information must remain authoritative when displaying an invoic
 
 ## Task #15 — Offline / Sync Integration
 
-Task #15 is the **Active Implementation Task**.
+Task #15 is **Completed / Locked** (verified and accepted through C1 Remote Sync Foundation, C1.5 Forensic Audit, C1.6 Migration Hardening, C2 Local Pull Foundation, C3 Sync Orchestration, C3.1 Realtime Broadcast, C4-A Release Safety, C4-B Pull/Test Hardening, and C4-C Two-Device Bidirectional Sync E2E).
 
 The architecture officially supports **Bidirectional Push + Pull Synchronization** across two terminal devices sharing a single remote Supabase backend:
 
 - **Local Source of Truth**: Local Drift/SQLite database remains the primary operational source of truth for the UI on each device.
-- **Push Pipeline**: Local business mutation commits atomically with `sync_operations` entry in SQLite. `SyncEngine` dispatches operations with `X-Operation-ID` and `base_version` through `RemoteApiDispatcher` to Supabase Edge Functions. PostgreSQL transactional RPCs apply business mutation, increment entity `server_version` where applicable, append to remote `sync_changes`, and log idempotency.
-- **Pull Pipeline**: Remote changes in `sync_changes` are pulled via `GET /sync/changes?after=<sequence>`. `RemoteChangeApplier` applies changes directly to local DAOs without creating outgoing `SyncOperations` (echo loop prevention) and updates `sync_state.last_applied_sequence` in the **same local transaction**.
-- **Realtime Wake-Up Signal**: Ephemeral wake-up notifications via Supabase Realtime trigger `SyncEngine.pull()`. Realtime payload is NOT authoritative data.
-- **Change Granularity**: Hybrid model. Order Creation is represented as an aggregate change payload containing all items; subsequent status transitions, payments, and storage changes are entity-specific.
-- **Conflict Handling**: Domain-aware conflict resolution (no generic LWW). Structured semantic error codes (`DUPLICATE_ENTITY`, `CONCURRENCY_CONFLICT`, `BUSINESS_RULE_VIOLATION`, `INVALID_REFERENCE`, `PAYMENT_BALANCE_EXCEEDED`, `INVALID_LIFECYCLE_TRANSITION`). Single-conflict isolation in `SyncEngine` prevents queue blockage.
-- **Recovery Contracts**: Initial Device Bootstrap and `CURSOR_TOO_OLD` handling guarantee that pending unsynced local records are never deleted.
+- **Push Pipeline**: Local business mutation commits atomically with `sync_operations` entry in SQLite. `SyncEngine` dispatches operations sequentially with `X-Operation-ID` through `RemoteApiDispatcher` to Supabase Edge Functions. PostgreSQL transactional RPCs apply business mutation, append to remote `sync_changes`, and log idempotency.
+- **Pull Pipeline**: Remote changes in `sync_changes` are pulled via cursor-based pagination `GET /sync/changes?after=<sequence>&limit=<limit>`. `RemoteChangeApplier` applies changes directly to local DAOs without creating outgoing `SyncOperations` (echo loop prevention) and updates `sync_state.last_applied_sequence` in the **same local transaction**.
+- **Realtime Wake-Up Signal**: Ephemeral wake-up notifications via Supabase Realtime Broadcast (`laundry:sync` / `sync_available`) trigger `SyncEngine.pull()`. Realtime payload is NOT authoritative data; Pull API remains the authoritative retrieval mechanism. (Realtime CDC publication migration on `sync_changes` exists as dormant infrastructure).
+- **Triggers & Coalescing**: `SyncEngine` orchestrates sync cycles across manual sync, startup sync, app resume, connectivity restoration, Realtime wake-up, and 15-minute periodic foreground safety pull. Push and Pull triggers are coalesced in a single-flight execution loop.
+- **Two-Device E2E Validation (C4-C)**: Verified end-to-end with two independent SQLite terminals synchronizing bidirectionally through live Supabase (Device A: Customer + Order → Supabase → Device B; Device B: Payment + Storage → Supabase → Device A).
+- **Change Granularity**: Hybrid model. Order Creation is represented as an aggregate change payload containing all items and carpet data; subsequent status transitions, payments, storage moves, and customer/expense/master data updates are entity-specific.
+- **Conflict Handling**: Domain-aware conflict resolution (no generic LWW). Payments are append-oriented and idempotent; Storage enforces at most one active record per `OrderItem` and rejects stale moves via server concurrency checks; Order status transitions follow lifecycle rules.
+- **Known Deferred Limitations**:
+  - *Optimistic Concurrency Propagation*: Remote backend supports `server_version`, but Flutter client currently does NOT maintain local `server_version` columns and does NOT propagate `base_version` through `SyncOperation` (Deferred V1 Limitation).
+  - *Recovery & Bootstrap*: `CURSOR_TOO_OLD` is detected (`CursorTooOldException`). Full automatic resync / initial bootstrap recovery is deferred; current implementation guarantees locally pending operations in `sync_operations` are never deleted.
+  - *Retention*: Synced operations retained for 90 days; automatic background purge is deferred (manual maintenance).
 
 ---
 
 ## Task #16 — Full Integration / QA / Hardening
+
+Task #16 is the **Active / Next Implementation Task**.
 
 The final implementation phase should verify the complete system as one product.
 
@@ -421,6 +428,6 @@ Task #11  Services & Pricing / Settings    ✅ LOCKED (Step 12 Backend Sync Comp
 Task #12  Dashboard                        ✅ LOCKED
 Task #13  Reports (Merged into #10)        ✅ LOCKED
 Task #14  Invoice / Receipt                ✅ LOCKED (PR #6 Merged)
-Task #15  Offline / Sync Integration       ⏳ ACTIVE (Bidirectional Sync)
-Task #16  Full Integration / QA / Hardening ← CURRENT NEXT TASK
+Task #15  Offline / Sync Integration       ✅ LOCKED (C1–C4-C Bidirectional Sync E2E Complete)
+Task #16  Full Integration / QA / Hardening ⏳ ACTIVE / NEXT
 ```
