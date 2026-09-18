@@ -120,17 +120,21 @@ The current implementation phase includes:
 
 The **Offline / Sync Integration** phase is now active. The following are now being implemented:
 
-- Synchronization infrastructure (Sync Queue, Sync Engine, Remote Data Sources).
-- Remote API integration with the approved Supabase backend via Retrofit + Dio.
-- Conflict handling per the approved entity-specific strategy.
+- **Bidirectional 2-Device Synchronization**: Two terminals operating against the shared Supabase backend.
+- **Push Pipeline**: Durable local Sync Queue (`sync_operations`), atomic enqueue, `SyncEngine`, `RemoteApiDispatcher` with `X-Operation-ID` and `base_version`.
+- **Remote Persistence & Change Log**: Supabase Edge Functions proxying to PostgreSQL transactional RPCs with idempotency logging and append-only `sync_changes` (monotonically increasing `sequence` cursor).
+- **Pull Pipeline & Ingestion**: Cursor-based pull API (`GET /sync/changes?after=<sequence>`), local infrastructure `sync_state` (`last_applied_sequence`), and `RemoteChangeApplier` writing directly to DAOs without creating outgoing sync operations (echo loop prevention).
+- **Realtime Signal**: Supabase Realtime wake-up notification adapter (`sync_available`) triggering `SyncEngine.pull()` with single-flight concurrency protection.
+- **Conflict Handling**: Domain-aware conflict handling with structured semantic errors (`DUPLICATE_ENTITY`, `CONCURRENCY_CONFLICT`, `BUSINESS_RULE_VIOLATION`, `INVALID_REFERENCE`, `PAYMENT_BALANCE_EXCEEDED`, `INVALID_LIFECYCLE_TRANSITION`) and `SyncEngine` queue conflict isolation.
+- **Recovery Contracts**: Initial Device Bootstrap and `CURSOR_TOO_OLD` full resync flows that strictly preserve locally pending unsynced records in `sync_operations`.
 
 The following remain intentionally deferred:
 
-- Advanced multi-device conflict resolution.
-- Real-time synchronization.
-- Complex background synchronization.
+- Complex distributed merge algorithms & CRDTs.
+- Raw WebSocket / full real-time collaborative document editing.
+- Multi-tenant / SaaS / multi-branch administration.
+- Complex platform background synchronization.
 - Distributed locking.
-- CRDTs.
 - Event sourcing.
 - Advanced caching architecture.
 - Authentication implementation unless explicitly required.
@@ -138,7 +142,6 @@ The following remain intentionally deferred:
 - Advanced analytics.
 - AI assistant.
 - Barcode workflows.
-- Multi-tenant / SaaS functionality.
 - Other future features not approved for V1.
 
 The implementation agent must not implement deferred functionality simply because the architecture is synchronization-ready or because corresponding folders exist.
@@ -622,14 +625,16 @@ Sync Operation Creation (atomic, same transaction)
 ↓
 Commit
 
-Sync Engine processes operations asynchronously while local operations remain fully functional offline.
+Sync Engine processes outgoing operations and incoming pull batches while local operations remain fully functional offline.
+
+The system supports bidirectional 2-device synchronization using a sequence-based cursor and an ephemeral Realtime wake-up signal.
 
 Do not implement:
 
-- Real-time synchronization
-- Complex background synchronization
-- Advanced conflict resolution
-- CRDTs
+- Complex distributed merge algorithms & CRDTs
+- Raw WebSocket / full real-time collaborative editing
+- Multi-tenant / SaaS / multi-branch administration
+- Complex platform background execution
 - Distributed locking
 
 unless explicitly approved later.

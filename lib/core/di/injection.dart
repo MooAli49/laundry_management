@@ -76,9 +76,16 @@ import '../../data/datasources/remote/order_remote_api.dart';
 import '../../data/datasources/remote/payment_remote_api.dart';
 import '../../data/datasources/remote/remote_api_dispatcher.dart';
 import '../../data/datasources/remote/storage_remote_api.dart';
+import '../../data/datasources/remote/sync_remote_api.dart';
+import '../../data/datasources/remote/sync_remote_data_source.dart';
+import '../../data/local/daos/sync_state_dao.dart';
+import '../../data/sync/remote_change_applier.dart';
 import '../../data/sync/sync_engine.dart';
 import '../../domain/sync/sync_error_classifier.dart';
 import '../../domain/sync/sync_retry_policy.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../network/realtime_sync_adapter.dart';
+import '../../data/datasources/remote/supabase_realtime_sync_adapter.dart';
 
 final getIt = GetIt.instance;
 
@@ -128,6 +135,16 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
   if (!getIt.isRegistered<MasterDataRemoteApi>()) {
     getIt.registerLazySingleton<MasterDataRemoteApi>(
       () => MasterDataRemoteApi(getIt<Dio>()),
+    );
+  }
+  if (!getIt.isRegistered<SyncRemoteApi>()) {
+    getIt.registerLazySingleton<SyncRemoteApi>(
+      () => SyncRemoteApi(getIt<Dio>()),
+    );
+  }
+  if (!getIt.isRegistered<SyncRemoteDataSource>()) {
+    getIt.registerLazySingleton<SyncRemoteDataSource>(
+      () => SyncRemoteDataSourceImpl(getIt<SyncRemoteApi>()),
     );
   }
 
@@ -211,6 +228,19 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
       () => SyncOperationsDao(getIt<AppDatabase>()),
     );
   }
+  if (!getIt.isRegistered<SyncStateDao>()) {
+    getIt.registerLazySingleton<SyncStateDao>(
+      () => SyncStateDao(getIt<AppDatabase>()),
+    );
+  }
+  if (!getIt.isRegistered<RemoteChangeApplier>()) {
+    getIt.registerLazySingleton<RemoteChangeApplier>(
+      () => RemoteChangeApplier(
+        db: getIt<AppDatabase>(),
+        syncStateDao: getIt<SyncStateDao>(),
+      ),
+    );
+  }
 
   // Sync Infrastructure
   if (!getIt.isRegistered<SyncRetryPolicy>()) {
@@ -221,6 +251,32 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
       () => const SyncErrorClassifier(),
     );
   }
+  // Realtime Infrastructure
+  if (!getIt.isRegistered<SupabaseClient>()) {
+    getIt.registerLazySingleton<SupabaseClient>(() {
+      const supabaseUrl = String.fromEnvironment(
+        'SUPABASE_URL_ROOT',
+        defaultValue: 'https://dyhfgnbhijukbdptreto.supabase.co',
+      );
+      const supabaseAnonKey = String.fromEnvironment(
+        'SUPABASE_ANON_KEY',
+        defaultValue:
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5aGZnbmJoaWp1a2JkcHRyZXRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NjcxNDcsImV4cCI6MjEwNDA0MzE0N30.gInc0tuzZiWq8EeEqbNBYa_Ay4liCcB4iGGOjUMnOBw',
+      );
+      return SupabaseClient(supabaseUrl, supabaseAnonKey);
+    });
+  }
+  if (!getIt.isRegistered<RealtimeSyncAdapter>()) {
+    getIt.registerLazySingleton<RealtimeSyncAdapter>(
+      () => SupabaseRealtimeSyncAdapter(client: getIt<SupabaseClient>()),
+      dispose: (adapter) {
+        if (adapter is SupabaseRealtimeSyncAdapter) {
+          adapter.dispose();
+        }
+      },
+    );
+  }
+
   if (!getIt.isRegistered<SyncEngine>()) {
     getIt.registerLazySingleton<SyncEngine>(
       () => SyncEngine(
@@ -229,6 +285,10 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
         networkInfo: getIt<NetworkInfo>(),
         retryPolicy: getIt<SyncRetryPolicy>(),
         errorClassifier: getIt<SyncErrorClassifier>(),
+        syncRemoteDataSource: getIt<SyncRemoteDataSource>(),
+        remoteChangeApplier: getIt<RemoteChangeApplier>(),
+        syncStateDao: getIt<SyncStateDao>(),
+        realtimeAdapter: getIt<RealtimeSyncAdapter>(),
       ),
       dispose: (engine) => engine.dispose(),
     );

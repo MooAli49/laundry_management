@@ -22,6 +22,7 @@ import '../tables/storage_location_item_types_table.dart';
 import '../tables/storage_locations_table.dart';
 import '../tables/storage_records_table.dart';
 import '../tables/sync_operations_table.dart';
+import '../tables/sync_states_table.dart';
 import 'seed_data.dart';
 
 part 'app_database.g.dart';
@@ -45,13 +46,14 @@ part 'app_database.g.dart';
     Expenses,
     BusinessSettings,
     SyncOperations,
+    SyncStates,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -96,6 +98,9 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'CREATE INDEX IF NOT EXISTS idx_sync_operations_status_next_retry ON sync_operations(status, next_retry_at);',
         );
+      }
+      if (from < 4) {
+        await m.createTable(syncStates);
       }
     },
     beforeOpen: (OpeningDetails details) async {

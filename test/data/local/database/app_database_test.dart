@@ -17,10 +17,10 @@ void main() {
   });
 
   group('1. Schema and Table Initialization', () {
-    test('all 17 tables exist and schema version is 3', () async {
-      expect(db.schemaVersion, equals(3));
+    test('all 18 tables exist and schema version is 4', () async {
+      expect(db.schemaVersion, equals(4));
 
-      // Query sqlite_master to verify all 17 tables are physically present
+      // Query sqlite_master to verify all 18 tables are physically present
       final tables = await db
           .customSelect(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%';",
@@ -47,6 +47,7 @@ void main() {
         'expenses',
         'business_settings',
         'sync_operations',
+        'sync_state',
       };
 
       for (final table in expectedTables) {

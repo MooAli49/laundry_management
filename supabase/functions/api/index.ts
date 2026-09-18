@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-operation-id",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-operation-id, x-base-version, x-previous-storage-location-id",
   "Access-Control-Allow-Methods": "GET, POST, PATCH, PUT, DELETE, OPTIONS",
 };
 
@@ -20,6 +20,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 function errorResponse(code: string, message: string, requestId: string, status = 400): Response {
   return jsonResponse(
     {
+      error: code,
       code,
       message,
       requestId,
@@ -32,32 +33,126 @@ function mapPostgresError(error: { code?: string; message: string }, requestId: 
   const code = error.code || "";
   const msg = error.message || "Database error";
 
+  // 1. Concurrency Conflict (P0004 or CONCURRENCY_CONFLICT message)
+  if (code === "P0004" || msg.includes("CONCURRENCY_CONFLICT")) {
+    return errorResponse("CONCURRENCY_CONFLICT", msg, requestId, 409);
+  }
+
+  // 2. Cursor Too Old (P0005 or CURSOR_TOO_OLD message)
+  if (code === "P0005" || msg.includes("CURSOR_TOO_OLD")) {
+    return errorResponse("CURSOR_TOO_OLD", msg, requestId, 410);
+  }
+
+  // 3. Payment Balance Exceeded
+  if (
+    msg.includes("exceeds") ||
+    msg.includes("remaining order balance") ||
+    msg.includes("remaining balance")
+  ) {
+    return errorResponse("PAYMENT_BALANCE_EXCEEDED", msg, requestId, 409);
+  }
+
+  // 4. Invalid Lifecycle Transition
+  if (
+    msg.includes("Cannot update order in status") ||
+    msg.includes("Cannot add payment to cancelled") ||
+    msg.includes("Invalid lifecycle transition") ||
+    msg.includes("cancelled")
+  ) {
+    return errorResponse("INVALID_LIFECYCLE_TRANSITION", msg, requestId, 409);
+  }
+
+  // 5. Duplicate Entity (Unique constraint 23505)
   if (
     code === "23505" ||
     msg.includes("already exists") ||
-    msg.includes("cancelled") ||
-    msg.includes("exceeds") ||
-    msg.includes("remaining balance")
+    msg.includes("duplicate key")
   ) {
-    return errorResponse("CONFLICT", msg, requestId, 409);
+    return errorResponse("DUPLICATE_ENTITY", msg, requestId, 409);
   }
+
+  // 6. Not Found (P0002)
   if (code === "P0002" || msg.includes("not found")) {
     return errorResponse("NOT_FOUND", msg, requestId, 404);
   }
+
+  // 7. Invalid Reference (Foreign Key violation 23503)
+  if (
+    code === "23503" ||
+    msg.includes("foreign key") ||
+    msg.includes("does not exist")
+  ) {
+    return errorResponse("INVALID_REFERENCE", msg, requestId, 422);
+  }
+
+  // 8. Business Rule Violation / Check Constraint (23514, 23502, P0001)
   if (
     code === "23514" ||
     code === "23502" ||
+    code === "P0001" ||
     msg.includes("Invalid") ||
     msg.includes("required") ||
     msg.includes("greater than zero")
   ) {
-    return errorResponse("VALIDATION_ERROR", msg, requestId, 422);
-  }
-  if (code === "23503" || msg.includes("does not exist")) {
-    return errorResponse("FOREIGN_KEY_VIOLATION", msg, requestId, 400);
+    return errorResponse("BUSINESS_RULE_VIOLATION", msg, requestId, 422);
   }
 
   return errorResponse("BAD_REQUEST", msg, requestId, 400);
+}
+
+function getBaseVersion(req: Request, body: Record<string, unknown> | null): number | null {
+  const header = req.headers.get("x-base-version");
+  if (header !== null && header !== undefined && header !== "") {
+    const parsed = parseInt(header, 10);
+    if (!isNaN(parsed)) return parsed;
+  }
+  if (body) {
+    if (typeof body.base_version === "number") return body.base_version;
+    if (typeof body.baseVersion === "number") return body.baseVersion;
+  }
+  return null;
+}
+
+function getPrevLocationId(req: Request, body: Record<string, unknown> | null): string | null {
+  const header = req.headers.get("x-previous-storage-location-id");
+  if (header) return header;
+  if (body) {
+    if (typeof body.previous_storage_location_id === "string") return body.previous_storage_location_id;
+    if (typeof body.previousStorageLocationId === "string") return body.previousStorageLocationId;
+  }
+  return null;
+}
+
+async function broadcastSyncWakeUp(supabaseUrl: string, serviceKey: string): Promise<void> {
+  if (!supabaseUrl || !serviceKey) return;
+  try {
+    const broadcastUrl = `${supabaseUrl.replace(/\/+$/, "")}/realtime/v1/api/broadcast`;
+    const res = await fetch(broadcastUrl, {
+      method: "POST",
+      headers: {
+        "apikey": serviceKey,
+        "Authorization": `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messages: [
+          {
+            topic: "laundry:sync",
+            event: "sync_available",
+            payload: {
+              type: "sync_available",
+            },
+          },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      console.warn(`[Realtime Broadcast] Broadcast returned status ${res.status}`);
+    }
+  } catch (err) {
+    // Non-fatal: broadcast failure must never roll back or fail mutation response
+    console.warn("[Realtime Broadcast] Failed to send wake-up broadcast:", err);
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -86,7 +181,40 @@ Deno.serve(async (req: Request) => {
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+  const handleMutation = async (
+    rpcResult: { data: unknown; error: { code?: string; message: string } | null },
+    status = 200,
+  ): Promise<Response> => {
+    if (rpcResult.error) {
+      return mapPostgresError(rpcResult.error, operationId);
+    }
+    await broadcastSyncWakeUp(supabaseUrl, supabaseServiceKey);
+    return jsonResponse(rpcResult.data, status);
+  };
+
   try {
+    // -------------------------------------------------------------------------
+    // Sync Changes API (Cursor-based Pull)
+    // -------------------------------------------------------------------------
+    if (path === "/sync/changes" || path.startsWith("/sync/changes")) {
+      if (method === "GET") {
+        const afterParam = url.searchParams.get("after") || "0";
+        const limitParam = url.searchParams.get("limit") || "100";
+        const after = parseInt(afterParam, 10);
+        let limit = parseInt(limitParam, 10);
+        if (isNaN(limit) || limit <= 0) limit = 100;
+        if (limit > 500) limit = 500;
+
+        const { data, error } = await supabase.rpc("get_sync_changes", {
+          p_after: isNaN(after) ? 0 : after,
+          p_limit: limit,
+        });
+
+        if (error) return mapPostgresError(error, operationId);
+        return jsonResponse(data, 200);
+      }
+    }
+
     // -------------------------------------------------------------------------
     // Customers API
     // -------------------------------------------------------------------------
@@ -109,23 +237,25 @@ Deno.serve(async (req: Request) => {
 
       if (method === "POST") {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_create_customer", {
+        const result = await supabase.rpc("sync_create_customer", {
           p_op_id: operationId,
           p_customer: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 201);
+        return handleMutation(result, 201);
       }
 
       if (method === "PATCH" && customerId) {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_update_customer", {
+        const baseVersion = getBaseVersion(req, body);
+        if (baseVersion !== null) {
+          body.base_version = baseVersion;
+        }
+        const result = await supabase.rpc("sync_update_customer", {
           p_op_id: operationId,
           p_customer_id: customerId,
           p_customer: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 200);
+        return handleMutation(result, 200);
       }
     }
 
@@ -159,24 +289,26 @@ Deno.serve(async (req: Request) => {
       if (method === "POST") {
         const body = await req.json();
         const items = body.items || [];
-        const { data, error } = await supabase.rpc("sync_create_order_aggregate", {
+        const result = await supabase.rpc("sync_create_order_aggregate", {
           p_op_id: operationId,
           p_order: body,
           p_items: items,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 201);
+        return handleMutation(result, 201);
       }
 
       if (method === "PATCH" && orderId) {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_update_order", {
+        const baseVersion = getBaseVersion(req, body);
+        if (baseVersion !== null) {
+          body.base_version = baseVersion;
+        }
+        const result = await supabase.rpc("sync_update_order", {
           p_op_id: operationId,
           p_order_id: orderId,
           p_order: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 200);
+        return handleMutation(result, 200);
       }
     }
 
@@ -210,26 +342,28 @@ Deno.serve(async (req: Request) => {
       if (method === "POST") {
         const body = await req.json();
         const supportedItemTypeIds = body.supported_item_type_ids || null;
-        const { data, error } = await supabase.rpc("sync_create_service", {
+        const result = await supabase.rpc("sync_create_service", {
           p_op_id: operationId,
           p_service: body,
           p_item_type_ids: supportedItemTypeIds,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 201);
+        return handleMutation(result, 201);
       }
 
       if (method === "PATCH" && serviceId) {
         const body = await req.json();
         const supportedItemTypeIds = body.supported_item_type_ids || null;
-        const { data, error } = await supabase.rpc("sync_update_service", {
+        const baseVersion = getBaseVersion(req, body);
+        if (baseVersion !== null) {
+          body.base_version = baseVersion;
+        }
+        const result = await supabase.rpc("sync_update_service", {
           p_op_id: operationId,
           p_service_id: serviceId,
           p_service: body,
           p_item_type_ids: supportedItemTypeIds,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 200);
+        return handleMutation(result, 200);
       }
     }
 
@@ -269,28 +403,34 @@ Deno.serve(async (req: Request) => {
 
       if (method === "POST") {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_create_storage_record", {
+        const prevLocationId = getPrevLocationId(req, body);
+        if (prevLocationId !== null) {
+          body.previous_storage_location_id = prevLocationId;
+        }
+        const result = await supabase.rpc("sync_create_storage_record", {
           p_op_id: operationId,
           p_storage: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 201);
+        return handleMutation(result, 201);
       }
 
       if (method === "PATCH" && targetId) {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_update_storage_record", {
+        const prevLocationId = getPrevLocationId(req, body);
+        if (prevLocationId !== null) {
+          body.previous_storage_location_id = prevLocationId;
+        }
+        const result = await supabase.rpc("sync_update_storage_record", {
           p_op_id: operationId,
           p_record_id: targetId,
           p_storage: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 200);
+        return handleMutation(result, 200);
       }
     }
 
     // -------------------------------------------------------------------------
-    // Payments API (Immutable in V1)
+    // Payments API (Append-only & Idempotent in V1)
     // -------------------------------------------------------------------------
     if (path === "/payments" || path.startsWith("/payments/")) {
       const parts = path.split("/").filter(Boolean);
@@ -320,12 +460,11 @@ Deno.serve(async (req: Request) => {
 
       if (method === "POST") {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_create_payment", {
+        const result = await supabase.rpc("sync_create_payment", {
           p_op_id: operationId,
           p_payment: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 201);
+        return handleMutation(result, 201);
       }
     }
 
@@ -360,23 +499,25 @@ Deno.serve(async (req: Request) => {
 
       if (method === "POST") {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_create_expense_category", {
+        const result = await supabase.rpc("sync_create_expense_category", {
           p_op_id: operationId,
           p_category: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 201);
+        return handleMutation(result, 201);
       }
 
       if (method === "PATCH" && categoryId) {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_update_expense_category", {
+        const baseVersion = getBaseVersion(req, body);
+        if (baseVersion !== null) {
+          body.base_version = baseVersion;
+        }
+        const result = await supabase.rpc("sync_update_expense_category", {
           p_op_id: operationId,
           p_category_id: categoryId,
           p_category: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 200);
+        return handleMutation(result, 200);
       }
 
       if (method === "DELETE") {
@@ -439,23 +580,25 @@ Deno.serve(async (req: Request) => {
 
       if (method === "POST") {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_create_expense", {
+        const result = await supabase.rpc("sync_create_expense", {
           p_op_id: operationId,
           p_expense: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 201);
+        return handleMutation(result, 201);
       }
 
       if (method === "PATCH" && expenseId) {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_update_expense", {
+        const baseVersion = getBaseVersion(req, body);
+        if (baseVersion !== null) {
+          body.base_version = baseVersion;
+        }
+        const result = await supabase.rpc("sync_update_expense", {
           p_op_id: operationId,
           p_expense_id: expenseId,
           p_expense: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 200);
+        return handleMutation(result, 200);
       }
 
       if (method === "DELETE") {
@@ -494,23 +637,25 @@ Deno.serve(async (req: Request) => {
 
       if (method === "POST") {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_create_item_type", {
+        const result = await supabase.rpc("sync_create_item_type", {
           p_op_id: operationId,
           p_item_type: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 201);
+        return handleMutation(result, 201);
       }
 
       if (method === "PATCH" && itemTypeId) {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_update_item_type", {
+        const baseVersion = getBaseVersion(req, body);
+        if (baseVersion !== null) {
+          body.base_version = baseVersion;
+        }
+        const result = await supabase.rpc("sync_update_item_type", {
           p_op_id: operationId,
           p_item_type_id: itemTypeId,
           p_item_type: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 200);
+        return handleMutation(result, 200);
       }
 
       if (method === "DELETE") {
@@ -553,23 +698,25 @@ Deno.serve(async (req: Request) => {
 
       if (method === "POST") {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_create_item_definition", {
+        const result = await supabase.rpc("sync_create_item_definition", {
           p_op_id: operationId,
           p_item_def: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 201);
+        return handleMutation(result, 201);
       }
 
       if (method === "PATCH" && itemDefId) {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_update_item_definition", {
+        const baseVersion = getBaseVersion(req, body);
+        if (baseVersion !== null) {
+          body.base_version = baseVersion;
+        }
+        const result = await supabase.rpc("sync_update_item_definition", {
           p_op_id: operationId,
           p_item_def_id: itemDefId,
           p_item_def: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 200);
+        return handleMutation(result, 200);
       }
 
       if (method === "DELETE") {
@@ -608,23 +755,25 @@ Deno.serve(async (req: Request) => {
 
       if (method === "POST") {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_create_carpet_size", {
+        const result = await supabase.rpc("sync_create_carpet_size", {
           p_op_id: operationId,
           p_carpet_size: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 201);
+        return handleMutation(result, 201);
       }
 
       if (method === "PATCH" && carpetSizeId) {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_update_carpet_size", {
+        const baseVersion = getBaseVersion(req, body);
+        if (baseVersion !== null) {
+          body.base_version = baseVersion;
+        }
+        const result = await supabase.rpc("sync_update_carpet_size", {
           p_op_id: operationId,
           p_carpet_size_id: carpetSizeId,
           p_carpet_size: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 200);
+        return handleMutation(result, 200);
       }
 
       if (method === "DELETE") {
@@ -694,23 +843,25 @@ Deno.serve(async (req: Request) => {
 
       if (method === "POST") {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_create_storage_location", {
+        const result = await supabase.rpc("sync_create_storage_location", {
           p_op_id: operationId,
           p_location: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 201);
+        return handleMutation(result, 201);
       }
 
       if (method === "PATCH" && locationId) {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_update_storage_location", {
+        const baseVersion = getBaseVersion(req, body);
+        if (baseVersion !== null) {
+          body.base_version = baseVersion;
+        }
+        const result = await supabase.rpc("sync_update_storage_location", {
           p_op_id: operationId,
           p_location_id: locationId,
           p_location: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 200);
+        return handleMutation(result, 200);
       }
 
       if (method === "DELETE") {
@@ -744,12 +895,15 @@ Deno.serve(async (req: Request) => {
 
       if (method === "PATCH") {
         const body = await req.json();
-        const { data, error } = await supabase.rpc("sync_update_business_settings", {
+        const baseVersion = getBaseVersion(req, body);
+        if (baseVersion !== null) {
+          body.base_version = baseVersion;
+        }
+        const result = await supabase.rpc("sync_update_business_settings", {
           p_op_id: operationId,
           p_settings: body,
         });
-        if (error) return mapPostgresError(error, operationId);
-        return jsonResponse(data, 200);
+        return handleMutation(result, 200);
       }
 
       if (method === "DELETE") {

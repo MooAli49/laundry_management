@@ -23,14 +23,15 @@ The implementation workflow remains:
 | Task #05 | Core Presentation Foundation | Establish the core Flutter presentation foundation and prepare the first production-ready screen flow. | Completed / Locked |
 | Task #06 | Orders — End-to-End | Implement the core Order experience from creation through order management, using the existing business workflows. | Completed / Locked |
 | Task #07 | Customers | Implement customer management and its integration with Orders. | Completed / Locked |
+| Task #08 | Storage | Implement physical OrderItem storage workflows and location management. | Completed / Locked |
 | Task #09 | Payments | Implement the payment workflow, payment-related Order experience, and Step 10 Live Supabase backend synchronization. | Completed / Locked |
 | Task #10 | Expenses & Reports | Implement operational expense management and operational/financial reporting as a tightly coupled unified feature, and Step 11 Live Supabase backend synchronization. | Completed / Locked |
 | Task #11 | Services & Pricing / Settings | Implement management of services, pricing/master data, and approved Settings workflows, and Step 12 Live Supabase backend synchronization. | Completed / Locked |
-| Task #12 | Dashboard | Implement the operational Dashboard using real data from the completed workflows. | Planned (Current Next Task) |
+| Task #12 | Dashboard | Implement the operational Dashboard using real data from the completed workflows. | Completed / Locked |
 | Task #13 | Reports | *(Merged into Task #10 — Expenses & Reports)* | Merged into Task #10 |
-| Task #14 | Invoice / Receipt | Implement invoice/receipt viewing and printing using historical Order information. | Planned |
-| Task #15 | Offline / Sync Integration | Integrate and verify synchronization after the core local workflows are stable. | Planned |
-| Task #16 | Full Integration / QA / Hardening | Perform end-to-end verification, business-rule audit, offline testing, UI/RTL/responsive checks, and release hardening. | Planned |
+| Task #14 | Invoice / Receipt | Implement invoice/receipt viewing and printing using historical Order information. | Completed / Locked |
+| Task #15 | Offline / Sync Integration | Integrate and verify bidirectional synchronization (Push + Pull + Realtime Signal) for 2-device terminal operation. | Active |
+| Task #16 | Full Integration / QA / Hardening | Perform end-to-end verification, business-rule audit, offline testing, UI/RTL/responsive checks, and release hardening. | Planned (Current Next Task) |
 
 ---
 
@@ -213,7 +214,7 @@ The Dashboard provides an operational overview of real system data without repla
   4. Add Expense (`AddExpenseDialog` with active category selection and expense recording)
 - **Responsive Layout & Design**: Single-column mobile layout, two-column responsive tablet/desktop layout with full Arabic RTL support.
 - **Verification**: 100% test pass rate across unit, repository, cubit, widget, and integration suites (735/735 passing, `flutter analyze` 0 issues, `git diff --check` clean).
-- **Status**: Completed / Locked. Next task is Task #14 — Invoice / Receipt.
+- **Status**: Completed / Locked. Next task is Task #15 — Offline / Sync Integration.
 
 ---
 
@@ -229,26 +230,23 @@ Invoice/Receipt functionality depends on stable Order and Payment information.
 
 Historical Order information must remain authoritative when displaying an invoice or receipt. Current master-data changes must not cause historical Orders to be recalculated.
 
+- **Status**: Completed / Locked via PR #6 (`9586658`) with `invoice_printer.dart` and `invoice_preview_dialog.dart` fully implemented and verified with automated test suites.
+
 ---
 
 ## Task #15 — Offline / Sync Integration
 
-Synchronization should be integrated after the major local workflows are stable.
+Task #15 is the **Active Implementation Task**.
 
-The product is Offline-First, but Sync depends on stable entities, relationships, and transaction behavior.
+The architecture officially supports **Bidirectional Push + Pull Synchronization** across two terminal devices sharing a single remote Supabase backend:
 
-The Sync scope includes the approved V1 business data such as:
-
-- Customers
-- Orders
-- OrderItems
-- Payments
-- Expenses
-- Storage
-- Services & Pricing
-- Approved configuration data
-
-Advanced conflict-resolution workflows and multi-device administration remain outside V1.
+- **Local Source of Truth**: Local Drift/SQLite database remains the primary operational source of truth for the UI on each device.
+- **Push Pipeline**: Local business mutation commits atomically with `sync_operations` entry in SQLite. `SyncEngine` dispatches operations with `X-Operation-ID` and `base_version` through `RemoteApiDispatcher` to Supabase Edge Functions. PostgreSQL transactional RPCs apply business mutation, increment entity `server_version` where applicable, append to remote `sync_changes`, and log idempotency.
+- **Pull Pipeline**: Remote changes in `sync_changes` are pulled via `GET /sync/changes?after=<sequence>`. `RemoteChangeApplier` applies changes directly to local DAOs without creating outgoing `SyncOperations` (echo loop prevention) and updates `sync_state.last_applied_sequence` in the **same local transaction**.
+- **Realtime Wake-Up Signal**: Ephemeral wake-up notifications via Supabase Realtime trigger `SyncEngine.pull()`. Realtime payload is NOT authoritative data.
+- **Change Granularity**: Hybrid model. Order Creation is represented as an aggregate change payload containing all items; subsequent status transitions, payments, and storage changes are entity-specific.
+- **Conflict Handling**: Domain-aware conflict resolution (no generic LWW). Structured semantic error codes (`DUPLICATE_ENTITY`, `CONCURRENCY_CONFLICT`, `BUSINESS_RULE_VIOLATION`, `INVALID_REFERENCE`, `PAYMENT_BALANCE_EXCEEDED`, `INVALID_LIFECYCLE_TRANSITION`). Single-conflict isolation in `SyncEngine` prevents queue blockage.
+- **Recovery Contracts**: Initial Device Bootstrap and `CURSOR_TOO_OLD` handling guarantee that pending unsynced local records are never deleted.
 
 ---
 
@@ -422,7 +420,7 @@ Task #10  Expenses & Reports               ✅ LOCKED (Step 11 Backend Sync Comp
 Task #11  Services & Pricing / Settings    ✅ LOCKED (Step 12 Backend Sync Complete)
 Task #12  Dashboard                        ✅ LOCKED
 Task #13  Reports (Merged into #10)        ✅ LOCKED
-Task #14  Invoice / Receipt                ← CURRENT NEXT TASK
-Task #15  Offline / Sync Integration
-Task #16  Full Integration / QA / Hardening
+Task #14  Invoice / Receipt                ✅ LOCKED (PR #6 Merged)
+Task #15  Offline / Sync Integration       ⏳ ACTIVE (Bidirectional Sync)
+Task #16  Full Integration / QA / Hardening ← CURRENT NEXT TASK
 ```

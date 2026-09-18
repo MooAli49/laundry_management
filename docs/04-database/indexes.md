@@ -1387,6 +1387,40 @@ Therefore, if a query requires it, the preferred index should be composite with 
 
 ---
 
+## 75.1. Local Sync State Index (sync_state)
+
+Required:
+
+    PRIMARY KEY sync_state(id)
+
+The local `sync_state` infrastructure table stores singleton device pull state (`id = 'singleton'`) with `last_applied_sequence`. The primary key index ensures fast point lookups and atomic updates during remote change ingestion.
+
+---
+
+## 75.2. Remote Change Tracking Indexes (sync_changes)
+
+On the remote Supabase PostgreSQL database, the `sync_changes` change log requires:
+
+1. **Pull Cursor Sequence Index (Primary Key)**:
+   ```sql
+   PRIMARY KEY (sequence)
+   ```
+   Supports high-throughput streaming queries: `WHERE sequence > p_after ORDER BY sequence ASC LIMIT p_limit`.
+
+2. **Entity Lookup Index**:
+   ```sql
+   INDEX idx_sync_changes_entity (entity_type, entity_id)
+   ```
+   Supports entity history lookups and conflict diagnostics.
+
+3. **Creation Timestamp Index**:
+   ```sql
+   INDEX idx_sync_changes_created_at (created_at)
+   ```
+   Supports audit, maintenance, and change retention window enforcement.
+
+---
+
 ## 76. Dashboard Query Support
 
 Dashboard queries should be supported by existing transactional indexes.

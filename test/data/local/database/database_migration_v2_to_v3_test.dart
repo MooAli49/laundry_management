@@ -182,12 +182,12 @@ void main() {
             equals('idx_sync_operations_status_next_retry'),
           );
 
-          // Verify schema version is now 3
+          // Verify schema version is now 4 (migrated through v3 and v4)
           final versionRow = await migratedDb
               .customSelect('PRAGMA user_version;')
               .getSingle();
-          expect(versionRow.read<int>('user_version'), equals(3));
-          expect(migratedDb.schemaVersion, equals(3));
+          expect(versionRow.read<int>('user_version'), equals(4));
+          expect(migratedDb.schemaVersion, equals(4));
 
           // 8. Verify inserting a record with nextRetryAt works on migrated schema
           final retryTime = DateTime.now().add(const Duration(minutes: 5));

@@ -3395,7 +3395,138 @@ Timestamp of the latest synchronization attempt.
 
 ---
 
-# 21. Table Summary
+# 21. sync_state
+
+## Purpose
+
+Infrastructure table used by the offline-first bidirectional synchronization system to persist the local incoming Pull cursor.
+
+This is NOT a Domain business entity.
+
+It exists to store the client's current synchronization position and guarantee crash-safe change application.
+
+---
+
+## Columns
+
+### id
+
+Type:
+
+    TEXT
+
+Required:
+
+    Yes
+
+Primary Key:
+
+    Yes
+
+Default:
+
+    'singleton'
+
+Description:
+
+Singleton identifier for the device synchronization state.
+
+---
+
+### last_applied_sequence
+
+Type:
+
+    INTEGER / BIGINT
+
+Required:
+
+    Yes
+
+Default:
+
+    0
+
+Description:
+
+The monotonically increasing sequence number of the latest remote change from `sync_changes` that was successfully applied to the local SQLite database.
+
+---
+
+### last_sync_at
+
+Type:
+
+    DATETIME
+
+Required:
+
+    No
+
+Nullable:
+
+    Yes
+
+Description:
+
+Timestamp of the latest successful pull synchronization.
+
+---
+
+### updated_at
+
+Type:
+
+    DATETIME
+
+Required:
+
+    Yes
+
+Description:
+
+Timestamp when the local sync state was last updated.
+
+---
+
+## Crash Safety & Ingestion Invariant
+
+The local database must enforce the following invariant:
+
+    Apply remote changes to local DAOs
+        +
+    Advance sync_state.last_applied_sequence
+        ↓
+    SAME LOCAL SQLITE TRANSACTION
+
+If the application or device crashes mid-batch, the entire transaction rolls back cleanly, leaving `last_applied_sequence` at the previous confirmed position so the batch can be safely re-pulled and re-applied without data loss.
+
+Remote change application must NEVER write to `sync_operations`.
+
+---
+
+# 21.1. Entity Concurrency Versioning Classification (server_version)
+
+For optimistic concurrency control across devices, entities are classified by whether they require versioning:
+
+### Entities Requiring server_version (Optimistic Concurrency):
+- `orders`: High concurrency risk (status transitions, cancellations, order details).
+- `customers`: Mutable customer phone, address, and name.
+- `expenses`: Mutable expense amount, notes, date, category.
+- `expense_categories`: Mutable category name and active/inactive status.
+- `business_settings`: Mutable singleton shop settings (tax rate, receipt footer, phone, etc.).
+- Master Data (`item_types`, `item_definitions`, `carpet_sizes`, `storage_locations`): Mutable/deactivatable configuration.
+
+### Entities NOT Requiring server_version:
+- `payments`: Append-only, immutable financial transaction records. Protected by stable UUID idempotency and server-side `SELECT ... FOR UPDATE` row locks on `orders`.
+- `storage_records`: Immutable physical movement logs. Protected by locking `order_item_id` and ensuring at most one active record.
+- `order_items`: Created within the Order Creation aggregate; subsequent edits are governed by Order concurrency or dedicated domain workflows.
+
+*Note: This classification specifies the synchronization contract without modifying the existing local Drift V1 code in this documentation task.*
+
+---
+
+# 22. Table Summary
 
 The V1 business tables are:
 
@@ -3416,9 +3547,10 @@ The V1 business tables are:
     expenses
     business_settings
 
-Infrastructure table:
+Infrastructure tables:
 
     sync_operations
+    sync_state
 
 ---
 

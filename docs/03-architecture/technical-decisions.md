@@ -575,26 +575,30 @@ The exact transport mechanism for communicating the operation ID to the backend 
 
 Conflict handling status:
 
-    Basic deterministic conflict handling: Approved for V1 sync
-    Advanced multi-device conflict resolution: Deferred
+    Entity-specific deterministic conflict handling for 2-device bidirectional synchronization: Approved
+    Generic / Automated Last-Write-Wins: Strictly Prohibited
+    Complex distributed merge algorithms / CRDTs: Deferred
 
-For the current Offline / Sync Integration phase:
+For the active Offline / Sync Integration phase:
 
-- Conflict resolution must be **deterministic** and **entity-specific**.
+- Synchronization is **bidirectional** across two terminal devices sharing a remote Supabase instance.
+- Conflict resolution must be **deterministic**, **domain-aware**, and **entity-specific**.
 - Do NOT implement a generic "last write wins" policy for all entities.
-- For each conflict-prone entity, the appropriate strategy must be defined at the domain / business-rule level.
 - Financial records (Payments, Expenses) must never be silently overwritten, duplicated, or lost through conflict resolution.
-- Conflicts that cannot be automatically resolved must fail safely rather than silently corrupting data.
+- **Payments**: Append-only, immutable financial transactions. Concurrency is guarded by `SELECT ... FOR UPDATE` row locks on `orders` during server RPC execution, authoritative balance checking, and stable client-generated UUID idempotency. Payments are never overwritten.
+- **Storage Moves**: `sync_changes.sequence` provides **committed ordering only**; it is NOT a generic LWW conflict resolver. A stale concurrent Storage Move attempting to move an item from a superseded location will receive `CONCURRENCY_CONFLICT` on the server. The winning committed change is then propagated to all devices through the normal pull mechanism.
+- **Orders**: Status lifecycle (`Processing → Ready → Completed` or `Cancelled`) is domain-authoritative. Stale remote pulls must never resurrect cancelled or completed orders. Order Creation is synchronized as an aggregate; subsequent mutations are entity-specific.
+- **Optimistic Concurrency**: Entities that support concurrent updates (Orders, Customers, Expenses, Expense Categories, Master Data, Business Settings) use an integer `server_version`. The client sends `base_version` with push mutations. A mismatch produces `CONCURRENCY_CONFLICT`.
+- **Structured Error Responses**: The remote API returns structured semantic error codes (`DUPLICATE_ENTITY`, `CONCURRENCY_CONFLICT`, `BUSINESS_RULE_VIOLATION`, `INVALID_REFERENCE`, `PAYMENT_BALANCE_EXCEEDED`, `INVALID_LIFECYCLE_TRANSITION`).
+- **Conflict Isolation**: `SyncEngine` isolates failed operations. A conflict on one entity transitions that operation to `Failed` without freezing or blocking unrelated operations in the synchronization queue.
 
-The following remain deferred from the current implementation phase:
+The following remain deferred:
 
-- Complex merge algorithms
-- Distributed conflict resolution
+- Complex distributed merge algorithms
 - CRDTs
-- Real-time collaboration conflict resolution
+- Real-time collaborative document editing
 - Distributed locking
-
-The architecture must remain extensible for future multi-device requirements.
+- Multi-tenant / SaaS conflict administration
 
 ---
 
@@ -1320,6 +1324,46 @@ However, SaaS functionality itself is NOT part of the current implementation.
 
 Do NOT introduce tenants, branches, roles, permissions, subscription management, or multi-tenant UI as part of this phase.
 
+#### 55.3.12 Bidirectional Synchronization Architecture
+
+The active synchronization architecture supports two devices operating against the same Supabase remote backend:
+
+- **Push**: Local business mutation commits atomically with `sync_operations` entry in SQLite. `SyncEngine` dispatches operations sequentially to Supabase Edge Functions with `X-Operation-ID` and `base_version`. PostgreSQL transactional RPCs apply mutations, increment entity `server_version` where applicable, append to remote `sync_changes`, and log idempotency.
+- **Pull**: Incoming changes from `sync_changes` are pulled via `GET /sync/changes?after=<sequence>`. `RemoteChangeApplier` applies changes directly to local DAOs without creating outgoing `SyncOperations` (echo loop prevention) and updates `sync_state.last_applied_sequence` in the **same local transaction**.
+- **Operational Invariant**: Local Drift/SQLite database remains the primary operational source of truth for the UI on both devices.
+
+#### 55.3.13 Global Sequence Cursor vs. Entity Server Version
+
+There are two distinct versioning concepts that must never be confused:
+
+1. **Entity `server_version`**:
+   - Monotonically incremented integer on mutable synchronizable entities (`orders`, `customers`, `expenses`, `expense_categories`, `business_settings`, and master data).
+   - Used for optimistic concurrency control (`base_version` vs current `server_version`).
+   - Append-only immutable records (`payments`, `storage_records`) do NOT maintain a `server_version`.
+2. **Global `sync_changes.sequence`**:
+   - Monotonically increasing synchronization sequence (`BIGINT`), logically scoped per shop/tenant.
+   - Authoritative cursor used by `SyncEngine.pull()` (`GET /sync/changes?after=<sequence>`).
+   - Timestamps (`updated_at`, `last_sync_at`) must NEVER be used as the authoritative synchronization cursor.
+
+#### 55.3.14 Local Sync State & Crash-Safe Ingestion
+
+- Local database stores pull progress in an infrastructure-only table: `sync_state` (`last_applied_sequence`).
+- Crash safety invariant: **Apply remote changes + Advance local cursor** inside the **SAME local SQLite transaction**.
+- Remote ingestion must NEVER generate outgoing `SyncOperation` records.
+
+#### 55.3.15 Realtime Wake-Up Signal Adapter
+
+- Supabase Realtime is approved strictly as an **ephemeral wake-up notification adapter** (`sync_available` event).
+- Realtime signals wake up `SyncEngine` to trigger a pull.
+- Realtime payloads are NOT authoritative data. All remote data is retrieved via the cursor-based pull API.
+- No raw WebSocket infrastructure is exposed to feature code.
+
+#### 55.3.16 Recovery & Bootstrap Protection
+
+- A new device initializes via an **Initial Device Bootstrap** flow that establishes a consistent baseline and cursor before normal incremental pull starts.
+- If a client cursor falls behind retained change history, the server returns `CURSOR_TOO_OLD`, initiating a controlled full resync.
+- Invariant: A full resync or bootstrap must **NEVER delete or overwrite locally pending unsynced business data** stored in `sync_operations`.
+
 ---
 
 ## 56. Current Approved Decisions Summary
@@ -1385,6 +1429,20 @@ The following decisions are currently approved:
     No Use Case layer
     +
     No Mapper layer
+    +
+    Bidirectional Push + Pull Synchronization
+    +
+    Sequence-based Pull Cursor (sync_changes.sequence)
+    +
+    Local Sync State (sync_state.last_applied_sequence)
+    +
+    RemoteChangeApplier (Echo Loop Prevention)
+    +
+    Realtime Wake-up Signal Adapter
+    +
+    Entity Server Versioning for Optimistic Concurrency
+    +
+    Structured Semantic Conflict Handling & Queue Isolation
 
 ---
 
@@ -1392,13 +1450,11 @@ The following decisions are currently approved:
 
 The following technical decisions are intentionally not finalized yet:
 
-    Dependency Injection Package
     Serialization / Additional Code Generation Approach
     Localization Package
     Logging Package
     Result / Exception Strategy
     Financial Value Representation
-    API Idempotency Transport Mechanism
 
 The following were previously TBD and are now resolved:
 
@@ -1406,8 +1462,9 @@ The following were previously TBD and are now resolved:
     Sync Retry Architecture           →  Exponential backoff + max retry count + permanent failure state
                                          (exact numeric values remain implementation-level config)
     Sync Idempotency Architecture     →  Stable operation ID, same ID preserved across retries,
-                                         backend uses ID to prevent duplicate effects
-                                         (exact transport mechanism remains implementation-level detail)
+                                         backend uses ID to prevent duplicate effects via sync_idempotency_log
+    API Idempotency Transport         →  X-Operation-ID HTTP header (Approved)
+    Dependency Injection Package      →  get_it (Approved)
     Remote Networking Stack           →  Dio + Retrofit (Approved)
     Routing Package                   →  go_router (Approved)
     V1 End-User Authentication        →  Out of scope for V1; API protection is centralized infrastructure
@@ -1422,14 +1479,16 @@ They are Approved technical decisions.
 
 The following are intentionally deferred from V1:
 
-    Advanced Multi-device Conflict Resolution
-    Real-time Synchronization
-    Complex Background Synchronization
+    Complex Distributed Merge Algorithms & CRDTs
+    Raw WebSocket / Full Real-time Collaborative Document Sync
+    Multi-tenant / SaaS / Multi-branch Administration
+    Complex Platform Background Synchronization
     Distributed Locking
-    CRDTs
     Event Sourcing
     Advanced Caching Architecture
     File/Image Storage Architecture when not required by V1
+
+*Note: 2-device bidirectional synchronization, cursor-based pull synchronization, and Realtime wake-up signal adapter are Approved for V1 and are no longer deferred.*
 
 These should not be implemented unless requirements change.
 

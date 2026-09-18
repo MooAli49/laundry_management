@@ -36,3 +36,13 @@ class DatabaseException extends AppException {
     super.cause,
   ]);
 }
+
+class CursorTooOldException extends AppException {
+  final int? oldestAvailableSequence;
+
+  const CursorTooOldException({
+    String message = 'Client cursor has expired; full resync required.',
+    this.oldestAvailableSequence,
+    dynamic cause,
+  }) : super(message, cause);
+}

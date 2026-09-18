@@ -2,31 +2,56 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 
+import '../../core/errors/app_exception.dart';
 import '../../core/network/network_info.dart';
+import '../../core/network/realtime_sync_adapter.dart';
 import '../../domain/sync/sync_engine_state.dart';
 import '../../domain/sync/sync_error_classifier.dart';
 import '../../domain/sync/sync_retry_policy.dart';
 import '../datasources/remote/remote_api_dispatcher.dart';
+import '../datasources/remote/sync_remote_data_source.dart';
 import '../local/daos/sync_operations_dao.dart';
+import '../local/daos/sync_state_dao.dart';
+import 'remote_change_applier.dart';
 
-/// Orchestrates the synchronization of local queued operations to the remote backend.
+/// Orchestrates bidirectional synchronization (Push + Pull + Realtime Wake-Up)
+/// between the local SQLite database and the remote Supabase backend.
 ///
 /// Follows `docs/08-implementation/synchronization-implementation.md`.
 ///
-/// Dispatches eligible operations sequentially through [RemoteApiDispatcher],
-/// classifies errors using [SyncErrorClassifier], and schedules retries via [SyncRetryPolicy].
+/// Invariants:
+/// 1. Local SQLite/Drift database remains the operational source of truth.
+/// 2. `sync_state.last_applied_sequence` is the authoritative local pull cursor.
+/// 3. Realtime is strictly a SIGNAL-ONLY wake-up mechanism. Payloads are never authoritative.
+/// 4. Actual change data is always retrieved from `GET /api/v1/sync/changes?after=<cursor>&limit=<limit>`.
+/// 5. [RemoteChangeApplier] is the exclusive boundary for applying remote changes to SQLite.
+/// 6. Remote apply never generates outgoing [SyncOperation] records (zero echo loop).
+/// 7. Unified single-flight concurrency: At most ONE synchronization operation runs at a time.
+/// 8. Multiple incoming triggers during active sync are coalesced into at most ONE trailing pass.
+/// 9. Pull pages are committed atomically in SQLite. Network calls never span a multi-page transaction.
+/// 10. `CURSOR_TOO_OLD` preserves pending [SyncOperation] records without destructive local reset.
 class SyncEngine {
+  static const int _defaultPageSize = 100;
+
   final SyncOperationsDao _syncOperationsDao;
   final RemoteApiDispatcher _remoteApiDispatcher;
   final NetworkInfo _networkInfo;
   final SyncRetryPolicy _retryPolicy;
   final SyncErrorClassifier _errorClassifier;
+  final SyncRemoteDataSource? _syncRemoteDataSource;
+  final RemoteChangeApplier? _remoteChangeApplier;
+  final SyncStateDao? _syncStateDao;
+  final RealtimeSyncAdapter? _realtimeAdapter;
   final DateTime Function() _clock;
 
-  bool _isSyncing = false;
+  bool _isSynchronizing = false;
+  bool _pendingNeedsPush = false;
+  bool _pendingNeedsPull = false;
   bool _isInitialized = false;
   bool _isDisposed = false;
+
   StreamSubscription<bool>? _connectivitySubscription;
+  StreamSubscription<void>? _realtimeSubscription;
   Timer? _periodicTimer;
 
   SyncEngineState _state = const SyncEngineState.idle();
@@ -39,12 +64,20 @@ class SyncEngine {
     required NetworkInfo networkInfo,
     required SyncRetryPolicy retryPolicy,
     required SyncErrorClassifier errorClassifier,
+    SyncRemoteDataSource? syncRemoteDataSource,
+    RemoteChangeApplier? remoteChangeApplier,
+    SyncStateDao? syncStateDao,
+    RealtimeSyncAdapter? realtimeAdapter,
     DateTime Function()? clock,
   }) : _syncOperationsDao = syncOperationsDao,
        _remoteApiDispatcher = remoteApiDispatcher,
        _networkInfo = networkInfo,
        _retryPolicy = retryPolicy,
        _errorClassifier = errorClassifier,
+       _syncRemoteDataSource = syncRemoteDataSource,
+       _remoteChangeApplier = remoteChangeApplier,
+       _syncStateDao = syncStateDao,
+       _realtimeAdapter = realtimeAdapter,
        _clock = clock ?? DateTime.now;
 
   /// Current lifecycle state of the synchronization engine.
@@ -53,8 +86,8 @@ class SyncEngine {
   /// Stream of state transitions emitted during sync cycles.
   Stream<SyncEngineState> get stateStream => _stateController.stream;
 
-  /// Whether a sync cycle is currently active.
-  bool get isSyncing => _isSyncing;
+  /// Whether a synchronization cycle (push, pull, or both) is actively running.
+  bool get isSyncing => _isSynchronizing;
 
   /// Whether the sync engine has been initialized.
   bool get isInitialized => _isInitialized;
@@ -64,15 +97,12 @@ class SyncEngine {
 
   /// Initializes the synchronization engine lifecycle and foreground triggers.
   ///
-  /// Subscribes to [NetworkInfo.onConnectivityChanged] to automatically trigger
-  /// [sync] when connectivity is restored to true.
-  /// Starts an optional [periodicSyncInterval] timer (defaults to 15 minutes)
-  /// that triggers [sync] while the application is foregrounded.
+  /// 1. Subscribes to [NetworkInfo.onConnectivityChanged] to trigger full sync on network recovery.
+  /// 2. Subscribes to [RealtimeSyncAdapter.onSyncAvailable] to trigger pull on remote change signals.
+  /// 3. Starts an optional periodic foreground sync timer (defaults to 15 minutes).
+  /// 4. Triggers initial foreground sync asynchronously if [triggerInitialSync] is true.
   ///
-  /// If [triggerInitialSync] is true, triggers an initial [sync] asynchronously
-  /// without blocking application startup.
-  ///
-  /// Calling [initialize] multiple times is safe and idempotent.
+  /// Idempotent: calling [initialize] multiple times is safe and returns early.
   Future<void> initialize({
     bool triggerInitialSync = true,
     Duration? periodicSyncInterval = const Duration(minutes: 15),
@@ -95,7 +125,21 @@ class SyncEngine {
       },
     );
 
-    // 2. Start optional periodic foreground sync timer
+    // 2. Subscribe to Realtime wake-up signals
+    if (_realtimeAdapter != null) {
+      await _realtimeAdapter.subscribe();
+      _realtimeSubscription = _realtimeAdapter.onSyncAvailable.listen(
+        (_) {
+          if (_isDisposed) return;
+          unawaited(pull().catchError((_, __) => null));
+        },
+        onError: (_) {
+          // Realtime stream errors are handled gracefully
+        },
+      );
+    }
+
+    // 3. Start optional periodic foreground sync timer
     if (periodicSyncInterval != null && periodicSyncInterval > Duration.zero) {
       _periodicTimer = Timer.periodic(periodicSyncInterval, (_) {
         if (_isDisposed) return;
@@ -103,32 +147,170 @@ class SyncEngine {
       });
     }
 
-    // 3. Trigger initial sync asynchronously (fire-and-forget, non-blocking)
+    // 4. Trigger initial sync asynchronously (fire-and-forget, non-blocking)
     if (triggerInitialSync) {
       unawaited(sync().catchError((_, __) => _state));
     }
   }
 
-  /// Triggers a synchronization cycle across eligible operations in the queue.
+  /// Triggers a complete synchronization cycle:
+  ///   1. Push pending local operations to remote
+  ///   2. Pull latest remote changes to local
   ///
-  /// If a cycle is already in progress, returns the current in-progress state.
-  /// If the device is offline, returns the current state without modifying the queue.
+  /// Concurrency Model:
+  /// Uses a unified single-flight coalescing guard. If a cycle is already active,
+  /// flags follow-up work so exactly ONE trailing pass executes upon completion.
   Future<SyncEngineState> sync() async {
-    // 1. Re-entrancy / Concurrency guard & disposal check
-    if (_isDisposed || _isSyncing) {
+    if (_isDisposed) {
       return _state;
     }
 
-    _isSyncing = true;
-    _updateState(
-      SyncEngineState.syncing(
-        lastSyncTime: _state.lastSyncTime,
-        pendingOperationsCount: _state.pendingOperationsCount,
-      ),
-    );
+    if (_isSynchronizing) {
+      _pendingNeedsPush = true;
+      _pendingNeedsPull = true;
+      return _state;
+    }
+
+    _isSynchronizing = true;
+    _pendingNeedsPush = true;
+    _pendingNeedsPull = true;
+
+    return await _runSyncLoop();
+  }
+
+  /// Triggers a pull-only synchronization cycle from the remote backend.
+  ///
+  /// Called by Realtime wake-up signals or targeted pull requests.
+  /// Uses the same unified single-flight guard: if a sync cycle is active,
+  /// coalesces into the pending follow-up pass.
+  Future<void> pull() async {
+    if (_isDisposed) {
+      return;
+    }
+
+    if (_isSynchronizing) {
+      _pendingNeedsPull = true;
+      return;
+    }
+
+    _isSynchronizing = true;
+    _pendingNeedsPull = true;
+
+    await _runSyncLoop();
+  }
+
+  /// Core coalescing execution loop.
+  ///
+  /// Ensures at most ONE synchronization operation actively mutates state.
+  /// Loops while pending flags remain, coalescing rapid triggers into a single trailing pass.
+  Future<SyncEngineState> _runSyncLoop() async {
+    try {
+      while (!_isDisposed) {
+        final doPush = _pendingNeedsPush;
+        final doPull = _pendingNeedsPull;
+
+        // Reset pending flags before executing this phase so any trigger
+        // arriving during execution re-flags pending work.
+        _pendingNeedsPush = false;
+        _pendingNeedsPull = false;
+
+        if (!doPush && !doPull) {
+          break;
+        }
+
+        if (doPush && !_isDisposed) {
+          await _executePush();
+        }
+
+        if (doPull && !_isDisposed) {
+          await _executePull();
+        }
+
+        if (!_pendingNeedsPush && !_pendingNeedsPull) {
+          break;
+        }
+      }
+    } finally {
+      _isSynchronizing = false;
+    }
+    return _state;
+  }
+
+  /// Executes page-by-page remote change pulling.
+  ///
+  /// Contract:
+  /// - Pulls until `has_more == false` or changes list is empty.
+  /// - Each page is applied atomically + cursor advanced in SQLite inside a single transaction.
+  /// - Network calls are NEVER held inside a multi-page transaction.
+  /// - If page N succeeds and page N+1 fails, page N remains committed and cursor remains at page N.
+  /// - `CURSOR_TOO_OLD` (HTTP 410) halts pagination and preserves pending operations.
+  Future<void> _executePull() async {
+    final remoteDataSource = _syncRemoteDataSource;
+    final changeApplier = _remoteChangeApplier;
+    final stateDao = _syncStateDao;
+
+    if (remoteDataSource == null || changeApplier == null || stateDao == null) {
+      return;
+    }
+
+    final isConnected = await _networkInfo.isConnected;
+    if (!isConnected || _isDisposed) {
+      return;
+    }
 
     try {
-      // 2. Network connectivity check
+      int cursor = await stateDao.getLastAppliedSequence();
+      bool hasMore = true;
+
+      while (hasMore && !_isDisposed) {
+        final stillConnected = await _networkInfo.isConnected;
+        if (!stillConnected || _isDisposed) {
+          break;
+        }
+
+        final response = await remoteDataSource.getChanges(
+          after: cursor,
+          limit: _defaultPageSize,
+        );
+
+        if (response.changes.isEmpty) {
+          break;
+        }
+
+        // Apply changes and advance sync_state.last_applied_sequence in Drift
+        await changeApplier.applyBatch(response.changes);
+
+        cursor = response.changes.last.sequence;
+        hasMore = response.hasMore;
+      }
+    } on CursorTooOldException catch (e) {
+      final remainingOps = await _syncOperationsDao.getEligibleOperations(
+        asOf: _clock(),
+      );
+      _updateState(
+        SyncEngineState.failed(
+          error: 'CURSOR_TOO_OLD: ${e.message}',
+          lastSyncTime: _state.lastSyncTime,
+          pendingOperationsCount: remainingOps.length,
+        ),
+      );
+    } catch (_) {
+      // Partial pagination safety: if an error occurs mid-pagination,
+      // all previously committed pages remain committed with updated cursor.
+      // Next pull will resume from the persisted cursor.
+    }
+  }
+
+  /// Executes push dispatching for pending local [SyncOperation] records.
+  Future<void> _executePush() async {
+    try {
+      _updateState(
+        SyncEngineState.syncing(
+          lastSyncTime: _state.lastSyncTime,
+          pendingOperationsCount: _state.pendingOperationsCount,
+        ),
+      );
+
       final isConnected = await _networkInfo.isConnected;
       if (!isConnected) {
         final remaining = await _syncOperationsDao.getEligibleOperations(
@@ -140,11 +322,10 @@ class SyncEngine {
             pendingOperationsCount: remaining.length,
           ),
         );
-        return _state;
+        return;
       }
 
       final now = _clock();
-      // 3. Fetch eligible operations in deterministic order
       final operations = await _syncOperationsDao.getEligibleOperations(
         asOf: now,
       );
@@ -156,7 +337,7 @@ class SyncEngine {
             pendingOperationsCount: 0,
           ),
         );
-        return _state;
+        return;
       }
 
       _updateState(
@@ -166,7 +347,6 @@ class SyncEngine {
         ),
       );
 
-      // 4. Sequential processing
       for (var i = 0; i < operations.length; i++) {
         if (_isDisposed) {
           break;
@@ -174,21 +354,15 @@ class SyncEngine {
 
         final op = operations[i];
 
-        // Check if connectivity was lost mid-processing
         final stillConnected = await _networkInfo.isConnected;
         if (!stillConnected || _isDisposed) {
-          // Stop processing safely without marking current unconfirmed operation as synced
           break;
         }
 
         try {
-          // Dispatch through RemoteApiDispatcher
           await _remoteApiDispatcher.dispatch(op);
-
-          // Success: Mark as synced
           await _syncOperationsDao.markOperationSynced(op.id);
         } catch (error) {
-          // Classify failure
           final details = _mapErrorToDetails(error);
           final failureKind = _errorClassifier.classify(details);
           final String errorMessage;
@@ -207,7 +381,6 @@ class SyncEngine {
                 nextRetryAt: nextRetryAt,
               );
             } else {
-              // Retry limit exhausted: permanent failure
               errorMessage =
                   'Retry limit exhausted: ${details.message ?? error.toString()}';
               await _syncOperationsDao.markOperationFailed(
@@ -217,7 +390,6 @@ class SyncEngine {
               );
             }
           } else {
-            // Permanent failure
             errorMessage = details.message ?? error.toString();
             await _syncOperationsDao.markOperationFailed(
               op.id,
@@ -226,7 +398,6 @@ class SyncEngine {
             );
           }
 
-          // Stop queue processing on failure to preserve dependency ordering
           final remainingOps = await _syncOperationsDao.getEligibleOperations(
             asOf: _clock(),
           );
@@ -237,15 +408,14 @@ class SyncEngine {
               pendingOperationsCount: remainingOps.length,
             ),
           );
-          return _state;
+          return;
         }
       }
 
       if (_isDisposed) {
-        return _state;
+        return;
       }
 
-      // 5. Completion state update
       final remainingOps = await _syncOperationsDao.getEligibleOperations(
         asOf: _clock(),
       );
@@ -256,7 +426,6 @@ class SyncEngine {
           pendingOperationsCount: remainingOps.length,
         ),
       );
-      return _state;
     } catch (unexpectedError) {
       int remainingCount = _state.pendingOperationsCount;
       try {
@@ -265,7 +434,7 @@ class SyncEngine {
         );
         remainingCount = remainingOps.length;
       } catch (_) {
-        // Defensive: preserve last known count if DAO query fails during unexpected error
+        // Defensive: preserve last known count if DAO query fails during double-fault
       }
       _updateState(
         SyncEngineState.failed(
@@ -274,9 +443,6 @@ class SyncEngine {
           pendingOperationsCount: remainingCount,
         ),
       );
-      return _state;
-    } finally {
-      _isSyncing = false;
     }
   }
 
@@ -335,12 +501,18 @@ class SyncEngine {
     return SyncErrorDetails(message: error.toString());
   }
 
+  /// Disposes the synchronization engine and frees all listeners and timers.
   void dispose() {
     _isDisposed = true;
     _connectivitySubscription?.cancel();
     _connectivitySubscription = null;
+    _realtimeSubscription?.cancel();
+    _realtimeSubscription = null;
     _periodicTimer?.cancel();
     _periodicTimer = null;
+    if (_realtimeAdapter != null) {
+      unawaited(_realtimeAdapter.unsubscribe().catchError((_) {}));
+    }
     if (!_stateController.isClosed) {
       _stateController.close();
     }

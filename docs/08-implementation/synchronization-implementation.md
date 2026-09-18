@@ -6,35 +6,66 @@ This document defines the implementation contract for offline-first synchronizat
 
 The synchronization architecture exists to allow the application to remain operational while offline and synchronize local changes with the backend when connectivity is available.
 
-The approved architecture is:
+The approved architecture is **Bidirectional Push + Pull Synchronization**:
 
-User
-↓
-Presentation
-↓
-Cubit
-↓
-Repository
-↓
-Local Database
-↓
-Sync Queue
-↓
-Sync Engine
-↓
-Remote Data Source
-↓
-Retrofit
-↓
-Dio
-↓
-Supabase Edge Functions
-↓
-Backend
+### PUSH Flow:
 
-The most important principle is:
+    User
+    ↓
+    Presentation (Screens / Widgets)
+    ↓
+    Cubit
+    ↓
+    Repository
+    ↓
+    Local SQLite Database (Drift)
+    ├── Apply business mutation
+    └── Enqueue SyncOperation (atomic local transaction)
+    ↓
+    SyncEngine
+    ↓
+    RemoteApiDispatcher (Retrofit + Dio)
+    ├── Header: X-Operation-ID (idempotency)
+    └── Body: base_version (optimistic concurrency where required)
+    ↓
+    Supabase Edge Functions (/api/v1/...)
+    ↓
+    PostgreSQL Transactional RPCs (ACID)
+    ├── Check sync_idempotency_log
+    ├── Validate server_version == base_version
+    ├── Execute business mutation
+    ├── Increment server_version where applicable
+    ├── Append to sync_changes (monotonically increasing sequence)
+    └── Commit
 
-Local operation must not depend on network availability.
+### PULL Flow:
+
+    Realtime signal (sync_available) / Foreground pull / Resume / Connectivity
+    ↓
+    SyncEngine.pull() (Single-flight concurrency guard)
+    ↓
+    RemoteApiDispatcher (Retrofit + Dio)
+    ↓
+    Supabase Edge Function (GET /api/v1/sync/changes?after=<cursor>)
+    ↓
+    Remote changes retrieved from sync_changes in sequence order
+    ↓
+    RemoteChangeApplier
+    ↓
+    Local SQLite Database (Drift ACID Transaction)
+    ├── Upsert records directly via DAOs (zero SyncOperations created)
+    └── Advance sync_state.last_applied_sequence
+    ↓
+    Reactive Drift Streams (db.tableUpdates)
+    ↓
+    UI updates automatically
+
+The most important principles are:
+
+1. Local operation must not depend on network availability.
+2. Realtime is ONLY an ephemeral wake-up signal; the Pull API is the authoritative source.
+3. Ingestion must never generate outgoing SyncOperations (echo loop prevention).
+4. Applying changes and advancing the local cursor must be atomic in SQLite.
 
 ---
 
@@ -1109,15 +1140,22 @@ Financial records require particular caution.
 
 ---
 
-## 54. Multi-Device Considerations
+## 54. Multi-Device Considerations (Two-Terminal Operation)
 
-The system may eventually support multiple clients/devices synchronizing against the same backend.
+The system officially supports **two devices** synchronizing bidirectionally against the same remote Supabase backend.
 
-The local implementation must therefore preserve stable identifiers and synchronization metadata.
+Key architectural requirements for two-device synchronization:
 
-However, advanced multi-device conflict resolution, distributed locking, and real-time collaboration remain deferred to a future phase.
-
-Do not introduce distributed synchronization complexity prematurely.
+1. **Bidirectional Ingestion**: Changes made on Device A are committed to remote `sync_changes` and pulled by Device B, and vice versa.
+2. **Deterministic Sequence Ordering**: All remote changes are ordered by `sync_changes.sequence ASC`.
+3. **Echo Loop Prevention**: `RemoteChangeApplier` directly writes pulled changes to Drift DAOs without enqueueing to `sync_operations`.
+4. **Domain-Aware Conflict Handling**:
+   - Generic Last-Write-Wins is strictly prohibited.
+   - Payments are append-only; balance validation is authoritative on the server.
+   - Storage moves enforce at most one active record per `OrderItem`. `sync_changes.sequence` provides committed ordering only; it is not a generic LWW conflict resolver. A stale concurrent move receives `CONCURRENCY_CONFLICT`, and the winning committed change is pulled by both terminals.
+   - Mutable entities use entity `server_version` checked against `base_version`.
+5. **Crash Safety**: Applying pulled changes and advancing `sync_state.last_applied_sequence` occur within the **same local transaction**.
+6. **Preservation of Local Pending Operations**: An initial bootstrap or full resync after `CURSOR_TOO_OLD` must NEVER delete locally pending unsynced records in `sync_operations`.
 
 ---
 
@@ -1821,3 +1859,132 @@ The Dashboard operates in accordance with the system's Offline-First principles:
 - **Automatic Sync Reflection**: When the background sync worker or local operations insert, update, or delete records in any of the 4 operational tables, `db.tableUpdates` triggers an immediate re-evaluation of `getDashboardData()`.
 - **No Polling**: No background polling loops or periodic timers are utilized.
 - **Clean Disposals**: Because `tableUpdates` operates via broadcast stream controllers rather than query stream listeners, subscription cancellations cleanly dispose without leaving unexecuted timer callbacks or lingering tasks.
+
+---
+
+## 67. Remote Change Application & Echo Loop Prevention (`RemoteChangeApplier`)
+
+### 67.1 Echo Loop Problem
+If remote changes pulled from the server were passed into standard repository methods (e.g. `orderRepository.createOrder()` or `paymentRepository.recordPayment()`), those methods would automatically call `syncOperationsDao.recordOperation()`, creating a circular ping-pong synchronization loop where pulled changes are uploaded back to the server.
+
+### 67.2 Architecture of `RemoteChangeApplier`
+The `RemoteChangeApplier` is a dedicated infrastructure service responsible for applying pulled changes directly to local storage:
+- Injected with Drift DAOs: `OrdersDao`, `CustomersDao`, `PaymentsDao`, `StorageRecordsDao`, `ExpensesDao`, `ExpenseCategoriesDao`, `MasterDataDao`, `SettingsDao`, `SyncStateDao`.
+- Bypasses repository mutation layers entirely.
+- Executes within an ACID Drift transaction:
+  ```dart
+  await db.transaction(() async {
+    for (final change in batch) {
+      await _applySingleChange(change);
+    }
+    await syncStateDao.updateLastAppliedSequence(lastSequenceInBatch);
+  });
+  ```
+- Guaranteed invariant: **Zero `SyncOperation` records are enqueued** during remote change application.
+- Triggering UI reactivity: Direct DAO writes emit SQLite table update notifications, automatically notifying reactive Drift stream queries (`db.tableUpdates()`) and refreshing Cubits/screens without manual UI re-fetch calls.
+
+---
+
+## 68. Cursor-Based Pull Contract & Change Tracking (`sync_changes`)
+
+### 68.1 Conceptual Schema of `sync_changes`
+The remote PostgreSQL database maintains a durable, append-only synchronization change log:
+
+| Column | Type | Nullable | Description |
+|---|---|---|---|
+| `sequence` | `BIGSERIAL` / `BIGINT` | No | Monotonically increasing primary key and pull cursor |
+| `operation_id` | `TEXT` | No | Stable ID of the client operation that triggered the change |
+| `entity_type` | `TEXT` | No | Entity type (`order`, `customer`, `payment`, `expense`, etc.) |
+| `entity_id` | `TEXT` | No | Stable UUID of the affected entity |
+| `operation_type` | `TEXT` | No | `create`, `update`, `deactivate` |
+| `payload` | `JSONB` | No | Canonical post-change snapshot required to reconstruct local state |
+| `server_version` | `INTEGER` | Yes | Entity version after mutation (null for unversioned entities) |
+| `created_at` | `TIMESTAMPTZ` | No | Server commit timestamp (`now()`) |
+
+### 68.2 Change Granularity: Hybrid Model
+- **Order Creation Aggregate**: For newly created orders, `sync_changes` records a single aggregate change (`entity_type = 'order'`, `operation_type = 'create'`) with a payload containing the complete canonical state (order header, all order items, carpet dimensions). This guarantees relational integrity on pull.
+- **Subsequent Mutations**: Status transitions, payments, storage moves, and cancellations are logged as independent, entity-specific change records.
+
+### 68.3 Pull Endpoint Contract
+- **Route**: `GET /api/v1/sync/changes`
+- **Query Parameters**:
+  - `after`: `BIGINT` (required, the client's `last_applied_sequence`)
+  - `limit`: `INTEGER` (optional, default 100, max 500)
+- **Response `200 OK`**:
+  ```json
+  {
+    "changes": [
+      {
+        "sequence": 1042,
+        "operation_id": "<UUID>",
+        "entity_type": "order",
+        "entity_id": "<UUID>",
+        "operation_type": "create",
+        "payload": { ... },
+        "server_version": 1,
+        "created_at": "2026-09-17T15:30:00.000Z"
+      }
+    ],
+    "has_more": false,
+    "latest_sequence": 1042
+  }
+  ```
+- **Error `410 Gone` (`CURSOR_TOO_OLD`)**:
+  If `after < oldest_retained_sequence` in `sync_changes`:
+  ```json
+  {
+    "error": "CURSOR_TOO_OLD",
+    "oldest_available_sequence": 500,
+    "message": "Client cursor has expired; full resync required."
+  }
+  ```
+
+### 68.4 Recovery & Bootstrap Invariant
+- When `CURSOR_TOO_OLD` is received, the client triggers a controlled full resync/bootstrap.
+- **CRITICAL INVARIANT**: Locally pending operations in `sync_operations` must **NEVER be deleted**. Pending local changes remain queued and are pushed to the server after the baseline snapshot is re-established.
+
+---
+
+## 69. Realtime Wake-Up Signal Adapter
+
+### 69.1 Purpose
+Supabase Realtime is utilized strictly as an **ephemeral wake-up notification adapter** to eliminate unnecessary polling when two devices are online simultaneously.
+
+### 69.2 Principles
+- **No Authoritative Data**: The Realtime payload contains only a lightweight notification (`{ "event": "sync_available", "latest_sequence": 1045 }`).
+- **No Direct Mutation**: The Realtime message does NOT modify the local database directly.
+- **Trigger Pull**: Upon receiving `sync_available`, the client adapter signals `SyncEngine.triggerPull()`.
+- **Single-Flight Concurrency Guard**: `SyncEngine` ensures that only one pull request is active at any time. Duplicate or overlapping Realtime signals are collapsed into the next single-flight pull.
+- **Resilience**: If the Realtime connection drops, the client continues normal operation and falls back to foreground pull triggers (app startup, app resume, connectivity restoration, periodic foreground timer).
+
+---
+
+## 70. Structured Semantic Error Classification & Queue Isolation
+
+### 70.1 Semantic Error Codes
+The remote API must return structured JSON error responses rather than monolithic `HTTP 409` strings:
+
+```json
+{
+  "error": "CONCURRENCY_CONFLICT",
+  "code": 409,
+  "message": "Base version 1 does not match current server version 2",
+  "entity_type": "order",
+  "entity_id": "<UUID>",
+  "current_server_version": 2
+}
+```
+
+Standard codes:
+- `DUPLICATE_ENTITY`: Entity identity already exists with conflicting non-idempotent payload.
+- `CONCURRENCY_CONFLICT`: Optimistic concurrency check failed (`server_version != base_version`).
+- `BUSINESS_RULE_VIOLATION`: Domain rule rejected mutation.
+- `INVALID_REFERENCE`: Referenced foreign entity is missing remotely.
+- `PAYMENT_BALANCE_EXCEEDED`: Payment amount exceeds order's remaining balance.
+- `INVALID_LIFECYCLE_TRANSITION`: Requested order status transition violates lifecycle rules.
+
+### 70.2 Queue Conflict Isolation in `SyncEngine`
+- When an operation receives a permanent semantic error or concurrency conflict:
+  - The operation's status in `sync_operations` is marked `failed` with the structured error details.
+  - The `SyncEngine` isolates the failed operation and **continues processing independent, unrelated operations** in the queue.
+  - Unrelated orders, payments, expenses, or master data are not blocked by a single isolated failure.

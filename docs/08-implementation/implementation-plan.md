@@ -70,7 +70,7 @@ Final Acceptance
 
 # 3. Phase Overview
 
-The V1 implementation is divided into the following phases:
+The V1 implementation was originally structured as 20 execution phases:
 
 1. Project Foundation
 2. Database Foundation
@@ -92,6 +92,21 @@ The V1 implementation is divided into the following phases:
 18. Offline Verification
 19. Final Stabilization
 20. Final Acceptance
+
+### Mapping to the 16 Consolidated Implementation Tasks:
+The execution sequence in `laundry-implementation-roadmap.md` consolidates these 20 phases into 16 vertical tasks:
+- **Phases 1–5** → Tasks #01–#05 (Foundation, Database, Domain, Data Layer, Presentation Foundation)
+- **Phase 8** → Task #06 (Orders E2E)
+- **Phase 6** → Task #07 (Customers)
+- **Phase 10** → Task #08 (Storage)
+- **Phase 9** → Task #09 (Payments + Step 10 Backend Sync)
+- **Phases 11 & 12** → Task #10 (Expenses & Reports + Step 11 Backend Sync)
+- **Phases 7 & 14** → Task #11 (Services & Pricing / Settings + Step 12 Backend Sync)
+- **Phase 13** → Task #12 (Dashboard)
+- **Phase 12** → Task #13 (Reports — merged into Task #10)
+- **Phase 15** → Task #14 (Invoice / Receipt — Completed in PR #6)
+- **Phases 16 & 18** → Task #15 (Offline / Sync Integration — Active Bidirectional 2-Device Sync)
+- **Phases 17, 19 & 20** → Task #16 (Full Integration / QA / Hardening)
 
 Each phase has:
 
@@ -1203,35 +1218,35 @@ Critical business behavior has automated coverage appropriate to its risk.
 
 ---
 
-# 21. Phase 18 — Offline Verification
+# 21. Phase 18 — Offline & Bidirectional Sync Verification
 
 ## Objective
 
-Verify that the V1 application behaves correctly without internet access.
+Verify that the V1 application operates reliably offline and synchronizes bidirectionally across two devices.
 
 ## Test Procedure
 
+### 1. Offline Operation:
 Test the application with network access unavailable.
-
 Verify:
+- Application starts from local SQLite database.
+- Seed data is loaded locally.
+- Customers, Orders, Payments, Storage, Expenses, Dashboard, and Invoices operate normally.
+- Local mutations enqueue `sync_operations` atomically.
 
-- Application starts
-- Database opens
-- Seed data is available
-- Customers work
-- Orders work
-- Payments work
-- Storage works
-- Expenses work
-- Reports work
-- Settings work
-- Invoice works
-
-Normal local operations must not fail simply because internet access is unavailable.
+### 2. Bidirectional Two-Device Synchronization:
+Verify:
+- Device A creates records offline, connects, and successfully pushes to remote Supabase.
+- Remote PostgreSQL transactional RPCs log changes to `sync_changes`.
+- Device B receives Realtime wake-up signal and pulls remote changes via `GET /sync/changes?after=<sequence>`.
+- `RemoteChangeApplier` applies changes directly to local DAOs without creating outgoing `SyncOperations` (echo loop prevented).
+- Applying changes and updating `sync_state.last_applied_sequence` are committed in the **same local transaction**.
+- Device crash before cursor advancement safely replays without duplication.
+- Push retry with duplicate `X-Operation-ID` returns cached response without duplicate records.
 
 ## Exit Criteria
 
-Core V1 workflows remain functional offline.
+Core V1 workflows remain functional offline and bidirectional 2-device synchronization converges deterministically.
 
 ---
 

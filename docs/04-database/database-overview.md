@@ -179,8 +179,11 @@ This represents application/business configuration.
 ### Infrastructure Entities
 
     SyncOperation
+    SyncState
 
-Infrastructure entities support synchronization and application behavior but do not represent core business concepts.
+Infrastructure entities support bidirectional synchronization and application behavior but do not represent core business concepts:
+- `SyncOperation` (`sync_operations`): Durable queue of outgoing local mutations waiting to be pushed.
+- `SyncState` (`sync_state`): Durable local cursor tracking incoming synchronization progress (`last_applied_sequence`).
 
 ---
 
@@ -205,9 +208,10 @@ The V1 logical database consists of the following main tables:
     storage_location_item_types
     business_settings
 
-The synchronization mechanism may require additional internal tables such as:
+The bidirectional synchronization mechanism uses internal infrastructure tables:
 
     sync_operations
+    sync_state
 
 These infrastructure tables are part of the Data Layer and do not represent business entities.
 
@@ -2609,6 +2613,7 @@ The high-level relationship structure is:
     BusinessSettings
 
     SyncOperation
+    SyncState
 
 This represents the approved V1 database direction.
 

@@ -478,21 +478,39 @@ Internet connectivity is required for synchronization, not for normal local oper
 
 ## 20. Synchronization
 
-Synchronization is a Data-layer responsibility.
+Synchronization is a Data-layer responsibility operating bidirectionally across two devices:
 
-Conceptually:
+### Outgoing (Push):
 
-    Local Database
+    Local Drift Database
           ↓
-    Pending Changes
+    Sync Queue (sync_operations)
           ↓
     Sync Engine
           ↓
-    Remote API
+    Remote API (X-Operation-ID + base_version)
+          ↓
+    Remote Database (sync_changes)
+
+### Incoming (Pull):
+
+    Realtime Wake-up Signal / Pull Triggers
+          ↓
+    Sync Engine.pull()
+          ↓
+    Remote API (GET /sync/changes?after=<sequence>)
+          ↓
+    RemoteChangeApplier
+          ↓
+    Local Drift Database (DAO upsert + sync_state advance in same Tx)
+          ↓
+    Reactive Streams (db.tableUpdates)
+          ↓
+    Flutter UI
 
 The UI does not need to know the technical details of synchronization.
 
-The repository and synchronization infrastructure coordinate local and remote persistence.
+The repository, `RemoteChangeApplier`, and synchronization infrastructure coordinate local and remote persistence.
 
 ---
 
@@ -1482,15 +1500,16 @@ Introduce abstraction when there is an actual problem to solve.
 
 The architecture may evolve when the product grows.
 
+*Note: Two-device bidirectional synchronization and Realtime wake-up signal are approved as part of the V1 baseline.*
+
 Possible future additions include:
 
-- Multi-device synchronization
-- Advanced conflict handling
 - Multi-branch
 - Delivery management
 - Refunds
 - Advanced reporting
 - Barcode support
+- Multi-tenant / SaaS platform administration
 
 These should be added only when approved as requirements.
 

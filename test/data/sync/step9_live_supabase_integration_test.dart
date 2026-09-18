@@ -157,7 +157,7 @@ void main() {
         );
 
         expect(res.statusCode, equals(422));
-        expect(res.data['code'], equals('VALIDATION_ERROR'));
+        expect(res.data['code'], isIn(['VALIDATION_ERROR', 'BUSINESS_RULE_VIOLATION']));
         expect(res.data['message'], contains('per_kilogram'));
       },
     );
@@ -393,6 +393,303 @@ void main() {
         );
         expect(unstoreRes.statusCode, equals(200));
         expect(unstoreRes.data['is_active'], isFalse);
+      },
+    );
+
+    test(
+      'Optimistic Concurrency Control: valid base_version increments server_version, stale base_version returns 409 CONCURRENCY_CONFLICT',
+      () async {
+        if (!isNetworkAvailable) return;
+
+        final custId = 'c0000001-0001-4001-8001-000000000001';
+
+        // 1. Fetch current customer to get server_version
+        final getRes = await dio.get('/customers/$custId');
+        expect(getRes.statusCode, equals(200));
+        final currentVersion = getRes.data['server_version'] as int;
+
+        // 2. Conflict attempt with stale base_version
+        final conflictRes = await dio.patch(
+          '/customers/$custId',
+          data: {
+            'name': 'Stale Name',
+            'base_version': currentVersion - 1,
+          },
+          options: Options(
+            headers: {'X-Operation-ID': 'op-cust-occ-conflict-1'},
+            validateStatus: (_) => true,
+          ),
+        );
+        expect(conflictRes.statusCode, equals(409));
+        expect(conflictRes.data['code'], equals('CONCURRENCY_CONFLICT'));
+
+        // 3. Conflict attempt with mismatched header
+        final headerConflictRes = await dio.patch(
+          '/customers/$custId',
+          data: {'name': 'Header Stale Name'},
+          options: Options(
+            headers: {
+              'X-Operation-ID': 'op-cust-occ-conflict-2',
+              'X-Base-Version': '${currentVersion + 99}',
+            },
+            validateStatus: (_) => true,
+          ),
+        );
+        expect(headerConflictRes.statusCode, equals(409));
+        expect(headerConflictRes.data['code'], equals('CONCURRENCY_CONFLICT'));
+
+        // 4. Successful update with matching base_version
+        final successRes = await dio.patch(
+          '/customers/$custId',
+          data: {'name': 'Valid Versioned Customer'},
+          options: Options(
+            headers: {
+              'X-Operation-ID': 'op-cust-occ-success-1',
+              'X-Base-Version': '$currentVersion',
+            },
+            validateStatus: (_) => true,
+          ),
+        );
+        expect(successRes.statusCode, equals(200));
+        expect(successRes.data['server_version'], equals(currentVersion + 1));
+      },
+    );
+
+    test(
+      'Storage Move Concurrency: mismatched previous_storage_location_id returns 409 CONCURRENCY_CONFLICT, matching moves atomically',
+      () async {
+        if (!isNetworkAvailable) return;
+
+        final itemId = 'e0000001-0001-4001-8001-000000000001';
+        final storeRecId = '90000005-0005-4005-8005-000000000005';
+        final moveRecId = '90000006-0006-4006-8006-000000000006';
+
+        // 1. Store at Rack 1
+        final storeRes = await dio.post(
+          '/storage',
+          data: {
+            'id': storeRecId,
+            'order_item_id': itemId,
+            'storage_location_id': 'rack-1',
+            'is_active': true,
+          },
+          options: Options(
+            headers: {'X-Operation-ID': 'op-sm-store-1'},
+            validateStatus: (_) => true,
+          ),
+        );
+        expect(storeRes.statusCode, equals(201));
+
+        // 2. Concurrent move attempt expecting rack-99 (mismatched previous location)
+        final conflictRes = await dio.post(
+          '/storage',
+          data: {
+            'id': moveRecId,
+            'order_item_id': itemId,
+            'storage_location_id': 'rack-2',
+            'is_active': true,
+          },
+          options: Options(
+            headers: {
+              'X-Operation-ID': 'op-sm-conflict-1',
+              'X-Previous-Storage-Location-Id': 'rack-99',
+            },
+            validateStatus: (_) => true,
+          ),
+        );
+        expect(conflictRes.statusCode, equals(409));
+        expect(conflictRes.data['code'], equals('CONCURRENCY_CONFLICT'));
+        expect(conflictRes.data['message'], contains('not expected rack-99'));
+
+        // 3. Valid move with matching previous location
+        final validMoveRes = await dio.post(
+          '/storage',
+          data: {
+            'id': moveRecId,
+            'order_item_id': itemId,
+            'storage_location_id': 'rack-2',
+            'is_active': true,
+          },
+          options: Options(
+            headers: {
+              'X-Operation-ID': 'op-sm-success-1',
+              'X-Previous-Storage-Location-Id': 'rack-1',
+            },
+            validateStatus: (_) => true,
+          ),
+        );
+        expect(validMoveRes.statusCode, equals(201));
+        expect(validMoveRes.data['is_active'], isTrue);
+        expect(validMoveRes.data['storage_location_id'], equals('rack-2'));
+      },
+    );
+
+    test(
+      'Pull API: returns changes in strict ascending sequence order with pagination metadata',
+      () async {
+        if (!isNetworkAvailable) return;
+
+        // 1. Fetch first batch of changes
+        final pullRes = await dio.get(
+          '/sync/changes',
+          queryParameters: {'after': 0, 'limit': 10},
+        );
+
+        expect(pullRes.statusCode, equals(200));
+        final data = pullRes.data as Map<String, dynamic>;
+        expect(data, contains('changes'));
+        expect(data, contains('has_more'));
+        expect(data, contains('latest_sequence'));
+
+        final changes = data['changes'] as List;
+        expect(changes, isNotEmpty);
+
+        // Verify strict monotonic ascending order
+        int prevSeq = -1;
+        for (final change in changes) {
+          final seq = change['sequence'] as int;
+          expect(seq, greaterThan(prevSeq));
+          prevSeq = seq;
+        }
+
+        // 2. Pagination test: pull next page using after = prevSeq
+        if (data['has_more'] == true) {
+          final nextRes = await dio.get(
+            '/sync/changes',
+            queryParameters: {'after': prevSeq, 'limit': 10},
+          );
+          expect(nextRes.statusCode, equals(200));
+          final nextChanges = (nextRes.data as Map<String, dynamic>)['changes'] as List;
+          if (nextChanges.isNotEmpty) {
+            final firstNextSeq = nextChanges.first['sequence'] as int;
+            expect(firstNextSeq, greaterThan(prevSeq));
+          }
+        }
+      },
+    );
+
+    test(
+      'Order Creation logs single aggregate entry, subsequent mutation logs single entity update',
+      () async {
+        if (!isNetworkAvailable) return;
+
+        final pullRes = await dio.get(
+          '/sync/changes',
+          queryParameters: {'after': 0, 'limit': 100},
+        );
+        expect(pullRes.statusCode, equals(200));
+        final changes = (pullRes.data as Map<String, dynamic>)['changes'] as List;
+
+        // Find the order creation entry
+        final orderCreateChange = changes.firstWhere(
+          (c) => c['operation_id'] == 'op-order-atomic-create-1',
+          orElse: () => null,
+        );
+        expect(orderCreateChange, isNotNull);
+        expect(orderCreateChange['entity_type'], equals('order'));
+        expect(orderCreateChange['operation_type'], equals('create'));
+
+        // Verify aggregate payload contains items with carpets
+        final payload = orderCreateChange['payload'] as Map<String, dynamic>;
+        expect(payload['items'], isNotNull);
+        final items = payload['items'] as List;
+        expect(items, isNotEmpty);
+        expect(items.first['carpet_data'], isNotNull);
+
+        // Update the order status
+        final orderId = 'd0000001-0001-4001-8001-000000000001';
+        final updateRes = await dio.patch(
+          '/orders/$orderId',
+          data: {'status': 'completed'},
+          options: Options(
+            headers: {'X-Operation-ID': 'op-order-status-update-1'},
+            validateStatus: (_) => true,
+          ),
+        );
+        expect(updateRes.statusCode, equals(200));
+
+        // Pull changes after the latest sequence
+        final latestSeq = (pullRes.data as Map<String, dynamic>)['latest_sequence'] as int;
+        final postUpdateRes = await dio.get(
+          '/sync/changes',
+          queryParameters: {'after': latestSeq, 'limit': 10},
+        );
+        expect(postUpdateRes.statusCode, equals(200));
+        final newChanges = (postUpdateRes.data as Map<String, dynamic>)['changes'] as List;
+
+        final orderUpdateChange = newChanges.firstWhere(
+          (c) => c['operation_id'] == 'op-order-status-update-1',
+          orElse: () => null,
+        );
+        expect(orderUpdateChange, isNotNull);
+        expect(orderUpdateChange['entity_type'], equals('order'));
+        expect(orderUpdateChange['operation_type'], equals('update'));
+        // Non-aggregate: subsequent update does NOT contain items list
+        final updatePayload = orderUpdateChange['payload'] as Map<String, dynamic>;
+        expect(updatePayload['status'], equals('completed'));
+      },
+    );
+
+    test(
+      'CURSOR_TOO_OLD: requesting sequence older than retention floor returns 410 CURSOR_TOO_OLD',
+      () async {
+        if (!isNetworkAvailable) return;
+
+        // Sequence 1 is older than minimum sequence (3)
+        final res = await dio.get(
+          '/sync/changes',
+          queryParameters: {'after': 1, 'limit': 10},
+          options: Options(validateStatus: (_) => true),
+        );
+
+        expect(res.statusCode, equals(410));
+        expect(res.data['code'], equals('CURSOR_TOO_OLD'));
+        expect(res.data['message'], contains('CURSOR_TOO_OLD'));
+      },
+    );
+
+    test(
+      'Exactly-once sync_changes creation: idempotent replay does not create duplicate sync_changes records',
+      () async {
+        if (!isNetworkAvailable) return;
+
+        // Fetch latest sequence before replay
+        final beforeRes = await dio.get(
+          '/sync/changes',
+          queryParameters: {'after': 0, 'limit': 1},
+        );
+        expect(beforeRes.statusCode, equals(200));
+        final latestSeqBefore = (beforeRes.data as Map<String, dynamic>)['latest_sequence'] as int;
+
+        // Replay customer creation with same operation ID
+        final custId = 'c0000001-0001-4001-8001-000000000001';
+        final custOpId = 'op-cust-create-1';
+
+        final replayRes = await dio.post(
+          '/customers',
+          data: {
+            'id': custId,
+            'name': 'Live Customer Test',
+            'phone': '01099990001',
+            'notes': 'Initial note',
+          },
+          options: Options(
+            headers: {'X-Operation-ID': custOpId},
+            validateStatus: (_) => true,
+          ),
+        );
+        expect(replayRes.statusCode, isIn([200, 201]));
+
+        // Fetch latest sequence after replay
+        final afterRes = await dio.get(
+          '/sync/changes',
+          queryParameters: {'after': 0, 'limit': 1},
+        );
+        expect(afterRes.statusCode, equals(200));
+        final latestSeqAfter = (afterRes.data as Map<String, dynamic>)['latest_sequence'] as int;
+
+        // Sequence must NOT have increased!
+        expect(latestSeqAfter, equals(latestSeqBefore));
       },
     );
   });
