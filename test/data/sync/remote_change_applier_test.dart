@@ -854,5 +854,243 @@ void main() {
       final seq = await syncStateDao.getLastAppliedSequence();
       expect(seq, equals(72));
     });
+
+    // -------------------------------------------------------------------------
+    // 11. Master Data Ingestion with Junction Relations (BUG-001 Regression)
+    // -------------------------------------------------------------------------
+    group('11. BUG-001: Master Data Junction Table UUID & Atomicity', () {
+      final uuidRegex = RegExp(
+        r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+      );
+
+      test('A. Service remote change with item_type_ids persists junction rows with valid UUIDs', () async {
+        // Seed two item types first
+        final itemType1 = SyncChangeDto(
+          sequence: 80,
+          operationId: 'op-it-1',
+          entityType: 'item_type',
+          entityId: 'it-srv-1',
+          operationType: 'create',
+          payload: {
+            'id': 'it-srv-1',
+            'name': 'قمصان',
+            'is_active': true,
+            'created_at': '2026-09-17T21:00:00.000Z',
+            'updated_at': '2026-09-17T21:00:00.000Z',
+          },
+          serverVersion: 1,
+          createdAt: DateTime.parse('2026-09-17T21:00:00.000Z'),
+        );
+        final itemType2 = SyncChangeDto(
+          sequence: 81,
+          operationId: 'op-it-2',
+          entityType: 'item_type',
+          entityId: 'it-srv-2',
+          operationType: 'create',
+          payload: {
+            'id': 'it-srv-2',
+            'name': 'بنطلونات',
+            'is_active': true,
+            'created_at': '2026-09-17T21:00:00.000Z',
+            'updated_at': '2026-09-17T21:00:00.000Z',
+          },
+          serverVersion: 1,
+          createdAt: DateTime.parse('2026-09-17T21:00:00.000Z'),
+        );
+
+        final serviceChange = SyncChangeDto(
+          sequence: 82,
+          operationId: 'op-srv-82',
+          entityType: 'service',
+          entityId: 'srv-82',
+          operationType: 'create',
+          payload: {
+            'id': 'srv-82',
+            'name': 'غسيل وكوي ممتاز',
+            'description': 'خدمة غسيل وكوي متكاملة للملابس',
+            'pricing_type': 'per_piece',
+            'price': 3500,
+            'is_active': true,
+            'item_type_ids': ['it-srv-1', 'it-srv-2'],
+            'created_at': '2026-09-17T21:05:00.000Z',
+            'updated_at': '2026-09-17T21:05:00.000Z',
+          },
+          serverVersion: 1,
+          createdAt: DateTime.parse('2026-09-17T21:05:00.000Z'),
+        );
+
+        // Act: apply batch with items and service
+        await applier.applyBatch([itemType1, itemType2, serviceChange]);
+
+        // 1. Verify service exists locally
+        final service = await (db.select(db.services)..where((t) => t.id.equals('srv-82'))).getSingle();
+        expect(service.name, equals('غسيل وكوي ممتاز'));
+        expect(service.price, equals(3500));
+        expect(service.pricingType, equals('per_piece'));
+
+        // 2. Verify both junction rows exist in service_item_types
+        final junctionRows = await (db.select(db.serviceItemTypes)
+              ..where((t) => t.serviceId.equals('srv-82')))
+            .get();
+        expect(junctionRows.length, equals(2));
+
+        // 3. Verify each junction row has a non-empty valid UUID id
+        for (final row in junctionRows) {
+          expect(row.id, isNotEmpty);
+          expect(uuidRegex.hasMatch(row.id), isTrue, reason: 'id "${row.id}" must be a valid UUID');
+          expect(row.serviceId, equals('srv-82'));
+        }
+        final linkedItemTypeIds = junctionRows.map((r) => r.itemTypeId).toSet();
+        expect(linkedItemTypeIds, containsAll(['it-srv-1', 'it-srv-2']));
+
+        // 4. Verify cursor advances
+        final seq = await syncStateDao.getLastAppliedSequence();
+        expect(seq, equals(82));
+
+        // 5. Verify zero echo (no SyncOperations created)
+        final syncOpCount = await (db.selectOnly(db.syncOperations)..addColumns([db.syncOperations.id.count()])).map((row) => row.read(db.syncOperations.id.count())).getSingle();
+        expect(syncOpCount, equals(0));
+      });
+
+      test('B. Storage Location remote change with supported_item_type_ids persists junction rows with valid UUIDs', () async {
+        // Seed two item types first
+        final itemType1 = SyncChangeDto(
+          sequence: 83,
+          operationId: 'op-it-3',
+          entityType: 'item_type',
+          entityId: 'it-loc-1',
+          operationType: 'create',
+          payload: {
+            'id': 'it-loc-1',
+            'name': 'فساتين',
+            'is_active': true,
+            'created_at': '2026-09-17T21:10:00.000Z',
+            'updated_at': '2026-09-17T21:10:00.000Z',
+          },
+          serverVersion: 1,
+          createdAt: DateTime.parse('2026-09-17T21:10:00.000Z'),
+        );
+        final itemType2 = SyncChangeDto(
+          sequence: 84,
+          operationId: 'op-it-4',
+          entityType: 'item_type',
+          entityId: 'it-loc-2',
+          operationType: 'create',
+          payload: {
+            'id': 'it-loc-2',
+            'name': 'بدل رجالي',
+            'is_active': true,
+            'created_at': '2026-09-17T21:10:00.000Z',
+            'updated_at': '2026-09-17T21:10:00.000Z',
+          },
+          serverVersion: 1,
+          createdAt: DateTime.parse('2026-09-17T21:10:00.000Z'),
+        );
+
+        final locationChange = SyncChangeDto(
+          sequence: 85,
+          operationId: 'op-loc-85',
+          entityType: 'storage_location',
+          entityId: 'loc-85',
+          operationType: 'create',
+          payload: {
+            'id': 'loc-85',
+            'name': 'شماعة الملابس الرسمية',
+            'is_active': true,
+            'supported_item_type_ids': ['it-loc-1', 'it-loc-2'],
+            'created_at': '2026-09-17T21:15:00.000Z',
+            'updated_at': '2026-09-17T21:15:00.000Z',
+          },
+          serverVersion: 1,
+          createdAt: DateTime.parse('2026-09-17T21:15:00.000Z'),
+        );
+
+        // Act: apply batch with items and storage location
+        await applier.applyBatch([itemType1, itemType2, locationChange]);
+
+        // 1. Verify storage location exists locally
+        final location = await (db.select(db.storageLocations)..where((t) => t.id.equals('loc-85'))).getSingle();
+        expect(location.name, equals('شماعة الملابس الرسمية'));
+        expect(location.isActive, isTrue);
+
+        // 2. Verify both junction rows exist in storage_location_item_types
+        final junctionRows = await (db.select(db.storageLocationItemTypes)
+              ..where((t) => t.storageLocationId.equals('loc-85')))
+            .get();
+        expect(junctionRows.length, equals(2));
+
+        // 3. Verify each junction row has a non-empty valid UUID id
+        for (final row in junctionRows) {
+          expect(row.id, isNotEmpty);
+          expect(uuidRegex.hasMatch(row.id), isTrue, reason: 'id "${row.id}" must be a valid UUID');
+          expect(row.storageLocationId, equals('loc-85'));
+        }
+        final linkedItemTypeIds = junctionRows.map((r) => r.itemTypeId).toSet();
+        expect(linkedItemTypeIds, containsAll(['it-loc-1', 'it-loc-2']));
+
+        // 4. Verify cursor advances
+        final seq = await syncStateDao.getLastAppliedSequence();
+        expect(seq, equals(85));
+
+        // 5. Verify zero echo (no SyncOperations created)
+        final syncOpCount = await (db.selectOnly(db.syncOperations)..addColumns([db.syncOperations.id.count()])).map((row) => row.read(db.syncOperations.id.count())).getSingle();
+        expect(syncOpCount, equals(0));
+      });
+
+      test('C. Atomic batch rollback: failure within batch rolls back all changes and keeps cursor unchanged', () async {
+        final initialSeq = await syncStateDao.getLastAppliedSequence();
+
+        // Change 1: valid item type
+        final validItemType = SyncChangeDto(
+          sequence: initialSeq + 1,
+          operationId: 'op-valid-it',
+          entityType: 'item_type',
+          entityId: 'it-atomic-rollback',
+          operationType: 'create',
+          payload: {
+            'id': 'it-atomic-rollback',
+            'name': 'عنصر للاختبار الذري',
+            'is_active': true,
+            'created_at': '2026-09-17T22:00:00.000Z',
+            'updated_at': '2026-09-17T22:00:00.000Z',
+          },
+          serverVersion: 1,
+          createdAt: DateTime.parse('2026-09-17T22:00:00.000Z'),
+        );
+
+        // Change 2: invalid storage record with non-existent order_item_id and invalid payload that violates foreign key
+        final invalidStorageChange = SyncChangeDto(
+          sequence: initialSeq + 2,
+          operationId: 'op-invalid-storage',
+          entityType: 'storage_record',
+          entityId: 'sr-invalid-fk',
+          operationType: 'create',
+          payload: {
+            'id': 'sr-invalid-fk',
+            'order_item_id': 'non-existent-order-item-id-999',
+            'storage_location_id': 'non-existent-location-id-999',
+            'is_active': true,
+            'created_at': '2026-09-17T22:01:00.000Z',
+            'updated_at': '2026-09-17T22:01:00.000Z',
+          },
+          serverVersion: 1,
+          createdAt: DateTime.parse('2026-09-17T22:01:00.000Z'),
+        );
+
+        // Act & Assert: batch application should fail due to foreign key restriction
+        expect(
+          () => applier.applyBatch([validItemType, invalidStorageChange]),
+          throwsA(anything),
+        );
+
+        // Verify rollback: validItemType was NOT committed
+        final itemType = await (db.select(db.itemTypes)..where((t) => t.id.equals('it-atomic-rollback'))).getSingleOrNull();
+        expect(itemType, isNull);
+
+        // Verify cursor did not advance
+        final finalSeq = await syncStateDao.getLastAppliedSequence();
+        expect(finalSeq, equals(initialSeq));
+      });
+    });
   });
 }

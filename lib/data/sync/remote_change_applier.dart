@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:uuid/uuid.dart';
 
 import '../local/daos/sync_state_dao.dart';
 import '../local/database/app_database.dart' as app_db;
@@ -544,6 +545,7 @@ class RemoteChangeApplier {
           if (itemTypeId is String) {
             await _db.into(_db.serviceItemTypes).insert(
                   app_db.ServiceItemTypesCompanion(
+                    id: Value(const Uuid().v4()),
                     serviceId: Value(id),
                     itemTypeId: Value(itemTypeId),
                     createdAt: Value(DateTime.now()),
@@ -669,6 +671,7 @@ class RemoteChangeApplier {
           if (itemTypeId is String) {
             await _db.into(_db.storageLocationItemTypes).insert(
                   app_db.StorageLocationItemTypesCompanion(
+                    id: Value(const Uuid().v4()),
                     storageLocationId: Value(id),
                     itemTypeId: Value(itemTypeId),
                     createdAt: Value(DateTime.now()),
