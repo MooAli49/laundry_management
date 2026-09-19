@@ -225,7 +225,7 @@ void main() {
     late TestDevice deviceB;
     bool isLiveBackendAvailable = true;
 
-    final runId = DateTime.now().millisecondsSinceEpoch
+    final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
         .toRadixString(16)
         .padLeft(12, '0');
 
@@ -256,16 +256,15 @@ void main() {
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5aGZnbmJoaWp1a2JkcHRyZXRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NjcxNDcsImV4cCI6MjEwNDA0MzE0N30.gInc0tuzZiWq8EeEqbNBYa_Ay4liCcB4iGGOjUMnOBw',
       );
 
-      testServiceId = 'b0000001-0001-4001-8001-$runId';
-      testCustomerId = 'c0000001-0001-4001-8001-$runId';
+      testServiceId = 'b4c00001-0001-4001-8001-$runId';
+      testCustomerId = 'c4c00001-0001-4001-8001-$runId';
       testCustomerPhone =
-          '015${DateTime.now().millisecondsSinceEpoch % 100000000}'
-              .padRight(11, '7');
-      testOrderId = 'd0000001-0001-4001-8001-$runId';
+          '015${(DateTime.now().microsecondsSinceEpoch % 100000000).toString().padLeft(8, '0')}';
+      testOrderId = 'd4c00001-0001-4001-8001-$runId';
       testOrderNumber = 'ORD-C4C-$runId';
-      testOrderItemId = 'e0000001-0001-4001-8001-$runId';
-      testCarpetId = 'f0000001-0001-4001-8001-$runId';
-      testPaymentId = 'a0000001-0001-4001-8001-$runId';
+      testOrderItemId = 'e4c00001-0001-4001-8001-$runId';
+      testCarpetId = 'f4c00001-0001-4001-8001-$runId';
+      testPaymentId = 'a4c00001-0001-4001-8001-$runId';
 
       drift.driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
 

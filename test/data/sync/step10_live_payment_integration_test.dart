@@ -259,7 +259,7 @@ void main() {
     bool isNetworkAvailable = true;
 
     // Unique per-run UUID generator to guarantee test idempotency and isolation
-    final runId = DateTime.now().millisecondsSinceEpoch
+    final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
         .toRadixString(16)
         .padLeft(12, '0');
     late final String testCustomerId;
@@ -290,8 +290,7 @@ void main() {
       }
 
       if (isNetworkAvailable) {
-        final phone = '010${DateTime.now().millisecondsSinceEpoch % 100000000}'
-            .padRight(11, '7');
+        final phone = '011${(DateTime.now().microsecondsSinceEpoch % 100000000).toString().padLeft(8, '0')}';
         // Seed customer
         await dio.post(
           '/customers',
@@ -555,7 +554,7 @@ void main() {
             'payment_method': 'bitcoin',
           },
           options: Options(
-            headers: {'X-Operation-ID': 'op-step10-invalid-method-1'},
+            headers: {'X-Operation-ID': 'op-step10-invalid-method-$runId'},
             validateStatus: (_) => true,
           ),
         );
@@ -577,7 +576,7 @@ void main() {
           'payment_method': 'cash',
         },
         options: Options(
-          headers: {'X-Operation-ID': 'op-step10-missing-order-1'},
+          headers: {'X-Operation-ID': 'op-step10-missing-order-$runId'},
           validateStatus: (_) => true,
         ),
       );

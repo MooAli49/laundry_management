@@ -118,8 +118,12 @@ void main() {
     );
 
     test('Run-scoped identifiers generate distinct non-colliding operation IDs and valid UUIDs', () {
-      final run1 = (DateTime.now().millisecondsSinceEpoch - 1000).toRadixString(16).padLeft(12, '0');
-      final run2 = DateTime.now().millisecondsSinceEpoch.toRadixString(16).padLeft(12, '0');
+      final run1 = ((DateTime.now().microsecondsSinceEpoch - 1000) % 0xFFFFFFFFFFFF)
+          .toRadixString(16)
+          .padLeft(12, '0');
+      final run2 = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
+          .toRadixString(16)
+          .padLeft(12, '0');
 
       final opId1 = 'op-step9-cust-create-$run1';
       final opId2 = 'op-step9-cust-create-$run2';
@@ -133,6 +137,10 @@ void main() {
       expect(uuid1.length, equals(36));
       expect(uuid2.length, equals(36));
       expect(uuid1, isNot(equals(uuid2)));
+
+      // Cross-suite UUID prefix non-collision regression check
+      final c4cUuid = 'c4c00001-0001-4001-8001-$run1';
+      expect(uuid1, isNot(equals(c4cUuid)));
     });
   });
 
@@ -142,7 +150,7 @@ void main() {
     bool isNetworkAvailable = true;
 
     // Unique per-run hex ID to guarantee test idempotency and isolation across repeated runs
-    final runId = DateTime.now().millisecondsSinceEpoch
+    final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
         .toRadixString(16)
         .padLeft(12, '0');
 
@@ -183,7 +191,7 @@ void main() {
       rejectServiceId = 'b8888888-8888-4888-8888-$runId';
       rejectOpId = 'op-step9-reject-kg-$runId';
       custId = 'c0000001-0001-4001-8001-$runId';
-      custPhone = '010${DateTime.now().millisecondsSinceEpoch % 100000000}'.padRight(11, '1');
+      custPhone = '010${(DateTime.now().microsecondsSinceEpoch % 100000000).toString().padLeft(8, '0')}';
       custCreateOpId = 'op-step9-cust-create-$runId';
       custUpdateOpId = 'op-step9-cust-update-$runId';
       srvId = 'b0000001-0001-4001-8001-$runId';
@@ -680,18 +688,27 @@ void main() {
         );
         expect(updateRes.statusCode, equals(200));
 
-        // Pull changes after the order create sequence
-        final postUpdateRes = await dio.get(
-          '/sync/changes',
-          queryParameters: {'after': orderCreateSeq, 'limit': 50},
-        );
-        expect(postUpdateRes.statusCode, equals(200));
-        final newChanges = (postUpdateRes.data as Map<String, dynamic>)['changes'] as List;
+        // Pull changes after orderCreateSeq until orderUpdateChange is located
+        dynamic orderUpdateChange;
+        int updateCursor = orderCreateSeq;
+        bool updateHasMore = true;
+        while (updateHasMore && orderUpdateChange == null) {
+          final postUpdateRes = await dio.get(
+            '/sync/changes',
+            queryParameters: {'after': updateCursor, 'limit': 100},
+          );
+          expect(postUpdateRes.statusCode, equals(200));
+          final postUpdateData = postUpdateRes.data as Map<String, dynamic>;
+          final newChanges = postUpdateData['changes'] as List;
+          if (newChanges.isEmpty) break;
+          orderUpdateChange = newChanges.firstWhere(
+            (c) => c['operation_id'] == orderStatusUpdateOpId,
+            orElse: () => null,
+          );
+          updateCursor = newChanges.last['sequence'] as int;
+          updateHasMore = postUpdateData['has_more'] == true;
+        }
 
-        final orderUpdateChange = newChanges.firstWhere(
-          (c) => c['operation_id'] == orderStatusUpdateOpId,
-          orElse: () => null,
-        );
         expect(orderUpdateChange, isNotNull);
         expect(orderUpdateChange['entity_type'], equals('order'));
         expect(orderUpdateChange['operation_type'], equals('update'));
@@ -724,15 +741,35 @@ void main() {
       () async {
         if (!isNetworkAvailable) return;
 
-        // Fetch latest sequence before replay
-        final beforeRes = await dio.get(
-          '/sync/changes',
-          queryParameters: {'after': 0, 'limit': 1},
-        );
-        expect(beforeRes.statusCode, equals(200));
-        final latestSeqBefore = (beforeRes.data as Map<String, dynamic>)['latest_sequence'] as int;
+        // 1. Locate the initial sync_changes record for this run's customer creation
+        dynamic initialChange;
+        int currentCursor = 0;
+        bool hasMore = true;
+        while (hasMore && initialChange == null) {
+          final pullRes = await dio.get(
+            '/sync/changes',
+            queryParameters: {'after': currentCursor, 'limit': 100},
+          );
+          expect(pullRes.statusCode, equals(200));
+          final data = pullRes.data as Map<String, dynamic>;
+          final changes = data['changes'] as List;
+          if (changes.isEmpty) break;
+          initialChange = changes.firstWhere(
+            (c) => c['operation_id'] == custCreateOpId,
+            orElse: () => null,
+          );
+          currentCursor = changes.last['sequence'] as int;
+          hasMore = data['has_more'] == true;
+        }
 
-        // Replay customer creation with same operation ID
+        expect(
+          initialChange,
+          isNotNull,
+          reason: 'Initial sync_changes record for $custCreateOpId must exist',
+        );
+        final initialSeq = initialChange['sequence'] as int;
+
+        // 2. Replay customer creation with the exact same operation ID
         final replayRes = await dio.post(
           '/customers',
           data: {
@@ -748,16 +785,34 @@ void main() {
         );
         expect(replayRes.statusCode, isIn([200, 201]));
 
-        // Fetch latest sequence after replay
-        final afterRes = await dio.get(
-          '/sync/changes',
-          queryParameters: {'after': 0, 'limit': 1},
-        );
-        expect(afterRes.statusCode, equals(200));
-        final latestSeqAfter = (afterRes.data as Map<String, dynamic>)['latest_sequence'] as int;
+        // 3. Verify exactly-once: scan all changes after initialSeq to latest head.
+        // There must be ZERO duplicate sync_changes records for custCreateOpId.
+        int scanCursor = initialSeq;
+        bool scanHasMore = true;
+        int duplicateCount = 0;
+        while (scanHasMore) {
+          final scanRes = await dio.get(
+            '/sync/changes',
+            queryParameters: {'after': scanCursor, 'limit': 100},
+          );
+          expect(scanRes.statusCode, equals(200));
+          final scanData = scanRes.data as Map<String, dynamic>;
+          final scanChanges = scanData['changes'] as List;
+          if (scanChanges.isEmpty) break;
+          for (final c in scanChanges) {
+            if (c['operation_id'] == custCreateOpId) {
+              duplicateCount++;
+            }
+          }
+          scanCursor = scanChanges.last['sequence'] as int;
+          scanHasMore = scanData['has_more'] == true;
+        }
 
-        // Sequence must NOT have increased!
-        expect(latestSeqAfter, equals(latestSeqBefore));
+        expect(
+          duplicateCount,
+          equals(0),
+          reason: 'Idempotent replay must NOT create duplicate sync_changes records for $custCreateOpId',
+        );
       },
     );
   });

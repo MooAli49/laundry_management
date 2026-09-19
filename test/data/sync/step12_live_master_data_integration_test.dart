@@ -9,7 +9,7 @@ void main() {
     bool isNetworkAvailable = true;
 
     // Unique per-run UUID generator to guarantee test idempotency and isolation
-    final runId = DateTime.now().millisecondsSinceEpoch
+    final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
         .toRadixString(16)
         .padLeft(12, '0');
 

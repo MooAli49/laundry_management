@@ -48,7 +48,7 @@ void main() {
     late SyncEngine syncEngine;
     bool isLiveBackendAvailable = true;
 
-    final runId = DateTime.now().millisecondsSinceEpoch
+    final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
         .toRadixString(16)
         .padLeft(12, '0');
     late final String testCustomerId;
@@ -76,13 +76,11 @@ void main() {
 
       testCustomerId = 'c1300000-0000-4000-8000-$runId';
       testCustomerName = 'Step 13 Realtime Tester $runId';
-      testPhone = '011${DateTime.now().millisecondsSinceEpoch % 100000000}'
-          .padRight(11, '3');
+      testPhone = '012${(DateTime.now().microsecondsSinceEpoch % 100000000).toString().padLeft(8, '0')}';
 
       noSignalCustomerId = 'c1300000-0000-4000-8001-$runId';
       noSignalCustomerName = 'Step 13 No-Signal Tester $runId';
-      noSignalPhone = '012${DateTime.now().millisecondsSinceEpoch % 100000000}'
-          .padRight(11, '4');
+      noSignalPhone = '013${(DateTime.now().microsecondsSinceEpoch % 100000000).toString().padLeft(8, '0')}';
 
       try {
         final res = await dio.get('/customers', queryParameters: {'limit': 1});
