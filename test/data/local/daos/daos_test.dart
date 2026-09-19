@@ -200,6 +200,135 @@ void main() {
         expect(itemsWithCarpets.first.carpet!.area, 6.0);
       },
     );
+
+    test(
+      'BUG-002: getDashboardOperationalStats filters expected_pickup_date using half-open interval [startOfToday, startOfNextDay)',
+      () async {
+        final refDay = DateTime.utc(2026, 9, 19);
+        final todayStart = DateTime(2026, 9, 19, 0, 0, 0);
+        final todayEnd = DateTime(2026, 9, 19, 23, 59, 59, 999);
+        final createdAt = DateTime(2026, 9, 19, 10, 0, 0);
+
+        await customersDao.insertCustomer(
+          CustomersCompanion(
+            id: const Value('cust-dash'),
+            name: const Value('عميل لوحة التحكم'),
+            phone: const Value('01011112222'),
+            createdAt: Value(createdAt),
+            updatedAt: Value(createdAt),
+          ),
+        );
+
+        // Case A: Order with expected_pickup_date at midnight today (00:00:00) -> INCLUDED
+        await ordersDao.insertOrder(
+          OrdersCompanion.insert(
+            id: 'ord-midnight-today',
+            orderNumber: '26-101',
+            customerId: 'cust-dash',
+            status: const Value('processing'),
+            expectedPickupDate: DateTime.utc(2026, 9, 19, 0, 0, 0),
+            subtotal: 1000,
+            total: 1000,
+            createdAt: createdAt,
+            updatedAt: createdAt,
+          ),
+        );
+
+        // Case B: Order with expected_pickup_date during today (14:30:00) -> INCLUDED
+        await ordersDao.insertOrder(
+          OrdersCompanion.insert(
+            id: 'ord-afternoon-today',
+            orderNumber: '26-102',
+            customerId: 'cust-dash',
+            status: const Value('processing'),
+            expectedPickupDate: DateTime.utc(2026, 9, 19, 14, 30, 0),
+            subtotal: 1000,
+            total: 1000,
+            createdAt: createdAt,
+            updatedAt: createdAt,
+          ),
+        );
+
+        // Case C: Order with expected_pickup_date near end of today (23:59:59) -> INCLUDED
+        await ordersDao.insertOrder(
+          OrdersCompanion.insert(
+            id: 'ord-end-today',
+            orderNumber: '26-103',
+            customerId: 'cust-dash',
+            status: const Value('ready'),
+            expectedPickupDate: DateTime.utc(2026, 9, 19, 23, 59, 59),
+            subtotal: 1000,
+            total: 1000,
+            createdAt: createdAt,
+            updatedAt: createdAt,
+          ),
+        );
+
+        // Case D: Order with expected_pickup_date exactly at start of tomorrow (00:00:00) -> EXCLUDED
+        await ordersDao.insertOrder(
+          OrdersCompanion.insert(
+            id: 'ord-tomorrow-start',
+            orderNumber: '26-104',
+            customerId: 'cust-dash',
+            status: const Value('processing'),
+            expectedPickupDate: DateTime.utc(2026, 9, 20, 0, 0, 0),
+            subtotal: 1000,
+            total: 1000,
+            createdAt: createdAt,
+            updatedAt: createdAt,
+          ),
+        );
+
+        // Case E: Order with expected_pickup_date yesterday (2026-09-18 23:59:59) -> EXCLUDED from today, counted in OVERDUE
+        await ordersDao.insertOrder(
+          OrdersCompanion.insert(
+            id: 'ord-yesterday',
+            orderNumber: '26-105',
+            customerId: 'cust-dash',
+            status: const Value('processing'),
+            expectedPickupDate: DateTime.utc(2026, 9, 18, 23, 59, 59),
+            subtotal: 1000,
+            total: 1000,
+            createdAt: createdAt,
+            updatedAt: createdAt,
+          ),
+        );
+
+        // Query operational stats with todayDate = refDay
+        final stats = await ordersDao.getDashboardOperationalStats(
+          todayStart: todayStart,
+          todayEnd: todayEnd,
+          todayDate: refDay,
+        );
+
+        // Verification:
+        // Cases A, B, C are included in todayPickupOrdersCount -> exactly 3
+        expect(
+          stats.todayPickupOrdersCount,
+          equals(3),
+          reason: 'Midnight (00:00), afternoon (14:30), and end-of-day (23:59) orders must be included in today pickups',
+        );
+
+        // Case E is overdue (< startOfToday) -> exactly 1
+        expect(
+          stats.overdueOrdersCount,
+          equals(1),
+          reason: 'Yesterday pickup is overdue',
+        );
+
+        // Case F: Verify remaining operational statistics are accurate
+        // All 5 orders created today
+        expect(stats.todayOrdersCount, equals(5));
+
+        // 4 processing (101, 102, 104, 105), 1 ready (103)
+        expect(stats.processingOrdersCount, equals(4));
+        expect(stats.readyOrdersCount, equals(1));
+
+        // Total unpaid = 5000 piastres across all 5 orders
+        expect(stats.totalRemainingPiastres, equals(5000));
+        expect(stats.unpaidOrdersCount, equals(5));
+      },
+    );
   });
 
   group('PaymentsDao', () {

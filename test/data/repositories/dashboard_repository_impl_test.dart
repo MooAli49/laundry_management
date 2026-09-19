@@ -702,4 +702,45 @@ void main() {
 
     await sub.cancel();
   });
+
+  test('BUG-002: getDashboardData includes orders with non-midnight expectedPickupDate in todayPickupOrdersCount', () async {
+    final now = DateTime.now();
+    final customer = Customer(
+      id: 'cust-time-test',
+      name: 'عميل وقت الاستلام',
+      phone: '01011223344',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await customersDao.insertCustomer(
+      CustomersCompanion.insert(
+        id: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+        createdAt: customer.createdAt,
+        updatedAt: customer.updatedAt,
+      ),
+    );
+
+    // Order with afternoon expected pickup time today (14:30)
+    final afternoonPickup = DateTime(now.year, now.month, now.day, 14, 30);
+    await ordersDao.insertOrder(
+      OrdersCompanion.insert(
+        id: 'ord-afternoon',
+        orderNumber: '26-701',
+        customerId: customer.id,
+        customerNameSnapshot: const Value('عميل وقت الاستلام'),
+        customerPhoneSnapshot: const Value('01011223344'),
+        status: const Value('processing'),
+        expectedPickupDate: afternoonPickup,
+        subtotal: 5000,
+        total: 5000,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    final data = await dashboardRepository.getDashboardData();
+    expect(data.todayPickupOrdersCount, equals(1));
+  });
 }
