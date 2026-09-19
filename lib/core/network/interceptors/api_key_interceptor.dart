@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../../config/supabase_config.dart';
+
 /// Interceptor that attaches the static infrastructure API key headers
 /// required by the remote Supabase REST API / Edge Functions.
 ///
@@ -8,14 +10,10 @@ import 'package:dio/dio.dart';
 class ApiKeyInterceptor extends Interceptor {
   final String _apiKey;
 
-  ApiKeyInterceptor({String? apiKey})
-    : _apiKey =
-          apiKey ??
-          const String.fromEnvironment(
-            'SUPABASE_ANON_KEY',
-            defaultValue:
-                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5aGZnbmJoaWp1a2JkcHRyZXRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NjcxNDcsImV4cCI6MjEwNDA0MzE0N30.gInc0tuzZiWq8EeEqbNBYa_Ay4liCcB4iGGOjUMnOBw',
-          );
+  ApiKeyInterceptor({String? apiKey, SupabaseConfig? config})
+      : _apiKey = apiKey ??
+            (config?.anonKey ??
+                SupabaseConfig.resolve(customAnonKey: apiKey).anonKey);
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {

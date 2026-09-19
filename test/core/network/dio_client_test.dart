@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
+import 'package:laundry_management/core/config/supabase_config.dart';
 import 'package:laundry_management/core/di/injection.dart';
 import 'package:laundry_management/core/network/dio_client.dart';
 import 'package:laundry_management/core/network/interceptors/api_key_interceptor.dart';
@@ -104,14 +105,17 @@ void main() {
       () async {
         await initDependencies();
 
+        expect(GetIt.instance.isRegistered<SupabaseConfig>(), isTrue);
         expect(GetIt.instance.isRegistered<NetworkInfo>(), isTrue);
         expect(GetIt.instance.isRegistered<DioClient>(), isTrue);
         expect(GetIt.instance.isRegistered<Dio>(), isTrue);
 
+        final config = GetIt.instance<SupabaseConfig>();
         final networkInfo = GetIt.instance<NetworkInfo>();
         final dioClient = GetIt.instance<DioClient>();
         final dio = GetIt.instance<Dio>();
 
+        expect(config, isA<SupabaseConfig>());
         expect(networkInfo, isA<NetworkInfo>());
         expect(dioClient, isA<DioClient>());
         expect(dio, isA<Dio>());

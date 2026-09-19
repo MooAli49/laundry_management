@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../config/supabase_config.dart';
 import 'interceptors/api_key_interceptor.dart';
 import 'interceptors/logging_interceptor.dart';
 
@@ -27,14 +28,17 @@ class DioClient {
     Duration? sendTimeout,
     List<Interceptor>? additionalInterceptors,
     Dio? dio,
+    SupabaseConfig? config,
   }) : _dio = dio ?? Dio() {
-    final effectiveBaseUrl =
-        baseUrl ??
-        const String.fromEnvironment(
-          'SUPABASE_URL',
-          defaultValue:
-              'https://dyhfgnbhijukbdptreto.supabase.co/functions/v1/api',
+    final effectiveConfig =
+        config ??
+        SupabaseConfig.resolve(
+          customApiUrl: baseUrl,
+          customAnonKey: apiKey,
         );
+
+    final effectiveBaseUrl = baseUrl ?? effectiveConfig.apiUrl;
+    final effectiveApiKey = apiKey ?? effectiveConfig.anonKey;
 
     _dio.options = BaseOptions(
       baseUrl: effectiveBaseUrl,
@@ -46,7 +50,7 @@ class DioClient {
     );
 
     _dio.interceptors.addAll([
-      ApiKeyInterceptor(apiKey: apiKey),
+      ApiKeyInterceptor(apiKey: effectiveApiKey),
       LoggingInterceptor(),
       if (additionalInterceptors != null) ...additionalInterceptors,
     ]);

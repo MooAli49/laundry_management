@@ -84,12 +84,18 @@ import '../../data/sync/sync_engine.dart';
 import '../../domain/sync/sync_error_classifier.dart';
 import '../../domain/sync/sync_retry_policy.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../config/supabase_config.dart';
 import '../network/realtime_sync_adapter.dart';
 import '../../data/datasources/remote/supabase_realtime_sync_adapter.dart';
 
 final getIt = GetIt.instance;
 
 Future<void> initDependencies({bool? enableDevTestData}) async {
+  // 0. Supabase Configuration
+  if (!getIt.isRegistered<SupabaseConfig>()) {
+    getIt.registerLazySingleton<SupabaseConfig>(() => SupabaseConfig.resolve());
+  }
+
   // 1. Core Local Database
   if (!getIt.isRegistered<AppDatabase>()) {
     getIt.registerLazySingleton<AppDatabase>(() => AppDatabase());
@@ -100,7 +106,9 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
     getIt.registerLazySingleton<NetworkInfo>(() => NetworkInfoImpl());
   }
   if (!getIt.isRegistered<DioClient>()) {
-    getIt.registerLazySingleton<DioClient>(() => DioClient());
+    getIt.registerLazySingleton<DioClient>(
+      () => DioClient(config: getIt<SupabaseConfig>()),
+    );
   }
   if (!getIt.isRegistered<Dio>()) {
     getIt.registerLazySingleton<Dio>(() => getIt<DioClient>().dio);
@@ -254,16 +262,8 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
   // Realtime Infrastructure
   if (!getIt.isRegistered<SupabaseClient>()) {
     getIt.registerLazySingleton<SupabaseClient>(() {
-      const supabaseUrl = String.fromEnvironment(
-        'SUPABASE_URL_ROOT',
-        defaultValue: 'https://dyhfgnbhijukbdptreto.supabase.co',
-      );
-      const supabaseAnonKey = String.fromEnvironment(
-        'SUPABASE_ANON_KEY',
-        defaultValue:
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5aGZnbmJoaWp1a2JkcHRyZXRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NjcxNDcsImV4cCI6MjEwNDA0MzE0N30.gInc0tuzZiWq8EeEqbNBYa_Ay4liCcB4iGGOjUMnOBw',
-      );
-      return SupabaseClient(supabaseUrl, supabaseAnonKey);
+      final config = getIt<SupabaseConfig>();
+      return SupabaseClient(config.urlRoot, config.anonKey);
     });
   }
   if (!getIt.isRegistered<RealtimeSyncAdapter>()) {
