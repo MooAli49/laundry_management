@@ -1092,5 +1092,449 @@ void main() {
         expect(finalSeq, equals(initialSeq));
       });
     });
+
+    // -------------------------------------------------------------------------
+    // 12. Phase 3A — Canonical Baseline Contract
+    // -------------------------------------------------------------------------
+    group('12. Phase 3A — Canonical Baseline Contract', () {
+      // ---- Service payload contract ------------------------------------------
+
+      test(
+          'A. Service with canonical supported_item_type_ids populates junction rows',
+          () async {
+        final itemType = SyncChangeDto(
+          sequence: 90,
+          operationId: 'op-canonical-it-1',
+          entityType: 'item_type',
+          entityId: '00000000-0000-0000-0001-000000000001',
+          operationType: 'create',
+          payload: {
+            'id': '00000000-0000-0000-0001-000000000001',
+            'name': 'ملابس',
+            'is_active': true,
+            'created_at': '2026-09-19T00:00:00.000Z',
+            'updated_at': '2026-09-19T00:00:00.000Z',
+          },
+          serverVersion: 1,
+          createdAt: DateTime.parse('2026-09-19T00:00:00.000Z'),
+        );
+
+        // Canonical service payload: uses supported_item_type_ids (not item_type_ids)
+        final serviceChange = SyncChangeDto(
+          sequence: 91,
+          operationId: 'op-canonical-srv-1',
+          entityType: 'service',
+          entityId: '00000000-0000-0000-0002-000000000001',
+          operationType: 'create',
+          payload: {
+            'id': '00000000-0000-0000-0002-000000000001',
+            'name': 'غسيل ومكوى',
+            'description': 'خدمة تجريبية',
+            'pricing_type': 'per_piece',
+            'price': 2500,
+            'is_active': true,
+            'server_version': 1,
+            'supported_item_type_ids': ['00000000-0000-0000-0001-000000000001'],
+            'created_at': '2026-09-19T00:00:00.000Z',
+            'updated_at': '2026-09-19T00:00:00.000Z',
+          },
+          serverVersion: 1,
+          createdAt: DateTime.parse('2026-09-19T00:00:00.000Z'),
+        );
+
+        await applier.applyBatch([itemType, serviceChange]);
+
+        // Service row persisted
+        final svc = await (db.select(db.services)
+              ..where(
+                  (t) => t.id.equals('00000000-0000-0000-0002-000000000001')))
+            .getSingle();
+        expect(svc.name, equals('غسيل ومكوى'));
+        expect(svc.price, equals(2500));
+        expect(svc.pricingType, equals('per_piece'));
+
+        // Junction row constructed from supported_item_type_ids
+        final junctionRows = await (db.select(db.serviceItemTypes)
+              ..where((t) =>
+                  t.serviceId.equals('00000000-0000-0000-0002-000000000001')))
+            .get();
+        expect(junctionRows.length, equals(1));
+        expect(junctionRows.first.itemTypeId,
+            equals('00000000-0000-0000-0001-000000000001'));
+
+        // Cursor advanced
+        expect(await syncStateDao.getLastAppliedSequence(), equals(91));
+      });
+
+      test(
+          'B. Service with legacy item_type_ids (backward compat) still populates junction rows',
+          () async {
+        final itemType = SyncChangeDto(
+          sequence: 92,
+          operationId: 'op-legacy-it-1',
+          entityType: 'item_type',
+          entityId: 'it-legacy-compat-1',
+          operationType: 'create',
+          payload: {
+            'id': 'it-legacy-compat-1',
+            'name': 'تجريبي',
+            'is_active': true,
+            'created_at': '2026-09-19T00:01:00.000Z',
+            'updated_at': '2026-09-19T00:01:00.000Z',
+          },
+          serverVersion: 1,
+          createdAt: DateTime.parse('2026-09-19T00:01:00.000Z'),
+        );
+
+        // Legacy payload: uses item_type_ids (old field name — backward compat)
+        final serviceChange = SyncChangeDto(
+          sequence: 93,
+          operationId: 'op-legacy-srv-1',
+          entityType: 'service',
+          entityId: 'srv-legacy-compat',
+          operationType: 'create',
+          payload: {
+            'id': 'srv-legacy-compat',
+            'name': 'خدمة قديمة',
+            'pricing_type': 'per_piece',
+            'price': 1000,
+            'is_active': true,
+            // Legacy field name — must still work
+            'item_type_ids': ['it-legacy-compat-1'],
+            'created_at': '2026-09-19T00:01:00.000Z',
+            'updated_at': '2026-09-19T00:01:00.000Z',
+          },
+          serverVersion: 1,
+          createdAt: DateTime.parse('2026-09-19T00:01:00.000Z'),
+        );
+
+        await applier.applyBatch([itemType, serviceChange]);
+
+        final junctionRows = await (db.select(db.serviceItemTypes)
+              ..where((t) => t.serviceId.equals('srv-legacy-compat')))
+            .get();
+        expect(junctionRows.length, equals(1));
+        expect(junctionRows.first.itemTypeId, equals('it-legacy-compat-1'));
+
+        expect(await syncStateDao.getLastAppliedSequence(), equals(93));
+      });
+
+      test(
+          'C. supported_item_type_ids takes precedence over item_type_ids when both present',
+          () async {
+        final itemTypeA = SyncChangeDto(
+          sequence: 94,
+          operationId: 'op-prio-it-a',
+          entityType: 'item_type',
+          entityId: 'it-prio-a',
+          operationType: 'create',
+          payload: {
+            'id': 'it-prio-a',
+            'name': 'أولوية أ',
+            'is_active': true,
+            'created_at': '2026-09-19T00:02:00.000Z',
+            'updated_at': '2026-09-19T00:02:00.000Z',
+          },
+          serverVersion: 1,
+          createdAt: DateTime.parse('2026-09-19T00:02:00.000Z'),
+        );
+        final itemTypeB = SyncChangeDto(
+          sequence: 95,
+          operationId: 'op-prio-it-b',
+          entityType: 'item_type',
+          entityId: 'it-prio-b',
+          operationType: 'create',
+          payload: {
+            'id': 'it-prio-b',
+            'name': 'أولوية ب',
+            'is_active': true,
+            'created_at': '2026-09-19T00:02:00.000Z',
+            'updated_at': '2026-09-19T00:02:00.000Z',
+          },
+          serverVersion: 1,
+          createdAt: DateTime.parse('2026-09-19T00:02:00.000Z'),
+        );
+
+        // Both fields present: supported_item_type_ids must win
+        final serviceChange = SyncChangeDto(
+          sequence: 96,
+          operationId: 'op-prio-srv',
+          entityType: 'service',
+          entityId: 'srv-priority-test',
+          operationType: 'create',
+          payload: {
+            'id': 'srv-priority-test',
+            'name': 'اختبار أولوية',
+            'pricing_type': 'per_piece',
+            'price': 1000,
+            'is_active': true,
+            // Canonical key must win
+            'supported_item_type_ids': ['it-prio-a'],
+            // Legacy key must be ignored
+            'item_type_ids': ['it-prio-b'],
+            'created_at': '2026-09-19T00:02:00.000Z',
+            'updated_at': '2026-09-19T00:02:00.000Z',
+          },
+          serverVersion: 1,
+          createdAt: DateTime.parse('2026-09-19T00:02:00.000Z'),
+        );
+
+        await applier.applyBatch([itemTypeA, itemTypeB, serviceChange]);
+
+        final junctionRows = await (db.select(db.serviceItemTypes)
+              ..where((t) => t.serviceId.equals('srv-priority-test')))
+            .get();
+        expect(junctionRows.length, equals(1));
+        // Must reference the canonical supported_item_type_ids entry (it-prio-a)
+        expect(junctionRows.first.itemTypeId, equals('it-prio-a'));
+
+        expect(await syncStateDao.getLastAppliedSequence(), equals(96));
+      });
+
+      test(
+          'D. Storage location with supported_item_type_ids reconstructs junction rows',
+          () async {
+        final itemType1 = SyncChangeDto(
+          sequence: 97,
+          operationId: 'op-loc-it-1',
+          entityType: 'item_type',
+          entityId: '00000000-0000-0000-0001-000000000001',
+          operationType: 'create',
+          payload: {
+            'id': '00000000-0000-0000-0001-000000000001',
+            'name': 'ملابس',
+            'is_active': true,
+            'created_at': '2026-09-19T00:03:00.000Z',
+            'updated_at': '2026-09-19T00:03:00.000Z',
+          },
+          serverVersion: 1,
+          createdAt: DateTime.parse('2026-09-19T00:03:00.000Z'),
+        );
+        final itemType2 = SyncChangeDto(
+          sequence: 98,
+          operationId: 'op-loc-it-2',
+          entityType: 'item_type',
+          entityId: '00000000-0000-0000-0001-000000000004',
+          operationType: 'create',
+          payload: {
+            'id': '00000000-0000-0000-0001-000000000004',
+            'name': 'أغطية',
+            'is_active': true,
+            'created_at': '2026-09-19T00:03:00.000Z',
+            'updated_at': '2026-09-19T00:03:00.000Z',
+          },
+          serverVersion: 1,
+          createdAt: DateTime.parse('2026-09-19T00:03:00.000Z'),
+        );
+
+        // Canonical storage location payload (matches baseline script)
+        final locChange = SyncChangeDto(
+          sequence: 99,
+          operationId: 'op-baseline-021',
+          entityType: 'storage_location',
+          entityId: '00000000-0000-0000-0006-000000000001',
+          operationType: 'create',
+          payload: {
+            'id': '00000000-0000-0000-0006-000000000001',
+            'name': 'رف أ-1',
+            'is_active': true,
+            'server_version': 1,
+            'supported_item_type_ids': [
+              '00000000-0000-0000-0001-000000000001',
+              '00000000-0000-0000-0001-000000000004',
+            ],
+            'created_at': '2026-09-19T00:03:00.000Z',
+            'updated_at': '2026-09-19T00:03:00.000Z',
+          },
+          serverVersion: 1,
+          createdAt: DateTime.parse('2026-09-19T00:03:00.000Z'),
+        );
+
+        await applier.applyBatch([itemType1, itemType2, locChange]);
+
+        // Storage location persisted
+        final loc = await (db.select(db.storageLocations)
+              ..where(
+                  (t) => t.id.equals('00000000-0000-0000-0006-000000000001')))
+            .getSingle();
+        expect(loc.name, equals('رف أ-1'));
+
+        // Both junction rows created
+        final junctionRows = await (db.select(db.storageLocationItemTypes)
+              ..where((t) => t.storageLocationId
+                  .equals('00000000-0000-0000-0006-000000000001')))
+            .get();
+        expect(junctionRows.length, equals(2));
+        final linkedTypeIds = junctionRows.map((r) => r.itemTypeId).toSet();
+        expect(linkedTypeIds,
+            containsAll(['00000000-0000-0000-0001-000000000001', '00000000-0000-0000-0001-000000000004']));
+
+        expect(await syncStateDao.getLastAppliedSequence(), equals(99));
+      });
+
+      // ---- Canonical Baseline ID & Count assertions ---------------------------
+
+      test(
+          'E. Canonical baseline batch replay (35 changes) produces correct master state',
+          () async {
+        // Build all 35 canonical baseline changes matching the approved plan
+        const t0 = '2026-09-19T00:00:00.000Z';
+        final dt0 = DateTime.parse(t0);
+
+        final batch = <SyncChangeDto>[
+          // Seq 1: business_settings
+          SyncChangeDto(sequence: 1, operationId: 'op-baseline-001', entityType: 'business_settings',
+              entityId: '00000000-0000-0000-0000-000000000001', operationType: 'create',
+              payload: {'id': '00000000-0000-0000-0000-000000000001', 'business_name': '', 'tax_enabled': false, 'tax_rate': 0.0, 'server_version': 1, 'created_at': t0, 'updated_at': t0},
+              serverVersion: 1, createdAt: dt0),
+
+          // Seq 2..5: item_types
+          SyncChangeDto(sequence: 2, operationId: 'op-baseline-002', entityType: 'item_type',
+              entityId: '00000000-0000-0000-0001-000000000001', operationType: 'create',
+              payload: {'id': '00000000-0000-0000-0001-000000000001', 'name': 'ملابس', 'is_active': true, 'created_at': t0, 'updated_at': t0},
+              serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 3, operationId: 'op-baseline-003', entityType: 'item_type',
+              entityId: '00000000-0000-0000-0001-000000000002', operationType: 'create',
+              payload: {'id': '00000000-0000-0000-0001-000000000002', 'name': 'بطاطين', 'is_active': true, 'created_at': t0, 'updated_at': t0},
+              serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 4, operationId: 'op-baseline-004', entityType: 'item_type',
+              entityId: '00000000-0000-0000-0001-000000000003', operationType: 'create',
+              payload: {'id': '00000000-0000-0000-0001-000000000003', 'name': 'سجاد', 'is_active': true, 'created_at': t0, 'updated_at': t0},
+              serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 5, operationId: 'op-baseline-005', entityType: 'item_type',
+              entityId: '00000000-0000-0000-0001-000000000004', operationType: 'create',
+              payload: {'id': '00000000-0000-0000-0001-000000000004', 'name': 'أغطية', 'is_active': true, 'created_at': t0, 'updated_at': t0},
+              serverVersion: 1, createdAt: dt0),
+
+          // Seq 6..12: expense_categories
+          SyncChangeDto(sequence: 6,  operationId: 'op-baseline-006', entityType: 'expense_category', entityId: '00000000-0000-0000-0002-000000000001', operationType: 'create', payload: {'id': '00000000-0000-0000-0002-000000000001', 'name': 'كهرباء', 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 7,  operationId: 'op-baseline-007', entityType: 'expense_category', entityId: '00000000-0000-0000-0002-000000000002', operationType: 'create', payload: {'id': '00000000-0000-0000-0002-000000000002', 'name': 'مياه', 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 8,  operationId: 'op-baseline-008', entityType: 'expense_category', entityId: '00000000-0000-0000-0002-000000000003', operationType: 'create', payload: {'id': '00000000-0000-0000-0002-000000000003', 'name': 'منظفات', 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 9,  operationId: 'op-baseline-009', entityType: 'expense_category', entityId: '00000000-0000-0000-0002-000000000004', operationType: 'create', payload: {'id': '00000000-0000-0000-0002-000000000004', 'name': 'صيانة', 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 10, operationId: 'op-baseline-010', entityType: 'expense_category', entityId: '00000000-0000-0000-0002-000000000005', operationType: 'create', payload: {'id': '00000000-0000-0000-0002-000000000005', 'name': 'مستلزمات', 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 11, operationId: 'op-baseline-011', entityType: 'expense_category', entityId: '00000000-0000-0000-0002-000000000006', operationType: 'create', payload: {'id': '00000000-0000-0000-0002-000000000006', 'name': 'نقل', 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 12, operationId: 'op-baseline-012', entityType: 'expense_category', entityId: '00000000-0000-0000-0002-000000000007', operationType: 'create', payload: {'id': '00000000-0000-0000-0002-000000000007', 'name': 'أخرى', 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+
+          // Seq 13..17: services (canonical supported_item_type_ids)
+          SyncChangeDto(sequence: 13, operationId: 'op-baseline-013', entityType: 'service', entityId: '00000000-0000-0000-0002-000000000001', operationType: 'create', payload: {'id': '00000000-0000-0000-0002-000000000001', 'name': 'غسيل ومكوى', 'description': 'خدمة تجريبية', 'pricing_type': 'per_piece', 'price': 2500, 'is_active': true, 'server_version': 1, 'supported_item_type_ids': ['00000000-0000-0000-0001-000000000001'], 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 14, operationId: 'op-baseline-014', entityType: 'service', entityId: '00000000-0000-0000-0002-000000000002', operationType: 'create', payload: {'id': '00000000-0000-0000-0002-000000000002', 'name': 'دراي كلين', 'description': 'خدمة تجريبية', 'pricing_type': 'per_piece', 'price': 4500, 'is_active': true, 'server_version': 1, 'supported_item_type_ids': ['00000000-0000-0000-0001-000000000001'], 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 15, operationId: 'op-baseline-015', entityType: 'service', entityId: '00000000-0000-0000-0002-000000000003', operationType: 'create', payload: {'id': '00000000-0000-0000-0002-000000000003', 'name': 'غسيل سجاد', 'description': 'خدمة تجريبية', 'pricing_type': 'per_square_meter', 'price': 6000, 'is_active': true, 'server_version': 1, 'supported_item_type_ids': ['00000000-0000-0000-0001-000000000003'], 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 16, operationId: 'op-baseline-016', entityType: 'service', entityId: '00000000-0000-0000-0002-000000000004', operationType: 'create', payload: {'id': '00000000-0000-0000-0002-000000000004', 'name': 'تنظيف بطاطين', 'description': 'خدمة تجريبية', 'pricing_type': 'fixed_price', 'price': 8000, 'is_active': true, 'server_version': 1, 'supported_item_type_ids': ['00000000-0000-0000-0001-000000000002'], 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 17, operationId: 'op-baseline-017', entityType: 'service', entityId: '00000000-0000-0000-0002-000000000005', operationType: 'create', payload: {'id': '00000000-0000-0000-0002-000000000005', 'name': 'غسيل أغطية', 'description': 'خدمة تجريبية', 'pricing_type': 'fixed_price', 'price': 3500, 'is_active': true, 'server_version': 1, 'supported_item_type_ids': ['00000000-0000-0000-0001-000000000004'], 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+
+          // Seq 18..20: carpet_sizes
+          SyncChangeDto(sequence: 18, operationId: 'op-baseline-018', entityType: 'carpet_size', entityId: '00000000-0000-0000-0007-000000000001', operationType: 'create', payload: {'id': '00000000-0000-0000-0007-000000000001', 'name': '2.0x3.0', 'length': 2.0, 'width': 3.0, 'area': 6.0, 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 19, operationId: 'op-baseline-019', entityType: 'carpet_size', entityId: '00000000-0000-0000-0007-000000000002', operationType: 'create', payload: {'id': '00000000-0000-0000-0007-000000000002', 'name': '1.5x2.0', 'length': 1.5, 'width': 2.0, 'area': 3.0, 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 20, operationId: 'op-baseline-020', entityType: 'carpet_size', entityId: '00000000-0000-0000-0007-000000000003', operationType: 'create', payload: {'id': '00000000-0000-0000-0007-000000000003', 'name': '1.0x4.0', 'length': 1.0, 'width': 4.0, 'area': 4.0, 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+
+          // Seq 21..25: storage_locations (canonical supported_item_type_ids)
+          SyncChangeDto(sequence: 21, operationId: 'op-baseline-021', entityType: 'storage_location', entityId: '00000000-0000-0000-0006-000000000001', operationType: 'create', payload: {'id': '00000000-0000-0000-0006-000000000001', 'name': 'رف أ-1', 'is_active': true, 'server_version': 1, 'supported_item_type_ids': ['00000000-0000-0000-0001-000000000001', '00000000-0000-0000-0001-000000000004'], 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 22, operationId: 'op-baseline-022', entityType: 'storage_location', entityId: '00000000-0000-0000-0006-000000000002', operationType: 'create', payload: {'id': '00000000-0000-0000-0006-000000000002', 'name': 'رف أ-2', 'is_active': true, 'server_version': 1, 'supported_item_type_ids': ['00000000-0000-0000-0001-000000000001', '00000000-0000-0000-0001-000000000004'], 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 23, operationId: 'op-baseline-023', entityType: 'storage_location', entityId: '00000000-0000-0000-0006-000000000003', operationType: 'create', payload: {'id': '00000000-0000-0000-0006-000000000003', 'name': 'رف ب-1', 'is_active': true, 'server_version': 1, 'supported_item_type_ids': ['00000000-0000-0000-0001-000000000001', '00000000-0000-0000-0001-000000000004'], 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 24, operationId: 'op-baseline-024', entityType: 'storage_location', entityId: '00000000-0000-0000-0006-000000000004', operationType: 'create', payload: {'id': '00000000-0000-0000-0006-000000000004', 'name': 'قسم السجاد 1', 'is_active': true, 'server_version': 1, 'supported_item_type_ids': ['00000000-0000-0000-0001-000000000003'], 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 25, operationId: 'op-baseline-025', entityType: 'storage_location', entityId: '00000000-0000-0000-0006-000000000005', operationType: 'create', payload: {'id': '00000000-0000-0000-0006-000000000005', 'name': 'قسم البطاطين 1', 'is_active': true, 'server_version': 1, 'supported_item_type_ids': ['00000000-0000-0000-0001-000000000002', '00000000-0000-0000-0001-000000000004'], 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+
+          // Seq 26..35: item_definitions
+          SyncChangeDto(sequence: 26, operationId: 'op-baseline-026', entityType: 'item_definition', entityId: '00000000-0000-0000-0005-000000000001', operationType: 'create', payload: {'id': '00000000-0000-0000-0005-000000000001', 'item_type_id': '00000000-0000-0000-0001-000000000001', 'name': 'قميص', 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 27, operationId: 'op-baseline-027', entityType: 'item_definition', entityId: '00000000-0000-0000-0005-000000000002', operationType: 'create', payload: {'id': '00000000-0000-0000-0005-000000000002', 'item_type_id': '00000000-0000-0000-0001-000000000001', 'name': 'بنطلون', 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 28, operationId: 'op-baseline-028', entityType: 'item_definition', entityId: '00000000-0000-0000-0005-000000000003', operationType: 'create', payload: {'id': '00000000-0000-0000-0005-000000000003', 'item_type_id': '00000000-0000-0000-0001-000000000001', 'name': 'بدلة', 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 29, operationId: 'op-baseline-029', entityType: 'item_definition', entityId: '00000000-0000-0000-0005-000000000004', operationType: 'create', payload: {'id': '00000000-0000-0000-0005-000000000004', 'item_type_id': '00000000-0000-0000-0001-000000000002', 'name': 'بطانية مفرد', 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 30, operationId: 'op-baseline-030', entityType: 'item_definition', entityId: '00000000-0000-0000-0005-000000000005', operationType: 'create', payload: {'id': '00000000-0000-0000-0005-000000000005', 'item_type_id': '00000000-0000-0000-0001-000000000002', 'name': 'بطانية دبل', 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 31, operationId: 'op-baseline-031', entityType: 'item_definition', entityId: '00000000-0000-0000-0005-000000000006', operationType: 'create', payload: {'id': '00000000-0000-0000-0005-000000000006', 'item_type_id': '00000000-0000-0000-0001-000000000003', 'name': 'سجادة صوف', 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 32, operationId: 'op-baseline-032', entityType: 'item_definition', entityId: '00000000-0000-0000-0005-000000000007', operationType: 'create', payload: {'id': '00000000-0000-0000-0005-000000000007', 'item_type_id': '00000000-0000-0000-0001-000000000003', 'name': 'مشاية', 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 33, operationId: 'op-baseline-033', entityType: 'item_definition', entityId: '00000000-0000-0000-0005-000000000008', operationType: 'create', payload: {'id': '00000000-0000-0000-0005-000000000008', 'item_type_id': '00000000-0000-0000-0001-000000000004', 'name': 'غطاء لحاف', 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 34, operationId: 'op-baseline-034', entityType: 'item_definition', entityId: '00000000-0000-0000-0005-000000000009', operationType: 'create', payload: {'id': '00000000-0000-0000-0005-000000000009', 'item_type_id': '00000000-0000-0000-0001-000000000004', 'name': 'كوفرتة', 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+          SyncChangeDto(sequence: 35, operationId: 'op-baseline-035', entityType: 'item_definition', entityId: '00000000-0000-0000-0005-000000000010', operationType: 'create', payload: {'id': '00000000-0000-0000-0005-000000000010', 'item_type_id': '00000000-0000-0000-0001-000000000003', 'name': 'سجادة حرير', 'is_active': true, 'created_at': t0, 'updated_at': t0}, serverVersion: 1, createdAt: dt0),
+        ];
+
+        // Apply the complete canonical baseline batch
+        await applier.applyBatch(batch);
+
+        // Cursor must be at exactly 35
+        expect(await syncStateDao.getLastAppliedSequence(), equals(35));
+
+        // --- Entity count assertions ---
+        final itemTypeCount = await (db.selectOnly(db.itemTypes)
+              ..addColumns([db.itemTypes.id.count()]))
+            .map((r) => r.read(db.itemTypes.id.count()))
+            .getSingle();
+        expect(itemTypeCount, equals(4), reason: 'item_types must have 4 rows');
+
+        final catCount = await (db.selectOnly(db.expenseCategories)
+              ..addColumns([db.expenseCategories.id.count()]))
+            .map((r) => r.read(db.expenseCategories.id.count()))
+            .getSingle();
+        expect(catCount, equals(7), reason: 'expense_categories must have 7 rows');
+
+        final svcCount = await (db.selectOnly(db.services)
+              ..addColumns([db.services.id.count()]))
+            .map((r) => r.read(db.services.id.count()))
+            .getSingle();
+        expect(svcCount, equals(5), reason: 'services must have 5 rows');
+
+        final csCount = await (db.selectOnly(db.carpetSizes)
+              ..addColumns([db.carpetSizes.id.count()]))
+            .map((r) => r.read(db.carpetSizes.id.count()))
+            .getSingle();
+        expect(csCount, equals(3), reason: 'carpet_sizes must have 3 rows');
+
+        final locCount = await (db.selectOnly(db.storageLocations)
+              ..addColumns([db.storageLocations.id.count()]))
+            .map((r) => r.read(db.storageLocations.id.count()))
+            .getSingle();
+        expect(locCount, equals(5), reason: 'storage_locations must have 5 rows');
+
+        final idefCount = await (db.selectOnly(db.itemDefinitions)
+              ..addColumns([db.itemDefinitions.id.count()]))
+            .map((r) => r.read(db.itemDefinitions.id.count()))
+            .getSingle();
+        expect(idefCount, equals(10), reason: 'item_definitions must have 10 rows');
+
+        // --- Service junction assertions ---
+        final srvJunctionCount = await (db.selectOnly(db.serviceItemTypes)
+              ..addColumns([db.serviceItemTypes.serviceId.count()]))
+            .map((r) => r.read(db.serviceItemTypes.serviceId.count()))
+            .getSingle();
+        expect(srvJunctionCount, equals(5), reason: 'service_item_types must have 5 rows');
+
+        // --- Storage location junction assertions ---
+        final locJunctionCount = await (db.selectOnly(db.storageLocationItemTypes)
+              ..addColumns([db.storageLocationItemTypes.storageLocationId.count()]))
+            .map((r) => r.read(db.storageLocationItemTypes.storageLocationId.count()))
+            .getSingle();
+        expect(locJunctionCount, equals(9), reason: 'storage_location_item_types must have 9 rows');
+
+        // --- Canonical ID spot checks ---
+        final clothingType = await (db.select(db.itemTypes)
+              ..where((t) => t.id.equals('00000000-0000-0000-0001-000000000001')))
+            .getSingleOrNull();
+        expect(clothingType?.name, equals('ملابس'));
+
+        final silkCarpetDef = await (db.select(db.itemDefinitions)
+              ..where((t) => t.id.equals('00000000-0000-0000-0005-000000000010')))
+            .getSingleOrNull();
+        expect(silkCarpetDef?.name, equals('سجادة حرير'));
+        expect(silkCarpetDef?.itemTypeId, equals('00000000-0000-0000-0001-000000000003'));
+
+        final carpetWash = await (db.select(db.services)
+              ..where((t) => t.id.equals('00000000-0000-0000-0002-000000000003')))
+            .getSingleOrNull();
+        expect(carpetWash?.name, equals('غسيل سجاد'));
+        expect(carpetWash?.price, equals(6000));
+        expect(carpetWash?.pricingType, equals('per_square_meter'));
+
+        final carpetSection = await (db.select(db.storageLocations)
+              ..where((t) => t.id.equals('00000000-0000-0000-0006-000000000004')))
+            .getSingleOrNull();
+        expect(carpetSection?.name, equals('قسم السجاد 1'));
+
+        final size2x3 = await (db.select(db.carpetSizes)
+              ..where((t) => t.id.equals('00000000-0000-0000-0007-000000000001')))
+            .getSingleOrNull();
+        expect(size2x3?.length, equals(2.0));
+        expect(size2x3?.width, equals(3.0));
+        expect(size2x3?.area, equals(6.0));
+      });
+    });
   });
 }

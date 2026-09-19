@@ -117,31 +117,35 @@ void main() {
       },
     );
 
-    test('Run-scoped identifiers generate distinct non-colliding operation IDs and valid UUIDs', () {
-      final run1 = ((DateTime.now().microsecondsSinceEpoch - 1000) % 0xFFFFFFFFFFFF)
-          .toRadixString(16)
-          .padLeft(12, '0');
-      final run2 = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
-          .toRadixString(16)
-          .padLeft(12, '0');
+    test(
+      'Run-scoped identifiers generate distinct non-colliding operation IDs and valid UUIDs',
+      () {
+        final run1 =
+            ((DateTime.now().microsecondsSinceEpoch - 1000) % 0xFFFFFFFFFFFF)
+                .toRadixString(16)
+                .padLeft(12, '0');
+        final run2 = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
+            .toRadixString(16)
+            .padLeft(12, '0');
 
-      final opId1 = 'op-step9-cust-create-$run1';
-      final opId2 = 'op-step9-cust-create-$run2';
+        final opId1 = 'op-step9-cust-create-$run1';
+        final opId2 = 'op-step9-cust-create-$run2';
 
-      expect(opId1, isNot(equals(opId2)));
-      expect(opId1, startsWith('op-step9-cust-create-'));
-      expect(opId2, startsWith('op-step9-cust-create-'));
+        expect(opId1, isNot(equals(opId2)));
+        expect(opId1, startsWith('op-step9-cust-create-'));
+        expect(opId2, startsWith('op-step9-cust-create-'));
 
-      final uuid1 = 'c0000001-0001-4001-8001-$run1';
-      final uuid2 = 'c0000001-0001-4001-8001-$run2';
-      expect(uuid1.length, equals(36));
-      expect(uuid2.length, equals(36));
-      expect(uuid1, isNot(equals(uuid2)));
+        final uuid1 = 'c0000001-0001-4001-8001-$run1';
+        final uuid2 = 'c0000001-0001-4001-8001-$run2';
+        expect(uuid1.length, equals(36));
+        expect(uuid2.length, equals(36));
+        expect(uuid1, isNot(equals(uuid2)));
 
-      // Cross-suite UUID prefix non-collision regression check
-      final c4cUuid = 'c4c00001-0001-4001-8001-$run1';
-      expect(uuid1, isNot(equals(c4cUuid)));
-    });
+        // Cross-suite UUID prefix non-collision regression check
+        final c4cUuid = 'c4c00001-0001-4001-8001-$run1';
+        expect(uuid1, isNot(equals(c4cUuid)));
+      },
+    );
   });
 
   group('Step 9 — Live Supabase Edge Function & PostgreSQL Integration Tests', () {
@@ -191,7 +195,8 @@ void main() {
       rejectServiceId = 'b8888888-8888-4888-8888-$runId';
       rejectOpId = 'op-step9-reject-kg-$runId';
       custId = 'c0000001-0001-4001-8001-$runId';
-      custPhone = '010${(DateTime.now().microsecondsSinceEpoch % 100000000).toString().padLeft(8, '0')}';
+      custPhone =
+          '010${(DateTime.now().microsecondsSinceEpoch % 100000000).toString().padLeft(8, '0')}';
       custCreateOpId = 'op-step9-cust-create-$runId';
       custUpdateOpId = 'op-step9-cust-update-$runId';
       srvId = 'b0000001-0001-4001-8001-$runId';
@@ -248,7 +253,10 @@ void main() {
         );
 
         expect(res.statusCode, equals(422));
-        expect(res.data['code'], isIn(['VALIDATION_ERROR', 'BUSINESS_RULE_VIOLATION']));
+        expect(
+          res.data['code'],
+          isIn(['VALIDATION_ERROR', 'BUSINESS_RULE_VIOLATION']),
+        );
         expect(res.data['message'], contains('per_kilogram'));
       },
     );
@@ -319,7 +327,7 @@ void main() {
           '/services',
           data: {
             'id': srvId,
-            'name': 'خدمة سجاد للاختبار',
+            'name': 'خدمة سجاد للاختبار $runId',
             'pricing_type': 'per_square_meter',
             'price': 4000,
             'is_active': true,
@@ -367,9 +375,9 @@ void main() {
             'items': [
               {
                 'id': itemId,
-                'item_type_id': 'type-carpet',
+                'item_type_id': '00000000-0000-0000-0001-000000000003',
                 'service_id': srvId,
-                'service_name_snapshot': 'خدمة سجاد للاختبار',
+                'service_name_snapshot': 'خدمة سجاد للاختبار $runId',
                 'pricing_type': 'per_square_meter',
                 'quantity': 6.0,
                 'unit_price': 4000,
@@ -377,7 +385,7 @@ void main() {
                 'carpet_data': {
                   'id': carpetId,
                   'order_item_id': itemId,
-                  'carpet_size_id': 'size-2x3',
+                  'carpet_size_id': '00000000-0000-0000-0007-000000000001',
                   'length': 3.0,
                   'width': 2.0,
                   'area': 6.0,
@@ -414,10 +422,7 @@ void main() {
         );
 
         expect(retryOrderRes.statusCode, isIn([200, 201]));
-        expect(
-          retryOrderRes.data['order_number'],
-          equals(orderNumber),
-        );
+        expect(retryOrderRes.data['order_number'], equals(orderNumber));
       },
     );
 
@@ -432,7 +437,7 @@ void main() {
           data: {
             'id': rec1Id,
             'order_item_id': itemId,
-            'storage_location_id': 'rack-1',
+            'storage_location_id': '00000000-0000-0000-0006-000000000001',
             'is_active': true,
           },
           options: Options(
@@ -448,7 +453,7 @@ void main() {
           data: {
             'id': rec2Id,
             'order_item_id': itemId,
-            'storage_location_id': 'rack-2',
+            'storage_location_id': '00000000-0000-0000-0006-000000000002',
             'is_active': true,
           },
           options: Options(
@@ -485,10 +490,7 @@ void main() {
         // 2. Conflict attempt with stale base_version
         final conflictRes = await dio.patch(
           '/customers/$custId',
-          data: {
-            'name': 'Stale Name',
-            'base_version': currentVersion - 1,
-          },
+          data: {'name': 'Stale Name', 'base_version': currentVersion - 1},
           options: Options(
             headers: {'X-Operation-ID': occConflict1OpId},
             validateStatus: (_) => true,
@@ -540,7 +542,7 @@ void main() {
           data: {
             'id': storeRecId,
             'order_item_id': itemId,
-            'storage_location_id': 'rack-1',
+            'storage_location_id': '00000000-0000-0000-0006-000000000001',
             'is_active': true,
           },
           options: Options(
@@ -556,20 +558,24 @@ void main() {
           data: {
             'id': moveRecId,
             'order_item_id': itemId,
-            'storage_location_id': 'rack-2',
+            'storage_location_id': '00000000-0000-0000-0006-000000000002',
             'is_active': true,
           },
           options: Options(
             headers: {
               'X-Operation-ID': smConflictOpId,
-              'X-Previous-Storage-Location-Id': 'rack-99',
+              'X-Previous-Storage-Location-Id':
+                  '00000000-0000-0000-0006-000000000099',
             },
             validateStatus: (_) => true,
           ),
         );
         expect(conflictRes.statusCode, equals(409));
         expect(conflictRes.data['code'], equals('CONCURRENCY_CONFLICT'));
-        expect(conflictRes.data['message'], contains('not expected rack-99'));
+        expect(
+          conflictRes.data['message'],
+          contains('not expected 00000000-0000-0000-0006-000000000099'),
+        );
 
         // 3. Valid move with matching previous location
         final validMoveRes = await dio.post(
@@ -577,20 +583,24 @@ void main() {
           data: {
             'id': moveRecId,
             'order_item_id': itemId,
-            'storage_location_id': 'rack-2',
+            'storage_location_id': '00000000-0000-0000-0006-000000000002',
             'is_active': true,
           },
           options: Options(
             headers: {
               'X-Operation-ID': smSuccessOpId,
-              'X-Previous-Storage-Location-Id': 'rack-1',
+              'X-Previous-Storage-Location-Id':
+                  '00000000-0000-0000-0006-000000000001',
             },
             validateStatus: (_) => true,
           ),
         );
         expect(validMoveRes.statusCode, equals(201));
         expect(validMoveRes.data['is_active'], isTrue);
-        expect(validMoveRes.data['storage_location_id'], equals('rack-2'));
+        expect(
+          validMoveRes.data['storage_location_id'],
+          equals('00000000-0000-0000-0006-000000000002'),
+        );
       },
     );
 
@@ -629,7 +639,8 @@ void main() {
             queryParameters: {'after': prevSeq, 'limit': 10},
           );
           expect(nextRes.statusCode, equals(200));
-          final nextChanges = (nextRes.data as Map<String, dynamic>)['changes'] as List;
+          final nextChanges =
+              (nextRes.data as Map<String, dynamic>)['changes'] as List;
           if (nextChanges.isNotEmpty) {
             final firstNextSeq = nextChanges.first['sequence'] as int;
             expect(firstNextSeq, greaterThan(prevSeq));
@@ -713,7 +724,8 @@ void main() {
         expect(orderUpdateChange['entity_type'], equals('order'));
         expect(orderUpdateChange['operation_type'], equals('update'));
         // Non-aggregate: subsequent update does NOT contain items list
-        final updatePayload = orderUpdateChange['payload'] as Map<String, dynamic>;
+        final updatePayload =
+            orderUpdateChange['payload'] as Map<String, dynamic>;
         expect(updatePayload['status'], equals('completed'));
       },
     );
@@ -811,7 +823,8 @@ void main() {
         expect(
           duplicateCount,
           equals(0),
-          reason: 'Idempotent replay must NOT create duplicate sync_changes records for $custCreateOpId',
+          reason:
+              'Idempotent replay must NOT create duplicate sync_changes records for $custCreateOpId',
         );
       },
     );

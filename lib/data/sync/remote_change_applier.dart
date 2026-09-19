@@ -534,9 +534,11 @@ class RemoteChangeApplier {
 
     await _db.into(_db.services).insertOnConflictUpdate(companion);
 
-    // Optional supported item type IDs
-    if (payload.containsKey('item_type_ids')) {
-      final rawIds = payload['item_type_ids'] as List<dynamic>?;
+    // Optional supported item type IDs (canonical: supported_item_type_ids, fallback: item_type_ids)
+    if (payload.containsKey('supported_item_type_ids') ||
+        payload.containsKey('item_type_ids')) {
+      final rawIds = (payload['supported_item_type_ids'] ??
+          payload['item_type_ids']) as List<dynamic>?;
       if (rawIds != null) {
         await (_db.delete(_db.serviceItemTypes)
               ..where((t) => t.serviceId.equals(id)))

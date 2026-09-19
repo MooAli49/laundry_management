@@ -23,7 +23,8 @@ import 'package:laundry_management/data/local/daos/storage_locations_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_state_dao.dart';
-import 'package:laundry_management/data/local/database/app_database.dart' as app_db;
+import 'package:laundry_management/data/local/database/app_database.dart'
+    as app_db;
 import 'package:laundry_management/data/remote/dto/sync_change_dto.dart';
 import 'package:laundry_management/data/repositories/customer_repository_impl.dart';
 import 'package:laundry_management/data/repositories/order_repository_impl.dart';
@@ -315,51 +316,63 @@ void main() {
       // Seed local master data in both Device A and Device B
       final now = DateTime.now();
       for (final device in [deviceA, deviceB]) {
-        await device.db.into(device.db.services).insertOnConflictUpdate(
-          app_db.ServicesCompanion.insert(
-            id: testServiceId,
-            name: 'خدمة سجاد C4C $runId',
-            pricingType: 'per_square_meter',
-            price: 4000,
-            isActive: const drift.Value(true),
-            createdAt: now,
-            updatedAt: now,
-          ),
-        );
+        await device.db
+            .into(device.db.services)
+            .insertOnConflictUpdate(
+              app_db.ServicesCompanion.insert(
+                id: testServiceId,
+                name: 'خدمة سجاد C4C $runId',
+                pricingType: 'per_square_meter',
+                price: 4000,
+                isActive: const drift.Value(true),
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
 
         await device.db.customStatement(
           'INSERT OR REPLACE INTO item_types (id, name, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-          ['type-carpet', 'سجاد-carpet', 1, now.millisecondsSinceEpoch ~/ 1000, now.millisecondsSinceEpoch ~/ 1000],
+          [
+            '00000000-0000-0000-0001-000000000003',
+            'سجاد-carpet',
+            1,
+            now.millisecondsSinceEpoch ~/ 1000,
+            now.millisecondsSinceEpoch ~/ 1000,
+          ],
         );
 
-        await device.db.into(device.db.carpetSizes).insertOnConflictUpdate(
-          app_db.CarpetSizesCompanion.insert(
-            id: 'size-2x3',
-            length: 3.0,
-            width: 2.0,
-            area: 6.0,
-            createdAt: now,
-            updatedAt: now,
-          ),
-        );
+        await device.db
+            .into(device.db.carpetSizes)
+            .insertOnConflictUpdate(
+              app_db.CarpetSizesCompanion.insert(
+                id: '00000000-0000-0000-0007-000000000001',
+                length: 3.0,
+                width: 2.0,
+                area: 6.0,
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
 
-        await device.db.into(device.db.storageLocations).insertOnConflictUpdate(
-          app_db.StorageLocationsCompanion.insert(
-            id: 'rack-1',
-            name: 'Rack 1',
-            isActive: const drift.Value(true),
-            createdAt: now,
-            updatedAt: now,
-          ),
-        );
+        await device.db
+            .into(device.db.storageLocations)
+            .insertOnConflictUpdate(
+              app_db.StorageLocationsCompanion.insert(
+                id: '00000000-0000-0000-0006-000000000001',
+                name: 'Rack 1',
+                isActive: const drift.Value(true),
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
 
         await device.db
             .into(device.db.storageLocationItemTypes)
             .insertOnConflictUpdate(
               app_db.StorageLocationItemTypesCompanion.insert(
-                id: 'slit-r1-tc',
-                storageLocationId: 'rack-1',
-                itemTypeId: 'type-carpet',
+                id: '00000000-0000-0000-0008-000000000001',
+                storageLocationId: '00000000-0000-0000-0006-000000000001',
+                itemTypeId: '00000000-0000-0000-0001-000000000003',
                 createdAt: now,
               ),
             );
@@ -401,8 +414,9 @@ void main() {
               after: currentCursor,
               limit: 100,
             );
-            final matches =
-                res.changes.where((c) => c.operationId == operationId).toList();
+            final matches = res.changes
+                .where((c) => c.operationId == operationId)
+                .toList();
             if (matches.isNotEmpty) {
               expect(
                 matches.length,
@@ -420,7 +434,9 @@ void main() {
         }
         await Future<void>.delayed(const Duration(milliseconds: 500));
       }
-      fail('Could not locate remote sync_changes record for operation $operationId');
+      fail(
+        'Could not locate remote sync_changes record for operation $operationId',
+      );
     }
 
     test(
@@ -455,8 +471,8 @@ void main() {
         await deviceA.customerRepository.createCustomer(customerA);
 
         // Capture customer operation ID generated on Device A
-        final pendingCustOpsOnA =
-            await deviceA.syncOperationsDao.getPendingOperations();
+        final pendingCustOpsOnA = await deviceA.syncOperationsDao
+            .getPendingOperations();
         final customerOpOnA = pendingCustOpsOnA.firstWhere(
           (o) => o.entityId == testCustomerId,
         );
@@ -478,8 +494,9 @@ void main() {
         Customer? localCustOnB;
         final custDeadline = DateTime.now().add(const Duration(seconds: 15));
         while (DateTime.now().isBefore(custDeadline)) {
-          localCustOnB =
-              await deviceB.customerRepository.getCustomerById(testCustomerId);
+          localCustOnB = await deviceB.customerRepository.getCustomerById(
+            testCustomerId,
+          );
           if (localCustOnB != null) break;
           await Future<void>.delayed(const Duration(milliseconds: 100));
         }
@@ -497,17 +514,17 @@ void main() {
         final customerSequence = custChange.sequence;
 
         // Verify Device B cursor advanced past customerSequence
-        final cursorAfterCustB =
-            await deviceB.syncStateDao.getLastAppliedSequence();
+        final cursorAfterCustB = await deviceB.syncStateDao
+            .getLastAppliedSequence();
         expect(cursorAfterCustB, greaterThanOrEqualTo(customerSequence));
 
         // ZERO ECHO: Device B pending operations must not have increased
         final opsAfterCustB =
             (await deviceB.syncOperationsDao.getPendingOperations()).length;
         expect(opsAfterCustB, equals(opsBeforeCustB));
-        final echoCustOpsOnB = await (deviceB.db.select(deviceB.db.syncOperations)
-              ..where((tbl) => tbl.entityId.equals(testCustomerId)))
-            .get();
+        final echoCustOpsOnB = await (deviceB.db.select(
+          deviceB.db.syncOperations,
+        )..where((tbl) => tbl.entityId.equals(testCustomerId))).get();
         expect(echoCustOpsOnB, isEmpty);
 
         // =====================================================================
@@ -528,7 +545,7 @@ void main() {
         final orderItem = OrderItem(
           id: testOrderItemId,
           orderId: testOrderId,
-          itemTypeId: 'type-carpet',
+          itemTypeId: '00000000-0000-0000-0001-000000000003',
           serviceId: testServiceId,
           itemTypeNameSnapshot: 'سجاد',
           serviceNameSnapshot: 'خدمة سجاد C4C $runId',
@@ -539,7 +556,7 @@ void main() {
           carpetData: CarpetItemData(
             id: testCarpetId,
             orderItemId: testOrderItemId,
-            carpetSizeId: 'size-2x3',
+            carpetSizeId: '00000000-0000-0000-0007-000000000001',
             length: 3.0,
             width: 2.0,
             area: 6.0,
@@ -557,8 +574,9 @@ void main() {
           customerNameSnapshot: 'عميل اختبار C4-C $runId',
           customerPhoneSnapshot: testCustomerPhone,
           status: OrderStatus.processing,
-          expectedPickupDate:
-              OrderDate.fromDate(now.add(const Duration(days: 3))),
+          expectedPickupDate: OrderDate.fromDate(
+            now.add(const Duration(days: 3)),
+          ),
           subtotal: const Money.fromPiastres(24000),
           total: const Money.fromPiastres(24000),
           createdAt: now,
@@ -571,8 +589,8 @@ void main() {
         );
 
         // Capture order operation ID generated on Device A
-        final pendingOrdOpsOnA =
-            await deviceA.syncOperationsDao.getPendingOperations();
+        final pendingOrdOpsOnA = await deviceA.syncOperationsDao
+            .getPendingOperations();
         final orderOpOnA = pendingOrdOpsOnA.firstWhere(
           (o) => o.entityId == testOrderId,
         );
@@ -594,8 +612,9 @@ void main() {
         Order? localOrderOnB;
         final ordDeadline = DateTime.now().add(const Duration(seconds: 15));
         while (DateTime.now().isBefore(ordDeadline)) {
-          localOrderOnB =
-              await deviceB.orderRepository.getOrderById(testOrderId);
+          localOrderOnB = await deviceB.orderRepository.getOrderById(
+            testOrderId,
+          );
           if (localOrderOnB != null) break;
           await Future<void>.delayed(const Duration(milliseconds: 100));
         }
@@ -608,8 +627,8 @@ void main() {
         expect(localOrderOnB.status, equals(OrderStatus.processing));
 
         // Verify Order Items & Carpet in SQLite B
-        final itemsWithCarpetsOnB =
-            await deviceB.ordersDao.getOrderItemsWithCarpets(testOrderId);
+        final itemsWithCarpetsOnB = await deviceB.ordersDao
+            .getOrderItemsWithCarpets(testOrderId);
         expect(itemsWithCarpetsOnB, hasLength(1));
         final itemB = itemsWithCarpetsOnB.first.item;
         final carpetB = itemsWithCarpetsOnB.first.carpet;
@@ -635,17 +654,17 @@ void main() {
         expect(ordChange.operationType, equals('create'));
 
         // Cursor on Device B must have advanced past orderSequence
-        final cursorAfterOrdB =
-            await deviceB.syncStateDao.getLastAppliedSequence();
+        final cursorAfterOrdB = await deviceB.syncStateDao
+            .getLastAppliedSequence();
         expect(cursorAfterOrdB, greaterThanOrEqualTo(orderSequence));
 
         // ZERO ECHO on Device B
         final opsAfterOrdB =
             (await deviceB.syncOperationsDao.getPendingOperations()).length;
         expect(opsAfterOrdB, equals(opsBeforeOrdB));
-        final echoOrdOpsOnB = await (deviceB.db.select(deviceB.db.syncOperations)
-              ..where((tbl) => tbl.entityId.equals(testOrderId)))
-            .get();
+        final echoOrdOpsOnB = await (deviceB.db.select(
+          deviceB.db.syncOperations,
+        )..where((tbl) => tbl.entityId.equals(testOrderId))).get();
         expect(echoOrdOpsOnB, isEmpty);
 
         // =====================================================================
@@ -674,8 +693,8 @@ void main() {
         await deviceB.paymentRepository.recordPayment(paymentB);
 
         // Capture payment operation ID generated on Device B
-        final pendingOpsOnB =
-            await deviceB.syncOperationsDao.getPendingOperations();
+        final pendingOpsOnB = await deviceB.syncOperationsDao
+            .getPendingOperations();
         final paymentOpOnB = pendingOpsOnB.firstWhere(
           (o) => o.entityId == testPaymentId,
         );
@@ -697,8 +716,8 @@ void main() {
         Payment? localPayOnA;
         final payDeadline = DateTime.now().add(const Duration(seconds: 15));
         while (DateTime.now().isBefore(payDeadline)) {
-          final paymentsOnA =
-              await deviceA.paymentRepository.getPaymentsForOrder(testOrderId);
+          final paymentsOnA = await deviceA.paymentRepository
+              .getPaymentsForOrder(testOrderId);
           if (paymentsOnA.any((p) => p.id == testPaymentId)) {
             localPayOnA = paymentsOnA.firstWhere((p) => p.id == testPaymentId);
             break;
@@ -723,17 +742,17 @@ void main() {
         expect(payChange.operationType, equals('create'));
 
         // Cursor on Device A must have advanced past paymentSequence
-        final cursorAfterPayA =
-            await deviceA.syncStateDao.getLastAppliedSequence();
+        final cursorAfterPayA = await deviceA.syncStateDao
+            .getLastAppliedSequence();
         expect(cursorAfterPayA, greaterThanOrEqualTo(paymentSequence));
 
         // ZERO ECHO on Device A
         final opsAfterPayA =
             (await deviceA.syncOperationsDao.getPendingOperations()).length;
         expect(opsAfterPayA, equals(opsBeforePayA));
-        final echoPayOpsOnA = await (deviceA.db.select(deviceA.db.syncOperations)
-              ..where((tbl) => tbl.entityId.equals(testPaymentId)))
-            .get();
+        final echoPayOpsOnA = await (deviceA.db.select(
+          deviceA.db.syncOperations,
+        )..where((tbl) => tbl.entityId.equals(testPaymentId))).get();
         expect(echoPayOpsOnA, isEmpty);
 
         // =====================================================================
@@ -749,15 +768,15 @@ void main() {
         final opsBeforeStoreA =
             (await deviceA.syncOperationsDao.getPendingOperations()).length;
 
-        // Store synchronized Order Item on Device B in rack-1
+        // Store synchronized Order Item on Device B in Rack A-1
         final storageRecordB = await deviceB.storageRepository.storeItem(
           orderItemId: testOrderItemId,
-          storageLocationId: 'rack-1',
+          storageLocationId: '00000000-0000-0000-0006-000000000001',
         );
 
         // Capture storage operation ID generated on Device B
-        final pendingOpsStoreOnB =
-            await deviceB.syncOperationsDao.getPendingOperations();
+        final pendingOpsStoreOnB = await deviceB.syncOperationsDao
+            .getPendingOperations();
         final storageOpOnB = pendingOpsStoreOnB.firstWhere(
           (o) => o.entityId == storageRecordB.id,
         );
@@ -788,7 +807,10 @@ void main() {
         expect(localStorageOnA, isNotNull);
         expect(localStorageOnA!.id, equals(storageRecordB.id));
         expect(localStorageOnA.orderItemId, equals(testOrderItemId));
-        expect(localStorageOnA.storageLocationId, equals('rack-1'));
+        expect(
+          localStorageOnA.storageLocationId,
+          equals('00000000-0000-0000-0006-000000000001'),
+        );
         expect(localStorageOnA.isActive, isTrue);
 
         // Capture exact storage change sequence by operation_id
@@ -802,8 +824,8 @@ void main() {
         expect(storeChange.operationType, equals('create'));
 
         // Cursor on Device A must have advanced past storageSequence
-        final cursorAfterStoreA =
-            await deviceA.syncStateDao.getLastAppliedSequence();
+        final cursorAfterStoreA = await deviceA.syncStateDao
+            .getLastAppliedSequence();
         expect(cursorAfterStoreA, greaterThanOrEqualTo(storageSequence));
 
         // ZERO ECHO on Device A
@@ -819,8 +841,10 @@ void main() {
         // SCENARIO 6 — CURSOR INDEPENDENCE VERIFICATION
         // =====================================================================
         // Verify Device A and Device B maintain distinct independent SQLite state rows
-        final finalCursorA = await deviceA.syncStateDao.getLastAppliedSequence();
-        final finalCursorB = await deviceB.syncStateDao.getLastAppliedSequence();
+        final finalCursorA = await deviceA.syncStateDao
+            .getLastAppliedSequence();
+        final finalCursorB = await deviceB.syncStateDao
+            .getLastAppliedSequence();
         expect(finalCursorA, greaterThanOrEqualTo(storageSequence));
         expect(finalCursorB, greaterThanOrEqualTo(orderSequence));
 
@@ -856,16 +880,14 @@ void main() {
         );
 
         // 2. Applying an already existing entity updates/preserves data idempotently without duplicate rows
-        final allCustsOnA =
-            await (deviceA.db.select(deviceA.db.customers)).get();
-        expect(
-          allCustsOnA.where((c) => c.id == testCustomerId),
-          hasLength(1),
-        );
+        final allCustsOnA = await (deviceA.db.select(
+          deviceA.db.customers,
+        )).get();
+        expect(allCustsOnA.where((c) => c.id == testCustomerId), hasLength(1));
 
         // 3. Transactional failure does not leave a partially applied page or an advanced cursor
-        final cursorBeforeFailingBatch =
-            await deviceA.syncStateDao.getLastAppliedSequence();
+        final cursorBeforeFailingBatch = await deviceA.syncStateDao
+            .getLastAppliedSequence();
         final rollbackCustomerId = 'cust-rollback-$runId';
         final failingBatch = [
           SyncChangeDto(
@@ -896,20 +918,22 @@ void main() {
 
         try {
           await deviceA.changeApplier.applyBatch(failingBatch);
-          fail('Batch with invalid entity type should have thrown UnsupportedError');
+          fail(
+            'Batch with invalid entity type should have thrown UnsupportedError',
+          );
         } catch (e) {
           expect(e, isA<UnsupportedError>());
         }
 
         // Verify cursor did not advance
-        final cursorAfterFailingBatch =
-            await deviceA.syncStateDao.getLastAppliedSequence();
+        final cursorAfterFailingBatch = await deviceA.syncStateDao
+            .getLastAppliedSequence();
         expect(cursorAfterFailingBatch, equals(cursorBeforeFailingBatch));
 
         // Verify first change in batch was rolled back
-        final rolledBackCust = await (deviceA.db.select(deviceA.db.customers)
-              ..where((tbl) => tbl.id.equals(rollbackCustomerId)))
-            .getSingleOrNull();
+        final rolledBackCust = await (deviceA.db.select(
+          deviceA.db.customers,
+        )..where((tbl) => tbl.id.equals(rollbackCustomerId))).getSingleOrNull();
         expect(rolledBackCust, isNull);
       },
     );

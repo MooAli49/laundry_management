@@ -290,7 +290,8 @@ void main() {
       }
 
       if (isNetworkAvailable) {
-        final phone = '011${(DateTime.now().microsecondsSinceEpoch % 100000000).toString().padLeft(8, '0')}';
+        final phone =
+            '011${(DateTime.now().microsecondsSinceEpoch % 100000000).toString().padLeft(8, '0')}';
         // Seed customer
         await dio.post(
           '/customers',
@@ -338,7 +339,7 @@ void main() {
             'items': [
               {
                 'id': 'e1000000-0000-4000-8000-$runId',
-                'item_type_id': 'it-test',
+                'item_type_id': '00000000-0000-0000-0001-000000000001',
                 'service_id': testServiceId,
                 'pricing_type': 'fixed_price',
                 'quantity': 2.0,
@@ -465,7 +466,10 @@ void main() {
         );
 
         expect(res.statusCode, equals(409));
-        expect(res.data['code'], isIn(['CONFLICT', 'PAYMENT_BALANCE_EXCEEDED']));
+        expect(
+          res.data['code'],
+          isIn(['CONFLICT', 'PAYMENT_BALANCE_EXCEEDED']),
+        );
         expect(res.data['message'], contains('exceeds'));
 
         // Verify order paid_amount remained at 8000
@@ -494,7 +498,10 @@ void main() {
         );
 
         expect(res.statusCode, equals(409));
-        expect(res.data['code'], isIn(['CONFLICT', 'INVALID_LIFECYCLE_TRANSITION']));
+        expect(
+          res.data['code'],
+          isIn(['CONFLICT', 'INVALID_LIFECYCLE_TRANSITION']),
+        );
         expect(res.data['message'], contains('cancelled'));
       },
     );
@@ -519,7 +526,10 @@ void main() {
           ),
         );
         expect(zeroRes.statusCode, equals(422));
-        expect(zeroRes.data['code'], isIn(['VALIDATION_ERROR', 'BUSINESS_RULE_VIOLATION']));
+        expect(
+          zeroRes.data['code'],
+          isIn(['VALIDATION_ERROR', 'BUSINESS_RULE_VIOLATION']),
+        );
 
         // Negative
         final negRes = await dio.post(
@@ -536,7 +546,10 @@ void main() {
           ),
         );
         expect(negRes.statusCode, equals(422));
-        expect(negRes.data['code'], isIn(['VALIDATION_ERROR', 'BUSINESS_RULE_VIOLATION']));
+        expect(
+          negRes.data['code'],
+          isIn(['VALIDATION_ERROR', 'BUSINESS_RULE_VIOLATION']),
+        );
       },
     );
 
@@ -560,7 +573,10 @@ void main() {
         );
 
         expect(res.statusCode, equals(422));
-        expect(res.data['code'], isIn(['VALIDATION_ERROR', 'BUSINESS_RULE_VIOLATION']));
+        expect(
+          res.data['code'],
+          isIn(['VALIDATION_ERROR', 'BUSINESS_RULE_VIOLATION']),
+        );
       },
     );
 

@@ -7,9 +7,8 @@ plugins {
 
 android {
     namespace = "com.example.laundry_management"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
-    buildToolsVersion = "35.0.0"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
