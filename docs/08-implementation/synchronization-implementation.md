@@ -2088,7 +2088,8 @@ Standard codes:
 ## 75. Known Implementation Findings
 
 ### 75.1 OrderItem PricingType Mapper Serialization Finding
-- **Location**: `OrderRepositoryImpl._mapOrderItemToDomain`
-- **Issue**: The method uses `PricingType.values.byName(item.pricingType)` instead of `PricingType.fromValue(item.pricingType)`.
-- **Effect**: When remote `OrderItems` contain pricing types such as `per_square_meter` (serialized as `'per_square_meter'`), `byName` throws an `ArgumentError` because the Dart enum identifier is `perSquareMeter`. `PricingType.fromValue` correctly handles serialized string conversion.
-- **Status**: Discovered during C4-C testing. Documented as a known implementation finding. In accordance with C4-D scope rules, production code is NOT modified in this documentation phase.
+- **Location**: `OrderRepositoryImpl._mapOrderItemToDomain`, `ServiceRepositoryImpl._mapToDomain`, `StorageRepositoryImpl._mapOrderItemToDomain`
+- **Issue**: The mapper methods previously used `PricingType.values.byName(item.pricingType)` instead of `PricingType.fromValue(item.pricingType)`.
+- **Effect**: When remote `OrderItems` or services contained pricing types such as `per_square_meter` (serialized as `'per_square_meter'`), `byName` threw an `ArgumentError` because the Dart enum identifier is `perSquareMeter`.
+- **Resolution**: Resolved in C4-E. Updated `OrderRepositoryImpl`, `ServiceRepositoryImpl`, and `StorageRepositoryImpl` to use canonical `PricingType.fromValue(...)` (which safely maps both serialized snake_case values and camelCase enum identifiers). Added dedicated regression test suite `pricing_type_mapping_regression_test.dart` covering all supported values (`per_piece`, `per_square_meter`, `fixed_price`) across local SQLite, remote sync applier, and repository read paths.
+- **Status**: Resolved and verified in C4-E.
