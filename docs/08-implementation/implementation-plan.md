@@ -106,7 +106,7 @@ The execution sequence in `laundry-implementation-roadmap.md` consolidates these
 - **Phase 12** → Task #13 (Reports — merged into Task #10)
 - **Phase 15** → Task #14 (Invoice / Receipt — Completed in PR #6)
 - **Phases 16 & 18** → Task #15 (Offline / Sync Integration — Completed / Locked via C1–C4-C Bidirectional 2-Device Sync E2E)
-- **Phases 17, 19 & 20** → Task #16 (Full Integration / QA / Hardening — Active / Next Task)
+- **Phases 17, 19 & 20** → Task #16 (Full Integration / QA / Hardening — Completed / Locked)
 
 Each phase has:
 

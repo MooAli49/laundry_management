@@ -31,7 +31,7 @@ The implementation workflow remains:
 | Task #13 | Reports | *(Merged into Task #10 — Expenses & Reports)* | Merged into Task #10 |
 | Task #14 | Invoice / Receipt | Implement invoice/receipt viewing and printing using historical Order information. | Completed / Locked |
 | Task #15 | Offline / Sync Integration | Integrate and verify bidirectional synchronization (Push + Pull + Realtime Signal) for 2-device terminal operation. | Completed / Locked |
-| Task #16 | Full Integration / QA / Hardening | Perform end-to-end verification, business-rule audit, offline testing, UI/RTL/responsive checks, and release hardening. | Active / Next |
+| Task #16 | Full Integration / QA / Hardening | Perform end-to-end verification, business-rule audit, offline testing, UI/RTL/responsive checks, and release hardening. | Completed / Locked |
 
 ---
 
@@ -257,7 +257,7 @@ The architecture officially supports **Bidirectional Push + Pull Synchronization
 
 ## Task #16 — Full Integration / QA / Hardening
 
-Task #16 is the **Active / Next Implementation Task**.
+Task #16 is **Completed / Locked**.
 
 The final implementation phase should verify the complete system as one product.
 
@@ -429,5 +429,7 @@ Task #12  Dashboard                        ✅ LOCKED
 Task #13  Reports (Merged into #10)        ✅ LOCKED
 Task #14  Invoice / Receipt                ✅ LOCKED (PR #6 Merged)
 Task #15  Offline / Sync Integration       ✅ LOCKED (C1–C4-C Bidirectional Sync E2E Complete)
-Task #16  Full Integration / QA / Hardening ⏳ ACTIVE / NEXT
+Task #16  Full Integration / QA / Hardening ✅ LOCKED (Phase 3A-C Hardening, Fresh Bootstrap & Manual QA Complete)
 ```
+
+**V1 Status**: All Tasks #01 through #16 are Completed and Locked. Current V1 implementation is complete.

@@ -2093,3 +2093,15 @@ Standard codes:
 - **Effect**: When remote `OrderItems` or services contained pricing types such as `per_square_meter` (serialized as `'per_square_meter'`), `byName` threw an `ArgumentError` because the Dart enum identifier is `perSquareMeter`.
 - **Resolution**: Resolved in C4-E. Updated `OrderRepositoryImpl`, `ServiceRepositoryImpl`, and `StorageRepositoryImpl` to use canonical `PricingType.fromValue(...)` (which safely maps both serialized snake_case values and camelCase enum identifiers). Added dedicated regression test suite `pricing_type_mapping_regression_test.dart` covering all supported values (`per_piece`, `per_square_meter`, `fixed_price`) across local SQLite, remote sync applier, and repository read paths.
 - **Status**: Resolved and verified in C4-E.
+
+### 75.2 Phase 3B Remote Foreign Key Integrity Hardening
+- **Location**: `supabase/migrations/20260919000000_enforce_master_foreign_keys.sql`
+- **Context**: During integration verification, remote PostgreSQL tables allowed untyped TEXT foreign key columns without database-level FK constraints.
+- **Resolution**: Added explicit PostgreSQL foreign keys (`order_items.item_type_id`, `order_items.item_definition_id`, `order_item_carpets.carpet_size_id`, `storage_records.storage_location_id`, `service_item_types.item_type_id`) with appropriate `ON DELETE RESTRICT` and `ON DELETE SET NULL` actions, converted columns to native `UUID`, added supporting performance indexes, and updated RPC write paths (`sync_create_order_aggregate`, `sync_store_order_items`, etc.) with explicit UUID casts.
+- **Status**: Completed, verified, and locked in Phase 3B.
+
+### 75.3 Canonical 35-Change Development Bootstrap Baseline & Safe Reset
+- **Location**: `scripts/dev_supabase_safe_reset.sql`, `scripts/dev_supabase_seed_canonical_baseline.sql`, `docs/09-operations/development-supabase-runbook.md`
+- **Context**: Repeated integration test runs contaminated development Supabase sequences with ephemeral test data.
+- **Resolution**: Created a guarded, single-transaction safe reset script to purge test records in reverse-dependency order, followed by a canonical seed script that generates sequences 1..35 representing the pristine baseline master data catalog. Fresh client bootstrap from cursor 0 was tested and verified to apply all 35 records cleanly without errors.
+- **Status**: Completed, verified, and locked in Phase 3C.
