@@ -17,6 +17,11 @@ Widget testBoilerplate(Widget child) {
   );
 }
 
+Future<void> tearDownWidgetTree(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUp(() async {
     await getIt.reset();
@@ -47,6 +52,8 @@ void main() {
           find.text('إضافة عميل'),
           findsNWidgets(2),
         ); // Header action + empty state action
+
+        await tearDownWidgetTree(tester);
       },
     );
 
@@ -80,6 +87,8 @@ void main() {
       expect(find.byType(CustomerCard), findsNWidgets(2));
       expect(find.text('عميل رقم واحد'), findsOneWidget);
       expect(find.text('عميل رقم اثنين'), findsOneWidget);
+
+      await tearDownWidgetTree(tester);
     });
 
     testWidgets('filters list when searching by name or phone', (tester) async {
@@ -125,6 +134,8 @@ void main() {
 
       expect(find.byType(CustomerCard), findsNothing);
       expect(find.text('لا توجد نتائج مطابقة'), findsOneWidget);
+
+      await tearDownWidgetTree(tester);
     });
 
     testWidgets(
@@ -169,6 +180,8 @@ void main() {
             narrowGrid.gridDelegate
                 as SliverGridDelegateWithFixedCrossAxisCount;
         expect(narrowDelegate.crossAxisCount, equals(1));
+
+        await tearDownWidgetTree(tester);
       },
     );
 
@@ -201,6 +214,8 @@ void main() {
         expect(find.text('جمال عبد الناصر'), findsOneWidget);
         expect(find.text('01019283746'), findsOneWidget);
         expect(find.text('إجمالي 1 عميل'), findsOneWidget);
+
+        await tearDownWidgetTree(tester);
       },
     );
 
@@ -250,6 +265,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('عميل رقم 55'), findsOneWidget);
         expect(find.text('تحميل المزيد من العملاء'), findsNothing);
+
+        await tearDownWidgetTree(tester);
       },
     );
   });

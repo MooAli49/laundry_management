@@ -358,6 +358,11 @@ class OrderRepositoryImpl implements OrderRepository {
   }
 
   @override
+  Stream<void> watchOrderTableUpdates() {
+    return _ordersDao.watchDashboardUpdates();
+  }
+
+  @override
   Future<Order> markOrderReady(String orderId) async {
     try {
       return await _db.transaction(() async {

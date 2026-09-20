@@ -44,6 +44,8 @@ abstract class OrderRepository {
 
   Stream<Order?> watchOrderById(String id);
 
+  Stream<void> watchOrderTableUpdates();
+
   Future<Order> markOrderReady(String orderId);
 
   Future<Order> completeOrder({

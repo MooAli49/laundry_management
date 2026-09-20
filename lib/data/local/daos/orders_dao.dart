@@ -535,6 +535,7 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
       'payments',
       'storage_records',
       'order_items',
+      'customers',
     };
     return db.tableUpdates().where(
       (updates) => updates.any((u) => watchedTables.contains(u.table)),

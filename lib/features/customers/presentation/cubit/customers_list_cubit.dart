@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 
@@ -17,8 +18,13 @@ class CustomersListCubit extends Cubit<CustomersListState> {
   final CustomerRepository _customerRepository;
   final OrderRepository _orderRepository;
   Timer? _debounceTimer;
+  StreamSubscription<dynamic>? _dbSubscription;
   int _searchRequestId = 0;
   int _latestLoadMoreRequestId = 0;
+  bool _hasPendingReload = false;
+
+  @visibleForTesting
+  bool get hasPendingReload => _hasPendingReload;
 
   bool _isStaleLoadMore(int requestId) {
     if (requestId != _searchRequestId) {
@@ -35,7 +41,17 @@ class CustomersListCubit extends Cubit<CustomersListState> {
     required OrderRepository orderRepository,
   }) : _customerRepository = customerRepository,
        _orderRepository = orderRepository,
-       super(const CustomersListState());
+       super(const CustomersListState()) {
+    _dbSubscription = _customerRepository.watchCustomers().listen((_) {
+      if (isClosed) return;
+      if (state.customers.length > _pageSize) return;
+      if (state.isLoading) {
+        _hasPendingReload = true;
+        return;
+      }
+      loadCustomers(refresh: true);
+    });
+  }
 
   Future<void> loadCustomers({bool refresh = false}) async {
     final requestId = ++_searchRequestId;
@@ -95,6 +111,13 @@ class CustomersListCubit extends Cubit<CustomersListState> {
           errorMessage: AppStrings.unexpectedError,
         ),
       );
+    } finally {
+      if (!isClosed && requestId == _searchRequestId && _hasPendingReload) {
+        _hasPendingReload = false;
+        if (state.customers.length <= _pageSize) {
+          await loadCustomers(refresh: true);
+        }
+      }
     }
   }
 
@@ -196,6 +219,7 @@ class CustomersListCubit extends Cubit<CustomersListState> {
   @override
   Future<void> close() {
     _debounceTimer?.cancel();
+    _dbSubscription?.cancel();
     return super.close();
   }
 }

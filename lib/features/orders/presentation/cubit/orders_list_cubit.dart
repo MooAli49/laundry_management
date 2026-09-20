@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/errors/failures.dart';
@@ -17,6 +20,13 @@ class OrdersListCubit extends Cubit<OrdersListState> {
 
   static const int _pageSize = 20;
 
+  StreamSubscription<void>? _dbSubscription;
+  int _loadRequestId = 0;
+  bool _hasPendingReload = false;
+
+  @visibleForTesting
+  bool get hasPendingReload => _hasPendingReload;
+
   OrdersListCubit({
     required OrderRepository orderRepository,
     required CustomerRepository customerRepository,
@@ -24,11 +34,20 @@ class OrdersListCubit extends Cubit<OrdersListState> {
   }) : _orderRepository = orderRepository,
        _customerRepository = customerRepository,
        _paymentRepository = paymentRepository,
-       super(const OrdersListState());
+       super(const OrdersListState()) {
+    _dbSubscription = _orderRepository.watchOrderTableUpdates().listen((_) {
+      if (isClosed) return;
+      if (state.orders.length > _pageSize) return;
+      if (state.isLoading) {
+        _hasPendingReload = true;
+        return;
+      }
+      loadOrders(refresh: true);
+    });
+  }
 
   Future<void> loadOrders({bool refresh = false}) async {
-    if (state.isLoading && !refresh) return;
-
+    final requestId = ++_loadRequestId;
     emit(state.copyWith(isLoading: true, clearErrorMessage: true));
 
     try {
@@ -48,6 +67,8 @@ class OrdersListCubit extends Cubit<OrdersListState> {
 
       final viewModels = await _enrichOrders(orders);
 
+      if (isClosed || requestId != _loadRequestId) return;
+
       emit(
         state.copyWith(
           orders: viewModels,
@@ -56,9 +77,18 @@ class OrdersListCubit extends Cubit<OrdersListState> {
         ),
       );
     } on Failure catch (f) {
+      if (isClosed || requestId != _loadRequestId) return;
       emit(state.copyWith(isLoading: false, errorMessage: f.message));
     } catch (e) {
+      if (isClosed || requestId != _loadRequestId) return;
       emit(state.copyWith(isLoading: false, errorMessage: e.toString()));
+    } finally {
+      if (!isClosed && requestId == _loadRequestId && _hasPendingReload) {
+        _hasPendingReload = false;
+        if (state.orders.length <= _pageSize) {
+          await loadOrders(refresh: true);
+        }
+      }
     }
   }
 
@@ -180,5 +210,11 @@ class OrdersListCubit extends Cubit<OrdersListState> {
       createdTo: createdTo,
       hasRemaining: hasRemaining,
     );
+  }
+
+  @override
+  Future<void> close() {
+    _dbSubscription?.cancel();
+    return super.close();
   }
 }
