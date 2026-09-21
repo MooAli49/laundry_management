@@ -376,6 +376,7 @@ void main() {
               {
                 'id': itemId,
                 'item_type_id': '00000000-0000-0000-0001-000000000003',
+                'item_type_name_snapshot': 'سجاد',
                 'service_id': srvId,
                 'service_name_snapshot': 'خدمة سجاد للاختبار $runId',
                 'pricing_type': 'per_square_meter',
@@ -689,9 +690,13 @@ void main() {
         final orderCreateSeq = orderCreateChange['sequence'] as int;
 
         // Update the order status
+        final completedAt = DateTime.now().toUtc();
         final updateRes = await dio.patch(
           '/orders/$orderId',
-          data: {'status': 'completed'},
+          data: {
+            'status': 'completed',
+            'completed_at': completedAt.toIso8601String(),
+          },
           options: Options(
             headers: {'X-Operation-ID': orderStatusUpdateOpId},
             validateStatus: (_) => true,

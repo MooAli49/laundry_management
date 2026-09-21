@@ -340,7 +340,9 @@ void main() {
               {
                 'id': 'e1000000-0000-4000-8000-$runId',
                 'item_type_id': '00000000-0000-0000-0001-000000000001',
+                'item_type_name_snapshot': 'ملابس',
                 'service_id': testServiceId,
+                'service_name_snapshot': 'خدمة اختبار دفع $runId',
                 'pricing_type': 'fixed_price',
                 'quantity': 2.0,
                 'unit_price': 10000,
