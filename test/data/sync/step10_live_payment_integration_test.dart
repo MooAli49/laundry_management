@@ -354,8 +354,14 @@ void main() {
           ),
         );
 
-        // Seed cancelled order
-        await dio.post(
+        // Seed cancelled order — Approach B: create as processing, then cancel
+        // via PATCH. This matches the real production lifecycle and ensures that
+        // sync_create_order_aggregate writes a CREATE change (status=processing)
+        // and sync_update_order writes a subsequent UPDATE change containing
+        // cancelled_at and cancellation_reason. A fresh device replaying both
+        // changes will end with a domain-valid cancelled order that satisfies:
+        //   cancelledAt != null && cancellationReason.isNotEmpty
+        final createCancelledRes = await dio.post(
           '/orders',
           data: {
             'id': testCancelledOrderId,
@@ -363,8 +369,7 @@ void main() {
             'customer_id': testCustomerId,
             'customer_name_snapshot': 'Step 10 Live Payment Tester',
             'customer_phone_snapshot': phone,
-            'status': 'cancelled',
-            'cancellation_reason': 'Customer request',
+            'status': 'processing',
             'expected_pickup_date': '2026-09-30T00:00:00.000',
             'subtotal': 10000,
             'total': 10000,
@@ -375,6 +380,33 @@ void main() {
             validateStatus: (_) => true,
           ),
         );
+        if (createCancelledRes.statusCode != 201) {
+          fail(
+            'Step 10 setUp: failed to seed cancelled order as processing. '
+            'Status=${createCancelledRes.statusCode} body=${createCancelledRes.data}',
+          );
+        }
+
+        final cancelledAt = DateTime.now().toUtc();
+        final patchCancelRes = await dio.patch(
+          '/orders/$testCancelledOrderId',
+          data: {
+            'status': 'cancelled',
+            'cancelled_at': cancelledAt.toIso8601String(),
+            'cancellation_reason': 'Customer request',
+            'updated_at': cancelledAt.toIso8601String(),
+          },
+          options: Options(
+            headers: {'X-Operation-ID': 'op-step10-cancel-$runId'},
+            validateStatus: (_) => true,
+          ),
+        );
+        if (patchCancelRes.statusCode != 200) {
+          fail(
+            'Step 10 setUp: failed to cancel seeded order via PATCH. '
+            'Status=${patchCancelRes.statusCode} body=${patchCancelRes.data}',
+          );
+        }
       }
     });
 
