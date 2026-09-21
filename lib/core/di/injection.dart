@@ -67,6 +67,7 @@ import '../../features/settings/presentation/cubit/services_management_cubit.dar
 import '../../features/settings/presentation/cubit/settings_cubit.dart';
 import '../../features/settings/presentation/cubit/storage_locations_management_cubit.dart';
 import '../../features/storage/presentation/cubit/storage_cubit.dart';
+import '../widgets/sync_status_cubit.dart';
 import '../network/dio_client.dart';
 import '../network/network_info.dart';
 import '../../data/datasources/remote/customer_remote_api.dart';
@@ -618,6 +619,14 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
     getIt.registerFactory<ExpenseCategoriesManagementCubit>(
       () => ExpenseCategoriesManagementCubit(
         expenseCategoryRepository: getIt<ExpenseCategoryRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<SyncStatusCubit>()) {
+    getIt.registerFactory<SyncStatusCubit>(
+      () => SyncStatusCubit(
+        syncEngine: getIt<SyncEngine>(),
+        networkInfo: getIt<NetworkInfo>(),
       ),
     );
   }

@@ -6,6 +6,7 @@ import 'package:laundry_management/core/routing/app_routes.dart';
 import 'package:laundry_management/core/theme/app_colors.dart';
 import 'package:laundry_management/core/theme/app_spacing.dart';
 import 'package:laundry_management/core/theme/app_text_styles.dart';
+import 'sync_status_indicator.dart';
 
 class AppShell extends StatelessWidget {
   final Widget mainContent;
@@ -162,28 +163,7 @@ class AppSidebar extends StatelessWidget {
                       );
                     }),
                     const Spacer(),
-                    Padding(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: AppColors.success,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          AppSpacing.gapHorizontalSm,
-                          Text(
-                            'متصل',
-                            style: AppTextStyles.labelSmall.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    const SyncStatusIndicator(),
                   ],
                 ),
               ),

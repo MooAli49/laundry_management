@@ -269,6 +269,18 @@ class SyncEngine {
       }
     } finally {
       _isSynchronizing = false;
+      if (!_isDisposed) {
+        if (_state.status == SyncEngineStatus.syncing) {
+          _updateState(
+            SyncEngineState.completed(
+              lastSyncTime: _clock(),
+              pendingOperationsCount: _state.pendingOperationsCount,
+            ),
+          );
+        } else if (_state.status == SyncEngineStatus.completed) {
+          _updateState(_state);
+        }
+      }
     }
     return _state;
   }
@@ -330,6 +342,10 @@ class SyncEngine {
           error: 'CURSOR_TOO_OLD: ${e.message}',
           lastSyncTime: _state.lastSyncTime,
           pendingOperationsCount: remainingOps.length,
+          errorDetails: const SyncErrorDetails(
+            statusCode: 410,
+            message: 'CURSOR_TOO_OLD',
+          ),
         ),
       );
     } catch (e, stack) {
@@ -354,6 +370,7 @@ class SyncEngine {
           error: errorMessage,
           lastSyncTime: _state.lastSyncTime,
           pendingOperationsCount: remainingCount,
+          errorDetails: _mapErrorToDetails(e),
         ),
       );
     }
@@ -464,6 +481,7 @@ class SyncEngine {
               error: errorMessage,
               lastSyncTime: _state.lastSyncTime,
               pendingOperationsCount: remainingOps.length,
+              errorDetails: details,
             ),
           );
           return;
@@ -500,6 +518,7 @@ class SyncEngine {
           error: unexpectedError.toString(),
           lastSyncTime: _state.lastSyncTime,
           pendingOperationsCount: remainingCount,
+          errorDetails: _mapErrorToDetails(unexpectedError),
         ),
       );
     }

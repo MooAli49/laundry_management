@@ -38,6 +38,12 @@ class AppStrings {
   static const String noData = 'لا توجد بيانات';
   static const String emptyStateDefaultTitle = 'لا توجد عناصر لعرضها';
 
+  // Sync Status
+  static const String syncConnected = 'متصل';
+  static const String syncSyncing = 'جاري المزامنة';
+  static const String syncOffline = 'غير متصل';
+  static const String syncError = 'فشل المزامنة';
+
   // Customers — Header, List & Search
   static const String addCustomer = 'إضافة عميل';
   static String totalCustomersCount(int count) => 'إجمالي $count عميل';
