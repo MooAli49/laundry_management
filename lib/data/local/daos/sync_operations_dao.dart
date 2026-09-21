@@ -42,6 +42,26 @@ class SyncOperationsDao extends DatabaseAccessor<app_db.AppDatabase> {
         .get();
   }
 
+  /// Emits the list of pending sync operation IDs whenever pending operations change.
+  ///
+  /// Drift query streams guarantee that emissions only occur AFTER enclosing SQLite
+  /// transactions have successfully committed.
+  Stream<List<String>> watchPendingOperationIds() {
+    final query = selectOnly(db.syncOperations)
+      ..addColumns([db.syncOperations.id])
+      ..where(db.syncOperations.status.equals('pending'));
+    return query.map((row) => row.read(db.syncOperations.id)!).watch();
+  }
+
+  /// Emits the full list of pending sync operations for UI/monitoring watchers.
+  Stream<List<app_db.SyncOperation>> watchPendingOperations({int limit = 100}) {
+    return (select(db.syncOperations)
+          ..where((t) => t.status.equals('pending'))
+          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)])
+          ..limit(limit))
+        .watch();
+  }
+
   /// Returns operations eligible for synchronization at [asOf] timestamp.
   ///
   /// Eligible operations are:

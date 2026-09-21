@@ -56,6 +56,8 @@ class SyncEngine {
 
   StreamSubscription<bool>? _connectivitySubscription;
   StreamSubscription<void>? _realtimeSubscription;
+  StreamSubscription<List<String>>? _outboxSubscription;
+  Set<String> _knownPendingIds = {};
   Timer? _periodicTimer;
 
   SyncEngineState _state = const SyncEngineState.idle();
@@ -119,7 +121,35 @@ class SyncEngine {
     }
     _isInitialized = true;
 
-    // 1. Subscribe to network connectivity changes
+    // Snapshot existing pending IDs before subscribing to avoid false trigger on pre-existing items
+    try {
+      final initialPending = await _syncOperationsDao.getPendingOperations();
+      if (_isDisposed) return;
+      _knownPendingIds = initialPending.map((op) => op.id).toSet();
+    } catch (_) {
+      // Safely ignore DB access errors in unit test environments without real storage
+    }
+
+    // 1. Subscribe to central outbox changes for newly committed pending operations
+    _outboxSubscription = _syncOperationsDao.watchPendingOperationIds().listen(
+      (ids) {
+        if (_isDisposed) return;
+        final currentIds = ids.toSet();
+        final hasNewOperations = currentIds.any(
+          (id) => !_knownPendingIds.contains(id),
+        );
+        _knownPendingIds = currentIds;
+
+        if (hasNewOperations) {
+          unawaited(sync().catchError((_, __) => _state));
+        }
+      },
+      onError: (_) {
+        // Outbox stream errors are safely ignored
+      },
+    );
+
+    // 2. Subscribe to network connectivity changes
     _connectivitySubscription = _networkInfo.onConnectivityChanged.listen(
       (isConnected) {
         if (_isDisposed) return;
@@ -566,6 +596,9 @@ class SyncEngine {
     _connectivitySubscription = null;
     _realtimeSubscription?.cancel();
     _realtimeSubscription = null;
+    _outboxSubscription?.cancel();
+    _outboxSubscription = null;
+    _knownPendingIds.clear();
     _periodicTimer?.cancel();
     _periodicTimer = null;
     if (_realtimeAdapter != null) {
