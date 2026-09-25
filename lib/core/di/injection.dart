@@ -5,6 +5,8 @@ import '../../application/use_cases/cancel_order_use_case.dart';
 import '../../application/use_cases/change_order_status_use_case.dart';
 import '../../application/use_cases/complete_order_use_case.dart';
 import '../../application/use_cases/create_order_use_case.dart';
+import '../../application/use_cases/create_refund_use_case.dart';
+import '../../application/use_cases/edit_processing_order_use_case.dart';
 import '../../application/use_cases/move_stored_item_use_case.dart';
 import '../../application/use_cases/store_order_items_use_case.dart';
 import '../../application/use_cases/unstore_item_use_case.dart';
@@ -17,6 +19,7 @@ import '../../data/local/daos/item_definitions_dao.dart';
 import '../../data/local/daos/item_types_dao.dart';
 import '../../data/local/daos/orders_dao.dart';
 import '../../data/local/daos/payments_dao.dart';
+import '../../data/local/daos/refunds_dao.dart';
 import '../../data/local/daos/services_dao.dart';
 import '../../data/local/daos/storage_locations_dao.dart';
 import '../../data/local/daos/storage_records_dao.dart';
@@ -32,6 +35,7 @@ import '../../data/repositories/item_definition_repository_impl.dart';
 import '../../data/repositories/item_type_repository_impl.dart';
 import '../../data/repositories/order_repository_impl.dart';
 import '../../data/repositories/payment_repository_impl.dart';
+import '../../data/repositories/refund_repository_impl.dart';
 import '../../data/repositories/reports_repository_impl.dart';
 import '../../data/repositories/service_repository_impl.dart';
 import '../../data/repositories/settings_repository_impl.dart';
@@ -46,6 +50,7 @@ import '../../domain/repositories/item_definition_repository.dart';
 import '../../domain/repositories/item_type_repository.dart';
 import '../../domain/repositories/order_repository.dart';
 import '../../domain/repositories/payment_repository.dart';
+import '../../domain/repositories/refund_repository.dart';
 import '../../domain/repositories/reports_repository.dart';
 import '../../domain/repositories/service_repository.dart';
 import '../../domain/repositories/settings_repository.dart';
@@ -57,8 +62,10 @@ import '../../features/dashboard/presentation/cubit/dashboard_cubit.dart';
 import '../../features/dashboard/presentation/cubit/record_payment_cubit.dart';
 import '../../features/expenses/presentation/cubit/add_expense_cubit.dart';
 import '../../features/orders/presentation/cubit/create_order_cubit.dart';
+import '../../features/orders/presentation/cubit/edit_processing_order_cubit.dart';
 import '../../features/orders/presentation/cubit/order_detail_cubit.dart';
 import '../../features/orders/presentation/cubit/orders_list_cubit.dart';
+import '../../features/orders/presentation/cubit/refund_cubit.dart';
 import '../../features/reports/presentation/cubit/reports_cubit.dart';
 import '../../features/settings/presentation/cubit/carpet_sizes_management_cubit.dart';
 import '../../features/settings/presentation/cubit/expense_categories_management_cubit.dart';
@@ -75,6 +82,7 @@ import '../../data/datasources/remote/expense_remote_api.dart';
 import '../../data/datasources/remote/master_data_remote_api.dart';
 import '../../data/datasources/remote/order_remote_api.dart';
 import '../../data/datasources/remote/payment_remote_api.dart';
+import '../../data/datasources/remote/refund_remote_api.dart';
 import '../../data/datasources/remote/remote_api_dispatcher.dart';
 import '../../data/datasources/remote/storage_remote_api.dart';
 import '../../data/datasources/remote/sync_remote_api.dart';
@@ -131,6 +139,11 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
       () => PaymentRemoteApi(getIt<Dio>()),
     );
   }
+  if (!getIt.isRegistered<RefundRemoteApi>()) {
+    getIt.registerLazySingleton<RefundRemoteApi>(
+      () => RefundRemoteApi(getIt<Dio>()),
+    );
+  }
   if (!getIt.isRegistered<StorageRemoteApi>()) {
     getIt.registerLazySingleton<StorageRemoteApi>(
       () => StorageRemoteApi(getIt<Dio>()),
@@ -164,6 +177,7 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
         customerApi: getIt<CustomerRemoteApi>(),
         orderApi: getIt<OrderRemoteApi>(),
         paymentApi: getIt<PaymentRemoteApi>(),
+        refundApi: getIt<RefundRemoteApi>(),
         storageApi: getIt<StorageRemoteApi>(),
         expenseApi: getIt<ExpenseRemoteApi>(),
         masterDataApi: getIt<MasterDataRemoteApi>(),
@@ -185,6 +199,11 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
   if (!getIt.isRegistered<PaymentsDao>()) {
     getIt.registerLazySingleton<PaymentsDao>(
       () => PaymentsDao(getIt<AppDatabase>()),
+    );
+  }
+  if (!getIt.isRegistered<RefundsDao>()) {
+    getIt.registerLazySingleton<RefundsDao>(
+      () => RefundsDao(getIt<AppDatabase>()),
     );
   }
   if (!getIt.isRegistered<StorageLocationsDao>()) {
@@ -311,6 +330,7 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
         ordersDao: getIt<OrdersDao>(),
         storageRecordsDao: getIt<StorageRecordsDao>(),
         syncOperationsDao: getIt<SyncOperationsDao>(),
+        paymentsDao: getIt<PaymentsDao>(),
         db: getIt<AppDatabase>(),
       ),
     );
@@ -318,6 +338,17 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
   if (!getIt.isRegistered<PaymentRepository>()) {
     getIt.registerLazySingleton<PaymentRepository>(
       () => PaymentRepositoryImpl(
+        paymentsDao: getIt<PaymentsDao>(),
+        ordersDao: getIt<OrdersDao>(),
+        syncOperationsDao: getIt<SyncOperationsDao>(),
+        db: getIt<AppDatabase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<RefundRepository>()) {
+    getIt.registerLazySingleton<RefundRepository>(
+      () => RefundRepositoryImpl(
+        refundsDao: getIt<RefundsDao>(),
         paymentsDao: getIt<PaymentsDao>(),
         ordersDao: getIt<OrdersDao>(),
         syncOperationsDao: getIt<SyncOperationsDao>(),
@@ -406,6 +437,7 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
         ordersDao: getIt<OrdersDao>(),
         paymentsDao: getIt<PaymentsDao>(),
         expensesDao: getIt<ExpensesDao>(),
+        refundsDao: getIt<RefundsDao>(),
         expenseRepository: getIt<ExpenseRepository>(),
       ),
     );
@@ -439,6 +471,13 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
         serviceRepository: getIt<ServiceRepository>(),
         itemTypeRepository: getIt<ItemTypeRepository>(),
         itemDefinitionRepository: getIt<ItemDefinitionRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<EditProcessingOrderUseCase>()) {
+    getIt.registerLazySingleton<EditProcessingOrderUseCase>(
+      () => EditProcessingOrderUseCase(
+        orderRepository: getIt<OrderRepository>(),
       ),
     );
   }
@@ -478,6 +517,11 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
       () => CancelOrderUseCase(getIt<OrderRepository>()),
     );
   }
+  if (!getIt.isRegistered<CreateRefundUseCase>()) {
+    getIt.registerLazySingleton<CreateRefundUseCase>(
+      () => CreateRefundUseCase(getIt<RefundRepository>()),
+    );
+  }
   if (!getIt.isRegistered<UnstoreItemUseCase>()) {
     getIt.registerLazySingleton<UnstoreItemUseCase>(
       () => UnstoreItemUseCase(storageRepository: getIt<StorageRepository>()),
@@ -507,12 +551,30 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
       ),
     );
   }
+  if (!getIt.isRegistered<EditProcessingOrderCubit>()) {
+    getIt.registerFactory<EditProcessingOrderCubit>(
+      () => EditProcessingOrderCubit(
+        orderRepository: getIt<OrderRepository>(),
+        customerRepository: getIt<CustomerRepository>(),
+        itemTypeRepository: getIt<ItemTypeRepository>(),
+        itemDefinitionRepository: getIt<ItemDefinitionRepository>(),
+        serviceRepository: getIt<ServiceRepository>(),
+        carpetSizeRepository: getIt<CarpetSizeRepository>(),
+        storageLocationRepository: getIt<StorageLocationRepository>(),
+        storageRecordsDao: getIt<StorageRecordsDao>(),
+        paymentsDao: getIt<PaymentsDao>(),
+        settingsRepository: getIt<SettingsRepository>(),
+        editProcessingOrderUseCase: getIt<EditProcessingOrderUseCase>(),
+      ),
+    );
+  }
   if (!getIt.isRegistered<OrderDetailCubit>()) {
     getIt.registerFactory<OrderDetailCubit>(
       () => OrderDetailCubit(
         orderRepository: getIt<OrderRepository>(),
         customerRepository: getIt<CustomerRepository>(),
         paymentRepository: getIt<PaymentRepository>(),
+        refundRepository: getIt<RefundRepository>(),
         storageRepository: getIt<StorageRepository>(),
         storageLocationRepository: getIt<StorageLocationRepository>(),
         settingsRepository: getIt<SettingsRepository>(),
@@ -520,6 +582,13 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
         changeOrderStatusUseCase: getIt<ChangeOrderStatusUseCase>(),
         completeOrderUseCase: getIt<CompleteOrderUseCase>(),
         cancelOrderUseCase: getIt<CancelOrderUseCase>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<RefundCubit>()) {
+    getIt.registerFactory<RefundCubit>(
+      () => RefundCubit(
+        createRefundUseCase: getIt<CreateRefundUseCase>(),
       ),
     );
   }

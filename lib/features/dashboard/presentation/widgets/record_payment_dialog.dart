@@ -272,6 +272,7 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
                                   children: [
                                     Text(
                                       displayNumber,
+                                      textDirection: TextDirection.ltr,
                                       style: AppTextStyles.labelMedium.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: AppColors.textPrimary,
@@ -385,6 +386,7 @@ class _RecordPaymentDialogViewState extends State<_RecordPaymentDialogView> {
                         children: [
                           Text(
                             displayNumber,
+                            textDirection: TextDirection.ltr,
                             style: AppTextStyles.titleSmall.copyWith(
                               fontWeight: FontWeight.bold,
                               color: AppColors.primaryDark,

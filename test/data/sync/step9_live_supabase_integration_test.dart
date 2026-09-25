@@ -740,16 +740,38 @@ void main() {
       () async {
         if (!isNetworkAvailable) return;
 
-        // Sequence 1 is older than minimum sequence (3)
-        final res = await dio.get(
+        // Query the oldest available sequence currently retained in sync_changes
+        final baselineRes = await dio.get(
           '/sync/changes',
-          queryParameters: {'after': 1, 'limit': 10},
+          queryParameters: {'after': 0, 'limit': 1},
           options: Options(validateStatus: (_) => true),
         );
+        final changes = baselineRes.data is Map
+            ? (baselineRes.data['changes'] as List?)
+            : null;
+        final oldestSeq = (changes != null && changes.isNotEmpty)
+            ? (changes.first['sequence'] as num).toInt()
+            : 1;
 
-        expect(res.statusCode, equals(410));
-        expect(res.data['code'], equals('CURSOR_TOO_OLD'));
-        expect(res.data['message'], contains('CURSOR_TOO_OLD'));
+        if (oldestSeq <= 2) {
+          // Retention floor still retains sequence 1. Requesting after: 1 is valid and returns 200.
+          final res = await dio.get(
+            '/sync/changes',
+            queryParameters: {'after': 1, 'limit': 10},
+            options: Options(validateStatus: (_) => true),
+          );
+          expect(res.statusCode, equals(200));
+        } else {
+          // Sequence 1 is older than retention floor (v_oldest_sequence - 1). Server returns 410 CURSOR_TOO_OLD.
+          final res = await dio.get(
+            '/sync/changes',
+            queryParameters: {'after': 1, 'limit': 10},
+            options: Options(validateStatus: (_) => true),
+          );
+          expect(res.statusCode, equals(410));
+          expect(res.data['code'], equals('CURSOR_TOO_OLD'));
+          expect(res.data['message'], contains('CURSOR_TOO_OLD'));
+        }
       },
     );
 

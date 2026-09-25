@@ -474,4 +474,30 @@ class StorageRecordsDao extends DatabaseAccessor<app_db.AppDatabase> {
         .getSingle();
     return result ?? 0;
   }
+
+  Future<int> countAllRecordsForOrderItem(String orderItemId) async {
+    final countExp = db.storageRecords.id.count();
+    final query = selectOnly(db.storageRecords)
+      ..where(db.storageRecords.orderItemId.equals(orderItemId))
+      ..addColumns([countExp]);
+    final result = await query.map((row) => row.read(countExp)).getSingle();
+    return result ?? 0;
+  }
+
+  Future<Map<String, int>> countAllRecordsForOrderItems(
+    List<String> orderItemIds,
+  ) async {
+    if (orderItemIds.isEmpty) return {};
+    final countExp = db.storageRecords.id.count();
+    final query = selectOnly(db.storageRecords)
+      ..where(db.storageRecords.orderItemId.isIn(orderItemIds))
+      ..addColumns([db.storageRecords.orderItemId, countExp])
+      ..groupBy([db.storageRecords.orderItemId]);
+    final rows = await query.get();
+    return {
+      for (final row in rows)
+        if (row.read(db.storageRecords.orderItemId) != null)
+          row.read(db.storageRecords.orderItemId)!: row.read(countExp) ?? 0,
+    };
+  }
 }

@@ -51,8 +51,13 @@ class _CustomersViewState extends State<_CustomersView> {
       context: context,
       builder: (dialogContext) {
         return CustomerFormDialog(
-          onSave: ({required name, required phone, notes}) =>
-              cubit.createCustomer(name: name, phone: phone, notes: notes),
+          onSave: ({required name, required phone, address, notes}) =>
+              cubit.createCustomer(
+                name: name,
+                phone: phone,
+                address: address,
+                notes: notes,
+              ),
           onFindDuplicate: cubit.getCustomerByPhone,
           onViewExisting: (existingCustomer) {
             context

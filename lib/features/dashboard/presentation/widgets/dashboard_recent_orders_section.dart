@@ -130,6 +130,7 @@ class DashboardRecentOrdersSection extends StatelessWidget {
                             children: [
                               Text(
                                 displayNumber,
+                                textDirection: TextDirection.ltr,
                                 style: AppTextStyles.labelLarge.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: AppColors.textPrimary,

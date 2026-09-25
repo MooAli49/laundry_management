@@ -18,6 +18,7 @@ class CustomerSelector extends StatefulWidget {
   final Future<void> Function({
     required String name,
     required String phone,
+    String? address,
     String? notes,
   })
   onAddNewCustomer;

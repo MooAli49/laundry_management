@@ -43,8 +43,13 @@ class _DashboardView extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => CustomerFormDialog(
-        onSave: ({required name, required phone, notes}) async {
-          await cubit.createCustomer(name: name, phone: phone, notes: notes);
+        onSave: ({required name, required phone, address, notes}) async {
+          await cubit.createCustomer(
+            name: name,
+            phone: phone,
+            address: address,
+            notes: notes,
+          );
           if (context.mounted) {
             context.read<DashboardCubit>().refresh();
             ScaffoldMessenger.of(context).showSnackBar(

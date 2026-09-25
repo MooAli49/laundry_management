@@ -38,7 +38,7 @@ When integration tests or verification runs introduce test rows or duplicate dat
    - Checks that `current_database()` does not contain production signatures (`prod`, `production`, `live`).
 2. **Reverse-Dependency Deletion**:
    - Deletes in strict foreign key reverse dependency order:
-     1. Transactional data: `sync_idempotency_log`, `order_item_carpets`, `order_items`, `orders`, `payments`, `storage_records`, `expenses`, `customers`.
+     1. Transactional data: `sync_idempotency_log`, `order_item_carpets`, `order_items`, `refunds`, `orders`, `payments`, `storage_records`, `expenses`, `customers`.
      2. Junction tables: `service_item_types`, `storage_location_item_types`.
      3. Master catalog entities: `item_definitions`, `storage_locations`, `carpet_sizes`, `services`, `expense_categories`, `item_types`.
      4. Synchronisation change log: `sync_changes`.
@@ -108,5 +108,28 @@ Following safe reset and canonical seeding, verify the following:
 - [ ] `SELECT COUNT(*) FROM sync_changes;` equals `35`
 - [ ] `SELECT MIN(sequence), MAX(sequence) FROM sync_changes;` returns `1, 35`
 - [ ] `SELECT public.get_sync_changes(0, 100);` returns all 35 records with `has_more = false` and `latest_sequence = 35`
-- [ ] Transactional tables (`orders`, `customers`, `payments`, `expenses`, `storage_records`, `sync_idempotency_log`) are completely empty (0 rows)
+- [ ] Transactional tables (`orders`, `customers`, `payments`, `refunds`, `expenses`, `storage_records`, `sync_idempotency_log`) are completely empty (0 rows)
 - [ ] Fresh client install bootstraps from cursor 0 cleanly to cursor 35 without errors
+
+---
+
+## 6. Applied Database Migrations
+
+The following 13 migrations are applied to the development Supabase project (`dyhfgnbhijukbdptreto`), located in `supabase/migrations/`:
+
+| Migration | Description |
+|---|---|
+| `20260916000000_step8_sync_schema.sql` | Step 8 sync schema foundation |
+| `20260916000001_sync_rpc_functions.sql` | Sync RPC functions |
+| `20260916000002_payments_schema.sql` | Payments schema & idempotency |
+| `20260916000003_expenses_schema.sql` | Expenses schema |
+| `20260916000004_master_data_schema.sql` | Master data schema |
+| `20260917000000_remote_sync_foundation.sql` | Remote sync foundation & pull endpoint |
+| `20260918000000_realtime_sync_changes.sql` | Realtime sync changes & triggers |
+| `20260919000000_enforce_master_foreign_keys.sql` | Master foreign key constraints |
+| `20260923000000_sync_update_order_aggregate.sql` | Atomic order aggregate edit RPC (`sync_update_order_aggregate`) |
+| `20260923000001_restrict_edit_order_to_processing.sql` | Restrict order aggregate edit to `processing` status |
+| `20260923000002_allow_completed_to_processing_correction.sql` | Allow `Completed -> Processing` administrative correction |
+| `20260924000000_refunds_schema.sql` | Refunds schema, constraints & `sync_create_refund` RPC |
+| `20260925000000_customer_address.sql` | Customer address column (`customers.address TEXT NULL`) |
+

@@ -89,7 +89,7 @@ Unless explicitly approved, do not add:
 - Driver management
 - Vehicle management
 - Delivery management
-- Refunds
+- Automated payment gateway refunds and line-item refunds
 - Loyalty programs
 - Barcode workflows
 - AI assistant

@@ -6,6 +6,7 @@ import 'expense_remote_api.dart';
 import 'master_data_remote_api.dart';
 import 'order_remote_api.dart';
 import 'payment_remote_api.dart';
+import 'refund_remote_api.dart';
 import 'storage_remote_api.dart';
 
 /// Translates a persisted [SyncOperation] into the corresponding typed Retrofit API call.
@@ -19,6 +20,7 @@ class RemoteApiDispatcher {
   final CustomerRemoteApi _customerApi;
   final OrderRemoteApi _orderApi;
   final PaymentRemoteApi _paymentApi;
+  final RefundRemoteApi _refundApi;
   final StorageRemoteApi _storageApi;
   final ExpenseRemoteApi _expenseApi;
   final MasterDataRemoteApi _masterDataApi;
@@ -27,12 +29,14 @@ class RemoteApiDispatcher {
     required CustomerRemoteApi customerApi,
     required OrderRemoteApi orderApi,
     required PaymentRemoteApi paymentApi,
+    required RefundRemoteApi refundApi,
     required StorageRemoteApi storageApi,
     required ExpenseRemoteApi expenseApi,
     required MasterDataRemoteApi masterDataApi,
   }) : _customerApi = customerApi,
        _orderApi = orderApi,
        _paymentApi = paymentApi,
+       _refundApi = refundApi,
        _storageApi = storageApi,
        _expenseApi = expenseApi,
        _masterDataApi = masterDataApi;
@@ -60,6 +64,14 @@ class RemoteApiDispatcher {
 
       case 'payment':
         return _dispatchPayment(
+          opId,
+          entityId,
+          operation.operationType,
+          payload,
+        );
+
+      case 'refund':
+        return _dispatchRefund(
           opId,
           entityId,
           operation.operationType,
@@ -186,6 +198,8 @@ class RemoteApiDispatcher {
         return _orderApi.createOrder(opId, payload);
       case 'update':
         return _orderApi.updateOrder(opId, entityId, payload);
+      case 'edit':
+        return _orderApi.editOrderAggregate(opId, entityId, payload);
       case 'mark_ready':
         return _orderApi.updateOrder(opId, entityId, {
           'status': 'ready',
@@ -222,6 +236,22 @@ class RemoteApiDispatcher {
       default:
         throw UnsupportedError(
           'Unsupported operation "$opType" for entity "payment"',
+        );
+    }
+  }
+
+  Future<dynamic> _dispatchRefund(
+    String opId,
+    String entityId,
+    String opType,
+    Map<String, dynamic> payload,
+  ) async {
+    switch (opType) {
+      case 'create':
+        return _refundApi.createRefund(opId, payload);
+      default:
+        throw UnsupportedError(
+          'Unsupported operation "$opType" for entity "refund"',
         );
     }
   }

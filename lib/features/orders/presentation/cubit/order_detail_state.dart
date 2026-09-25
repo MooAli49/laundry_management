@@ -3,6 +3,8 @@ import '../../../../domain/entities/customer.dart';
 import '../../../../domain/entities/order.dart';
 import '../../../../domain/entities/order_item.dart';
 import '../../../../domain/entities/payment.dart';
+import '../../../../domain/entities/refund.dart';
+import '../../../../domain/entities/refund_balance_summary.dart';
 import '../../../../domain/entities/storage_location.dart';
 import '../../../../domain/entities/storage_record.dart';
 import '../../../../domain/value_objects/money.dart';
@@ -23,6 +25,8 @@ class OrderDetailState {
   final List<Payment> payments;
   final Money totalPaid;
   final Money remainingAmount;
+  final List<Refund> refunds;
+  final RefundBalanceSummary refundBalance;
   final BusinessSettings? settings;
   final String? errorMessage;
   final String? actionSuccessMessage;
@@ -40,12 +44,16 @@ class OrderDetailState {
     this.payments = const [],
     this.totalPaid = Money.zero,
     this.remainingAmount = Money.zero,
+    this.refunds = const [],
+    this.refundBalance = RefundBalanceSummary.zero,
     this.settings,
     this.errorMessage,
     this.actionSuccessMessage,
   });
 
   bool get isFullyPaid => remainingAmount.isZero || remainingAmount.isNegative;
+  Money get totalRefunded => refundBalance.totalRefunded;
+  Money get remainingRefundable => refundBalance.remainingRefundable;
   bool get allItemsStored =>
       items.isNotEmpty &&
       items.every((i) => activeStorageRecords.containsKey(i.id));
@@ -87,6 +95,8 @@ class OrderDetailState {
     List<Payment>? payments,
     Money? totalPaid,
     Money? remainingAmount,
+    List<Refund>? refunds,
+    RefundBalanceSummary? refundBalance,
     BusinessSettings? settings,
     String? errorMessage,
     bool clearErrorMessage = false,
@@ -107,6 +117,8 @@ class OrderDetailState {
       payments: payments ?? this.payments,
       totalPaid: totalPaid ?? this.totalPaid,
       remainingAmount: remainingAmount ?? this.remainingAmount,
+      refunds: refunds ?? this.refunds,
+      refundBalance: refundBalance ?? this.refundBalance,
       settings: settings ?? this.settings,
       errorMessage: clearErrorMessage
           ? null

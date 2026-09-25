@@ -367,13 +367,13 @@ Financial values must be displayed using the approved EGP formatting.
 
 After an Order is created, the generated Order Number should be highly visible.
 
-V1 format:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length (zero-padded below 1000, expands naturally at 1000+).
 
-    YY-XXX
-
-Example:
+Examples:
 
     26-001
+    26-999
+    26-1000
 
 The Order Number is immutable.
 

@@ -2,6 +2,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/core/di/injection.dart';
+import 'package:laundry_management/core/theme/app_colors.dart';
 import 'package:laundry_management/core/theme/app_theme.dart';
 import 'package:laundry_management/data/local/database/app_database.dart'
     as db_pkg;
@@ -43,6 +44,30 @@ void main() {
   });
 
   group('CustomerDetailScreen Tests', () {
+    testWidgets('renders customer address only when non-null and non-empty', (
+      tester,
+    ) async {
+      final repo = getIt<CustomerRepository>();
+      final now = DateTime.now();
+      final customerWithAddr = await repo.createCustomer(
+        Customer(
+          id: 'c-test-addr-1',
+          name: 'عميل مع عنوان',
+          phone: '01012345699',
+          address: 'شارع عباس العقاد، مدينة نصر',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      await tester.pumpWidget(
+        testBoilerplate(CustomerDetailScreen(customerId: customerWithAddr.id)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('شارع عباس العقاد، مدينة نصر'), findsOneWidget);
+      expect(find.byIcon(Icons.location_on_outlined), findsOneWidget);
+    });
     testWidgets('renders customer details, KPI cards, and empty order state', (
       tester,
     ) async {
@@ -68,12 +93,14 @@ void main() {
       expect(find.text('01012345678'), findsOneWidget);
       expect(find.text('ملاحظة تجريبية للعميل'), findsOneWidget);
 
-      // KPI Cards (5 metrics)
+      // KPI Cards
       expect(find.text('إجمالي الطلبات'), findsOneWidget);
       expect(find.text('طلبات جارية'), findsOneWidget);
       expect(find.text('طلبات مكتملة'), findsOneWidget);
-      expect(find.text('إجمالي المدفوع'), findsOneWidget);
-      expect(find.text('إجمالي المتبقي'), findsOneWidget);
+      expect(find.text('إجمالي المدفوعات'), findsOneWidget);
+      expect(find.text('إجمالي الاستردادات'), findsOneWidget);
+      expect(find.text('صافي المدفوع'), findsOneWidget);
+      expect(find.text('المبالغ المستحقة'), findsOneWidget);
 
       // Empty Order State
       expect(find.text('لا توجد طلبات لهذا العميل'), findsOneWidget);
@@ -147,14 +174,21 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('26-777'), findsOneWidget);
+      expect(find.text('#26-777'), findsOneWidget);
       expect(find.text('قيد التجهيز'), findsOneWidget);
-      expect(
-        find.text('120.00 ج.م'),
-        findsNWidgets(2),
-      ); // Order total and KPI remaining total
+      expect(find.text('الإجمالي: 120.00 ج.م'), findsOneWidget); // Order total
+      expect(find.text('120.00 ج.م'), findsOneWidget); // KPI remaining total
       expect(find.text('المدفوع: 0.00 ج.م'), findsOneWidget);
       expect(find.text('المتبقي: 120.00 ج.م'), findsOneWidget);
+
+      // Verify outstanding amount uses AppColors.warning (amber) and NOT AppColors.error (red)
+      final remainingText =
+          tester.widget<Text>(find.text('المتبقي: 120.00 ج.م'));
+      expect(remainingText.style?.color, AppColors.warning);
+
+      final outstandingKpiText = tester.widget<Text>(find.text('120.00 ج.م'));
+      expect(outstandingKpiText.style?.color, AppColors.warning);
+      expect(outstandingKpiText.style?.color, isNot(AppColors.error));
     });
 
     testWidgets('tapping edit customer opens CustomerFormDialog', (

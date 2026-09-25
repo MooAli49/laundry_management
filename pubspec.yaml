@@ -27,6 +27,7 @@ dependencies:
   retrofit: ^4.1.0
   connectivity_plus: ^6.0.3
   supabase_flutter: ^2.17.2
+  flutter_svg: ^2.0.17
 
 dev_dependencies:
   flutter_test:

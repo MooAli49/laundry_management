@@ -1,6 +1,8 @@
+import '../../application/use_cases/edit_processing_order_use_case.dart';
 import '../entities/customer_order_aggregate.dart';
 import '../entities/order.dart';
 import '../entities/order_item.dart';
+import '../entities/payment.dart';
 import '../enums/order_status.dart';
 import '../value_objects/order_date.dart';
 
@@ -8,7 +10,10 @@ abstract class OrderRepository {
   Future<Order> createOrder({
     required Order order,
     required List<OrderItem> items,
+    Payment? initialPayment,
   });
+
+  Future<Order> editProcessingOrder(EditProcessingOrderInput input);
 
   Future<Order> updateOrder(Order order);
 

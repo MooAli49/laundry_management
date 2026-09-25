@@ -151,8 +151,8 @@ void main() {
         // Empty state is now gone
         expect(find.text('لا توجد طلبات لهذا العميل'), findsNothing);
 
-        // The order appears in the history
-        expect(find.text(createdOrder.orderNumber), findsOneWidget);
+        // The order appears in the history with explicit # prefix
+        expect(find.text('#${createdOrder.orderNumber}'), findsOneWidget);
         expect(find.text('قيد التجهيز'), findsOneWidget);
 
         // Verify KPI stats: 1 total, 1 active, 0 completed

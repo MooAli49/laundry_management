@@ -1,6 +1,7 @@
 class OrdersReportAggregateQueryResult {
   final int totalOrders;
   final int totalOrderValuePiastres;
+  final int totalSalesPiastres;
   final int totalDiscountsPiastres;
   final int processingCount;
   final int readyCount;
@@ -11,6 +12,7 @@ class OrdersReportAggregateQueryResult {
   const OrdersReportAggregateQueryResult({
     required this.totalOrders,
     required this.totalOrderValuePiastres,
+    this.totalSalesPiastres = 0,
     required this.totalDiscountsPiastres,
     required this.processingCount,
     required this.readyCount,
@@ -22,6 +24,7 @@ class OrdersReportAggregateQueryResult {
   static const empty = OrdersReportAggregateQueryResult(
     totalOrders: 0,
     totalOrderValuePiastres: 0,
+    totalSalesPiastres: 0,
     totalDiscountsPiastres: 0,
     processingCount: 0,
     readyCount: 0,

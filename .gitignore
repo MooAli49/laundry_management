@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Temporary QA, scratch, local databases & test artifacts
+scratch/
+*.db
+*.sqlite
+*.sqlite3
+/*.png
+scripts/*.json

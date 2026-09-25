@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/application/use_cases/change_order_status_use_case.dart';
 import 'package:laundry_management/core/errors/failures.dart';
 import 'package:laundry_management/data/local/daos/orders_dao.dart';
+import 'package:laundry_management/data/local/daos/payments_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
 import 'package:laundry_management/data/local/database/app_database.dart'
@@ -31,6 +32,7 @@ void main() {
 
     orderRepository = OrderRepositoryImpl(
       ordersDao: ordersDao,
+      paymentsDao: PaymentsDao(db),
       storageRecordsDao: storageRecordsDao,
       syncOperationsDao: syncOperationsDao,
       db: db,

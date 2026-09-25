@@ -11,6 +11,7 @@ import 'package:laundry_management/data/datasources/remote/expense_remote_api.da
 import 'package:laundry_management/data/datasources/remote/master_data_remote_api.dart';
 import 'package:laundry_management/data/datasources/remote/order_remote_api.dart';
 import 'package:laundry_management/data/datasources/remote/payment_remote_api.dart';
+import 'package:laundry_management/data/datasources/remote/refund_remote_api.dart';
 import 'package:laundry_management/data/datasources/remote/remote_api_dispatcher.dart';
 import 'package:laundry_management/data/datasources/remote/storage_remote_api.dart';
 import 'package:laundry_management/data/datasources/remote/supabase_realtime_sync_adapter.dart';
@@ -137,6 +138,7 @@ class TestDevice {
       customerApi: CustomerRemoteApi(dio),
       orderApi: OrderRemoteApi(dio),
       paymentApi: PaymentRemoteApi(dio),
+      refundApi: RefundRemoteApi(dio),
       storageApi: StorageRemoteApi(dio),
       expenseApi: ExpenseRemoteApi(dio),
       masterDataApi: MasterDataRemoteApi(dio),
@@ -162,6 +164,7 @@ class TestDevice {
 
     final orderRepository = OrderRepositoryImpl(
       ordersDao: ordersDao,
+      paymentsDao: paymentsDao,
       storageRecordsDao: storageRecordsDao,
       syncOperationsDao: syncOperationsDao,
       db: db,

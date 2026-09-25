@@ -1,4 +1,4 @@
-import 'package:laundry_management/core/localization/app_strings.dart';
+import '../localization/app_strings.dart';
 
 abstract class Failure implements Exception {
   final String message;

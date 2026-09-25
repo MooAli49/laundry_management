@@ -5,6 +5,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
+import '../../../../domain/value_objects/money.dart';
 import '../cubit/create_order_state.dart';
 
 class OrderSummaryCard extends StatelessWidget {
@@ -34,11 +35,11 @@ class OrderSummaryCard extends StatelessWidget {
         children: [
           Text(
             'ملخص الطلب',
-            style: AppTextStyles.titleLarge.copyWith(
+            style: AppTextStyles.titleMedium.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
-          AppSpacing.gapLg,
+          AppSpacing.gapMd,
 
           _buildRow('عدد القطع', '$totalPieces قطعة'),
           AppSpacing.gapSm,
@@ -72,27 +73,103 @@ class OrderSummaryCard extends StatelessWidget {
             ),
           ],
 
-          const Divider(height: AppSpacing.xl, color: AppColors.divider),
+          if (state.tax.isPositive) ...[
+            AppSpacing.gapSm,
+            _buildRow(
+              'الضريبة',
+              '+ ${state.tax.toEgp.toStringAsFixed(2)} ج.م',
+            ),
+          ],
 
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'الإجمالي',
-                style: AppTextStyles.titleLarge.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+          if (state.isInitialPaymentEnabled &&
+              state.initialPaymentAmount.isPositive) ...[
+            AppSpacing.gapSm,
+            _buildRow(
+              'الدفعة المقدمة',
+              '- ${state.initialPaymentAmount.toEgp.toStringAsFixed(2)} ج.م',
+              valueColor: AppColors.success,
+            ),
+          ],
+
+          if (state.isInitialPaymentEnabled) ...[
+            AppSpacing.gapSm,
+            _buildRow(
+              'المتبقي',
+              state.remainingAmount == Money.zero
+                  ? '0.00 ج.م (مدفوع بالكامل)'
+                  : '${state.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
+              valueColor: state.remainingAmount == Money.zero
+                  ? AppColors.success
+                  : AppColors.warningDark,
+            ),
+          ],
+
+          const Divider(height: AppSpacing.lg, color: AppColors.divider),
+
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceSelected,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.25),
               ),
-              Text(
-                '${state.total.toEgp.toStringAsFixed(2)} ج.م',
-                style: AppTextStyles.headlineSmall.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'الإجمالي',
+                  style: AppTextStyles.titleMedium.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-              ),
-            ],
+                Text(
+                  '${state.total.toEgp.toStringAsFixed(2)} ج.م',
+                  style: AppTextStyles.headlineSmall.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
           ),
-          AppSpacing.gapXl,
+
+          if (state.isInitialPaymentEnabled &&
+              state.initialPaymentAmount.isPositive) ...[
+            AppSpacing.gapXs,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'المتبقي للتحصيل عند التسليم:',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    state.remainingAmount == Money.zero
+                        ? 'خالص بالكامل'
+                        : '${state.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: state.remainingAmount == Money.zero
+                          ? AppColors.success
+                          : AppColors.warningDark,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          AppSpacing.gapLg,
 
           AppButton(
             label: 'حفظ الطلب',

@@ -1447,7 +1447,7 @@ Do not create dedicated tables for:
 - Roles
 - Permissions
 - Branches
-- Refunds
+- Automated payment gateway refunds and line-item refunds
 - Loyalty
 - Storage movement history
 - Storage capacity

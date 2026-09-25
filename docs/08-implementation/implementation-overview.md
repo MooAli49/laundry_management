@@ -749,7 +749,7 @@ Includes:
 
 Order Number format:
 
-YY-XXX
+YY-<numeric sequence> (minimum width of 3 digits, no maximum length; e.g. 26-001, 26-999, 26-1000)
 
 ### Customers
 
@@ -1523,7 +1523,7 @@ The following are not V1 implementation targets unless explicitly approved:
 - Roles
 - Permissions
 - Branches
-- Refunds
+- Automated payment gateway refunds and line-item refunds
 - Loyalty
 - Storage capacity
 - Storage movement history

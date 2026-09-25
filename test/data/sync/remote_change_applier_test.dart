@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/data/local/daos/customers_dao.dart';
 import 'package:laundry_management/data/local/daos/orders_dao.dart';
 import 'package:laundry_management/data/local/daos/payments_dao.dart';
+import 'package:laundry_management/data/local/daos/refunds_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_state_dao.dart';
@@ -19,6 +20,7 @@ void main() {
     late CustomersDao customersDao;
     late OrdersDao ordersDao;
     late PaymentsDao paymentsDao;
+    late RefundsDao refundsDao;
     late StorageRecordsDao storageRecordsDao;
     late RemoteChangeApplier applier;
 
@@ -29,6 +31,7 @@ void main() {
       customersDao = CustomersDao(db);
       ordersDao = OrdersDao(db);
       paymentsDao = PaymentsDao(db);
+      refundsDao = RefundsDao(db);
       storageRecordsDao = StorageRecordsDao(db);
 
       applier = RemoteChangeApplier(
@@ -77,6 +80,121 @@ void main() {
 
       final seq = await syncStateDao.getLastAppliedSequence();
       expect(seq, equals(1));
+    });
+
+    test('1b. Applying remote customer change with address persists address to Drift', () async {
+      final change = SyncChangeDto(
+        sequence: 1,
+        operationId: 'op-addr-1',
+        entityType: 'customer',
+        entityId: 'c-addr-100',
+        operationType: 'create',
+        payload: {
+          'id': 'c-addr-100',
+          'name': 'Customer With Address',
+          'phone': '01011113333',
+          'address': '22 شارع الجمهورية، عابدين',
+          'created_at': '2026-09-17T10:00:00.000Z',
+          'updated_at': '2026-09-17T10:00:00.000Z',
+        },
+        serverVersion: 1,
+        createdAt: DateTime.parse('2026-09-17T10:00:00.000Z'),
+      );
+
+      await applier.applyBatch([change]);
+
+      final customer = await customersDao.getCustomerById('c-addr-100');
+      expect(customer, isNotNull);
+      expect(customer!.address, equals('22 شارع الجمهورية، عابدين'));
+    });
+
+    test('1c. Applying remote customer change with null address clears existing address', () async {
+      // First create with address
+      final change1 = SyncChangeDto(
+        sequence: 1,
+        operationId: 'op-addr-2',
+        entityType: 'customer',
+        entityId: 'c-addr-200',
+        operationType: 'create',
+        payload: {
+          'id': 'c-addr-200',
+          'name': 'Customer To Clear',
+          'phone': '01011114444',
+          'address': 'شارع جامعة الدول',
+          'created_at': '2026-09-17T10:00:00.000Z',
+          'updated_at': '2026-09-17T10:00:00.000Z',
+        },
+        serverVersion: 1,
+        createdAt: DateTime.parse('2026-09-17T10:00:00.000Z'),
+      );
+      await applier.applyBatch([change1]);
+
+      // Now clear address with null
+      final change2 = SyncChangeDto(
+        sequence: 2,
+        operationId: 'op-addr-3',
+        entityType: 'customer',
+        entityId: 'c-addr-200',
+        operationType: 'update',
+        payload: {
+          'id': 'c-addr-200',
+          'name': 'Customer To Clear',
+          'phone': '01011114444',
+          'address': null,
+          'updated_at': '2026-09-17T11:00:00.000Z',
+        },
+        serverVersion: 2,
+        createdAt: DateTime.parse('2026-09-17T11:00:00.000Z'),
+      );
+      await applier.applyBatch([change2]);
+
+      final customer = await customersDao.getCustomerById('c-addr-200');
+      expect(customer, isNotNull);
+      expect(customer!.address, isNull);
+    });
+
+    test('1d. Applying remote customer change without address key preserves existing address', () async {
+      final change1 = SyncChangeDto(
+        sequence: 1,
+        operationId: 'op-addr-4',
+        entityType: 'customer',
+        entityId: 'c-addr-300',
+        operationType: 'create',
+        payload: {
+          'id': 'c-addr-300',
+          'name': 'Customer Partial',
+          'phone': '01011115555',
+          'address': 'المعادي - شارع 9',
+          'created_at': '2026-09-17T10:00:00.000Z',
+          'updated_at': '2026-09-17T10:00:00.000Z',
+        },
+        serverVersion: 1,
+        createdAt: DateTime.parse('2026-09-17T10:00:00.000Z'),
+      );
+      await applier.applyBatch([change1]);
+
+      // Update without 'address' key in payload
+      final change2 = SyncChangeDto(
+        sequence: 2,
+        operationId: 'op-addr-5',
+        entityType: 'customer',
+        entityId: 'c-addr-300',
+        operationType: 'update',
+        payload: {
+          'id': 'c-addr-300',
+          'name': 'Customer Partial Renamed',
+          'phone': '01011115555',
+          'updated_at': '2026-09-17T11:00:00.000Z',
+        },
+        serverVersion: 2,
+        createdAt: DateTime.parse('2026-09-17T11:00:00.000Z'),
+      );
+      await applier.applyBatch([change2]);
+
+      final customer = await customersDao.getCustomerById('c-addr-300');
+      expect(customer, isNotNull);
+      expect(customer!.name, equals('Customer Partial Renamed'));
+      expect(customer.address, equals('المعادي - شارع 9'));
     });
 
     // -------------------------------------------------------------------------
@@ -394,6 +512,167 @@ void main() {
 
       final totalPaid = await paymentsDao.getTotalPaidForOrder('ord-pay-1');
       expect(totalPaid, equals(5000));
+    });
+
+    // -------------------------------------------------------------------------
+    // 5b. Refund Ingestion (Append-only & Idempotent)
+    // -------------------------------------------------------------------------
+    test('5b. Applying remote refund change persists to Drift without generating outbox operation', () async {
+      await db.into(db.customers).insert(
+        app_db.CustomersCompanion(
+          id: const Value('cust-ref-applier'),
+          name: const Value('Cust Refund Applier'),
+          phone: const Value('01099998888'),
+          createdAt: Value(DateTime.now()),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+
+      await db.into(db.orders).insert(
+        app_db.OrdersCompanion(
+          id: const Value('ord-ref-1'),
+          orderNumber: const Value('26-555'),
+          customerId: const Value('cust-ref-applier'),
+          status: const Value('cancelled'),
+          expectedPickupDate: Value(DateTime.now()),
+          subtotal: const Value(10000),
+          total: const Value(10000),
+          cancelledAt: Value(DateTime.now()),
+          cancellationReason: const Value('Customer request'),
+          createdAt: Value(DateTime.now()),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+
+      await db.into(db.payments).insert(
+        app_db.PaymentsCompanion(
+          id: const Value('pay-ref-1'),
+          orderId: const Value('ord-ref-1'),
+          amount: const Value(10000),
+          paymentMethod: const Value('cash'),
+          paidAt: Value(DateTime.now()),
+          createdAt: Value(DateTime.now()),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+
+      final refundChange = SyncChangeDto(
+        sequence: 16,
+        operationId: 'op-ref-applier-1',
+        entityType: 'refund',
+        entityId: 'ref-applier-1',
+        operationType: 'create',
+        payload: {
+          'id': 'ref-applier-1',
+          'order_id': 'ord-ref-1',
+          'amount': 4000,
+          'refund_method': 'insta_pay',
+          'reason': 'Overcharge compensation',
+          'refunded_at': '2026-09-24T12:00:00.000Z',
+          'created_at': '2026-09-24T12:00:00.000Z',
+          'updated_at': '2026-09-24T12:00:00.000Z',
+        },
+        serverVersion: null,
+        createdAt: DateTime.parse('2026-09-24T12:00:00.000Z'),
+      );
+
+      await applier.applyBatch([refundChange]);
+
+      // 1. Verify refund persisted
+      final refund = await refundsDao.getRefundById('ref-applier-1');
+      expect(refund, isNotNull);
+      expect(refund!.orderId, equals('ord-ref-1'));
+      expect(refund.amount, equals(4000));
+      expect(refund.refundMethod, equals('insta_pay'));
+      expect(refund.reason, equals('Overcharge compensation'));
+
+      final totalRefunded = await refundsDao.getTotalRefundedForOrder('ord-ref-1');
+      expect(totalRefunded, equals(4000));
+
+      // 2. Invariant: ZERO outbox operations generated
+      final outboxOps = await syncOperationsDao.getEligibleOperations(asOf: DateTime.now());
+      expect(outboxOps, isEmpty);
+
+      // 3. Invariants: Order and Payment rows UNCHANGED
+      final order = await ordersDao.getOrderById('ord-ref-1');
+      expect(order!.total, equals(10000));
+      expect(order.status, equals('cancelled'));
+
+      final payments = await paymentsDao.getPaymentsForOrder('ord-ref-1');
+      expect(payments.length, equals(1));
+      expect(payments.first.amount, equals(10000));
+
+      final seq = await syncStateDao.getLastAppliedSequence();
+      expect(seq, equals(16));
+    });
+
+    test('5c. Applying identical remote refund change multiple times is idempotent and produces no duplicates', () async {
+      await db.into(db.customers).insert(
+        app_db.CustomersCompanion(
+          id: const Value('cust-ref-idem'),
+          name: const Value('Cust Refund Idem'),
+          phone: const Value('01099997777'),
+          createdAt: Value(DateTime.now()),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+
+      await db.into(db.orders).insert(
+        app_db.OrdersCompanion(
+          id: const Value('ord-ref-idem'),
+          orderNumber: const Value('26-556'),
+          customerId: const Value('cust-ref-idem'),
+          status: const Value('cancelled'),
+          expectedPickupDate: Value(DateTime.now()),
+          subtotal: const Value(5000),
+          total: const Value(5000),
+          createdAt: Value(DateTime.now()),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+
+      final change = SyncChangeDto(
+        sequence: 17,
+        operationId: 'op-ref-idem-1',
+        entityType: 'refund',
+        entityId: 'ref-idem-1',
+        operationType: 'create',
+        payload: {
+          'id': 'ref-idem-1',
+          'order_id': 'ord-ref-idem',
+          'amount': 2500,
+          'refund_method': 'cash',
+          'reason': null,
+          'refunded_at': '2026-09-24T12:00:00.000Z',
+          'created_at': '2026-09-24T12:00:00.000Z',
+          'updated_at': '2026-09-24T12:00:00.000Z',
+        },
+        serverVersion: null,
+        createdAt: DateTime.parse('2026-09-24T12:00:00.000Z'),
+      );
+
+      // Apply first time
+      await applier.applyBatch([change]);
+
+      // Apply second time (re-play)
+      await applier.applyBatch([
+        SyncChangeDto(
+          sequence: 18,
+          operationId: 'op-ref-idem-1',
+          entityType: 'refund',
+          entityId: 'ref-idem-1',
+          operationType: 'create',
+          payload: change.payload,
+          serverVersion: null,
+          createdAt: change.createdAt,
+        ),
+      ]);
+
+      final refunds = await refundsDao.getRefundsForOrder('ord-ref-idem');
+      expect(refunds.length, equals(1));
+      expect(refunds.first.id, equals('ref-idem-1'));
+      expect(refunds.first.amount, equals(2500));
+      expect(refunds.first.reason, isNull);
     });
 
     // -------------------------------------------------------------------------

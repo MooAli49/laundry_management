@@ -185,6 +185,7 @@ class CustomersListCubit extends Cubit<CustomersListState> {
   Future<Customer> createCustomer({
     required String name,
     required String phone,
+    String? address,
     String? notes,
   }) async {
     final now = DateTime.now();
@@ -192,6 +193,7 @@ class CustomersListCubit extends Cubit<CustomersListState> {
       id: const Uuid().v4(),
       name: name,
       phone: phone,
+      address: address,
       notes: notes,
       createdAt: now,
       updatedAt: now,

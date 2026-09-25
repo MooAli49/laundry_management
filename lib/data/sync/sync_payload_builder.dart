@@ -11,11 +11,13 @@ import '../../domain/entities/item_type.dart';
 import '../../domain/entities/order.dart';
 import '../../domain/entities/order_item.dart';
 import '../../domain/entities/payment.dart';
+import '../../domain/entities/refund.dart';
 import '../../domain/entities/service.dart';
 import '../../domain/entities/storage_location.dart';
 import '../../domain/entities/storage_record.dart';
 import '../../domain/enums/order_status.dart';
 import '../../domain/enums/payment_method.dart';
+import '../../domain/enums/refund_method.dart';
 
 /// Strongly typed serializer in the Data Layer that constructs self-contained
 /// JSON payloads for synchronization operations.
@@ -35,6 +37,7 @@ class SyncPayloadBuilder {
       'id': customer.id,
       'name': customer.name,
       'phone': customer.phone,
+      'address': customer.address,
       'notes': customer.notes,
       'created_at': customer.createdAt.toIso8601String(),
       'updated_at': customer.updatedAt.toIso8601String(),
@@ -47,6 +50,7 @@ class SyncPayloadBuilder {
       'id': customer.id,
       'name': customer.name,
       'phone': customer.phone,
+      'address': customer.address,
       'notes': customer.notes,
       'updated_at': customer.updatedAt.toIso8601String(),
     });
@@ -110,6 +114,29 @@ class SyncPayloadBuilder {
       'cancellation_reason': order.cancellationReason,
       'updated_at': order.updatedAt.toIso8601String(),
     });
+  }
+
+  /// Builds a payload for aggregate order edit (header + full items list).
+  static String buildOrderEditPayload(Order order, List<OrderItem> items) {
+    final payload = <String, dynamic>{
+      'id': order.id,
+      'order_number': order.orderNumber,
+      'customer_id': order.customerId,
+      'expected_pickup_date':
+          order.expectedPickupDate.toDateTime().toIso8601String(),
+      'notes': order.notes,
+      'customer_pickup_requested': order.customerPickupRequested,
+      'customer_pickup_fee': order.customerPickupFee.piastres,
+      'customer_delivery_requested': order.customerDeliveryRequested,
+      'customer_delivery_fee': order.customerDeliveryFee.piastres,
+      'subtotal': order.subtotal.piastres,
+      'discount': order.discount.piastres,
+      'tax': order.tax.piastres,
+      'total': order.total.piastres,
+      'updated_at': order.updatedAt.toIso8601String(),
+      'items': items.map(_serializeOrderItem).toList(),
+    };
+    return jsonEncode(payload);
   }
 
   /// Builds a payload for order status transitions (ready, complete, cancel, correction).
@@ -272,6 +299,33 @@ class SyncPayloadBuilder {
       'paid_at': payment.paidAt.toUtc().toIso8601String(),
       'created_at': payment.createdAt.toUtc().toIso8601String(),
       'updated_at': payment.updatedAt.toUtc().toIso8601String(),
+    });
+  }
+
+  // ===========================================================================
+  // Refund Payloads
+  // ===========================================================================
+
+  /// Builds a self-contained payload for refund creation.
+  ///
+  /// Converts [RefundMethod] to canonical backend snake_case ('cash', 'insta_pay', 'e_wallet')
+  /// and amounts to integer minor units (piastres).
+  static String buildRefundPayload(Refund refund) {
+    final refundMethodStr = switch (refund.refundMethod) {
+      RefundMethod.cash => 'cash',
+      RefundMethod.instaPay => 'insta_pay',
+      RefundMethod.eWallet => 'e_wallet',
+    };
+
+    return jsonEncode(<String, dynamic>{
+      'id': refund.id,
+      'order_id': refund.orderId,
+      'amount': refund.amount.piastres,
+      'refund_method': refundMethodStr,
+      'reason': refund.reason,
+      'refunded_at': refund.refundedAt.toUtc().toIso8601String(),
+      'created_at': refund.createdAt.toUtc().toIso8601String(),
+      'updated_at': refund.updatedAt.toUtc().toIso8601String(),
     });
   }
 

@@ -918,6 +918,25 @@ This preserves financial history.
 
 ---
 
+## 32A. Refund Constraints
+
+Every Refund must satisfy:
+
+1. Foreign Key:
+   `refunds.order_id → orders.id` with `ON DELETE RESTRICT`.
+2. Amount:
+   `CHECK (amount > 0)`.
+3. Method:
+   `CHECK (refund_method IN ('cash', 'insta_pay', 'e_wallet'))`.
+4. Order Lifecycle Invariant:
+   Only `cancelled` orders can receive refunds (enforced server-side in `sync_create_refund`).
+5. Refundable Balance Invariant:
+   Cumulative refunds must not exceed total payments (`amount <= Total Paid - Total Refunded`).
+6. Append-Only:
+   Refund records are immutable and must not be updated or deleted.
+
+---
+
 ## 33. Storage Location Constraints
 
 Every Storage Location must have:
@@ -3261,7 +3280,7 @@ The database must not introduce constraints for unsupported V1 features such as:
     Delivery Routes
     Driver Assignment
     Delivery Tracking
-    Refunds
+    Payment Gateway Refunds and Item-Level Refunds
     Loyalty
     Employee Permissions
     Multi-Branch

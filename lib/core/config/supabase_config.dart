@@ -61,18 +61,18 @@ class SupabaseConfig {
   }) {
     final suppliedUrlRoot =
         (customUrlRoot != null && customUrlRoot.trim().isNotEmpty)
-            ? customUrlRoot.trim()
-            : (envUrlRoot.trim().isNotEmpty ? envUrlRoot.trim() : null);
+        ? customUrlRoot.trim()
+        : (envUrlRoot.trim().isNotEmpty ? envUrlRoot.trim() : null);
 
     final suppliedApiUrl =
         (customApiUrl != null && customApiUrl.trim().isNotEmpty)
-            ? customApiUrl.trim()
-            : (envUrl.trim().isNotEmpty ? envUrl.trim() : null);
+        ? customApiUrl.trim()
+        : (envUrl.trim().isNotEmpty ? envUrl.trim() : null);
 
     final suppliedAnonKey =
         (customAnonKey != null && customAnonKey.trim().isNotEmpty)
-            ? customAnonKey.trim()
-            : (envAnonKey.trim().isNotEmpty ? envAnonKey.trim() : null);
+        ? customAnonKey.trim()
+        : (envAnonKey.trim().isNotEmpty ? envAnonKey.trim() : null);
 
     if (isRelease) {
       final missing = <String>[];

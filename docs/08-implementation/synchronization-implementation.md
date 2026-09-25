@@ -1851,6 +1851,52 @@ All RPCs log to `sync_idempotency_log` within the transaction and return cached 
 
 ---
 
+## 65A. Refund Synchronization Specification
+
+### 65A.1 Overview
+Refunds are synchronized as first-class, immutable financial transactions operating at the order level for cancelled orders:
+- **Entity Type**: `refund`
+- **Creation**: Generated locally via `CreateRefundUseCase` / `RefundRepositoryImpl`.
+- **Outbox Enqueueing**: Atomic with local SQLite write in `RefundsDao`. Stored in `sync_operations` with `entity_type: 'refund'`, `operation_type: 'create'`.
+- **Dispatch**: Dispatched through `POST /api/v1/refunds` proxying to `sync_create_refund` RPC with `X-Operation-ID`.
+- **Remote Change Log**: Represented in `sync_changes` with `entity_type: 'refund'`, `operation_type: 'create'`, `server_version: null` (append-only financial transaction).
+- **Remote Ingestion**: Pulled via cursor-based pull and applied directly to `RefundsDao` through `RemoteChangeApplier`.
+- **Zero Echo**: Ingestion does not enqueue an outgoing `SyncOperation` on the receiving terminal.
+
+### 65A.2 Payload Schema
+```json
+{
+  "id": "<UUID>",
+  "order_id": "<UUID>",
+  "amount": 3500,
+  "refund_method": "cash | insta_pay | e_wallet",
+  "reason": "optional string",
+  "refunded_at": "<ISO-8601 UTC>"
+}
+```
+
+---
+
+## 65B. Customer Address Synchronization Specification
+
+- **Address Field**: `Customer.address` (`TEXT NULL`) is included in Customer sync payloads.
+- **Create & Update**: Local mutations capture `address` in the outgoing `sync_operations` payload.
+- **Normalization**: Whitespace-only values normalize to `null`.
+- **Remote Change Applier**: `RemoteChangeApplier` maps `payload['address']` directly to `CustomersDao.updateCustomer` and `CustomersDao.insertCustomer`.
+- **Scope Guard**: Address is profile information only; no address search or delivery routing in V1.
+
+---
+
+## 65C. Order Aggregate Edit Synchronization Specification
+
+- **Endpoint**: `PATCH /api/v1/orders/{id}/edit-aggregate` backed by transactional PostgreSQL RPC `sync_update_order_aggregate`.
+- **Scope**: Full aggregate edit of an active `processing` order, replacing/updating items and carpet measurements.
+- **Server Version**: Managed and incremented on the Supabase backend.
+- **Client Concurrency**: Flutter Edit V3 does not send `base_version`; client-side OCC propagation remains deferred as documented.
+- **Sync Changes**: Emits discrete `sync_changes` events for affected entities (`order`, `order_items`, `order_item_carpets`).
+
+---
+
 ## 66. Dashboard Operational Aggregation & Offline-First Reactivity
 
 The Dashboard operates in accordance with the system's Offline-First principles:

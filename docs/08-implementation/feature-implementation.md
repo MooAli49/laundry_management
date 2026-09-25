@@ -983,7 +983,7 @@ The feature must not allow normal editing of a cancelled Order.
 
 Existing Payment records remain historical.
 
-Cancellation does not automatically create a Refund because Refund is not a V1 Domain entity.
+Cancellation does not automatically create a Refund. Refund is an approved V1 Domain entity, but Cancellation and Refund remain separate operations; manual refunds may be created for eligible cancelled orders.
 
 ---
 
@@ -2893,7 +2893,7 @@ The coding agent must not create:
 - Roles
 - Permissions
 - Branches
-- Refunds
+- Automated payment gateway refunds and item-level refunds
 - Loyalty
 - Barcode scanning
 - Advanced laundry stages

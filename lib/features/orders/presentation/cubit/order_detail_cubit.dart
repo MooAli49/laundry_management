@@ -7,6 +7,8 @@ import '../../../../application/use_cases/complete_order_use_case.dart';
 import '../../../../application/use_cases/store_order_items_use_case.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../domain/entities/payment.dart';
+import '../../../../domain/entities/refund.dart';
+import '../../../../domain/entities/refund_balance_summary.dart';
 import '../../../../domain/entities/storage_location.dart';
 import '../../../../domain/entities/storage_record.dart';
 import '../../../../domain/enums/order_status.dart';
@@ -14,6 +16,7 @@ import '../../../../domain/enums/payment_method.dart';
 import '../../../../domain/repositories/customer_repository.dart';
 import '../../../../domain/repositories/order_repository.dart';
 import '../../../../domain/repositories/payment_repository.dart';
+import '../../../../domain/repositories/refund_repository.dart';
 import '../../../../domain/repositories/settings_repository.dart';
 import '../../../../domain/repositories/storage_location_repository.dart';
 import '../../../../domain/repositories/storage_repository.dart';
@@ -24,6 +27,7 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
   final OrderRepository _orderRepository;
   final CustomerRepository _customerRepository;
   final PaymentRepository _paymentRepository;
+  final RefundRepository? _refundRepository;
   final StorageRepository _storageRepository;
   final StorageLocationRepository _storageLocationRepository;
   final SettingsRepository _settingsRepository;
@@ -37,6 +41,7 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
     required OrderRepository orderRepository,
     required CustomerRepository customerRepository,
     required PaymentRepository paymentRepository,
+    RefundRepository? refundRepository,
     required StorageRepository storageRepository,
     required StorageLocationRepository storageLocationRepository,
     required SettingsRepository settingsRepository,
@@ -48,6 +53,7 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
   }) : _orderRepository = orderRepository,
        _customerRepository = customerRepository,
        _paymentRepository = paymentRepository,
+       _refundRepository = refundRepository,
        _storageRepository = storageRepository,
        _storageLocationRepository = storageLocationRepository,
        _settingsRepository = settingsRepository,
@@ -120,6 +126,13 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
         }
       }
 
+      final refundBalance = _refundRepository != null
+          ? await _refundRepository.getRefundableBalanceSummary(orderId)
+          : RefundBalanceSummary.zero;
+      final refunds = _refundRepository != null
+          ? await _refundRepository.getRefundsForOrder(orderId)
+          : <Refund>[];
+
       emit(
         state.copyWith(
           isLoading: false,
@@ -133,6 +146,8 @@ class OrderDetailCubit extends Cubit<OrderDetailState> {
           payments: payments,
           totalPaid: totalPaid,
           remainingAmount: remaining,
+          refunds: refunds,
+          refundBalance: refundBalance,
           settings: settings,
         ),
       );

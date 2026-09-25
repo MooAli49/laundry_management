@@ -38,17 +38,21 @@ The Laundry Management System V1 has successfully completed all development task
 ## 4. Database Architecture
 
 - **Local Database (Drift / SQLite)**:
-  - Strict foreign key enforcement, custom indexes, partial unique index on storage records.
+  - Schema version 6 containing 19 tables (17 business tables + 2 sync tables: `sync_operations`, `sync_states`).
+  - Strict foreign key enforcement (`PRAGMA foreign_keys = ON;`), custom indexes, partial unique index on active storage records.
+  - Customer profile support with optional address (`customers.address TEXT NULL`), normalized to null on whitespace.
+  - Dedicated `refunds` table: append-only financial records linked to orders, omitting `server_version`.
   - Baseline singleton (`business_settings`) and default categories seeded on schema creation.
 - **Remote Database (Supabase PostgreSQL)**:
+  - 13 applied migrations from `supabase/migrations/` (through `20260925000000_customer_address.sql`).
   - Relational tables protected by Row Level Security (`rowsecurity: true`). Direct PostgREST mutations disabled; all mutations route through `SECURITY DEFINER` RPCs.
   - Monotonically increasing `sequence BIGSERIAL` in `sync_changes` change log.
   - Dedicated `sync_idempotency_log` table storing client operation hashes.
 - **Canonical Master Baseline**:
   - Authority catalog consisting of 35 initial changes (sequences 1..35): 1 business setting, 4 item types, 7 expense categories, 5 services, 5 service-item-type links, 3 carpet sizes, 5 storage locations, 9 storage-location-item-type links, 10 item definitions.
-- **Phase 3B Remote Foreign Key Hardening**:
-  - Enforced referential integrity on remote tables (`order_items`, `order_item_carpets`, `storage_records`, `service_item_types`) with `ON DELETE RESTRICT` and `ON DELETE SET NULL`.
-  - All foreign key columns converted from legacy `TEXT` to native PostgreSQL `UUID` types.
+- **Referential Integrity & Type Hardening**:
+  - Enforced referential integrity on remote tables (`order_items`, `order_item_carpets`, `storage_records`, `service_item_types`, `refunds`) with `ON DELETE RESTRICT` and `ON DELETE SET NULL`.
+  - All foreign key columns use native PostgreSQL `UUID` types.
 
 ---
 
@@ -56,6 +60,7 @@ The Laundry Management System V1 has successfully completed all development task
 
 - **Push Mechanism**: Flushes queued local `sync_operations` to remote Edge Functions with idempotency header (`X-Operation-ID`).
 - **Pull Mechanism**: Cursor-based polling querying `GET /api/v1/sync/changes?after=<cursor>&limit=100`.
+- **Supported Entities**: Customers (with optional address), Orders, OrderItems, OrderItemCarpets, Payments, Refunds (`POST /api/v1/refunds`), Order Aggregate Edits (`PATCH /api/v1/orders/{id}/edit-aggregate`), StorageRecords, and Expenses.
 - **Realtime Wake-Up Signal**: Listens to Supabase Realtime broadcast channel (`sync_available`) to trigger an immediate pull without transmitting raw data payloads over WebSockets.
 - **Atomic Apply & Cursor Advancement**: [RemoteChangeApplier](file:///d:/projects/laundry_management/lib/data/sync/remote_change_applier.dart) applies batches inside a single SQLite transaction and advances `sync_state.last_applied_sequence` in the same transaction.
 - **Zero Echo**: Remote changes applied locally bypass `SyncOperationsDao` to prevent re-enqueueing local mutations.
@@ -67,27 +72,30 @@ The Laundry Management System V1 has successfully completed all development task
 ## 6. Quality Assurance & Verification
 
 - **Static Analysis**: `flutter analyze` completed with **0 issues**.
-- **Automated Test Suites**: **757 / 757 tests passed (100%)**:
-  - `test/domain`, `test/core`, `test/application`: 238 passed
-  - `test/data/local`, `test/data/daos`, `test/data/database`, `test/data/datasources`, `test/data/remote`, `test/data/repositories`: 173 passed
-  - `test/features`: 233 passed
-  - Non-live synchronization test suite: 97 passed
-  - `SupabaseConfig` release configuration suite: 16 passed
+- **Automated Test Suites**:
+  - **Full Suite**: **1,188 / 1,188 passed** (Command: `flutter test --concurrency=1`). Sequential execution is required when running the entire suite with live cloud integration to prevent remote database lock contention.
+  - **Offline / Non-Live Suite**: **773 / 773 passed** (`flutter test test/features/ test/core/`).
+  - **Controlled Live Integration Batch**: **128 / 128 passed** (`test/data/sync/`).
+  - **Targeted Validation Suite**: **341 / 341 passed** (`test/features/orders/ test/features/customers/ test/features/reports/`).
+  - *Coverage Note*: The project avoids artificial blanket 100% code coverage claims. Testing focuses rigorously on high-risk domain invariants, offline persistence, sync engine transactions, and financial accuracy.
 - **Fresh Client Bootstrap Verification**: Verified from cursor 0 on Android emulator. All 35 canonical changes applied cleanly; local cursor advanced to 35 with 0 errors (0 UNIQUE errors, 0 FK errors, 0 DriftRemoteException).
-- **Manual QA Workflows (100% PASS)**:
-  - Customer creation & validation
-  - Order creation with multi-item types and carpets
-  - Partial payment recording and remaining balance computation
-  - Payment push and remote sync log entry
-  - Physical item storage, moving across locations, and capacity tracking
-  - Ready lifecycle transition upon all items stored
-  - Complete lifecycle transition upon balance cleared and handover confirmed
-  - Offline order creation and queueing
-  - Offline → Online network reconnection and automatic push
-  - Operational expense recording and validation
-  - Operational and financial report calculations (net profit formula)
-  - Service catalog management across pricing types (per-piece, per-sqm, fixed-price)
-  - Settings singleton configuration (business name, tax toggle, tax rate)
+- **Manual User Acceptance Testing (UAT)**:
+  - Customer creation, optional address entry & editing, phone duplicate handling.
+  - Order creation with multi-item types and carpets.
+  - Order numbering format (`26-001` to `26-10000`), cleanly ignoring synthetic test prefixes (`ORD-TEST-...`).
+  - Item snapshots invariant: verified `itemTypeNameSnapshot` and `serviceNameSnapshot` persist immutable historical names without fallback fabrication.
+  - Partial payment recording and remaining balance computation.
+  - Automatic Ready lifecycle transition upon all order items stored.
+  - Physical item storage assignment, moving across locations, and capacity tracking.
+  - Delivery handover confirmation and completion upon balance cleared.
+  - Administrative correction: `Completed -> Processing` transition verified (requires non-empty reason, clears `completed_at`, storage records cleared requiring re-store).
+  - Order aggregate editing in Processing state (add/remove items, recalculate totals).
+  - Order cancellation (strictly terminal) and full/partial refund processing (`استرداد المبلغ` with mandatory reason). Refunds are available only for cancelled orders with a refundable balance.
+  - Offline order creation, outbox queueing, network reconnection, and automatic push.
+  - Operational expense recording and validation.
+  - Financial reports: verified 6-section hierarchy (Key Metrics, Payment Methods, Collections & Discounts, Analytics, Expense History, Outstanding Orders), accurate net profit formula (`Total Sales - Operating Expenses`), and amber/warning styling for remaining balances (red reserved strictly for errors).
+  - Overdue boundary semantics: strictly calendar-day based (`expected_pickup_date < start_of_today`), today is never overdue.
+  - **Synthetic Data Cleanup Checkpoint**: Synthetic test orders contaminated during initial automated tests were purged from local SQLite; canonical sequence was restored to `26-023`, and a real `26-023` order was created during UAT. Operational/UAT data was preserved.
 
 ---
 
@@ -103,7 +111,10 @@ The following items are intentionally deferred from V1 and are documented as out
 7. **End-user role-based authentication**: Uses infrastructure anonymous API key.
 8. **ESC/POS direct thermal printer socket communication**: Printing uses standard PDF preview and platform print dialogs.
 9. **VAT / Per-kg pricing models**: Catalog restricted to per-piece, per-square-meter, and fixed-price.
-10. **Global Last-Write-Wins (LWW)**: Rejected in favor of domain-aware atomic upserts.
+10. **Delivery routing & fleet dispatch**: Customer profile includes optional address field for identification, but automated routing and dispatch are out of scope.
+11. **Automated payment gateway refunds**: In-app refunds record manual cash/electronic returns; payment gateway API reversals are deferred.
+12. **Global Last-Write-Wins (LWW)**: Rejected in favor of domain-aware atomic upserts.
+
 
 ---
 

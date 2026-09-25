@@ -139,6 +139,7 @@ class CustomerDetailCubit extends Cubit<CustomerDetailState> {
   Future<bool> updateCustomerInfo({
     required String name,
     required String phone,
+    String? address,
     String? notes,
   }) async {
     if (state.data == null) return false;
@@ -155,6 +156,8 @@ class CustomerDetailCubit extends Cubit<CustomerDetailState> {
       final updated = current.copyWith(
         name: name.trim(),
         phone: phone.trim(),
+        address: address?.trim().isNotEmpty == true ? address!.trim() : null,
+        clearAddress: address?.trim().isNotEmpty != true,
         notes: notes?.trim().isNotEmpty == true ? notes!.trim() : null,
         updatedAt: DateTime.now(),
       );

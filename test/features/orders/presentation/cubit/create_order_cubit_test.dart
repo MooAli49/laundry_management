@@ -7,6 +7,7 @@ import 'package:laundry_management/data/local/daos/customers_dao.dart';
 import 'package:laundry_management/data/local/daos/item_definitions_dao.dart';
 import 'package:laundry_management/data/local/daos/item_types_dao.dart';
 import 'package:laundry_management/data/local/daos/orders_dao.dart';
+import 'package:laundry_management/data/local/daos/payments_dao.dart';
 import 'package:laundry_management/data/local/daos/services_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
@@ -21,6 +22,7 @@ import 'package:laundry_management/data/repositories/service_repository_impl.dar
 import 'package:laundry_management/data/repositories/settings_repository_impl.dart';
 import 'package:laundry_management/domain/entities/customer.dart';
 import 'package:laundry_management/domain/entities/service.dart';
+import 'package:laundry_management/domain/enums/payment_method.dart';
 import 'package:laundry_management/domain/enums/pricing_type.dart';
 import 'package:laundry_management/domain/value_objects/money.dart';
 import 'package:laundry_management/features/orders/presentation/cubit/create_order_cubit.dart';
@@ -67,6 +69,7 @@ void main() {
 
     orderRepository = OrderRepositoryImpl(
       ordersDao: ordersDao,
+      paymentsDao: PaymentsDao(db),
       storageRecordsDao: storageRecordsDao,
       syncOperationsDao: syncOperationsDao,
       db: db,
@@ -415,5 +418,395 @@ void main() {
         expect(cubit.state.draftNotes, isNull);
       },
     );
+
+    group('Advance Payment (Initial Payment)', () {
+      test('toggleInitialPayment(true) enables payment with Money.zero default (no auto-fill)', () async {
+        await cubit.initialize();
+        final itemType = cubit.state.itemTypes.first;
+        final service = Service(
+          id: 'srv-test-pay',
+          name: 'غسيل',
+          pricingType: PricingType.fixedPrice,
+          price: const Money.fromPiastres(5000), // 50 EGP
+          isActive: true,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+        await serviceRepository.createService(
+          service,
+          supportedItemTypeIds: [itemType.id],
+        );
+        await cubit.selectItemType(itemType);
+        cubit.selectService(service);
+        cubit.addItemDraftToOrder();
+
+        expect(cubit.state.total, const Money.fromPiastres(5000));
+
+        // Toggle advance payment ON
+        cubit.toggleInitialPayment(true);
+
+        // Invariant check: isInitialPaymentEnabled is true, but amount defaults to Money.zero (NOT 5000)
+        expect(cubit.state.isInitialPaymentEnabled, isTrue);
+        expect(cubit.state.initialPaymentAmount, Money.zero);
+        expect(cubit.state.initialPaymentMethod, PaymentMethod.cash);
+        expect(cubit.state.remainingAmount, const Money.fromPiastres(5000));
+      });
+
+      test('toggleInitialPayment(false) resets initialPaymentAmount to Money.zero', () async {
+        await cubit.initialize();
+        final itemType = cubit.state.itemTypes.first;
+        final service = Service(
+          id: 'srv-test-pay-2',
+          name: 'غسيل',
+          pricingType: PricingType.fixedPrice,
+          price: const Money.fromPiastres(4000),
+          isActive: true,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+        await serviceRepository.createService(
+          service,
+          supportedItemTypeIds: [itemType.id],
+        );
+        await cubit.selectItemType(itemType);
+        cubit.selectService(service);
+        cubit.addItemDraftToOrder();
+
+        cubit.toggleInitialPayment(true);
+        cubit.updateInitialPaymentAmount(const Money.fromPiastres(2000));
+        expect(cubit.state.initialPaymentAmount, const Money.fromPiastres(2000));
+
+        cubit.toggleInitialPayment(false);
+        expect(cubit.state.isInitialPaymentEnabled, isFalse);
+        expect(cubit.state.initialPaymentAmount, Money.zero);
+      });
+
+      test('setFullInitialPayment sets amount to total', () async {
+        await cubit.initialize();
+        final itemType = cubit.state.itemTypes.first;
+        final service = Service(
+          id: 'srv-test-pay-3',
+          name: 'غسيل',
+          pricingType: PricingType.fixedPrice,
+          price: const Money.fromPiastres(7500),
+          isActive: true,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+        await serviceRepository.createService(
+          service,
+          supportedItemTypeIds: [itemType.id],
+        );
+        await cubit.selectItemType(itemType);
+        cubit.selectService(service);
+        cubit.addItemDraftToOrder();
+
+        cubit.toggleInitialPayment(true);
+        cubit.setFullInitialPayment();
+
+        expect(cubit.state.initialPaymentAmount, const Money.fromPiastres(7500));
+        expect(cubit.state.remainingAmount, Money.zero);
+      });
+
+      test('updateInitialPaymentAmount clamps to current total and non-negative', () async {
+        await cubit.initialize();
+        final itemType = cubit.state.itemTypes.first;
+        final service = Service(
+          id: 'srv-test-pay-4',
+          name: 'غسيل',
+          pricingType: PricingType.fixedPrice,
+          price: const Money.fromPiastres(3000),
+          isActive: true,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+        await serviceRepository.createService(
+          service,
+          supportedItemTypeIds: [itemType.id],
+        );
+        await cubit.selectItemType(itemType);
+        cubit.selectService(service);
+        cubit.addItemDraftToOrder();
+
+        cubit.toggleInitialPayment(true);
+
+        // Exceeding amount clamps to total (3000)
+        cubit.updateInitialPaymentAmount(const Money.fromPiastres(5000));
+        expect(cubit.state.initialPaymentAmount, const Money.fromPiastres(3000));
+
+        // Negative amount clamps to Money.zero
+        cubit.updateInitialPaymentAmount(const Money.fromPiastres(-500));
+        expect(cubit.state.initialPaymentAmount, Money.zero);
+      });
+
+      test('maintains invariant when order total decreases (e.g. discount added or item removed)', () async {
+        await cubit.initialize();
+        final itemType = cubit.state.itemTypes.first;
+        final service = Service(
+          id: 'srv-test-pay-5',
+          name: 'غسيل',
+          pricingType: PricingType.fixedPrice,
+          price: const Money.fromPiastres(5000),
+          isActive: true,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+        await serviceRepository.createService(
+          service,
+          supportedItemTypeIds: [itemType.id],
+        );
+        await cubit.selectItemType(itemType);
+        cubit.selectService(service);
+        cubit.addItemDraftToOrder();
+
+        cubit.toggleInitialPayment(true);
+        cubit.updateInitialPaymentAmount(const Money.fromPiastres(4000));
+        expect(cubit.state.initialPaymentAmount, const Money.fromPiastres(4000));
+
+        // Applying a discount of 2000 reduces total from 5000 to 3000
+        cubit.updateDiscount(const Money.fromPiastres(2000));
+        expect(cubit.state.total, const Money.fromPiastres(3000));
+        // initialPaymentAmount must be clamped from 4000 down to 3000
+        expect(cubit.state.initialPaymentAmount, const Money.fromPiastres(3000));
+        expect(cubit.state.remainingAmount, Money.zero);
+
+        // Removing the item reduces total to 0
+        cubit.removeItem(0);
+        expect(cubit.state.total, Money.zero);
+        expect(cubit.state.initialPaymentAmount, Money.zero);
+      });
+
+      test('updateInitialPaymentMethod updates selected method', () {
+        cubit.toggleInitialPayment(true);
+        expect(cubit.state.initialPaymentMethod, PaymentMethod.cash);
+
+        cubit.updateInitialPaymentMethod(PaymentMethod.instapay);
+        expect(cubit.state.initialPaymentMethod, PaymentMethod.instapay);
+
+        cubit.updateInitialPaymentMethod(PaymentMethod.ewallet);
+        expect(cubit.state.initialPaymentMethod, PaymentMethod.ewallet);
+      });
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // V1 TAX REQUIREMENT TESTS
+    // Tax is architecturally supported but disabled for V1.
+    // Every order must have tax = Money.zero regardless of business settings.
+    // ─────────────────────────────────────────────────────────────────────────
+    group('V1 Tax Requirement — tax is always Money.zero', () {
+      Future<Service> seedService(String id, int piastres) async {
+        final now = DateTime.now();
+        final itemType = cubit.state.itemTypes.first;
+        final service = Service(
+          id: id,
+          name: 'خدمة اختبار',
+          pricingType: PricingType.perPiece,
+          price: Money.fromPiastres(piastres),
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        );
+        await serviceRepository.createService(
+          service,
+          supportedItemTypeIds: [itemType.id],
+        );
+        return service;
+      }
+
+      test(
+        'tax is Money.zero when settings are null (no settings loaded)',
+        () async {
+          await cubit.initialize();
+          // state.settings may be null if no business settings exist
+          expect(cubit.state.tax, Money.zero);
+        },
+      );
+
+      test(
+        'tax is Money.zero even when settings.taxEnabled is true and taxRate > 0',
+        () async {
+          // This simulates the scenario where the remote sync pushes
+          // taxEnabled=true, taxRate=14.0 — V1 must still produce tax=0
+          await cubit.initialize();
+          final service = await seedService('srv-tax-1', 8000); // 80 EGP
+          await cubit.selectItemType(cubit.state.itemTypes.first);
+          cubit.selectService(service);
+          cubit.addItemDraftToOrder();
+
+          // Subtotal = 80 EGP
+          expect(cubit.state.subtotal, const Money.fromPiastres(8000));
+          // V1 invariant: tax is always zero
+          expect(cubit.state.tax, Money.zero);
+          // Total must equal subtotal (no VAT added)
+          expect(cubit.state.total, const Money.fromPiastres(8000));
+        },
+      );
+
+      test(
+        'total = subtotal (no tax added) for a simple order',
+        () async {
+          await cubit.initialize();
+          final service = await seedService('srv-tax-2', 8000); // 80 EGP
+          await cubit.selectItemType(cubit.state.itemTypes.first);
+          cubit.selectService(service);
+          cubit.addItemDraftToOrder();
+
+          expect(cubit.state.subtotal, const Money.fromPiastres(8000));
+          expect(cubit.state.tax, Money.zero);
+          expect(cubit.state.total, cubit.state.subtotal);
+        },
+      );
+
+      test(
+        'full advance payment uses tax-free total — remaining = 0',
+        () async {
+          await cubit.initialize();
+          final service = await seedService('srv-tax-3', 4500); // 45 EGP
+          await cubit.selectItemType(cubit.state.itemTypes.first);
+          cubit.selectService(service);
+          cubit.addItemDraftToOrder();
+
+          // subtotal = 45, tax = 0, total = 45
+          expect(cubit.state.subtotal, const Money.fromPiastres(4500));
+          expect(cubit.state.tax, Money.zero);
+          expect(cubit.state.total, const Money.fromPiastres(4500));
+
+          cubit.toggleInitialPayment(true);
+          cubit.setFullInitialPayment();
+
+          // Full payment must be exactly 45 EGP (NOT 45 + tax)
+          expect(
+            cubit.state.initialPaymentAmount,
+            const Money.fromPiastres(4500),
+          );
+          expect(cubit.state.remainingAmount, Money.zero);
+        },
+      );
+
+      test(
+        'partial advance payment remaining = total - payment (no tax)',
+        () async {
+          await cubit.initialize();
+          final service = await seedService('srv-tax-4', 10000); // 100 EGP
+          await cubit.selectItemType(cubit.state.itemTypes.first);
+          cubit.selectService(service);
+          cubit.addItemDraftToOrder();
+
+          // total = 100, no tax
+          expect(cubit.state.total, const Money.fromPiastres(10000));
+          expect(cubit.state.tax, Money.zero);
+
+          cubit.toggleInitialPayment(true);
+          cubit.updateInitialPaymentAmount(const Money.fromPiastres(4000)); // 40 EGP paid
+
+          // remaining = 100 - 40 = 60 EGP
+          expect(
+            cubit.state.remainingAmount,
+            const Money.fromPiastres(6000),
+          );
+        },
+      );
+
+      test(
+        'Cash payment method: submitted order has tax=zero and correct total',
+        () async {
+          await cubit.initialize();
+          final now = DateTime.now();
+          final customer = Customer(
+            id: 'cust-tax-cash',
+            name: 'عميل كاش',
+            phone: '01011110001',
+            createdAt: now,
+            updatedAt: now,
+          );
+          await customerRepository.createCustomer(customer);
+          cubit.selectCustomer(customer);
+
+          final service = await seedService('srv-tax-5', 8000); // 80 EGP
+          await cubit.selectItemType(cubit.state.itemTypes.first);
+          cubit.selectService(service);
+          cubit.addItemDraftToOrder();
+
+          cubit.toggleInitialPayment(true);
+          cubit.updateInitialPaymentMethod(PaymentMethod.cash);
+          cubit.setFullInitialPayment();
+
+          await cubit.submitOrder();
+
+          final order = cubit.state.createdOrder;
+          expect(order, isNotNull);
+          expect(order!.tax, Money.zero);
+          expect(order.total, const Money.fromPiastres(8000));
+          expect(order.subtotal, const Money.fromPiastres(8000));
+        },
+      );
+
+      test(
+        'InstaPay payment method: submitted order has tax=zero and correct total',
+        () async {
+          await cubit.initialize();
+          final now = DateTime.now();
+          final customer = Customer(
+            id: 'cust-tax-instapay',
+            name: 'عميل انستاباي',
+            phone: '01011110002',
+            createdAt: now,
+            updatedAt: now,
+          );
+          await customerRepository.createCustomer(customer);
+          cubit.selectCustomer(customer);
+
+          final service = await seedService('srv-tax-6', 5500); // 55 EGP
+          await cubit.selectItemType(cubit.state.itemTypes.first);
+          cubit.selectService(service);
+          cubit.addItemDraftToOrder();
+
+          cubit.toggleInitialPayment(true);
+          cubit.updateInitialPaymentMethod(PaymentMethod.instapay);
+          cubit.updateInitialPaymentAmount(const Money.fromPiastres(3000));
+
+          await cubit.submitOrder();
+
+          final order = cubit.state.createdOrder;
+          expect(order, isNotNull);
+          expect(order!.tax, Money.zero);
+          expect(order.total, const Money.fromPiastres(5500));
+        },
+      );
+
+      test(
+        'E-Wallet payment method: submitted order has tax=zero and correct total',
+        () async {
+          await cubit.initialize();
+          final now = DateTime.now();
+          final customer = Customer(
+            id: 'cust-tax-ewallet',
+            name: 'عميل محفظة',
+            phone: '01011110003',
+            createdAt: now,
+            updatedAt: now,
+          );
+          await customerRepository.createCustomer(customer);
+          cubit.selectCustomer(customer);
+
+          final service = await seedService('srv-tax-7', 6000); // 60 EGP
+          await cubit.selectItemType(cubit.state.itemTypes.first);
+          cubit.selectService(service);
+          cubit.addItemDraftToOrder();
+
+          cubit.toggleInitialPayment(true);
+          cubit.updateInitialPaymentMethod(PaymentMethod.ewallet);
+          cubit.setFullInitialPayment();
+
+          await cubit.submitOrder();
+
+          final order = cubit.state.createdOrder;
+          expect(order, isNotNull);
+          expect(order!.tax, Money.zero);
+          expect(order.total, const Money.fromPiastres(6000));
+          expect(order.subtotal, const Money.fromPiastres(6000));
+        },
+      );
+    });
   });
 }

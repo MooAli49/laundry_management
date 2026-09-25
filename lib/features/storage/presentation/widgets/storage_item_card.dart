@@ -134,6 +134,24 @@ class StorageItemCard extends StatelessWidget {
                           ),
                         ),
                       ),
+                    if (orderItem.carpetData != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sm,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.secondary,
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Text(
+                          '${orderItem.carpetData!.length.truncateToDouble() == orderItem.carpetData!.length ? orderItem.carpetData!.length.toStringAsFixed(1) : orderItem.carpetData!.length.toStringAsFixed(2)} × ${orderItem.carpetData!.width.truncateToDouble() == orderItem.carpetData!.width ? orderItem.carpetData!.width.toStringAsFixed(1) : orderItem.carpetData!.width.toStringAsFixed(2)} م = ${orderItem.carpetData!.area.truncateToDouble() == orderItem.carpetData!.area ? orderItem.carpetData!.area.toStringAsFixed(0) : orderItem.carpetData!.area.toStringAsFixed(2)} م²',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
                     Text(
                       '— ${orderItem.serviceNameSnapshot}',
                       style: AppTextStyles.bodySmall.copyWith(
@@ -143,6 +161,7 @@ class StorageItemCard extends StatelessWidget {
                     ),
                     Text(
                       '#${item.orderNumber}',
+                      textDirection: TextDirection.ltr,
                       style: AppTextStyles.bodySmall.copyWith(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,

@@ -136,7 +136,8 @@ void main() {
         );
 
         expect(find.text('مغسلة النقاء المتطورة'), findsOneWidget);
-        expect(find.text('فاتورة #26-001'), findsOneWidget);
+        expect(find.text('فاتورة '), findsOneWidget);
+        expect(find.text('#26-001'), findsOneWidget);
         expect(find.text('عميل الفاتورة'), findsOneWidget);
         expect(find.text('قميص - غسيل'), findsOneWidget);
         expect(find.text('100.00 ج.م'), findsWidgets);

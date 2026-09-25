@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/core/errors/failures.dart';
 import 'package:laundry_management/data/local/daos/customers_dao.dart';
 import 'package:laundry_management/data/local/daos/orders_dao.dart';
+import 'package:laundry_management/data/local/daos/payments_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
 import 'package:laundry_management/data/local/database/app_database.dart'
@@ -44,6 +45,7 @@ void main() {
 
     orderRepository = OrderRepositoryImpl(
       ordersDao: ordersDao,
+      paymentsDao: PaymentsDao(db),
       storageRecordsDao: storageRecordsDao,
       syncOperationsDao: syncOperationsDao,
       db: db,
@@ -414,6 +416,178 @@ void main() {
       final grouped = await orderRepository.getOrderCountsByCustomer();
       expect(grouped[custA.id], equals(2));
       expect(grouped[custB.id], equals(1));
+    });
+
+    group('Customer Address', () {
+      test('1. Create customer with address persists and normalizes address', () async {
+        final now = DateTime.now();
+        final customer = Customer(
+          id: 'cust-addr-1',
+          name: 'عميل العنوان',
+          phone: '01099887766',
+          address: '  شارع التحرير، الدقي  ',
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        final created = await customerRepository.createCustomer(customer);
+        expect(created.address, equals('شارع التحرير، الدقي'));
+
+        final fetched = await customerRepository.getCustomerById('cust-addr-1');
+        expect(fetched?.address, equals('شارع التحرير، الدقي'));
+      });
+
+      test('2. Create customer without address persists null', () async {
+        final now = DateTime.now();
+        final customer = Customer(
+          id: 'cust-addr-2',
+          name: 'عميل بدون عنوان',
+          phone: '01099887767',
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        final created = await customerRepository.createCustomer(customer);
+        expect(created.address, isNull);
+
+        final fetched = await customerRepository.getCustomerById('cust-addr-2');
+        expect(fetched?.address, isNull);
+      });
+
+      test('3 & 4. Edit and replace existing address', () async {
+        final now = DateTime.now();
+        final customer = Customer(
+          id: 'cust-addr-3',
+          name: 'عميل تعديل العنوان',
+          phone: '01099887768',
+          address: 'شارع التحرير',
+          createdAt: now,
+          updatedAt: now,
+        );
+        await customerRepository.createCustomer(customer);
+
+        final updated = await customerRepository.updateCustomer(
+          customer.copyWith(address: 'شارع النيل'),
+        );
+        expect(updated.address, equals('شارع النيل'));
+
+        final fetched = await customerRepository.getCustomerById('cust-addr-3');
+        expect(fetched?.address, equals('شارع النيل'));
+      });
+
+      test('5. Clear address to NULL via copyWith', () async {
+        final now = DateTime.now();
+        final customer = Customer(
+          id: 'cust-addr-5',
+          name: 'عميل حذف العنوان',
+          phone: '01099887769',
+          address: 'شارع التحرير',
+          createdAt: now,
+          updatedAt: now,
+        );
+        await customerRepository.createCustomer(customer);
+
+        // Clear using address: null
+        final cleared = await customerRepository.updateCustomer(
+          customer.copyWith(address: null),
+        );
+        expect(cleared.address, isNull);
+
+        final fetched = await customerRepository.getCustomerById('cust-addr-5');
+        expect(fetched?.address, isNull);
+      });
+
+      test('6. Whitespace-only address becomes NULL on create and update', () async {
+        final now = DateTime.now();
+        final customer = Customer(
+          id: 'cust-addr-6',
+          name: 'عميل مسافات',
+          phone: '01099887770',
+          address: '     ',
+          createdAt: now,
+          updatedAt: now,
+        );
+        final created = await customerRepository.createCustomer(customer);
+        expect(created.address, isNull);
+
+        final updated = await customerRepository.updateCustomer(
+          created.copyWith(address: '\t \n '),
+        );
+        expect(updated.address, isNull);
+      });
+
+      test('7. Address persists after local database reload', () async {
+        final now = DateTime.now();
+        final customer = Customer(
+          id: 'cust-addr-7',
+          name: 'عميل استمرار قاعدة البيانات',
+          phone: '01099887771',
+          address: '15 شارع طلعت حرب',
+          createdAt: now,
+          updatedAt: now,
+        );
+        await customerRepository.createCustomer(customer);
+
+        // Fetch again through fresh accessor
+        final freshDao = CustomersDao(db);
+        final freshRepo = CustomerRepositoryImpl(
+          customersDao: freshDao,
+          syncOperationsDao: syncOperationsDao,
+          db: db,
+        );
+
+        final fetched = await freshRepo.getCustomerById('cust-addr-7');
+        expect(fetched?.address, equals('15 شارع طلعت حرب'));
+      });
+
+      test('8 & 9. Address appears in create and update outbox payloads', () async {
+        final now = DateTime.now();
+        final customer = Customer(
+          id: 'cust-addr-8',
+          name: 'عميل المزامنة',
+          phone: '01099887772',
+          address: 'شارع العروبة',
+          createdAt: now,
+          updatedAt: now,
+        );
+        await customerRepository.createCustomer(customer);
+
+        final ops = await syncOperationsDao.getPendingOperations();
+        final createOp = ops.firstWhere((o) => o.entityId == 'cust-addr-8' && o.operationType == 'create');
+        expect(createOp.payload, contains('"address":"شارع العروبة"'));
+
+        await customerRepository.updateCustomer(
+          customer.copyWith(address: 'شارع مصدق'),
+        );
+        final updatedOps = await syncOperationsDao.getPendingOperations();
+        final updateOp = updatedOps.firstWhere((o) => o.entityId == 'cust-addr-8' && o.operationType == 'update');
+        expect(updateOp.payload, contains('"address":"شارع مصدق"'));
+      });
+
+      test('12. Existing customer with NULL address remains valid', () async {
+        final now = DateTime.now();
+        // Insert directly into Drift DB with NULL address (simulating row created before schema v6)
+        await db.into(db.customers).insert(
+          app_db.CustomersCompanion.insert(
+            id: 'legacy-cust-1',
+            name: 'عميل قديم',
+            phone: '01011119999',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+        final existing = await customerRepository.getCustomerById('legacy-cust-1');
+        expect(existing, isNotNull);
+        expect(existing?.address, isNull);
+
+        // Update name of existing customer without setting address
+        final updated = await customerRepository.updateCustomer(
+          existing!.copyWith(name: 'عميل قديم محدث'),
+        );
+        expect(updated.name, equals('عميل قديم محدث'));
+        expect(updated.address, isNull);
+      });
     });
   });
 }

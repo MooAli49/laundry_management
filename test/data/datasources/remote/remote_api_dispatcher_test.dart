@@ -6,6 +6,7 @@ import 'package:laundry_management/data/datasources/remote/expense_remote_api.da
 import 'package:laundry_management/data/datasources/remote/master_data_remote_api.dart';
 import 'package:laundry_management/data/datasources/remote/order_remote_api.dart';
 import 'package:laundry_management/data/datasources/remote/payment_remote_api.dart';
+import 'package:laundry_management/data/datasources/remote/refund_remote_api.dart';
 import 'package:laundry_management/data/datasources/remote/remote_api_dispatcher.dart';
 import 'package:laundry_management/data/datasources/remote/storage_remote_api.dart';
 import 'package:laundry_management/data/local/database/app_database.dart';
@@ -75,6 +76,19 @@ class FakeOrderApi implements OrderRemoteApi {
   }
 
   @override
+  Future<dynamic> editOrderAggregate(
+    String operationId,
+    String id,
+    Map<String, dynamic> body,
+  ) async {
+    if (shouldThrow) throw Exception('Order edit remote error');
+    lastOpId = operationId;
+    lastId = id;
+    lastBody = body;
+    return {'id': id};
+  }
+
+  @override
   Future<dynamic> getOrderById(String id) async => null;
 
   @override
@@ -100,6 +114,23 @@ class FakePaymentApi implements PaymentRemoteApi {
 
   @override
   Future<dynamic> getPayments({String? orderId}) async => null;
+}
+
+class FakeRefundApi implements RefundRemoteApi {
+  String? lastOpId;
+  Map<String, dynamic>? lastBody;
+  bool shouldThrow = false;
+
+  @override
+  Future<dynamic> createRefund(
+    String operationId,
+    Map<String, dynamic> body,
+  ) async {
+    if (shouldThrow) throw Exception('Refund creation remote error');
+    lastOpId = operationId;
+    lastBody = body;
+    return {'id': body['id']};
+  }
 }
 
 class FakeStorageApi implements StorageRemoteApi {
@@ -397,6 +428,7 @@ void main() {
     late FakeCustomerApi customerApi;
     late FakeOrderApi orderApi;
     late FakePaymentApi paymentApi;
+    late FakeRefundApi refundApi;
     late FakeStorageApi storageApi;
     late FakeExpenseApi expenseApi;
     late FakeMasterDataApi masterDataApi;
@@ -428,6 +460,7 @@ void main() {
       customerApi = FakeCustomerApi();
       orderApi = FakeOrderApi();
       paymentApi = FakePaymentApi();
+      refundApi = FakeRefundApi();
       storageApi = FakeStorageApi();
       expenseApi = FakeExpenseApi();
       masterDataApi = FakeMasterDataApi();
@@ -436,6 +469,7 @@ void main() {
         customerApi: customerApi,
         orderApi: orderApi,
         paymentApi: paymentApi,
+        refundApi: refundApi,
         storageApi: storageApi,
         expenseApi: expenseApi,
         masterDataApi: masterDataApi,
@@ -481,7 +515,7 @@ void main() {
     );
 
     test(
-      'dispatches order lifecycle operations (create, update, mark_ready, complete, cancel, status_correction)',
+      'dispatches order lifecycle operations (create, update, edit, mark_ready, complete, cancel, status_correction)',
       () async {
         // 1. Create
         await dispatcher.dispatch(
@@ -548,6 +582,28 @@ void main() {
         );
         expect(orderApi.lastOpId, equals('op-o-correct'));
         expect(orderApi.lastId, equals('ord-1'));
+
+        // 6. Edit (Aggregate)
+        final editPayload = {
+          'id': 'ord-1',
+          'notes': 'updated notes',
+          'items': [
+            {'id': 'oi-1', 'unit_price': 1500}
+          ],
+        };
+        await dispatcher.dispatch(
+          createOp(
+            id: 'op-o-edit',
+            entityType: 'order',
+            entityId: 'ord-1',
+            operationType: 'edit',
+            payload: jsonEncode(editPayload),
+          ),
+        );
+        expect(orderApi.lastOpId, equals('op-o-edit'));
+        expect(orderApi.lastId, equals('ord-1'));
+        expect(orderApi.lastBody?['notes'], equals('updated notes'));
+        expect(orderApi.lastBody?['items'], isA<List>());
       },
     );
 
@@ -564,6 +620,75 @@ void main() {
 
       expect(paymentApi.lastOpId, equals('op-p-1'));
       expect(paymentApi.lastBody?['amount'], equals(5000));
+    });
+
+    test('dispatches refund create preserving operation ID and payload', () async {
+      final refundPayload = {
+        'id': 'ref-1',
+        'order_id': 'ord-1',
+        'amount': 3000,
+        'refund_method': 'cash',
+        'reason': 'Customer requested cancellation',
+        'refunded_at': '2026-09-24T12:00:00.000Z',
+      };
+      final op = createOp(
+        id: 'op-r-1',
+        entityType: 'refund',
+        entityId: 'ref-1',
+        operationType: 'create',
+        payload: jsonEncode(refundPayload),
+      );
+
+      await dispatcher.dispatch(op);
+
+      expect(refundApi.lastOpId, equals('op-r-1'));
+      expect(refundApi.lastBody?['id'], equals('ref-1'));
+      expect(refundApi.lastBody?['order_id'], equals('ord-1'));
+      expect(refundApi.lastBody?['amount'], equals(3000));
+      expect(refundApi.lastBody?['refund_method'], equals('cash'));
+      expect(refundApi.lastBody?['reason'], equals('Customer requested cancellation'));
+    });
+
+    test('propagates remote exceptions when refund creation fails', () async {
+      refundApi.shouldThrow = true;
+      final op = createOp(
+        id: 'op-r-err',
+        entityType: 'refund',
+        entityId: 'ref-1',
+        operationType: 'create',
+        payload: jsonEncode({'id': 'ref-1', 'amount': 3000}),
+      );
+
+      expect(
+        () => dispatcher.dispatch(op),
+        throwsA(
+          isA<Exception>().having(
+            (e) => e.toString(),
+            'toString()',
+            contains('Refund creation remote error'),
+          ),
+        ),
+      );
+    });
+
+    test('throws UnsupportedError on unsupported operation type for refund', () async {
+      final op = createOp(
+        id: 'op-r-del',
+        entityType: 'refund',
+        entityId: 'ref-1',
+        operationType: 'delete',
+      );
+
+      expect(
+        () => dispatcher.dispatch(op),
+        throwsA(
+          isA<UnsupportedError>().having(
+            (e) => e.message,
+            'message',
+            contains('Unsupported operation "delete" for entity "refund"'),
+          ),
+        ),
+      );
     });
 
     test('dispatches storage operations (create, move, unstore)', () async {

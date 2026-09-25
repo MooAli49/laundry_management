@@ -90,7 +90,7 @@ The local SQLite/Drift database remains the operational source of truth for each
         ├── Append to sync_changes (monotonically increasing sequence)
         └── Commit
 
-*Note: Backend supports server_version checks, but Flutter client local storage of server_version and propagation of base_version is a known deferred V1 limitation.*
+*Note: The backend maintains and increments server_version, while the Flutter client relies on the monotonic sync sequence/cursor (sync_state.last_applied_sequence) for remote change application. The Edit Order V3 client contract intentionally does not send base_version, and client-side optimistic concurrency via base_version is a documented deferred V1 limitation.*
 
 ### PULL Flow:
 
@@ -984,13 +984,9 @@ Different domain entities require specific conflict and concurrency models:
 
 For mutable entities where concurrent edits can occur (Orders, Customers, Expenses, Expense Categories, Master Data, Business Settings):
 
-- The remote table maintains an integer `server_version`, incremented upon each accepted mutation.
-- The remote transaction verifies `server_version == base_version` where `base_version` is supplied.
-- If versions do not match, the transaction rejects the push with `CONCURRENCY_CONFLICT`.
-- The `SyncEngine` isolates the conflict without blocking unrelated queue operations.
-
-> **Known Deferred Limitation (Flutter Client OCC)**:
-> While the remote PostgreSQL backend and RPCs fully support integer `server_version` optimistic concurrency checks, the Flutter client currently does NOT maintain local `server_version` columns and does NOT propagate `base_version` through the normal `SyncOperation` flow. This is explicitly documented as a deferred V1 limitation.
+- **Backend Architecture**: The remote table maintains an integer `server_version`, incremented upon each accepted mutation. The backend RPCs and transaction logic verify `server_version == base_version` whenever `base_version` is supplied, rejecting mismatches with `CONCURRENCY_CONFLICT`.
+- **Flutter Client Architecture**: The Flutter client currently relies on the monotonic sync sequence/cursor (`sync_state.last_applied_sequence`) for remote change application via `RemoteChangeApplier`. The client does not perform local optimistic concurrency using `base_version`.
+- **Edit Order V3 Contract**: The Edit Order V3 client contract intentionally does NOT send `base_version`. The client does not maintain local `server_version` columns, and propagation of `base_version` remains a documented deferred V1 limitation without introducing a new concurrency mechanism.
 
 ---
 
@@ -2412,7 +2408,7 @@ The approved V1 synchronization architecture is:
         ├── sync_changes append (sequence)
         └── Commit
 
-*Note: Backend supports server_version checks, but Flutter client propagation of base_version is a known deferred V1 limitation.*
+*Note: The backend maintains and increments server_version, while the Flutter client relies on the monotonic sync sequence/cursor for remote change application. The Edit Order V3 client contract intentionally does not send base_version.*
 
 ### Pull Path:
 

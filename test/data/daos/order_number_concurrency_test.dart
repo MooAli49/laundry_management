@@ -2,6 +2,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/core/errors/failures.dart';
 import 'package:laundry_management/data/local/daos/orders_dao.dart';
+import 'package:laundry_management/data/local/daos/payments_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
 import 'package:laundry_management/data/local/database/app_database.dart'
@@ -17,6 +18,7 @@ import 'package:laundry_management/domain/value_objects/order_date.dart';
 void main() {
   late AppDatabase db;
   late OrdersDao ordersDao;
+  late PaymentsDao paymentsDao;
   late StorageRecordsDao storageRecordsDao;
   late SyncOperationsDao syncOperationsDao;
   late OrderRepositoryImpl orderRepository;
@@ -24,10 +26,12 @@ void main() {
   setUp(() async {
     db = AppDatabase(NativeDatabase.memory());
     ordersDao = OrdersDao(db);
+    paymentsDao = PaymentsDao(db);
     storageRecordsDao = StorageRecordsDao(db);
     syncOperationsDao = SyncOperationsDao(db);
     orderRepository = OrderRepositoryImpl(
       ordersDao: ordersDao,
+      paymentsDao: paymentsDao,
       storageRecordsDao: storageRecordsDao,
       syncOperationsDao: syncOperationsDao,
       db: db,
@@ -144,6 +148,7 @@ void main() {
       );
       final testOrderRepo = OrderRepositoryImpl(
         ordersDao: testOrdersDao,
+        paymentsDao: paymentsDao,
         storageRecordsDao: storageRecordsDao,
         syncOperationsDao: syncOperationsDao,
         db: db,
@@ -215,6 +220,7 @@ void main() {
         );
         final testOrderRepo = OrderRepositoryImpl(
           ordersDao: alwaysCollidingDao,
+          paymentsDao: paymentsDao,
           storageRecordsDao: storageRecordsDao,
           syncOperationsDao: syncOperationsDao,
           db: db,

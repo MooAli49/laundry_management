@@ -170,7 +170,7 @@ The following are not V1 Domain entities:
 - Role
 - Permission
 - Branch
-- Refund
+- Automated payment gateway refunds and item-level refunds
 - LoyaltyAccount
 - StorageMovement
 - StorageCapacity
@@ -355,13 +355,13 @@ Business invariants must also be validated before persistence.
 
 The human-readable Order Number is separate from the internal database ID.
 
-Approved V1 format:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length (zero-padded below 1000; naturally expands to 4+ digits at 1000+).
 
-YY-XXX
+Examples:
 
-Example:
-
-26-001
+    26-001
+    26-999
+    26-1000
 
 The Order Number must:
 
@@ -566,15 +566,15 @@ Cancellation information should include:
 
 ---
 
-## 21. Cancellation Does Not Mean Refund
+## 21. Cancellation Does Not Mean Automatic Refund
 
 Cancelling an Order does not automatically create a refund.
 
-The V1 Domain does not contain a Refund entity.
+Refund is an approved V1 Domain entity (`Refund`) operating at the order level for cancelled orders.
 
-Existing Payment records remain historical records.
+Existing Payment records remain immutable historical records.
 
-If refund functionality is introduced later, it must be an explicitly approved requirement.
+Cancellation and refund remain separate operations: cancelled orders with a positive refundable balance (`Total Paid - Total Refunded`) can receive manual refunds via `CreateRefundUseCase`.
 
 ---
 
@@ -2820,7 +2820,7 @@ The AI must not create new V1 entities for:
 - Role
 - Permission
 - Branch
-- Refund
+- Automated payment gateway refunds and line-item refunds
 - Loyalty
 - StorageMovement
 - StorageCapacity

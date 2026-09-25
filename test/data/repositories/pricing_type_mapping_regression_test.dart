@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/data/local/daos/orders_dao.dart';
+import 'package:laundry_management/data/local/daos/payments_dao.dart';
 import 'package:laundry_management/data/local/daos/services_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_locations_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
@@ -82,6 +83,7 @@ void main() {
 
       orderRepository = OrderRepositoryImpl(
         ordersDao: ordersDao,
+        paymentsDao: PaymentsDao(db),
         storageRecordsDao: storageRecordsDao,
         syncOperationsDao: syncOperationsDao,
         db: db,

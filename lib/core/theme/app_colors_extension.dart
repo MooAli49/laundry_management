@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:laundry_management/core/theme/app_colors.dart';
+
+import 'app_colors.dart';
 
 @immutable
 class AppColorsExtension extends ThemeExtension<AppColorsExtension> {

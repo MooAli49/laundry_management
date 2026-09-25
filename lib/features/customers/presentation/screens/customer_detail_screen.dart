@@ -15,6 +15,7 @@ import '../../../../core/widgets/app_error_state.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../core/widgets/order_status_badge.dart';
+import '../../../../domain/enums/order_status.dart';
 import '../../../../domain/value_objects/money.dart';
 import '../cubit/customer_detail_cubit.dart';
 import '../cubit/customer_detail_state.dart';
@@ -53,10 +54,11 @@ class _CustomerDetailView extends StatelessWidget {
       builder: (dialogContext) {
         return CustomerFormDialog(
           customer: customer,
-          onSave: ({required name, required phone, notes}) async {
+          onSave: ({required name, required phone, address, notes}) async {
             await cubit.updateCustomerInfo(
               name: name,
               phone: phone,
+              address: address,
               notes: notes,
             );
           },
@@ -157,6 +159,28 @@ class _CustomerDetailView extends StatelessWidget {
                                 ),
                               ],
                             ),
+                            if (customer.address != null &&
+                                customer.address!.trim().isNotEmpty) ...[
+                              AppSpacing.gapXs,
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.location_on_outlined,
+                                    size: 16,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  AppSpacing.gapHorizontalXs,
+                                  Expanded(
+                                    child: Text(
+                                      customer.address!.trim(),
+                                      style: AppTextStyles.bodyMedium.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -258,15 +282,51 @@ class _CustomerDetailView extends StatelessWidget {
                     ],
                   ),
                   AppSpacing.gapMd,
-                  // Row 2: Financial Summary
+                  // Row 2: Financial Summary — Payments & Refunds
                   Row(
                     children: [
                       Expanded(
                         child: _KpiCard(
-                          title: AppStrings.totalPaid,
+                          title: AppStrings.totalPayments,
+                          subtitle: 'المدفوعات المسجلة للعميل',
                           value:
                               '${data.totalPaid.toEgp.toStringAsFixed(2)} ${AppStrings.currency}',
                           icon: Icons.payments_outlined,
+                          color: AppColors.info,
+                          backgroundColor: AppColors.infoLight,
+                          isFinancial: true,
+                        ),
+                      ),
+                      AppSpacing.gapHorizontalMd,
+                      Expanded(
+                        child: _KpiCard(
+                          title: AppStrings.totalRefunds,
+                          subtitle: 'المبالغ المستردة للعميل',
+                          value:
+                              '${data.totalRefunds.toEgp.toStringAsFixed(2)} ${AppStrings.currency}',
+                          icon: Icons.assignment_return_outlined,
+                          color: data.totalRefunds.isPositive
+                              ? AppColors.warning
+                              : AppColors.textSecondary,
+                          backgroundColor: data.totalRefunds.isPositive
+                              ? AppColors.warningLight
+                              : AppColors.backgroundSecondary,
+                          isFinancial: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                  AppSpacing.gapMd,
+                  // Row 3: Financial Summary — Net Paid & Outstanding
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _KpiCard(
+                          title: AppStrings.netPaid,
+                          subtitle: 'المدفوعات − الاستردادات',
+                          value:
+                              '${data.netPaid.toEgp.toStringAsFixed(2)} ${AppStrings.currency}',
+                          icon: Icons.account_balance_outlined,
                           color: AppColors.success,
                           backgroundColor: AppColors.successLight,
                           isFinancial: true,
@@ -275,16 +335,17 @@ class _CustomerDetailView extends StatelessWidget {
                       AppSpacing.gapHorizontalMd,
                       Expanded(
                         child: _KpiCard(
-                          title: AppStrings.totalRemaining,
+                          title: AppStrings.outstandingAmounts,
+                          subtitle: 'على الطلبات غير الملغاة',
                           value:
                               '${data.totalRemaining.toEgp.toStringAsFixed(2)} ${AppStrings.currency}',
-                          icon: Icons.account_balance_wallet_outlined,
+                          icon: Icons.hourglass_bottom,
                           color: data.totalRemaining.isZero
                               ? AppColors.textSecondary
-                              : AppColors.error,
+                              : AppColors.warning,
                           backgroundColor: data.totalRemaining.isZero
                               ? AppColors.backgroundSecondary
-                              : AppColors.errorLight,
+                              : AppColors.warningLight,
                           isFinancial: true,
                         ),
                       ),
@@ -330,10 +391,21 @@ class _CustomerDetailView extends StatelessWidget {
                       separatorBuilder: (_, __) => AppSpacing.gapSm,
                       itemBuilder: (context, index) {
                         final order = data.orders[index];
-                        final remaining = data.remainingAmounts[order.id];
-                        final paid = data.paidAmounts[order.id] ?? Money.zero;
-                        final isFullyPaid =
-                            remaining == null || remaining.isZero;
+                        final summary = data.paymentSummaries[order.id];
+                        final isCancelled =
+                            order.status == OrderStatus.cancelled;
+                        final paid =
+                            summary?.totalPaid ??
+                            data.paidAmounts[order.id] ??
+                            Money.zero;
+                        final refunded = summary?.totalRefunded ?? Money.zero;
+                        final remaining =
+                            isCancelled
+                                ? Money.zero
+                                : (summary?.remaining ??
+                                    data.remainingAmounts[order.id] ??
+                                    Money.zero);
+                        final isFullyPaid = remaining.isZero;
 
                         return AppCard(
                           onTap: () {
@@ -351,15 +423,19 @@ class _CustomerDetailView extends StatelessWidget {
                                 width: 40,
                                 height: 40,
                                 decoration: BoxDecoration(
-                                  color: AppColors.primaryLighter,
+                                  color: isCancelled
+                                      ? AppColors.backgroundSecondary
+                                      : AppColors.primaryLighter,
                                   borderRadius: BorderRadius.circular(
                                     AppSpacing.radiusSm,
                                   ),
                                 ),
                                 alignment: Alignment.center,
-                                child: const Icon(
+                                child: Icon(
                                   Icons.receipt_outlined,
-                                  color: AppColors.primary,
+                                  color: isCancelled
+                                      ? AppColors.textSecondary
+                                      : AppColors.primary,
                                   size: 20,
                                 ),
                               ),
@@ -373,7 +449,10 @@ class _CustomerDetailView extends StatelessWidget {
                                     Row(
                                       children: [
                                         Text(
-                                          order.orderNumber,
+                                          order.orderNumber.startsWith('#')
+                                              ? order.orderNumber
+                                              : '#${order.orderNumber}',
+                                          textDirection: TextDirection.ltr,
                                           style: AppTextStyles.titleMedium
                                               .copyWith(
                                                 fontWeight: FontWeight.bold,
@@ -394,15 +473,20 @@ class _CustomerDetailView extends StatelessWidget {
                                 ),
                               ),
 
-                              // Amounts: Total, Paid & Remaining
+                              // Amounts: Total, Paid & Remaining (and Refunded if cancelled or exists)
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    '${order.total.toEgp.toStringAsFixed(2)} ${AppStrings.currency}',
+                                    AppStrings.totalAmount(
+                                      order.total.toEgp.toStringAsFixed(2),
+                                    ),
                                     style: AppTextStyles.titleSmall.copyWith(
                                       fontWeight: FontWeight.bold,
+                                      color: isCancelled
+                                          ? AppColors.textSecondary
+                                          : AppColors.textPrimary,
                                     ),
                                   ),
                                   AppSpacing.gapXs,
@@ -414,17 +498,35 @@ class _CustomerDetailView extends StatelessWidget {
                                       color: AppColors.textSecondary,
                                     ),
                                   ),
+                                  if (refunded.isPositive || isCancelled) ...[
+                                    AppSpacing.gapXs,
+                                    Text(
+                                      AppStrings.refundedAmount(
+                                        refunded.toEgp.toStringAsFixed(2),
+                                      ),
+                                      style: AppTextStyles.bodySmall.copyWith(
+                                        color: refunded.isPositive
+                                            ? AppColors.warning
+                                            : AppColors.textSecondary,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
                                   AppSpacing.gapXs,
                                   Text(
-                                    isFullyPaid
-                                        ? AppStrings.fullyPaid
-                                        : AppStrings.remainingAmount(
-                                            remaining.toEgp.toStringAsFixed(2),
-                                          ),
+                                    isCancelled
+                                        ? AppStrings.remainingAmount('0.00')
+                                        : isFullyPaid
+                                            ? AppStrings.fullyPaid
+                                            : AppStrings.remainingAmount(
+                                                remaining.toEgp.toStringAsFixed(2),
+                                              ),
                                     style: AppTextStyles.bodySmall.copyWith(
-                                      color: isFullyPaid
-                                          ? AppColors.success
-                                          : AppColors.error,
+                                      color: isCancelled
+                                          ? AppColors.textSecondary
+                                          : isFullyPaid
+                                              ? AppColors.success
+                                              : AppColors.warning,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
@@ -467,6 +569,7 @@ class _CustomerDetailView extends StatelessWidget {
 
 class _KpiCard extends StatelessWidget {
   final String title;
+  final String? subtitle;
   final String value;
   final IconData icon;
   final Color color;
@@ -475,6 +578,7 @@ class _KpiCard extends StatelessWidget {
 
   const _KpiCard({
     required this.title,
+    this.subtitle,
     required this.value,
     required this.icon,
     required this.color,
@@ -508,8 +612,19 @@ class _KpiCard extends StatelessWidget {
                   title,
                   style: AppTextStyles.bodySmall.copyWith(
                     color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
                 AppSpacing.gapXs,
                 Text(
                   value,

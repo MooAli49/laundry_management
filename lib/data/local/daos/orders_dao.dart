@@ -16,26 +16,43 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     final yearPrefix = (now.year % 100).toString().padLeft(2, '0');
     final pattern = '$yearPrefix-%';
 
-    final query = select(db.orders)
-      ..where((t) => t.orderNumber.like(pattern))
-      ..orderBy([
-        (t) => OrderingTerm.desc(t.orderNumber.length),
-        (t) => OrderingTerm.desc(t.orderNumber),
-      ])
-      ..limit(1);
+    // 1. Query existing order numbers matching the year prefix pattern
+    final query = selectOnly(db.orders)
+      ..addColumns([db.orders.orderNumber])
+      ..where(db.orders.orderNumber.like(pattern));
 
-    final latest = await query.getSingleOrNull();
-    if (latest == null) {
-      return '$yearPrefix-001';
+    final rows = await query.get();
+
+    // 2. Strict canonical numeric regex: ^YY-(\d{3,})$
+    // Suffix contains digits only, with a minimum width of 3 digits and no maximum length.
+    // Suffixes shorter than 3 digits (e.g. 26-12), multi-hyphen, or alphanumeric strings are ignored.
+    final canonicalRegex = RegExp('^${RegExp.escape(yearPrefix)}-(\\d{3,})\$');
+    var maxSeq = 0;
+
+    for (final row in rows) {
+      final orderNum = row.read(db.orders.orderNumber);
+      if (orderNum == null) continue;
+
+      final match = canonicalRegex.firstMatch(orderNum);
+      if (match != null) {
+        final seq = int.tryParse(match.group(1)!);
+        if (seq != null && seq > maxSeq) {
+          maxSeq = seq;
+        }
+      }
     }
 
-    final parts = latest.orderNumber.split('-');
-    if (parts.length == 2) {
-      final currentSeq = int.tryParse(parts[1]) ?? 0;
-      final nextSeq = (currentSeq + 1).toString().padLeft(3, '0');
-      return '$yearPrefix-$nextSeq';
+    // 3. Next sequential candidate (YY-NNN format, min 3 digits with padLeft)
+    var candidateSeq = maxSeq + 1;
+    var candidate = '$yearPrefix-${candidateSeq.toString().padLeft(3, '0')}';
+
+    // 4. Collision safeguard against existing orders
+    while (await getOrderByNumber(candidate) != null) {
+      candidateSeq++;
+      candidate = '$yearPrefix-${candidateSeq.toString().padLeft(3, '0')}';
     }
-    return '$yearPrefix-001';
+
+    return candidate;
   }
 
   Future<void> insertOrder(app_db.OrdersCompanion order) async {
@@ -340,19 +357,25 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
         COALESCE(SUM(CASE WHEN o.status = 'cancelled' THEN 1 ELSE 0 END), 0) AS cancelled_count,
         COALESCE(SUM(COALESCE(p.paid_amount, 0)), 0) AS total_paid,
         COALESCE(SUM(CASE 
-          WHEN o.total > COALESCE(p.paid_amount, 0) THEN o.total - COALESCE(p.paid_amount, 0) 
+          WHEN o.status != 'cancelled' AND o.total > COALESCE(p.paid_amount, 0) THEN o.total - COALESCE(p.paid_amount, 0) 
           ELSE 0 
-        END), 0) AS total_remaining
+        END), 0) AS total_remaining,
+        COALESCE(SUM(COALESCE(r.refund_amount, 0)), 0) AS total_refunds
       FROM orders o
       LEFT JOIN (
         SELECT order_id, SUM(amount) AS paid_amount
         FROM payments
         GROUP BY order_id
       ) p ON p.order_id = o.id
+      LEFT JOIN (
+        SELECT order_id, SUM(amount) AS refund_amount
+        FROM refunds
+        GROUP BY order_id
+      ) r ON r.order_id = o.id
       WHERE o.customer_id = ?
       ''',
       variables: [Variable.withString(customerId)],
-      readsFrom: {db.orders, db.payments},
+      readsFrom: {db.orders, db.payments, db.refunds},
     );
 
     final row = await query.getSingleOrNull();
@@ -373,6 +396,7 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
       cancelledOrders: row.read<int>('cancelled_count'),
       totalPaidPiastres: row.read<int>('total_paid'),
       totalRemainingPiastres: row.read<int>('total_remaining'),
+      totalRefundsPiastres: row.read<int>('total_refunds'),
     );
   }
 
@@ -381,11 +405,18 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     required DateTime endDate,
     required DateTime overdueCutoff,
   }) async {
+    final startOfToday = DateTime.utc(
+      overdueCutoff.year,
+      overdueCutoff.month,
+      overdueCutoff.day,
+    );
+
     final query = db.customSelect(
       '''
       SELECT 
         COUNT(o.id) AS total_orders,
         COALESCE(SUM(o.total), 0) AS total_order_value,
+        COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN o.total ELSE 0 END), 0) AS total_sales,
         COALESCE(SUM(o.discount), 0) AS total_discounts,
         COALESCE(SUM(CASE WHEN o.status = 'processing' THEN 1 ELSE 0 END), 0) AS processing_count,
         COALESCE(SUM(CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END), 0) AS ready_count,
@@ -400,7 +431,7 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
       WHERE o.created_at >= ? AND o.created_at <= ?
       ''',
       variables: [
-        Variable.withDateTime(overdueCutoff),
+        Variable.withDateTime(startOfToday),
         Variable.withDateTime(startDate),
         Variable.withDateTime(endDate),
       ],
@@ -415,6 +446,7 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     return OrdersReportAggregateQueryResult(
       totalOrders: row.read<int>('total_orders'),
       totalOrderValuePiastres: row.read<int>('total_order_value'),
+      totalSalesPiastres: row.read<int>('total_sales'),
       totalDiscountsPiastres: row.read<int>('total_discounts'),
       processingCount: row.read<int>('processing_count'),
       readyCount: row.read<int>('ready_count'),

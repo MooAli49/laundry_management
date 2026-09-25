@@ -3963,7 +3963,7 @@ The implementation must not create tables for:
     Delivery Routes
     Delivery Tracking
     Loyalty
-    Refunds
+    Payment Gateway Refunds and Item-Level Refunds
     Employee Permissions
     Multi-Branch
     Advanced Inventory
@@ -4554,7 +4554,7 @@ The AI must not:
     Add Invoice tables.
     Add Analytics tables.
     Add Loyalty tables.
-    Add Refund tables.
+    Add Line-Item Refund tables.
     Add Processing Stage tables.
     Add Storage Capacity tables.
     Add Barcode tables.

@@ -169,12 +169,27 @@ class _MoveStorageDialogState extends State<MoveStorageDialog> {
                   color: AppColors.secondary,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                 ),
-                child: Text(
-                  'العنصر: ${widget.item.orderItem.itemTypeNameSnapshot} — الموقع الحالي: $currentLocName',
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'العنصر: ${widget.item.orderItem.itemTypeNameSnapshot}${widget.item.orderItem.itemDefinitionNameSnapshot != null && widget.item.orderItem.itemDefinitionNameSnapshot!.isNotEmpty ? " - ${widget.item.orderItem.itemDefinitionNameSnapshot}" : ""}${widget.item.orderItem.carpetData != null ? " (${widget.item.orderItem.carpetData!.length.truncateToDouble() == widget.item.orderItem.carpetData!.length ? widget.item.orderItem.carpetData!.length.toStringAsFixed(1) : widget.item.orderItem.carpetData!.length.toStringAsFixed(2)} × ${widget.item.orderItem.carpetData!.width.truncateToDouble() == widget.item.orderItem.carpetData!.width ? widget.item.orderItem.carpetData!.width.toStringAsFixed(1) : widget.item.orderItem.carpetData!.width.toStringAsFixed(2)} م = ${widget.item.orderItem.carpetData!.area.truncateToDouble() == widget.item.orderItem.carpetData!.area ? widget.item.orderItem.carpetData!.area.toStringAsFixed(0) : widget.item.orderItem.carpetData!.area.toStringAsFixed(2)} م²)" : ""} — ${widget.item.orderItem.serviceNameSnapshot}',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'الطلب: #${widget.item.orderNumber} • العميل: ${widget.item.customerName} • الموقع الحالي: $currentLocName',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               AppSpacing.gapLg,

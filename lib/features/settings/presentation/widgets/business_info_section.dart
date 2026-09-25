@@ -135,7 +135,7 @@ class _BusinessInfoSectionState extends State<BusinessInfoSection> {
                     AppTextField(
                       controller: _nameController,
                       label: AppStrings.businessNameLabel,
-                      hintText: 'مثال: مغسلةالحديثة',
+                      hintText: 'مثال: المغسلة الحديثة',
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return AppStrings.businessNameRequired;

@@ -59,6 +59,7 @@ Examples:
     orders
     order_items
     payments
+    refunds
     expenses
 
 Column names use:
@@ -262,6 +263,26 @@ Optional customer notes.
 
 ---
 
+### address
+
+Type:
+
+    TEXT
+
+Required:
+
+    No
+
+Nullable:
+
+    Yes
+
+Description:
+
+Optional customer address. Stored on Customer only (no separate address table or delivery routing in V1). Whitespace-only values normalize to NULL. Profile attribute only.
+
+---
+
 ### created_at
 
 Type:
@@ -354,13 +375,19 @@ Description:
 
 Human-readable business Order Number.
 
-The approved V1 format is:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length:
 
-    YY-XXX
+- YY = 2-digit year prefix.
+- Numeric sequence only.
+- Minimum display width of 3 digits (zero-padded below 1000).
+- No maximum length (valid values include 26-001, 26-999, 26-1000, 26-10000).
+- Non-numeric or alphanumeric values (e.g. 26-T123) are not valid business order numbers.
 
-Example:
+Examples:
 
     26-001
+    26-999
+    26-1000
 
 The Order Number:
 
@@ -1319,6 +1346,40 @@ Payment belongs to an Order.
 Payment is independent from Expense.
 
 A Payment cannot exceed the current Order remaining amount.
+
+---
+
+# 7A. refunds
+
+## Purpose
+
+Stores order-level refund transactions returned to customers for cancelled orders.
+
+Append-only, immutable financial transaction records.
+
+## Columns
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| id | UUID | PRIMARY KEY | Unique refund transaction ID |
+| order_id | UUID | NOT NULL REFERENCES orders(id) ON DELETE RESTRICT | Associated cancelled order |
+| amount | BIGINT | NOT NULL CHECK (amount > 0) | Refund amount in positive minor units (piastres) |
+| refund_method | TEXT | NOT NULL CHECK (refund_method IN ('cash', 'insta_pay', 'e_wallet')) | Method used to issue refund |
+| reason | TEXT | NULL | Optional explanation for refund |
+| refunded_at | TIMESTAMPTZ | NOT NULL | Transaction timestamp |
+| created_at | TIMESTAMPTZ | NOT NULL DEFAULT now() | Record creation timestamp |
+| updated_at | TIMESTAMPTZ | NOT NULL DEFAULT now() | Record update timestamp |
+
+## Refund Data Rules
+
+- Append-only and immutable: records are never edited or deleted.
+- Append-only financial records: refunds do not use `server_version`.
+- Order-level: directly references `orders(id)`, no `payment_id`.
+- Only `cancelled` orders can receive refunds.
+- Cumulative refunds for an order cannot exceed the order's total paid amount (`Total Paid - Total Refunded >= amount`).
+- Mutation is strictly controlled through the `sync_create_refund` SECURITY DEFINER RPC.
+- Protected by row-level locking on `orders` (`FOR UPDATE`) to prevent race conditions.
+- Direct table mutation via PostgREST is blocked by RLS default-deny.
 
 ---
 
@@ -3647,7 +3708,7 @@ The following tables are not part of V1:
     drivers
     vehicles
     delivery_routes
-    refunds
+    payment_gateway_refunds
     loyalty_accounts
     storage_movement_history
     storage_capacity
@@ -4338,7 +4399,7 @@ The database must not introduce dedicated V1 business tables for:
     Roles
     Permissions
     Branches
-    Refunds
+    Payment Gateway Refunds and Item-Level Refunds
     Loyalty
     Storage Movement History
     Storage Capacity

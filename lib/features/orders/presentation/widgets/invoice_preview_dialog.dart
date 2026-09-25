@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/localization/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -131,16 +132,16 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                               Container(
                                 width: 48,
                                 height: 48,
+                                padding: const EdgeInsets.all(AppSpacing.sm),
                                 decoration: BoxDecoration(
                                   color: AppColors.primaryLighter,
                                   borderRadius: BorderRadius.circular(
                                     AppSpacing.radiusMd,
                                   ),
                                 ),
-                                child: const Icon(
-                                  Icons.local_laundry_service_outlined,
-                                  size: 28,
-                                  color: AppColors.primary,
+                                child: SvgPicture.asset(
+                                  'assets/images/logo_primary_mark.svg',
+                                  fit: BoxFit.contain,
                                 ),
                               ),
                               AppSpacing.gapSm,
@@ -185,11 +186,23 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'فاتورة #${widget.order.orderNumber}',
-                                  style: AppTextStyles.titleLarge.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'فاتورة ',
+                                      style: AppTextStyles.titleLarge.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Text(
+                                      '#${widget.order.orderNumber}',
+                                      textDirection: TextDirection.ltr,
+                                      style: AppTextStyles.titleLarge.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 AppSpacing.gapXs,
                                 Text(

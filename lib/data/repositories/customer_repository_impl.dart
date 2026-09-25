@@ -39,7 +39,13 @@ class CustomerRepositoryImpl implements CustomerRepository {
         throw const DuplicateCustomerPhoneFailure();
       }
 
-      final normalizedCustomer = customer.copyWith(phone: normalizedPhone);
+      final normalizedAddress = customer.address?.trim().isNotEmpty == true
+          ? customer.address!.trim()
+          : null;
+      final normalizedCustomer = customer.copyWith(
+        phone: normalizedPhone,
+        address: normalizedAddress,
+      );
 
       return await _db.transaction(() async {
         await _customersDao.insertCustomer(
@@ -47,6 +53,7 @@ class CustomerRepositoryImpl implements CustomerRepository {
             id: Value(normalizedCustomer.id),
             name: Value(normalizedCustomer.name),
             phone: Value(normalizedCustomer.phone),
+            address: Value(normalizedCustomer.address),
             notes: Value(normalizedCustomer.notes),
             createdAt: Value(normalizedCustomer.createdAt),
             updatedAt: Value(normalizedCustomer.updatedAt),
@@ -94,7 +101,13 @@ class CustomerRepositoryImpl implements CustomerRepository {
         throw const DuplicateCustomerPhoneFailure();
       }
 
-      final normalizedCustomer = customer.copyWith(phone: normalizedPhone);
+      final normalizedAddress = customer.address?.trim().isNotEmpty == true
+          ? customer.address!.trim()
+          : null;
+      final normalizedCustomer = customer.copyWith(
+        phone: normalizedPhone,
+        address: normalizedAddress,
+      );
 
       return await _db.transaction(() async {
         final existing = await _customersDao.getCustomerById(
@@ -109,6 +122,7 @@ class CustomerRepositoryImpl implements CustomerRepository {
             id: Value(normalizedCustomer.id),
             name: Value(normalizedCustomer.name),
             phone: Value(normalizedCustomer.phone),
+            address: Value(normalizedCustomer.address),
             notes: Value(normalizedCustomer.notes),
             createdAt: Value(normalizedCustomer.createdAt),
             updatedAt: Value(normalizedCustomer.updatedAt),
@@ -219,6 +233,7 @@ class CustomerRepositoryImpl implements CustomerRepository {
       id: row.id,
       name: row.name,
       phone: row.phone,
+      address: row.address,
       notes: row.notes,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,

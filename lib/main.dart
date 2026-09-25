@@ -2,9 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:laundry_management/app.dart';
-import 'package:laundry_management/core/di/injection.dart';
-import 'package:laundry_management/data/sync/sync_engine.dart';
+
+import 'app.dart';
+import 'core/di/injection.dart';
+import 'data/sync/sync_engine.dart';
 
 AppLifecycleListener? _appLifecycleListener;
 

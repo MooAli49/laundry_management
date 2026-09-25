@@ -57,6 +57,7 @@ void main() {
 
     orderRepository = OrderRepositoryImpl(
       ordersDao: ordersDao,
+      paymentsDao: paymentsDao,
       storageRecordsDao: storageRecordsDao,
       syncOperationsDao: syncOperationsDao,
       db: db,

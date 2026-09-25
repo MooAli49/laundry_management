@@ -387,12 +387,13 @@ The final V1 Financial Report includes:
 
     إجمالي المبيعات
     إجمالي المدفوعات
-    إجمالي المصروفات
-    المبالغ المتبقية
-    إجمالي الخصومات
+    إجمالي الاستردادات
+    صافي المدفوعات
+    المصروفات التشغيلية
+    صافي الربح
+    المبالغ المستحقة
     طرق الدفع
     المصروفات حسب التصنيف
-    صافي الربح
 
 The Financial Report remains an operational financial summary rather than a complete accounting system.
 
@@ -404,7 +405,11 @@ The report must display:
 
     إجمالي المبيعات
 
-This represents the total value of Orders included in the selected reporting period according to the approved Order reporting date.
+This represents the total value of non-cancelled Orders (`status != cancelled`) created in the selected reporting period (`Order.createdAt`).
+
+Cancelled orders contribute 0 to Total Sales.
+
+Refunds are not subtracted from Total Sales.
 
 Historical Order totals must be used.
 
@@ -418,15 +423,37 @@ The report must display:
 
     إجمالي المدفوعات
 
-Payment totals are based on Payments recorded during the selected reporting period.
+Payment totals are based on Payments recorded during the selected reporting period according to `Payment.paidAt`.
 
-The payment reporting date is:
-
-    Payment.paidAt
+Cancelled-order payments remain included in historical Total Payments.
 
 This is separate from the Order creation date.
 
-This distinction is explicitly established in the Business Rules. 
+This distinction is explicitly established in the Business Rules.
+
+---
+
+# 21A. Financial Report — Total Refunds
+
+The report must display:
+
+    إجمالي الاستردادات
+
+Total Refunds is based on refunds recorded during the selected reporting period according to `Refund.refundedAt`.
+
+Refunds are separate financial transactions and are not Operating Expenses.
+
+---
+
+# 21B. Financial Report — Net Payments
+
+The report must display:
+
+    صافي المدفوعات
+
+Net Payments represents net cash movement in the selected period:
+
+Net Payments = Total Payments - Total Refunds
 
 ---
 
@@ -434,15 +461,17 @@ This distinction is explicitly established in the Business Rules.
 
 The report must display:
 
-    المبالغ المتبقية
+    المبالغ المستحقة
 
-Outstanding amount is conceptually:
+Outstanding amount represents money still owed by customers for non-cancelled orders created within the period:
 
-    Order Total
-        -
-    Total Payments
+    Order Total - Total Payments
 
-Outstanding Amount represents money still owed by customers.
+where remaining amount > 0 and status != cancelled.
+
+Cancelled orders contribute 0 to Outstanding.
+
+Refunds do not reduce or alter Outstanding.
 
 It is not an Expense.
 
@@ -777,25 +806,19 @@ These are outside V1.
 
 # 39. Financial Report Layout
 
-The Financial Report should be organized into clear sections.
+The Financial Report is organized into six distinct hierarchical sections:
 
-Recommended structure:
+1. **أهم المؤشرات** (Primary Indicators: Total Sales, Net Payments, Operating Expenses, Net Profit)
+2. **حركة المدفوعات** (Payment Movement: Total Payments, Total Refunds, Net Payments)
+3. **التحصيل والخصومات** (Collection & Discounts: Total Order Value, Collected, Outstanding, Discounts)
+4. **التحليلات** (Analyses: Payment Methods Breakdown & Expenses by Category Breakdown)
+5. **سجل المصروفات** (Expense History: Detailed list of expenses recorded in the period)
+6. **طلبات عليها مبالغ متبقية** (Outstanding Orders: Orders with remaining balances)
 
-    Report Header
-        ↓
-    Period Selector
-        ↓
-    Financial Summary
-        ↓
-    Payment Breakdown
-        ↓
-    Expense Breakdown
-        ↓
-    Net Profit
-        ↓
-    Optional Detailed Transactions
-
-The final visual arrangement is subject to the final Figma design.
+Hierarchy and Layout Rules:
+- **Section Order**: Section 5 (**سجل المصروفات**) MUST appear before Section 6 (**طلبات عليها مبالغ متبقية**).
+- **Responsive Layout**: Upper sections (1–4) adapt using responsive grid/wrap cards and two-column side-by-side rows that stack vertically on narrower tablet screens. Lower sections (5 and 6) render as responsive full-width data sections.
+- **Color Standards**: Warning/amber color is used for outstanding balances, while red is reserved exclusively for actual error and destructive states.
 
 ---
 
@@ -1076,7 +1099,7 @@ The Financial Report must follow the approved treatment of cancelled Order finan
 
 Cancellation must not delete Payment history.
 
-No automatic refund workflow exists in V1.
+No automatic refund workflow exists in V1. Cancellation and refund are separate operations; refunds for cancelled orders are aggregated separately in Total Refunds and Net Payments.
 
 ---
 
@@ -1386,7 +1409,10 @@ Semantic colors may represent:
     Neutral
     Primary
 
-Net Profit should not rely on color alone to communicate its meaning.
+Color usage rules:
+- Warning/amber color (`AppColors.warning`) is used for outstanding balances to represent actionable operational attention.
+- Red (`AppColors.error`) is reserved strictly for actual error, conflict, or destructive states. Outstanding balances must not be rendered in red.
+- Net Profit should not rely on color alone to communicate its meaning.
 
 The numeric value and label must always remain clear.
 

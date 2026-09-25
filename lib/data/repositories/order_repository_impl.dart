@@ -1,16 +1,20 @@
 import 'package:drift/drift.dart';
+import 'package:uuid/uuid.dart';
 
+import '../../application/use_cases/edit_processing_order_use_case.dart';
 import '../../core/errors/failures.dart';
 import '../../domain/entities/carpet_item_data.dart';
 import '../../domain/entities/customer_order_aggregate.dart';
 import '../../domain/entities/order.dart';
 import '../../domain/entities/order_item.dart';
+import '../../domain/entities/payment.dart';
 import '../../domain/enums/order_status.dart';
 import '../../domain/enums/pricing_type.dart';
 import '../../domain/repositories/order_repository.dart';
 import '../../domain/value_objects/money.dart';
 import '../../domain/value_objects/order_date.dart';
 import '../local/daos/orders_dao.dart';
+import '../local/daos/payments_dao.dart';
 import '../local/daos/storage_records_dao.dart';
 import '../local/daos/sync_operations_dao.dart';
 import '../local/database/app_database.dart' as app_db;
@@ -20,22 +24,26 @@ class OrderRepositoryImpl implements OrderRepository {
   final OrdersDao _ordersDao;
   final StorageRecordsDao _storageRecordsDao;
   final SyncOperationsDao _syncOperationsDao;
+  final PaymentsDao _paymentsDao;
   final app_db.AppDatabase _db;
 
   OrderRepositoryImpl({
     required OrdersDao ordersDao,
     required StorageRecordsDao storageRecordsDao,
     required SyncOperationsDao syncOperationsDao,
+    required PaymentsDao paymentsDao,
     required app_db.AppDatabase db,
   }) : _ordersDao = ordersDao,
        _storageRecordsDao = storageRecordsDao,
        _syncOperationsDao = syncOperationsDao,
+       _paymentsDao = paymentsDao,
        _db = db;
 
   @override
   Future<Order> createOrder({
     required Order order,
     required List<OrderItem> items,
+    Payment? initialPayment,
   }) async {
     try {
       if (items.isEmpty) {
@@ -148,6 +156,44 @@ class OrderRepositoryImpl implements OrderRepository {
               ),
             );
 
+            // Handle initial payment if provided
+            if (initialPayment != null) {
+              if (initialPayment.orderId != order.id) {
+                throw const ValidationFailure(
+                  'Payment orderId must match order id',
+                );
+              }
+              if (initialPayment.amount.piastres <= 0) {
+                throw const ValidationFailure(
+                  'Payment amount must be greater than zero',
+                );
+              }
+              if (initialPayment.amount > order.total) {
+                throw const BusinessRuleFailure(
+                  'Payment amount exceeds remaining order balance',
+                );
+              }
+
+              await _paymentsDao.insertPayment(
+                app_db.PaymentsCompanion(
+                  id: Value(initialPayment.id),
+                  orderId: Value(order.id),
+                  amount: Value(initialPayment.amount.piastres),
+                  paymentMethod: Value(initialPayment.paymentMethod.name),
+                  paidAt: Value(initialPayment.paidAt),
+                  createdAt: Value(initialPayment.createdAt),
+                  updatedAt: Value(initialPayment.updatedAt),
+                ),
+              );
+
+              await _syncOperationsDao.recordOperation(
+                entityType: 'payment',
+                entityId: initialPayment.id,
+                operationType: 'create',
+                payload: SyncPayloadBuilder.buildPaymentPayload(initialPayment),
+              );
+            }
+
             return committedOrder;
           });
         } catch (e) {
@@ -171,6 +217,528 @@ class OrderRepositoryImpl implements OrderRepository {
       );
     } on ArgumentError catch (e) {
       throw ValidationFailure(e.message.toString());
+    } catch (e) {
+      if (e is Failure) rethrow;
+      throw DatabaseFailure(e.toString());
+    }
+  }
+
+  @override
+  Future<Order> editProcessingOrder(EditProcessingOrderInput input) async {
+    try {
+      return await _db.transaction(() async {
+        // 1. Fetch existing order
+        final existingRow = await _ordersDao.getOrderById(input.orderId);
+        if (existingRow == null) {
+          throw const ValidationFailure('Order not found');
+        }
+
+        // 2. Reject non-processing orders
+        if (existingRow.status != OrderStatus.processing.name) {
+          throw BusinessRuleFailure(
+            'Cannot edit order in status: ${existingRow.status}. Only processing orders can be edited.',
+          );
+        }
+
+        // 3. Read total paid for financial validation
+        final totalPaidPiastres =
+            await _paymentsDao.getTotalPaidForOrder(input.orderId);
+        final totalPaid = Money.fromPiastres(totalPaidPiastres);
+
+        // 4. Customer change validation
+        var customerId = existingRow.customerId;
+        var customerNameSnapshot = existingRow.customerNameSnapshot;
+        var customerPhoneSnapshot = existingRow.customerPhoneSnapshot;
+
+        if (input.customerId != existingRow.customerId) {
+          if (totalPaid > Money.zero) {
+            throw const BusinessRuleFailure(
+              'Cannot change customer on an order with recorded payments',
+            );
+          }
+          final newCustomerRow = await (_db.select(_db.customers)
+                ..where((t) => t.id.equals(input.customerId)))
+              .getSingleOrNull();
+          if (newCustomerRow == null) {
+            throw const ValidationFailure('Customer not found');
+          }
+          customerId = newCustomerRow.id;
+          customerNameSnapshot = newCustomerRow.name;
+          customerPhoneSnapshot = newCustomerRow.phone;
+        }
+
+        // 5. Existing items and carpets
+        final existingItemAndCarpetRows =
+            await _ordersDao.getOrderItemsWithCarpets(input.orderId);
+        final existingItemsMap = {
+          for (final r in existingItemAndCarpetRows) r.item.id: r,
+        };
+
+        // 6. Validate item deletions (storage records deletion guard)
+        for (final deletedId in input.deletedItemIds) {
+          if (!existingItemsMap.containsKey(deletedId)) {
+            throw ValidationFailure('Item to delete not found: $deletedId');
+          }
+          final storageCount =
+              await _storageRecordsDao.countAllRecordsForOrderItem(deletedId);
+          if (storageCount > 0) {
+            throw BusinessRuleFailure(
+              'Cannot delete item with storage records: $deletedId',
+            );
+          }
+        }
+
+        // 7. Validate and prepare modified items
+        final now = DateTime.now();
+        final survivingExistingIds = existingItemsMap.keys
+            .toSet()
+            .difference(input.deletedItemIds.toSet());
+
+        final updatedItemsMap = <String, ({
+          app_db.OrderItemsCompanion item,
+          app_db.OrderItemCarpetsCompanion? carpet,
+          Money total,
+        })>{};
+
+        for (final mod in input.modifiedItems) {
+          if (!survivingExistingIds.contains(mod.id)) {
+            throw ValidationFailure(
+              'Modified item not found or deleted: ${mod.id}',
+            );
+          }
+          final existing = existingItemsMap[mod.id]!;
+          final existingItem = existing.item;
+
+          // item_type_id is immutable for existing items
+          final itemTypeId = existingItem.itemTypeId;
+          final itemTypeNameSnapshot = existingItem.itemTypeNameSnapshot;
+
+          // Validate service
+          final serviceRow = await (_db.select(_db.services)
+                ..where((t) => t.id.equals(mod.serviceId)))
+              .getSingleOrNull();
+          if (serviceRow == null) {
+            throw const ValidationFailure('Service not found');
+          }
+          if (!serviceRow.isActive) {
+            throw const BusinessRuleFailure('Service is inactive');
+          }
+
+          // Verify service compatibility with itemTypeId via service_item_types
+          final isServiceCompatible = await (_db.select(_db.serviceItemTypes)
+                ..where(
+                  (t) =>
+                      t.serviceId.equals(mod.serviceId) &
+                      t.itemTypeId.equals(itemTypeId),
+                ))
+              .getSingleOrNull();
+          if (isServiceCompatible == null) {
+            throw IncompatibleServiceFailure(
+              serviceId: mod.serviceId,
+              itemTypeId: itemTypeId,
+            );
+          }
+
+          // Validate item definition if provided
+          String? itemDefNameSnapshot =
+              existingItem.itemDefinitionNameSnapshot;
+          if (mod.itemDefinitionId != null) {
+            final defRow = await (_db.select(_db.itemDefinitions)
+                  ..where((t) => t.id.equals(mod.itemDefinitionId!)))
+                .getSingleOrNull();
+            if (defRow == null) {
+              throw const ValidationFailure('Item definition not found');
+            }
+            if (defRow.itemTypeId != itemTypeId) {
+              throw const BusinessRuleFailure(
+                'Item definition does not belong to the selected item type',
+              );
+            }
+            itemDefNameSnapshot = defRow.name;
+          } else {
+            itemDefNameSnapshot = null;
+          }
+
+          final unitPrice =
+              mod.customUnitPrice ?? Money.fromPiastres(serviceRow.price);
+          if (unitPrice <= Money.zero) {
+            throw const ValidationFailure(
+              'Unit price must be strictly greater than zero',
+            );
+          }
+
+          final pricingType = PricingType.fromValue(serviceRow.pricingType);
+          Money calculatedTotal;
+          app_db.OrderItemCarpetsCompanion? carpetCompanion;
+
+          if (pricingType == PricingType.perSquareMeter) {
+            if (mod.carpetData == null) {
+              throw const ValidationFailure(
+                'Carpet data is required for per-square-meter services',
+              );
+            }
+            if (mod.carpetData!.length <= 0 || mod.carpetData!.width <= 0) {
+              throw const ValidationFailure(
+                'Carpet dimensions must be greater than zero',
+              );
+            }
+            final area = mod.carpetData!.length * mod.carpetData!.width;
+            calculatedTotal = Money.fromPiastres(
+              (unitPrice.piastres * area).round(),
+            );
+
+            final existingCarpet = existing.carpet;
+            final carpetId = existingCarpet?.id ?? const Uuid().v4();
+            carpetCompanion = app_db.OrderItemCarpetsCompanion(
+              id: Value(carpetId),
+              orderItemId: Value(mod.id),
+              carpetSizeId: Value(mod.carpetData!.carpetSizeId),
+              length: Value(mod.carpetData!.length),
+              width: Value(mod.carpetData!.width),
+              area: Value(area),
+              createdAt: Value(existingCarpet?.createdAt ?? now),
+              updatedAt: Value(now),
+            );
+          } else {
+            if (mod.carpetData != null) {
+              throw const ValidationFailure(
+                'Carpet data is not allowed for non-carpet pricing types',
+              );
+            }
+            calculatedTotal = unitPrice;
+          }
+
+          updatedItemsMap[mod.id] = (
+            item: app_db.OrderItemsCompanion(
+              id: Value(mod.id),
+              orderId: Value(input.orderId),
+              itemTypeId: Value(itemTypeId),
+              itemDefinitionId: Value(mod.itemDefinitionId),
+              serviceId: Value(mod.serviceId),
+              itemTypeNameSnapshot: Value(itemTypeNameSnapshot),
+              itemDefinitionNameSnapshot: Value(itemDefNameSnapshot),
+              serviceNameSnapshot: Value(serviceRow.name),
+              pricingType: Value(pricingType.value),
+              quantity: Value(
+                pricingType == PricingType.perSquareMeter
+                    ? (mod.carpetData!.length * mod.carpetData!.width)
+                    : 1.0,
+              ),
+              unitPrice: Value(unitPrice.piastres),
+              calculatedTotal: Value(calculatedTotal.piastres),
+              notes: Value(mod.notes),
+              updatedAt: Value(now),
+            ),
+            carpet: carpetCompanion,
+            total: calculatedTotal,
+          );
+        }
+
+        // 8. Validate and prepare brand new items
+        final newItemsList = <({
+          app_db.OrderItemsCompanion item,
+          app_db.OrderItemCarpetsCompanion? carpet,
+          Money total,
+        })>[];
+
+        for (final newItemInput in input.newItems) {
+          if (newItemInput.physicalQuantity <= 0) {
+            throw const ValidationFailure(
+              'Physical quantity must be greater than zero',
+            );
+          }
+
+          final itemType = await (_db.select(_db.itemTypes)
+                ..where((t) => t.id.equals(newItemInput.itemTypeId)))
+              .getSingleOrNull();
+          if (itemType == null) {
+            throw const ValidationFailure('Item type not found');
+          }
+          if (!itemType.isActive) {
+            throw const BusinessRuleFailure('Item type is inactive');
+          }
+
+          String? itemDefName;
+          if (newItemInput.itemDefinitionId != null) {
+            final def = await (_db.select(_db.itemDefinitions)
+                  ..where((t) => t.id.equals(newItemInput.itemDefinitionId!)))
+                .getSingleOrNull();
+            if (def == null) {
+              throw const ValidationFailure('Item definition not found');
+            }
+            if (def.itemTypeId != itemType.id) {
+              throw const BusinessRuleFailure(
+                'Item definition does not belong to the selected item type',
+              );
+            }
+            itemDefName = def.name;
+          }
+
+          final service = await (_db.select(_db.services)
+                ..where((t) => t.id.equals(newItemInput.serviceId)))
+              .getSingleOrNull();
+          if (service == null) {
+            throw const ValidationFailure('Service not found');
+          }
+          if (!service.isActive) {
+            throw const BusinessRuleFailure('Service is inactive');
+          }
+
+          final isComp = await (_db.select(_db.serviceItemTypes)
+                ..where(
+                  (t) =>
+                      t.serviceId.equals(service.id) &
+                      t.itemTypeId.equals(itemType.id),
+                ))
+              .getSingleOrNull();
+          if (isComp == null) {
+            throw IncompatibleServiceFailure(
+              serviceId: service.id,
+              itemTypeId: itemType.id,
+            );
+          }
+
+          final unitPrice =
+              newItemInput.customUnitPrice ??
+              Money.fromPiastres(service.price);
+          if (unitPrice <= Money.zero) {
+            throw const ValidationFailure(
+              'Unit price must be strictly greater than zero',
+            );
+          }
+
+          final pricingType = PricingType.fromValue(service.pricingType);
+
+          if (pricingType == PricingType.perSquareMeter) {
+            if (newItemInput.carpetData == null) {
+              throw const ValidationFailure(
+                'Carpet data is required for per-square-meter services',
+              );
+            }
+            if (newItemInput.carpetData!.length <= 0 ||
+                newItemInput.carpetData!.width <= 0) {
+              throw const ValidationFailure(
+                'Carpet dimensions must be greater than zero',
+              );
+            }
+            final area =
+                newItemInput.carpetData!.length * newItemInput.carpetData!.width;
+            final calcTotal = Money.fromPiastres(
+              (unitPrice.piastres * area).round(),
+            );
+
+            for (var i = 0; i < newItemInput.physicalQuantity; i++) {
+              final itemId = const Uuid().v4();
+              final carpetId = const Uuid().v4();
+              newItemsList.add((
+                item: app_db.OrderItemsCompanion(
+                  id: Value(itemId),
+                  orderId: Value(input.orderId),
+                  itemTypeId: Value(itemType.id),
+                  itemDefinitionId: Value(newItemInput.itemDefinitionId),
+                  serviceId: Value(service.id),
+                  itemTypeNameSnapshot: Value(itemType.name),
+                  itemDefinitionNameSnapshot: Value(itemDefName),
+                  serviceNameSnapshot: Value(service.name),
+                  pricingType: Value(pricingType.value),
+                  quantity: Value(area),
+                  unitPrice: Value(unitPrice.piastres),
+                  calculatedTotal: Value(calcTotal.piastres),
+                  notes: Value(newItemInput.notes),
+                  createdAt: Value(now),
+                  updatedAt: Value(now),
+                ),
+                carpet: app_db.OrderItemCarpetsCompanion(
+                  id: Value(carpetId),
+                  orderItemId: Value(itemId),
+                  carpetSizeId: Value(newItemInput.carpetData!.carpetSizeId),
+                  length: Value(newItemInput.carpetData!.length),
+                  width: Value(newItemInput.carpetData!.width),
+                  area: Value(area),
+                  createdAt: Value(now),
+                  updatedAt: Value(now),
+                ),
+                total: calcTotal,
+              ));
+            }
+          } else {
+            if (newItemInput.carpetData != null) {
+              throw const ValidationFailure(
+                'Carpet data is not allowed for non-carpet pricing types',
+              );
+            }
+            final calcTotal = unitPrice;
+            for (var i = 0; i < newItemInput.physicalQuantity; i++) {
+              final itemId = const Uuid().v4();
+              newItemsList.add((
+                item: app_db.OrderItemsCompanion(
+                  id: Value(itemId),
+                  orderId: Value(input.orderId),
+                  itemTypeId: Value(itemType.id),
+                  itemDefinitionId: Value(newItemInput.itemDefinitionId),
+                  serviceId: Value(service.id),
+                  itemTypeNameSnapshot: Value(itemType.name),
+                  itemDefinitionNameSnapshot: Value(itemDefName),
+                  serviceNameSnapshot: Value(service.name),
+                  pricingType: Value(pricingType.value),
+                  quantity: const Value(1.0),
+                  unitPrice: Value(unitPrice.piastres),
+                  calculatedTotal: Value(calcTotal.piastres),
+                  notes: Value(newItemInput.notes),
+                  createdAt: Value(now),
+                  updatedAt: Value(now),
+                ),
+                carpet: null,
+                total: calcTotal,
+              ));
+            }
+          }
+        }
+
+        // 9. Total items count validation
+        final totalItemCount =
+            survivingExistingIds.length + newItemsList.length;
+        if (totalItemCount == 0) {
+          throw const ValidationFailure('Order must contain at least one item');
+        }
+
+        // 10. Financial calculations
+        var subtotal = Money.zero;
+        for (final id in survivingExistingIds) {
+          if (updatedItemsMap.containsKey(id)) {
+            subtotal += updatedItemsMap[id]!.total;
+          } else {
+            subtotal += Money.fromPiastres(
+              existingItemsMap[id]!.item.calculatedTotal,
+            );
+          }
+        }
+        for (final n in newItemsList) {
+          subtotal += n.total;
+        }
+
+        if (input.discount.isNegative) {
+          throw const ValidationFailure('Discount cannot be negative');
+        }
+        if (input.discount > subtotal) {
+          throw const BusinessRuleFailure('Discount cannot exceed subtotal');
+        }
+
+        final tax = Money.fromPiastres(existingRow.tax); // 0 in V1
+        final pickupFee = input.customerPickupRequested
+            ? input.customerPickupFee
+            : Money.zero;
+        final deliveryFee = input.customerDeliveryRequested
+            ? input.customerDeliveryFee
+            : Money.zero;
+        final total = subtotal - input.discount + pickupFee + deliveryFee + tax;
+
+        if (total < totalPaid) {
+          throw const BusinessRuleFailure(
+            'Order total cannot be less than total paid amount',
+          );
+        }
+
+        // 11. Execute DB mutations
+        // 11a. Delete removed items and their carpets
+        for (final deletedId in input.deletedItemIds) {
+          await (_db.delete(_db.orderItemCarpets)
+                ..where((t) => t.orderItemId.equals(deletedId)))
+              .go();
+          await (_db.delete(_db.orderItems)
+                ..where((t) => t.id.equals(deletedId)))
+              .go();
+        }
+
+        // 11b. Update modified items
+        for (final modEntry in updatedItemsMap.values) {
+          await (_db.update(_db.orderItems)
+                ..where((t) => t.id.equals(modEntry.item.id.value)))
+              .write(modEntry.item);
+
+          if (modEntry.carpet != null) {
+            await _db
+                .into(_db.orderItemCarpets)
+                .insertOnConflictUpdate(modEntry.carpet!);
+          } else {
+            await (_db.delete(_db.orderItemCarpets)
+                  ..where((t) => t.orderItemId.equals(modEntry.item.id.value)))
+                .go();
+          }
+        }
+
+        // 11c. Insert new items
+        for (final newItem in newItemsList) {
+          await _db.into(_db.orderItems).insert(newItem.item);
+          if (newItem.carpet != null) {
+            await _db.into(_db.orderItemCarpets).insert(newItem.carpet!);
+          }
+        }
+
+        // 12. Evaluate readiness invariant:
+        // activeStoredCount == totalItemCount && totalItemCount > 0 -> ready else processing
+        final storedActiveJoin = _db.select(_db.orderItems).join([
+          innerJoin(
+            _db.storageRecords,
+            _db.storageRecords.orderItemId.equalsExp(_db.orderItems.id) &
+                _db.storageRecords.isActive.equals(true),
+          ),
+        ])..where(_db.orderItems.orderId.equals(input.orderId));
+
+        final activeStoredRows = await storedActiveJoin.get();
+        final activeStoredCount = activeStoredRows.length;
+
+        final newStatus =
+            (totalItemCount > 0 && activeStoredCount == totalItemCount)
+                ? OrderStatus.ready
+                : OrderStatus.processing;
+
+        // 13. Update orders header
+        await (_db.update(_db.orders)
+              ..where((t) => t.id.equals(input.orderId)))
+            .write(
+              app_db.OrdersCompanion(
+                customerId: Value(customerId),
+                customerNameSnapshot: Value(customerNameSnapshot),
+                customerPhoneSnapshot: Value(customerPhoneSnapshot),
+                status: Value(newStatus.name),
+                expectedPickupDate: Value(
+                  input.expectedPickupDate.toDateTime(),
+                ),
+                notes: Value(input.notes),
+                customerPickupRequested: Value(input.customerPickupRequested),
+                customerPickupFee: Value(pickupFee.piastres),
+                customerDeliveryRequested: Value(
+                  input.customerDeliveryRequested,
+                ),
+                customerDeliveryFee: Value(deliveryFee.piastres),
+                subtotal: Value(subtotal.piastres),
+                discount: Value(input.discount.piastres),
+                total: Value(total.piastres),
+                updatedAt: Value(now),
+              ),
+            );
+
+        // 14. Outbox Enqueueing
+        final updatedOrderRow =
+            (await _ordersDao.getOrderById(input.orderId))!;
+        final committedOrder = _mapOrderToDomain(updatedOrderRow);
+        final currentOrderItems = await getOrderItems(input.orderId);
+
+        final editPayload = SyncPayloadBuilder.buildOrderEditPayload(
+          committedOrder,
+          currentOrderItems,
+        );
+
+        await _syncOperationsDao.recordOperation(
+          entityType: 'order',
+          entityId: input.orderId,
+          operationType: 'edit',
+          payload: editPayload,
+        );
+
+        return committedOrder;
+      });
     } catch (e) {
       if (e is Failure) rethrow;
       throw DatabaseFailure(e.toString());
@@ -765,6 +1333,7 @@ class OrderRepositoryImpl implements OrderRepository {
         cancelledOrders: res.cancelledOrders,
         totalPaid: Money.fromPiastres(res.totalPaidPiastres),
         totalRemaining: Money.fromPiastres(res.totalRemainingPiastres),
+        totalRefunds: Money.fromPiastres(res.totalRefundsPiastres),
       );
     } catch (e) {
       if (e is Failure) rethrow;

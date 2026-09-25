@@ -1039,9 +1039,18 @@ Do not use auto-increment integers as business entity IDs.
 
 ## 54. Order Number Architecture
 
-The approved Order Number format is:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length:
 
-YY-XXX
+- YY = 2-digit year prefix.
+- Suffix is numeric only with a minimum width of 3 digits (zero-padded below 1000).
+- Suffix has no maximum length (e.g. 26-001, 26-999, 26-1000, 26-10000).
+- Non-numeric or alphanumeric values (e.g. 26-T123) are not valid business order numbers.
+
+Examples:
+
+    26-001
+    26-999
+    26-1000
 
 This must remain separate from the internal UUID.
 
@@ -1798,7 +1807,7 @@ Do not create architecture for:
 - Drivers
 - Vehicles
 - Delivery Routes
-- Refunds
+- Automated payment gateway refunds and line-item refunds
 - Loyalty
 - Storage Capacity
 - Storage Movement History
@@ -1823,7 +1832,7 @@ Possible future additions include:
 - Advanced conflict resolution
 - Multi-branch support
 - Delivery management
-- Refund workflows
+- Advanced refund workflows (line-item refunds, store credit, gateway reconciliation)
 - Barcode support
 - Advanced reporting
 - AI capabilities

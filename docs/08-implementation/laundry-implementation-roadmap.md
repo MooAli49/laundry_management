@@ -355,7 +355,7 @@ Do not introduce features such as:
 - Roles/Permissions
 - Loyalty
 - Advanced notifications
-- Refund workflow
+- Automated payment gateway refunds and item-level refunds
 - Advanced warehouse management
 - Storage movement history
 - Storage capacity management

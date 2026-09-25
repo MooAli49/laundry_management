@@ -12,6 +12,7 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/loading_indicator.dart';
+import '../../../../domain/enums/payment_method.dart';
 import '../../../../domain/enums/pricing_type.dart';
 import '../../../../domain/value_objects/money.dart';
 import '../../../../domain/value_objects/order_date.dart';
@@ -49,6 +50,7 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
   final TextEditingController _notesController = TextEditingController();
   final TextEditingController _pickupFeeController = TextEditingController();
   final TextEditingController _deliveryFeeController = TextEditingController();
+  final TextEditingController _initialPaymentController = TextEditingController();
 
   @override
   void dispose() {
@@ -56,6 +58,7 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
     _notesController.dispose();
     _pickupFeeController.dispose();
     _deliveryFeeController.dispose();
+    _initialPaymentController.dispose();
     super.dispose();
   }
 
@@ -152,7 +155,8 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
         listenWhen: (prev, curr) =>
             prev.createdOrder != curr.createdOrder ||
             (curr.errorMessage != null &&
-                prev.errorMessage != curr.errorMessage),
+                prev.errorMessage != curr.errorMessage) ||
+            prev.initialPaymentAmount != curr.initialPaymentAmount,
         listener: (context, state) {
           if (state.createdOrder != null) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -169,6 +173,18 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                 backgroundColor: AppColors.error,
               ),
             );
+          }
+
+          if (state.isInitialPaymentEnabled) {
+            final currentParsed =
+                double.tryParse(_initialPaymentController.text) ?? 0.0;
+            if ((currentParsed - state.initialPaymentAmount.toEgp).abs() >
+                0.001) {
+              _initialPaymentController.text =
+                  state.initialPaymentAmount.isPositive
+                      ? state.initialPaymentAmount.toEgp.toStringAsFixed(2)
+                      : '';
+            }
           }
         },
         builder: (context, state) {
@@ -726,14 +742,20 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                         ),
                         AppSpacing.gapHorizontalLg,
 
-                        // Left Column (Sticky Order Summary Card)
+                        // Left Column (Advance Payment & Sticky Order Summary Card)
                         Expanded(
                           flex: 3,
                           child: SingleChildScrollView(
-                            child: OrderSummaryCard(
-                              state: state,
-                              onSubmit: cubit.submitOrder,
-                              onCancel: () => context.go(AppRoutes.orders),
+                            child: Column(
+                              children: [
+                                _buildAdvancePaymentCard(context, state, cubit),
+                                AppSpacing.gapLg,
+                                OrderSummaryCard(
+                                  state: state,
+                                  onSubmit: cubit.submitOrder,
+                                  onCancel: () => context.go(AppRoutes.orders),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -745,6 +767,380 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildAdvancePaymentCard(
+    BuildContext context,
+    CreateOrderState state,
+    CreateOrderCubit cubit,
+  ) {
+    final isEnabled = state.isInitialPaymentEnabled;
+    final isFullyPaid =
+        isEnabled && state.remainingAmount == Money.zero;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        color: isEnabled
+            ? (isFullyPaid
+                ? AppColors.successLight
+                : AppColors.primaryLighter.withValues(alpha: 0.5))
+            : AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+        border: Border.all(
+          color: isEnabled
+              ? (isFullyPaid ? AppColors.success : AppColors.primary)
+              : AppColors.border,
+          width: isEnabled ? 1.5 : 1.0,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ─── Header row ────────────────────────────────────────
+              Row(
+                children: [
+                  Icon(
+                    isFullyPaid
+                        ? Icons.check_circle_outline
+                        : Icons.payments_outlined,
+                    size: 18,
+                    color: isEnabled
+                        ? (isFullyPaid
+                            ? AppColors.success
+                            : AppColors.primary)
+                        : AppColors.textTertiary,
+                  ),
+                  AppSpacing.gapHorizontalSm,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'تسجيل دفعة مقدمة',
+                          style: AppTextStyles.labelLarge.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: isEnabled
+                                ? AppColors.textPrimary
+                                : AppColors.textSecondary,
+                          ),
+                        ),
+                        Text(
+                          isEnabled
+                              ? (isFullyPaid
+                                  ? 'مدفوع بالكامل ✓'
+                                  : 'أدخل المبلغ المُقدَّم أدناه')
+                              : 'اختياري — اضغط للتفعيل',
+                          style: AppTextStyles.caption.copyWith(
+                            color: isEnabled
+                                ? (isFullyPaid
+                                    ? AppColors.success
+                                    : AppColors.primary)
+                                : AppColors.textTertiary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch.adaptive(
+                    key: const ValueKey('advance_payment_switch'),
+                    value: state.isInitialPaymentEnabled,
+                    activeThumbColor: AppColors.primary,
+                    inactiveThumbColor: AppColors.textTertiary,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onChanged: (enabled) {
+                      cubit.toggleInitialPayment(enabled);
+                      if (!enabled) {
+                        _initialPaymentController.clear();
+                      } else {
+                        _initialPaymentController.text =
+                            state.initialPaymentAmount.isPositive
+                                ? state.initialPaymentAmount.toEgp
+                                    .toStringAsFixed(2)
+                                : '';
+                      }
+                    },
+                  ),
+                ],
+              ),
+
+              // ─── Expanded body (only when enabled) ─────────────────
+              AnimatedSize(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                child: isEnabled
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Divider(
+                            height: AppSpacing.lg,
+                            color: AppColors.divider,
+                          ),
+
+                          // Amount field
+                          AppTextField(
+                            key: const ValueKey(
+                              'advance_payment_amount_field',
+                            ),
+                            controller: _initialPaymentController,
+                            label: 'مبلغ الدفعة (ج.م)',
+                            hintText: '0.00',
+                            keyboardType:
+                                const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            onChanged: (val) {
+                              final amount =
+                                  double.tryParse(val) ?? 0.0;
+                              cubit.updateInitialPaymentAmount(
+                                Money.fromEgp(amount),
+                              );
+                            },
+                          ),
+                          AppSpacing.gapSm,
+
+                          // Full-amount shortcut button
+                          _buildFullAmountButton(state, cubit),
+                          AppSpacing.gapMd,
+
+                          // Payment method chips
+                          Text(
+                            'طريقة الدفع',
+                            style: AppTextStyles.caption.copyWith(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          AppSpacing.gapXs,
+                          _buildPaymentMethodRow(state, cubit),
+                          AppSpacing.gapSm,
+
+                          // Remaining amount banner
+                          _buildRemainingAmountBanner(state),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFullAmountButton(
+    CreateOrderState state,
+    CreateOrderCubit cubit,
+  ) {
+    final isActive =
+        state.total.isPositive && state.initialPaymentAmount == state.total;
+    final canPress = state.total.isPositive;
+    final activeColor = isActive ? AppColors.primaryDark : AppColors.primary;
+    final inactiveColor = AppColors.textDisabled;
+    final labelColor = canPress ? activeColor : inactiveColor;
+
+    return SizedBox(
+      height: 34,
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        key: const ValueKey('advance_payment_full_amount_button'),
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(
+            color: canPress
+                ? (isActive ? AppColors.primary : AppColors.borderStrong)
+                : AppColors.border,
+            width: 1.0,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+          backgroundColor: isActive ? AppColors.primaryLighter : AppColors.surface,
+        ),
+        onPressed: canPress
+            ? () {
+                cubit.setFullInitialPayment();
+                _initialPaymentController.text =
+                    state.total.toEgp.toStringAsFixed(2);
+              }
+            : null,
+        icon: Icon(
+          isActive ? Icons.check_circle : Icons.check_circle_outline,
+          size: 15,
+          color: labelColor,
+        ),
+        label: Text(
+          canPress
+              ? 'دفع الإجمالي (${state.total.toEgp.toStringAsFixed(2)} ج.م)'
+              : 'دفع المبلغ بالكامل',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTextStyles.labelMedium.copyWith(
+            color: labelColor,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentMethodRow(
+    CreateOrderState state,
+    CreateOrderCubit cubit,
+  ) {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildPaymentMethodChip(
+            key: const ValueKey('advance_payment_method_cash'),
+            label: 'كاش',
+            icon: Icons.payments_outlined,
+            isSelected: state.initialPaymentMethod == PaymentMethod.cash,
+            onTap: () => cubit.updateInitialPaymentMethod(PaymentMethod.cash),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: _buildPaymentMethodChip(
+            key: const ValueKey('advance_payment_method_instapay'),
+            label: 'إنستا باي',
+            icon: Icons.bolt_outlined,
+            isSelected:
+                state.initialPaymentMethod == PaymentMethod.instapay,
+            onTap: () =>
+                cubit.updateInitialPaymentMethod(PaymentMethod.instapay),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: _buildPaymentMethodChip(
+            key: const ValueKey('advance_payment_method_wallet'),
+            label: 'محفظة',
+            icon: Icons.account_balance_wallet_outlined,
+            isSelected:
+                state.initialPaymentMethod == PaymentMethod.ewallet,
+            onTap: () =>
+                cubit.updateInitialPaymentMethod(PaymentMethod.ewallet),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaymentMethodChip({
+    required Key key,
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      key: key,
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        height: 36,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xs,
+          vertical: AppSpacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.surfaceSelected : AppColors.surface,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.border,
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isSelected
+                  ? AppColors.primaryDark
+                  : AppColors.textSecondary,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.labelSmall.copyWith(
+                  fontWeight:
+                      isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected
+                      ? AppColors.primaryDark
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRemainingAmountBanner(CreateOrderState state) {
+    final isFullyPaid = state.remainingAmount == Money.zero;
+    final bannerColor = isFullyPaid ? AppColors.successDark : AppColors.warningDark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: isFullyPaid ? AppColors.successLight : AppColors.warningLight,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        border: Border.all(
+          color: isFullyPaid
+              ? AppColors.success.withValues(alpha: 0.35)
+              : AppColors.warning.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isFullyPaid ? Icons.check_circle_outline : Icons.info_outline,
+            size: 14,
+            color: isFullyPaid ? AppColors.success : AppColors.warning,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Flexible(
+            child: Text(
+              'المتبقي:',
+              style: AppTextStyles.caption.copyWith(
+                fontWeight: FontWeight.w600,
+                color: bannerColor,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            isFullyPaid
+                ? 'مدفوع بالكامل'
+                : '${state.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
+            style: AppTextStyles.labelMedium.copyWith(
+              fontWeight: FontWeight.bold,
+              color: bannerColor,
+            ),
+          ),
+        ],
       ),
     );
   }

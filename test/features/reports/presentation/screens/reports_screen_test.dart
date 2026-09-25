@@ -7,6 +7,7 @@ import 'package:laundry_management/data/local/daos/customers_dao.dart';
 import 'package:laundry_management/data/local/daos/expense_categories_dao.dart';
 import 'package:laundry_management/data/local/daos/orders_dao.dart';
 import 'package:laundry_management/data/local/daos/payments_dao.dart';
+import 'package:laundry_management/data/local/daos/refunds_dao.dart';
 import 'package:laundry_management/data/local/database/app_database.dart'
     hide Expense, ExpenseCategory;
 import 'package:laundry_management/domain/entities/expense.dart';
@@ -147,14 +148,18 @@ void main() {
         expect(find.text('500.00 ج.م'), findsWidgets); // Sales
         expect(find.text('إجمالي المدفوعات'), findsOneWidget);
         expect(find.text('300.00 ج.م'), findsWidgets); // Payments
-        expect(find.text('إجمالي المصروفات'), findsOneWidget);
+        expect(find.text('إجمالي الاستردادات'), findsOneWidget);
+        expect(find.text('0.00 ج.م'), findsWidgets); // Refunds
+        expect(find.text('صافي المدفوعات'), findsNWidgets(2)); // Primary metric card + Payment movement block
+        expect(find.text('300.00 ج.م'), findsWidgets); // Net Payments: 300 - 0 = 300
+        expect(find.text('المصروفات التشغيلية'), findsOneWidget);
         expect(find.text('100.00 ج.م'), findsWidgets); // Expenses
         expect(find.text('صافي الربح'), findsOneWidget);
         expect(
           find.text('400.00 ج.م'),
           findsOneWidget,
         ); // Net profit: 500 - 100 = 400
-        expect(find.text('المبالغ المتبقية'), findsOneWidget);
+        expect(find.text('المبالغ المستحقة'), findsOneWidget);
         expect(
           find.text('200.00 ج.م'),
           findsWidgets,
@@ -170,11 +175,117 @@ void main() {
 
         // Check Outstanding orders section
         expect(find.text('طلبات عليها مبالغ متبقية'), findsOneWidget);
-        expect(find.text('26-999'), findsOneWidget);
+        expect(find.text('#26-999'), findsOneWidget);
 
         // Check Expense transactions table
         expect(find.text('سجل المصروفات'), findsOneWidget);
         expect(find.text('صابون'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'Financial Report correctly reflects cancelled orders and refunds in UI cards',
+      (tester) async {
+        final now = DateTime.now();
+
+        final customersDao = getIt<CustomersDao>();
+        await customersDao.insertCustomer(
+          CustomersCompanion.insert(
+            id: 'cust-canc-rep',
+            name: 'عميل إلغاء',
+            phone: '01000000002',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+        // Active Order: 200 EGP, 100 paid
+        final ordersDao = getIt<OrdersDao>();
+        await ordersDao.insertOrder(
+          OrdersCompanion.insert(
+            id: 'ord-active-1',
+            orderNumber: '26-101',
+            customerId: 'cust-canc-rep',
+            status: const Value('processing'),
+            expectedPickupDate: now.add(const Duration(days: 1)),
+            subtotal: 20000,
+            total: 20000, // 200 EGP
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+        final paymentsDao = getIt<PaymentsDao>();
+        await paymentsDao.insertPayment(
+          PaymentsCompanion.insert(
+            id: 'pay-active-1',
+            orderId: 'ord-active-1',
+            amount: 10000, // 100 EGP
+            paymentMethod: PaymentMethod.cash.value,
+            paidAt: now,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+        // Cancelled Order: 115 EGP, 35 paid, 35 refunded
+        await ordersDao.insertOrder(
+          OrdersCompanion.insert(
+            id: 'ord-canc-1',
+            orderNumber: '26-102',
+            customerId: 'cust-canc-rep',
+            status: const Value('cancelled'),
+            expectedPickupDate: now.add(const Duration(days: 1)),
+            subtotal: 11500,
+            total: 11500, // 115 EGP
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+        await paymentsDao.insertPayment(
+          PaymentsCompanion.insert(
+            id: 'pay-canc-1',
+            orderId: 'ord-canc-1',
+            amount: 3500, // 35 EGP
+            paymentMethod: PaymentMethod.cash.value,
+            paidAt: now,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+        final refundsDao = getIt<RefundsDao>();
+        await refundsDao.insertRefund(
+          RefundsCompanion.insert(
+            id: 'ref-rep-1',
+            orderId: 'ord-canc-1',
+            amount: 3500, // 35 EGP
+            refundMethod: 'cash',
+            refundedAt: now,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+        await tester.pumpWidget(buildTestableWidget(const ReportsScreen()));
+        await tester.pumpAndSettle();
+
+        // Switch to Financial tab
+        await tester.tap(find.text('التقرير المالي'));
+        await tester.pumpAndSettle();
+
+        // Total Sales = 200.00 EGP (Order 26-102 cancelled contributes 0)
+        expect(find.text('200.00 ج.م'), findsWidgets);
+
+        // Total Payments = 100 + 35 = 135.00 EGP
+        expect(find.text('135.00 ج.م'), findsWidgets);
+
+        // Total Refunds = 35.00 EGP
+        expect(find.text('35.00 ج.م'), findsWidgets);
+
+        // Net Payments = 135 - 35 = 100.00 EGP
+        expect(find.text('100.00 ج.م'), findsWidgets);
       },
     );
 

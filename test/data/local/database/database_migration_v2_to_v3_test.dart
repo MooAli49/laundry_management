@@ -37,6 +37,29 @@ void main() {
           // Force table creation and initial seed by running a query
           await initialDb.select(initialDb.businessSettings).get();
 
+          // Drop tables introduced in later migrations (v4 sync_states, v5 refunds)
+          await initialDb.customStatement('DROP TABLE IF EXISTS refunds;');
+          await initialDb.customStatement('DROP TABLE IF EXISTS sync_state;');
+
+          // Recreate customers table without address to strictly reflect schema v2
+          await initialDb.customStatement('DROP TABLE IF EXISTS customers;');
+          await initialDb.customStatement('''
+            CREATE TABLE customers (
+              id TEXT NOT NULL PRIMARY KEY,
+              name TEXT NOT NULL,
+              phone TEXT NOT NULL,
+              notes TEXT,
+              created_at INTEGER NOT NULL,
+              updated_at INTEGER NOT NULL
+            );
+          ''');
+          await initialDb.customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);',
+          );
+          await initialDb.customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);',
+          );
+
           // Recreate sync_operations table without next_retry_at to strictly reflect schema v2
           await initialDb.customStatement(
             'DROP INDEX IF EXISTS idx_sync_operations_status_next_retry;',
@@ -182,12 +205,20 @@ void main() {
             equals('idx_sync_operations_status_next_retry'),
           );
 
-          // Verify schema version is now 4 (migrated through v3 and v4)
+          // Verify schema version is now 6 (migrated through v3, v4, v5, and v6)
           final versionRow = await migratedDb
               .customSelect('PRAGMA user_version;')
               .getSingle();
-          expect(versionRow.read<int>('user_version'), equals(4));
-          expect(migratedDb.schemaVersion, equals(4));
+          expect(versionRow.read<int>('user_version'), equals(6));
+          expect(migratedDb.schemaVersion, equals(6));
+
+          // Verify customer table has address column added in v6
+          final customerCols = await migratedDb
+              .customSelect("PRAGMA table_info('customers');")
+              .get();
+          final customerColNames =
+              customerCols.map((r) => r.read<String>('name')).toSet();
+          expect(customerColNames, contains('address'));
 
           // 8. Verify inserting a record with nextRetryAt works on migrated schema
           final retryTime = DateTime.now().add(const Duration(minutes: 5));

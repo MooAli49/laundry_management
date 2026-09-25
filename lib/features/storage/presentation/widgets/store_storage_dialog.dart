@@ -173,13 +173,36 @@ class _StoreStorageDialogState extends State<StoreStorageDialog> {
                   color: AppColors.secondary,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                 ),
-                child: Text(
-                  summaryText,
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
+                child: isBulk || single == null
+                    ? Text(
+                        summaryText,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'العنصر: ${single.orderItem.itemTypeNameSnapshot}${single.orderItem.itemDefinitionNameSnapshot != null && single.orderItem.itemDefinitionNameSnapshot!.isNotEmpty ? " - ${single.orderItem.itemDefinitionNameSnapshot}" : ""}${single.orderItem.carpetData != null ? " (${single.orderItem.carpetData!.length.truncateToDouble() == single.orderItem.carpetData!.length ? single.orderItem.carpetData!.length.toStringAsFixed(1) : single.orderItem.carpetData!.length.toStringAsFixed(2)} × ${single.orderItem.carpetData!.width.truncateToDouble() == single.orderItem.carpetData!.width ? single.orderItem.carpetData!.width.toStringAsFixed(1) : single.orderItem.carpetData!.width.toStringAsFixed(2)} م = ${single.orderItem.carpetData!.area.truncateToDouble() == single.orderItem.carpetData!.area ? single.orderItem.carpetData!.area.toStringAsFixed(0) : single.orderItem.carpetData!.area.toStringAsFixed(2)} م²)" : ""} — ${single.orderItem.serviceNameSnapshot}',
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'الطلب: #${single.orderNumber} • العميل: ${single.customerName}',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
               ),
               AppSpacing.gapLg,
 

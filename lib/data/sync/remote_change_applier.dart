@@ -74,6 +74,9 @@ class RemoteChangeApplier {
       case 'payment':
         await _applyPayment(change);
         break;
+      case 'refund':
+        await _applyRefund(change);
+        break;
       case 'storage_record':
         await _applyStorageRecord(change);
         break;
@@ -119,6 +122,9 @@ class RemoteChangeApplier {
       id: Value(id),
       name: Value(payload['name'] as String? ?? ''),
       phone: Value(payload['phone'] as String? ?? ''),
+      address: payload.containsKey('address')
+          ? Value(payload['address'] as String?)
+          : const Value.absent(),
       notes: Value(payload['notes'] as String?),
       createdAt: Value(
         payload['created_at'] != null
@@ -217,13 +223,13 @@ class RemoteChangeApplier {
           itemDefinitionId: Value(rawItem['item_definition_id'] as String?),
           serviceId: Value(rawItem['service_id'] as String? ?? ''),
           itemTypeNameSnapshot: Value(
-            rawItem['item_type_name_snapshot'] as String? ?? '',
+            (rawItem['item_type_name_snapshot'] as String?)?.trim() ?? '',
           ),
           itemDefinitionNameSnapshot: Value(
             rawItem['item_definition_name_snapshot'] as String?,
           ),
           serviceNameSnapshot: Value(
-            rawItem['service_name_snapshot'] as String? ?? '',
+            (rawItem['service_name_snapshot'] as String?)?.trim() ?? '',
           ),
           pricingType: Value(rawItem['pricing_type'] as String? ?? 'per_piece'),
           quantity: Value((rawItem['quantity'] as num?)?.toDouble() ?? 1.0),
@@ -275,8 +281,17 @@ class RemoteChangeApplier {
               .insertOnConflictUpdate(carpetCompanion);
         }
       }
+    } else if (change.operationType == 'edit') {
+      await _applyOrderEdit(change);
     } else {
       // Subsequent Order updates (e.g. status transition, notes, cancellation)
+      // Read existing local order before applying updates to accurately capture previous status
+      final existingOrder = await (_db.select(_db.orders)
+            ..where((t) => t.id.equals(orderId)))
+          .getSingleOrNull();
+      final previousStatus = existingOrder?.status;
+      final incomingStatus = payload['status'] as String?;
+
       // Updates only the Order header row; does not modify items or carpets.
       final updates = app_db.OrdersCompanion(
         id: Value(orderId),
@@ -334,7 +349,303 @@ class RemoteChangeApplier {
 
       await (_db.update(_db.orders)..where((t) => t.id.equals(orderId)))
           .write(updates);
+
+      // Lifecycle Storage Reconciliation Rule:
+      // Deactivate active local storage records if:
+      // 1. Order transitioned to completed
+      // 2. Order transitioned to cancelled
+      // 3. Order corrected from ready back to processing
+      // For processing -> ready: active storage MUST be preserved.
+      final shouldDeactivateStorage = incomingStatus == 'completed' ||
+          incomingStatus == 'cancelled' ||
+          (previousStatus == 'ready' && incomingStatus == 'processing');
+
+      if (shouldDeactivateStorage) {
+        final orderItems = await (_db.select(_db.orderItems)
+              ..where((t) => t.orderId.equals(orderId)))
+            .get();
+        final itemIds = orderItems.map((e) => e.id).toList();
+
+        if (itemIds.isNotEmpty) {
+          final deactivationTime = payload['updated_at'] != null
+              ? DateTime.parse(payload['updated_at'] as String)
+              : change.createdAt;
+
+          await (_db.update(_db.storageRecords)
+                ..where(
+                  (t) =>
+                      t.orderItemId.isIn(itemIds) &
+                      t.isActive.equals(true),
+                ))
+              .write(
+                app_db.StorageRecordsCompanion(
+                  isActive: const Value(false),
+                  updatedAt: Value(deactivationTime),
+                ),
+              );
+        }
+      }
     }
+  }
+
+  /// Applies a remote 'edit' change to an order aggregate.
+  ///
+  /// Authoritative full aggregate reconciliation:
+  /// - Upserts the order header with remote authoritative values
+  /// - Reconciles items by ID:
+  ///   - Remotely deleted items: deactivates active local storage records,
+  ///     removes carpet metadata, and deletes the order item row
+  ///   - Surviving & new items: upserts item data and reconciles carpet metadata
+  /// - Executes atomically inside a single Drift transaction
+  /// - Never enqueues outbox operations
+  Future<void> _applyOrderEdit(SyncChangeDto change) async {
+    final payload = change.payload;
+    final orderId = payload['id'] as String? ?? change.entityId;
+
+    await _db.transaction(() async {
+      // 1. Reconcile Order Header
+      final existingOrder = await (_db.select(_db.orders)
+            ..where((t) => t.id.equals(orderId)))
+          .getSingleOrNull();
+
+      final orderCompanion = app_db.OrdersCompanion(
+        id: Value(orderId),
+        orderNumber: Value(
+          payload['order_number'] as String? ??
+              existingOrder?.orderNumber ??
+              '',
+        ),
+        customerId: Value(
+          payload['customer_id'] as String? ??
+              existingOrder?.customerId ??
+              '',
+        ),
+        customerNameSnapshot: Value(
+          payload['customer_name_snapshot'] as String? ??
+              existingOrder?.customerNameSnapshot ??
+              '',
+        ),
+        customerPhoneSnapshot: Value(
+          payload['customer_phone_snapshot'] as String? ??
+              existingOrder?.customerPhoneSnapshot ??
+              '',
+        ),
+        status: Value(
+          payload['status'] as String? ??
+              existingOrder?.status ??
+              'processing',
+        ),
+        expectedPickupDate: Value(
+          payload['expected_pickup_date'] != null
+              ? DateTime.parse(payload['expected_pickup_date'] as String)
+              : (existingOrder?.expectedPickupDate ?? DateTime.now()),
+        ),
+        notes: Value(
+          payload.containsKey('notes')
+              ? (payload['notes'] as String?)
+              : existingOrder?.notes,
+        ),
+        customerPickupRequested: Value(
+          payload['customer_pickup_requested'] as bool? ??
+              existingOrder?.customerPickupRequested ??
+              false,
+        ),
+        customerPickupFee: Value(
+          (payload['customer_pickup_fee'] as num?)?.toInt() ??
+              existingOrder?.customerPickupFee ??
+              0,
+        ),
+        customerDeliveryRequested: Value(
+          payload['customer_delivery_requested'] as bool? ??
+              existingOrder?.customerDeliveryRequested ??
+              false,
+        ),
+        customerDeliveryFee: Value(
+          (payload['customer_delivery_fee'] as num?)?.toInt() ??
+              existingOrder?.customerDeliveryFee ??
+              0,
+        ),
+        subtotal: Value(
+          (payload['subtotal'] as num?)?.toInt() ??
+              existingOrder?.subtotal ??
+              0,
+        ),
+        discount: Value(
+          (payload['discount'] as num?)?.toInt() ??
+              existingOrder?.discount ??
+              0,
+        ),
+        tax: Value(
+          (payload['tax'] as num?)?.toInt() ?? existingOrder?.tax ?? 0,
+        ),
+        total: Value(
+          (payload['total'] as num?)?.toInt() ?? existingOrder?.total ?? 0,
+        ),
+        completedAt: Value(
+          payload['completed_at'] != null
+              ? DateTime.parse(payload['completed_at'] as String)
+              : existingOrder?.completedAt,
+        ),
+        cancelledAt: Value(
+          payload['cancelled_at'] != null
+              ? DateTime.parse(payload['cancelled_at'] as String)
+              : existingOrder?.cancelledAt,
+        ),
+        cancellationReason: Value(
+          payload.containsKey('cancellation_reason')
+              ? (payload['cancellation_reason'] as String?)
+              : existingOrder?.cancellationReason,
+        ),
+        createdAt: Value(
+          payload['created_at'] != null
+              ? DateTime.parse(payload['created_at'] as String)
+              : (existingOrder?.createdAt ?? change.createdAt),
+        ),
+        updatedAt: Value(
+          payload['updated_at'] != null
+              ? DateTime.parse(payload['updated_at'] as String)
+              : change.createdAt,
+        ),
+      );
+
+      await _db.into(_db.orders).insertOnConflictUpdate(orderCompanion);
+
+      // 2. Reconcile Items & Carpet Metadata
+      final rawItems = payload['items'] as List<dynamic>? ?? [];
+      final incomingItemIds = <String>{};
+      for (final rawItem in rawItems) {
+        if (rawItem is Map<String, dynamic> && rawItem['id'] != null) {
+          incomingItemIds.add(rawItem['id'] as String);
+        }
+      }
+
+      // Existing local items
+      final localItems = await (_db.select(_db.orderItems)
+            ..where((t) => t.orderId.equals(orderId)))
+          .get();
+      final localItemIds = localItems.map((e) => e.id).toSet();
+
+      // Local items missing from incoming aggregate must be removed
+      final removedItemIds = localItemIds.difference(incomingItemIds);
+
+      for (final removedId in removedItemIds) {
+        // Deactivate active local storage records for removed items
+        await (_db.update(_db.storageRecords)
+              ..where(
+                (t) =>
+                    t.orderItemId.equals(removedId) &
+                    t.isActive.equals(true),
+              ))
+            .write(
+              app_db.StorageRecordsCompanion(
+                isActive: const Value(false),
+                updatedAt: Value(change.createdAt),
+              ),
+            );
+
+        // Delete carpet metadata
+        await (_db.delete(_db.orderItemCarpets)
+              ..where((t) => t.orderItemId.equals(removedId)))
+            .go();
+
+        // Delete storage records for this removed item so SQLite foreign key
+        // constraint (ON DELETE RESTRICT) allows deleting the item without affecting unrelated records
+        await (_db.delete(_db.storageRecords)
+              ..where((t) => t.orderItemId.equals(removedId)))
+            .go();
+
+        // Delete order item
+        await (_db.delete(_db.orderItems)
+              ..where((t) => t.id.equals(removedId)))
+            .go();
+      }
+
+      // Upsert surviving & new items
+      for (final rawItem in rawItems) {
+        if (rawItem is! Map<String, dynamic>) continue;
+        final itemId = rawItem['id'] as String;
+
+        final itemCompanion = app_db.OrderItemsCompanion(
+          id: Value(itemId),
+          orderId: Value(orderId),
+          itemTypeId: Value(rawItem['item_type_id'] as String? ?? ''),
+          itemDefinitionId: Value(rawItem['item_definition_id'] as String?),
+          serviceId: Value(rawItem['service_id'] as String? ?? ''),
+          itemTypeNameSnapshot: Value(
+            (rawItem['item_type_name_snapshot'] as String?)?.trim() ?? '',
+          ),
+          itemDefinitionNameSnapshot: Value(
+            rawItem['item_definition_name_snapshot'] as String?,
+          ),
+          serviceNameSnapshot: Value(
+            (rawItem['service_name_snapshot'] as String?)?.trim() ?? '',
+          ),
+          pricingType: Value(
+            rawItem['pricing_type'] as String? ?? 'per_piece',
+          ),
+          quantity: Value((rawItem['quantity'] as num?)?.toDouble() ?? 1.0),
+          unitPrice: Value((rawItem['unit_price'] as num?)?.toInt() ?? 0),
+          calculatedTotal: Value(
+            (rawItem['calculated_total'] as num?)?.toInt() ?? 0,
+          ),
+          notes: Value(rawItem['notes'] as String?),
+          createdAt: Value(
+            rawItem['created_at'] != null
+                ? DateTime.parse(rawItem['created_at'] as String)
+                : change.createdAt,
+          ),
+          updatedAt: Value(
+            rawItem['updated_at'] != null
+                ? DateTime.parse(rawItem['updated_at'] as String)
+                : change.createdAt,
+          ),
+        );
+
+        await _db.into(_db.orderItems).insertOnConflictUpdate(itemCompanion);
+
+        // Reconcile Carpet Metadata
+        final rawCarpet = rawItem['carpet_data'] ?? rawItem['carpet'];
+        if (rawCarpet is Map<String, dynamic>) {
+          final carpetId = rawCarpet['id'] as String;
+          final carpetCompanion = app_db.OrderItemCarpetsCompanion(
+            id: Value(carpetId),
+            orderItemId: Value(itemId),
+            carpetSizeId: Value(rawCarpet['carpet_size_id'] as String?),
+            length: Value((rawCarpet['length'] as num?)?.toDouble() ?? 0.0),
+            width: Value((rawCarpet['width'] as num?)?.toDouble() ?? 0.0),
+            area: Value((rawCarpet['area'] as num?)?.toDouble() ?? 0.0),
+            createdAt: Value(
+              rawCarpet['created_at'] != null
+                  ? DateTime.parse(rawCarpet['created_at'] as String)
+                  : change.createdAt,
+            ),
+            updatedAt: Value(
+              rawCarpet['updated_at'] != null
+                  ? DateTime.parse(rawCarpet['updated_at'] as String)
+                  : change.createdAt,
+            ),
+          );
+
+          await _db
+              .into(_db.orderItemCarpets)
+              .insertOnConflictUpdate(carpetCompanion);
+
+          // Clean up any obsolete carpet records for this item with different id
+          await (_db.delete(_db.orderItemCarpets)
+                ..where(
+                  (t) =>
+                      t.orderItemId.equals(itemId) &
+                      t.id.isNotValue(carpetId),
+                ))
+              .go();
+        } else {
+          // If item is no longer carpet, delete any carpet metadata for this item
+          await (_db.delete(_db.orderItemCarpets)
+                ..where((t) => t.orderItemId.equals(itemId)))
+              .go();
+        }
+      }
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -367,6 +678,39 @@ class RemoteChangeApplier {
     );
 
     await _db.into(_db.payments).insertOnConflictUpdate(companion);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Refund Ingestion (Append-only & Idempotent)
+  // ---------------------------------------------------------------------------
+  Future<void> _applyRefund(SyncChangeDto change) async {
+    final payload = change.payload;
+    final refundId = payload['id'] as String? ?? change.entityId;
+
+    final companion = app_db.RefundsCompanion(
+      id: Value(refundId),
+      orderId: Value(payload['order_id'] as String? ?? ''),
+      amount: Value((payload['amount'] as num?)?.toInt() ?? 0),
+      refundMethod: Value(payload['refund_method'] as String? ?? 'cash'),
+      reason: Value(payload['reason'] as String?),
+      refundedAt: Value(
+        payload['refunded_at'] != null
+            ? DateTime.parse(payload['refunded_at'] as String)
+            : change.createdAt,
+      ),
+      createdAt: Value(
+        payload['created_at'] != null
+            ? DateTime.parse(payload['created_at'] as String)
+            : change.createdAt,
+      ),
+      updatedAt: Value(
+        payload['updated_at'] != null
+            ? DateTime.parse(payload['updated_at'] as String)
+            : change.createdAt,
+      ),
+    );
+
+    await _db.into(_db.refunds).insertOnConflictUpdate(companion);
   }
 
   // ---------------------------------------------------------------------------

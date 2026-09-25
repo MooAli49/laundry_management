@@ -2,13 +2,19 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/data/sync/sync_payload_builder.dart';
+import 'package:laundry_management/domain/entities/customer.dart';
 import 'package:laundry_management/domain/entities/business_settings.dart';
+import 'package:laundry_management/domain/entities/carpet_item_data.dart';
 import 'package:laundry_management/domain/entities/carpet_size.dart';
 import 'package:laundry_management/domain/entities/expense.dart';
 import 'package:laundry_management/domain/entities/expense_category.dart';
 import 'package:laundry_management/domain/entities/item_definition.dart';
 import 'package:laundry_management/domain/entities/item_type.dart';
+import 'package:laundry_management/domain/entities/order.dart';
+import 'package:laundry_management/domain/entities/order_item.dart';
 import 'package:laundry_management/domain/entities/storage_location.dart';
+import 'package:laundry_management/domain/enums/order_status.dart';
+import 'package:laundry_management/domain/enums/pricing_type.dart';
 import 'package:laundry_management/domain/value_objects/money.dart';
 import 'package:laundry_management/domain/value_objects/order_date.dart';
 
@@ -299,6 +305,255 @@ void main() {
       expect(map['tax_rate'], 15.0);
       expect(map['created_at'], '2026-09-16T10:00:00.000Z');
       expect(map['updated_at'], '2026-09-16T12:00:00.000Z');
+    });
+  });
+
+  group('SyncPayloadBuilder — Order Edit Aggregate Serialization Tests (Phase 2)', () {
+    final testCreatedAt = DateTime.utc(2026, 9, 20, 10, 0, 0);
+    final testUpdatedAt = DateTime.utc(2026, 9, 23, 11, 30, 0);
+
+    test('buildOrderEditPayload produces complete aggregate matching specification contract', () {
+      final order = Order(
+        id: 'ord-edit-test-1',
+        orderNumber: '26-042',
+        customerId: 'cust-uuid-42',
+        customerNameSnapshot: 'محمد خالد',
+        customerPhoneSnapshot: '0509876543',
+        status: OrderStatus.processing,
+        expectedPickupDate: OrderDate(2026, 9, 30),
+        notes: 'مستعجل مع غسيل خاص',
+        customerPickupRequested: true,
+        customerPickupFee: const Money.fromPiastres(1500),
+        customerDeliveryRequested: true,
+        customerDeliveryFee: const Money.fromPiastres(2500),
+        subtotal: const Money.fromPiastres(10000),
+        discount: const Money.fromPiastres(1000),
+        tax: Money.zero,
+        total: const Money.fromPiastres(13000),
+        completedAt: null,
+        cancelledAt: null,
+        cancellationReason: null,
+        createdAt: testCreatedAt,
+        updatedAt: testUpdatedAt,
+      );
+
+      final standardItem = OrderItem(
+        id: 'oi-item-1',
+        orderId: 'ord-edit-test-1',
+        itemTypeId: 'it-thobe',
+        itemDefinitionId: 'def-thobe-white',
+        serviceId: 'srv-wash-iron',
+        itemTypeNameSnapshot: 'ثوب',
+        itemDefinitionNameSnapshot: 'ثوب أبيض رجالي',
+        serviceNameSnapshot: 'غسيل وكوي',
+        pricingType: PricingType.perPiece,
+        quantity: 2.0,
+        unitPrice: const Money.fromPiastres(2500),
+        calculatedTotal: const Money.fromPiastres(5000),
+        notes: 'نشا خفيف',
+        carpetData: null,
+        createdAt: testCreatedAt,
+        updatedAt: testUpdatedAt,
+      );
+
+      final carpetItem = OrderItem(
+        id: 'oi-item-2',
+        orderId: 'ord-edit-test-1',
+        itemTypeId: 'it-carpet',
+        itemDefinitionId: null,
+        serviceId: 'srv-carpet-clean',
+        itemTypeNameSnapshot: 'سجاد',
+        itemDefinitionNameSnapshot: null,
+        serviceNameSnapshot: 'غسيل سجاد بالبخار',
+        pricingType: PricingType.perSquareMeter,
+        quantity: 6.0,
+        unitPrice: const Money.fromPiastres(1000),
+        calculatedTotal: const Money.fromPiastres(6000),
+        notes: null,
+        carpetData: CarpetItemData(
+          id: 'carpet-data-1',
+          orderItemId: 'oi-item-2',
+          carpetSizeId: 'cs-3x2',
+          length: 3.0,
+          width: 2.0,
+          area: 6.0,
+          createdAt: testCreatedAt,
+          updatedAt: testUpdatedAt,
+        ),
+        createdAt: testCreatedAt,
+        updatedAt: testUpdatedAt,
+      );
+
+      final jsonStr = SyncPayloadBuilder.buildOrderEditPayload(order, [
+        standardItem,
+        carpetItem,
+      ]);
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+
+      // 1. INCLUDED header fields
+      expect(map['id'], 'ord-edit-test-1');
+      expect(map['order_number'], '26-042');
+      expect(map['customer_id'], 'cust-uuid-42');
+      expect(map['expected_pickup_date'], '2026-09-30T00:00:00.000Z');
+      expect(map['notes'], 'مستعجل مع غسيل خاص');
+      expect(map['customer_pickup_requested'], isTrue);
+      expect(map['customer_pickup_fee'], 1500);
+      expect(map['customer_delivery_requested'], isTrue);
+      expect(map['customer_delivery_fee'], 2500);
+      expect(map['subtotal'], 10000);
+      expect(map['discount'], 1000);
+      expect(map['tax'], 0);
+      expect(map['total'], 13000);
+      expect(map['updated_at'], '2026-09-23T11:30:00.000Z');
+
+      // 2. EXCLUDED header fields
+      expect(map.containsKey('base_version'), isFalse);
+      expect(map.containsKey('created_at'), isFalse);
+      expect(map.containsKey('status'), isFalse);
+      expect(map.containsKey('paid_amount'), isFalse);
+      expect(map.containsKey('completed_at'), isFalse);
+      expect(map.containsKey('cancelled_at'), isFalse);
+      expect(map.containsKey('cancellation_reason'), isFalse);
+      expect(map.containsKey('customer_name_snapshot'), isFalse);
+      expect(map.containsKey('customer_phone_snapshot'), isFalse);
+
+      // 3. Child items array
+      final items = map['items'] as List<dynamic>;
+      expect(items.length, 2);
+
+      // Item 1 (non-carpet)
+      final item0 = items[0] as Map<String, dynamic>;
+      expect(item0['id'], 'oi-item-1');
+      expect(item0['order_id'], 'ord-edit-test-1');
+      expect(item0['item_type_id'], 'it-thobe');
+      expect(item0['item_definition_id'], 'def-thobe-white');
+      expect(item0['service_id'], 'srv-wash-iron');
+      expect(item0['pricing_type'], 'per_piece');
+      expect(item0['quantity'], 2.0);
+      expect(item0['unit_price'], 2500);
+      expect(item0['calculated_total'], 5000);
+      expect(item0['notes'], 'نشا خفيف');
+      expect(item0.containsKey('carpet_data'), isFalse);
+
+      // Item 2 (carpet)
+      final item1 = items[1] as Map<String, dynamic>;
+      expect(item1['id'], 'oi-item-2');
+      expect(item1['pricing_type'], 'per_square_meter');
+      expect(item1['quantity'], 6.0);
+      expect(item1['carpet_data'], isNotNull);
+
+      final carpetData = item1['carpet_data'] as Map<String, dynamic>;
+      expect(carpetData['id'], 'carpet-data-1');
+      expect(carpetData['order_item_id'], 'oi-item-2');
+      expect(carpetData['carpet_size_id'], 'cs-3x2');
+      expect(carpetData['length'], 3.0);
+      expect(carpetData['width'], 2.0);
+      expect(carpetData['area'], 6.0);
+    });
+
+    test('buildOrderEditPayload handles empty items array and null notes', () {
+      final order = Order(
+        id: 'ord-edit-test-2',
+        orderNumber: '26-043',
+        customerId: 'cust-uuid-99',
+        customerNameSnapshot: 'فاطمة علي',
+        customerPhoneSnapshot: '0501112233',
+        status: OrderStatus.processing,
+        expectedPickupDate: OrderDate(2026, 10, 1),
+        notes: null,
+        subtotal: Money.zero,
+        total: Money.zero,
+        createdAt: testCreatedAt,
+        updatedAt: testUpdatedAt,
+      );
+
+      final jsonStr = SyncPayloadBuilder.buildOrderEditPayload(order, []);
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+
+      expect(map['id'], 'ord-edit-test-2');
+      expect(map['notes'], isNull);
+      expect(map['items'], isEmpty);
+      expect(map.containsKey('base_version'), isFalse);
+      expect(map.containsKey('status'), isFalse);
+    });
+  });
+
+  group('SyncPayloadBuilder — Customer Serialization Tests', () {
+    final testCreatedAt = DateTime.utc(2026, 9, 25, 10, 0, 0);
+    final testUpdatedAt = DateTime.utc(2026, 9, 25, 10, 30, 0);
+
+    test('buildCustomerPayload includes address when present', () {
+      final customer = Customer(
+        id: 'c-test-1',
+        name: 'عميل اختبار',
+        phone: '01012345678',
+        address: 'شارع الهرم',
+        notes: 'ملاحظة',
+        createdAt: testCreatedAt,
+        updatedAt: testUpdatedAt,
+      );
+
+      final jsonStr = SyncPayloadBuilder.buildCustomerPayload(customer);
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+
+      expect(map['id'], 'c-test-1');
+      expect(map['name'], 'عميل اختبار');
+      expect(map['phone'], '01012345678');
+      expect(map['address'], 'شارع الهرم');
+      expect(map['notes'], 'ملاحظة');
+      expect(map['created_at'], '2026-09-25T10:00:00.000Z');
+      expect(map['updated_at'], '2026-09-25T10:30:00.000Z');
+    });
+
+    test('buildCustomerPayload includes address: null when absent', () {
+      final customer = Customer(
+        id: 'c-test-2',
+        name: 'عميل بدون عنوان',
+        phone: '01012345679',
+        createdAt: testCreatedAt,
+        updatedAt: testUpdatedAt,
+      );
+
+      final jsonStr = SyncPayloadBuilder.buildCustomerPayload(customer);
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+
+      expect(map['address'], isNull);
+    });
+
+    test('buildCustomerUpdatePayload includes address when updated', () {
+      final customer = Customer(
+        id: 'c-test-3',
+        name: 'عميل تحديث',
+        phone: '01012345680',
+        address: 'شارع فيصل',
+        createdAt: testCreatedAt,
+        updatedAt: testUpdatedAt,
+      );
+
+      final jsonStr = SyncPayloadBuilder.buildCustomerUpdatePayload(customer);
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+
+      expect(map['id'], 'c-test-3');
+      expect(map['name'], 'عميل تحديث');
+      expect(map['phone'], '01012345680');
+      expect(map['address'], 'شارع فيصل');
+      expect(map['updated_at'], '2026-09-25T10:30:00.000Z');
+    });
+
+    test('buildCustomerUpdatePayload includes address: null when cleared', () {
+      final customer = Customer(
+        id: 'c-test-4',
+        name: 'عميل مسح العنوان',
+        phone: '01012345681',
+        address: null,
+        createdAt: testCreatedAt,
+        updatedAt: testUpdatedAt,
+      );
+
+      final jsonStr = SyncPayloadBuilder.buildCustomerUpdatePayload(customer);
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+
+      expect(map['address'], isNull);
     });
   });
 }

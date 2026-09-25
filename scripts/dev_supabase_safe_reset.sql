@@ -299,7 +299,7 @@ END $$;
 -- Deletes contaminated test transactional rows and ad-hoc test master data rows.
 -- =============================================================================
 
-RAISE NOTICE 'Executing safe development reset in reverse dependency order...';
+-- Executing safe development reset in reverse dependency order...
 
 -- 1. Sync Tracking & Change Logs
 DELETE FROM public.sync_changes;

@@ -196,7 +196,7 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
       backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480, maxHeight: 720),
+        constraints: const BoxConstraints(maxWidth: 400),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.xl),
           child: Form(
@@ -213,7 +213,7 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                   ),
                 ),
                 AppSpacing.gapLg,
-                Expanded(
+                Flexible(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
                     child: Column(

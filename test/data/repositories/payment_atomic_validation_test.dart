@@ -51,6 +51,7 @@ void main() {
 
     orderRepository = OrderRepositoryImpl(
       ordersDao: ordersDao,
+      paymentsDao: paymentsDao,
       storageRecordsDao: storageRecordsDao,
       syncOperationsDao: syncOperationsDao,
       db: db,
@@ -333,5 +334,186 @@ void main() {
         expect(remaining, Money.zero);
       },
     );
+
+    group('Order Creation with Advance Payment (Atomic & Outbox)', () {
+      test('creates order and initial payment atomically with strict outbox ordering (order -> payment)', () async {
+        final now = DateTime.now();
+        await customerRepository.createCustomer(
+          Customer(
+            id: 'cust-ap-1',
+            name: 'عميل الدفع المقدم',
+            phone: '01099887766',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        final itemTypes = await db.select(db.itemTypes).get();
+        await servicesDao.insertService(
+          db_pkg.ServicesCompanion.insert(
+            id: 'srv-ap-1',
+            name: 'غسيل',
+            pricingType: 'perPiece',
+            price: 8000,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        await (db.delete(db.syncOperations)).go();
+
+        final order = Order(
+          id: 'ord-ap-1',
+          customerId: 'cust-ap-1',
+          customerNameSnapshot: 'عميل الدفع المقدم',
+          customerPhoneSnapshot: '01099887766',
+          orderNumber: '26-101',
+          subtotal: const Money.fromPiastres(8000), // 80 EGP
+          total: const Money.fromPiastres(8000),
+          expectedPickupDate: OrderDate(2026, 9, 25),
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        final item = OrderItem(
+          id: 'item-ap-1',
+          orderId: 'ord-ap-1',
+          itemTypeId: itemTypes.first.id,
+          serviceId: 'srv-ap-1',
+          itemTypeNameSnapshot: 'قميص',
+          serviceNameSnapshot: 'غسيل',
+          pricingType: PricingType.perPiece,
+          unitPrice: const Money.fromPiastres(8000),
+          quantity: 1.0,
+          calculatedTotal: const Money.fromPiastres(8000),
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        final initialPayment = Payment(
+          id: 'pay-ap-1',
+          orderId: 'ord-ap-1',
+          amount: const Money.fromPiastres(3000), // 30 EGP advance
+          paymentMethod: PaymentMethod.instapay,
+          paidAt: now,
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        final createdOrder = await orderRepository.createOrder(
+          order: order,
+          items: [item],
+          initialPayment: initialPayment,
+        );
+
+        expect(createdOrder.id, 'ord-ap-1');
+
+        // Verify payment exists in paymentsDao / paymentRepository
+        final payments = await paymentRepository.getPaymentsForOrder('ord-ap-1');
+        expect(payments.length, 1);
+        expect(payments.first.id, 'pay-ap-1');
+        expect(payments.first.amount, const Money.fromPiastres(3000));
+        expect(payments.first.paymentMethod, PaymentMethod.instapay);
+
+        // Verify remaining balance
+        final remaining = await paymentRepository.getRemainingAmountForOrder('ord-ap-1');
+        expect(remaining, const Money.fromPiastres(5000));
+
+        // Verify outbox ordering: order CREATE then payment CREATE
+        final pendingOps = await syncOperationsDao.getPendingOperations();
+        expect(pendingOps.length, 2);
+
+        expect(pendingOps[0].entityType, 'order');
+        expect(pendingOps[0].operationType, 'create');
+        expect(pendingOps[0].entityId, 'ord-ap-1');
+
+        expect(pendingOps[1].entityType, 'payment');
+        expect(pendingOps[1].operationType, 'create');
+        expect(pendingOps[1].entityId, 'pay-ap-1');
+      });
+
+      test('rolls back entire transaction if payment validation fails (neither order nor payment saved)', () async {
+        final now = DateTime.now();
+        await customerRepository.createCustomer(
+          Customer(
+            id: 'cust-ap-2',
+            name: 'عميل التراجع',
+            phone: '01011223399',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        final itemTypes = await db.select(db.itemTypes).get();
+        await servicesDao.insertService(
+          db_pkg.ServicesCompanion.insert(
+            id: 'srv-ap-2',
+            name: 'غسيل',
+            pricingType: 'perPiece',
+            price: 5000,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        await (db.delete(db.syncOperations)).go();
+
+        final order = Order(
+          id: 'ord-ap-fail',
+          customerId: 'cust-ap-2',
+          customerNameSnapshot: 'عميل التراجع',
+          customerPhoneSnapshot: '01011223399',
+          orderNumber: '26-102',
+          subtotal: const Money.fromPiastres(5000),
+          total: const Money.fromPiastres(5000),
+          expectedPickupDate: OrderDate(2026, 9, 25),
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        final item = OrderItem(
+          id: 'item-ap-fail',
+          orderId: 'ord-ap-fail',
+          itemTypeId: itemTypes.first.id,
+          serviceId: 'srv-ap-2',
+          itemTypeNameSnapshot: 'قميص',
+          serviceNameSnapshot: 'غسيل',
+          pricingType: PricingType.perPiece,
+          unitPrice: const Money.fromPiastres(5000),
+          quantity: 1.0,
+          calculatedTotal: const Money.fromPiastres(5000),
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        // Payment orderId mismatch triggers ValidationFailure in repository
+        final invalidPayment = Payment(
+          id: 'pay-ap-fail',
+          orderId: 'wrong-order-id',
+          amount: const Money.fromPiastres(2000),
+          paymentMethod: PaymentMethod.cash,
+          paidAt: now,
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        await expectLater(
+          () => orderRepository.createOrder(
+            order: order,
+            items: [item],
+            initialPayment: invalidPayment,
+          ),
+          throwsA(isA<ValidationFailure>()),
+        );
+
+        // Verify order was NOT inserted
+        final savedOrder = await orderRepository.getOrderById('ord-ap-fail');
+        expect(savedOrder, isNull);
+
+        // Verify payment was NOT inserted
+        final payments = await paymentRepository.getPaymentsForOrder('ord-ap-fail');
+        expect(payments, isEmpty);
+
+        // Verify outbox has 0 pending operations
+        final pendingOps = await syncOperationsDao.getPendingOperations();
+        expect(pendingOps, isEmpty);
+      });
+    });
   });
 }

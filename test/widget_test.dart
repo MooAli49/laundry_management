@@ -1,8 +1,8 @@
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/app.dart';
-import 'package:laundry_management/core/constants/app_constants.dart';
 import 'package:laundry_management/core/di/injection.dart';
 import 'package:laundry_management/core/localization/app_strings.dart';
 import 'package:laundry_management/core/routing/app_router.dart';
@@ -16,16 +16,71 @@ import 'package:laundry_management/features/reports/presentation/screens/reports
 import 'package:laundry_management/features/settings/presentation/screens/settings_screen.dart';
 import 'package:laundry_management/features/storage/presentation/screens/storage_screen.dart';
 
+import 'dart:async';
+import 'package:laundry_management/domain/sync/sync_engine_state.dart';
+import 'package:laundry_management/core/network/network_info.dart';
+import 'package:laundry_management/data/sync/sync_engine.dart';
+
+class _FakeNetworkInfo implements NetworkInfo {
+  final StreamController<bool> _connectivityController =
+      StreamController<bool>.broadcast();
+
+  @override
+  Future<bool> get isConnected async => true;
+
+  @override
+  Stream<bool> get onConnectivityChanged => _connectivityController.stream;
+
+  void dispose() {
+    _connectivityController.close();
+  }
+}
+
+class _FakeSyncEngine implements SyncEngine {
+  final StreamController<SyncEngineState> _stateController =
+      StreamController<SyncEngineState>.broadcast();
+
+  @override
+  SyncEngineState get state => SyncEngineState.completed(
+        lastSyncTime: DateTime(2026, 9, 24),
+      );
+
+  @override
+  Stream<SyncEngineState> get stateStream => _stateController.stream;
+
+  @override
+  bool get isSyncing => false;
+
+  @override
+  void dispose() {
+    _stateController.close();
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 void main() {
+  late _FakeNetworkInfo fakeNetworkInfo;
+  late _FakeSyncEngine fakeSyncEngine;
+
   setUp(() async {
     await getIt.reset();
+    fakeNetworkInfo = _FakeNetworkInfo();
+    fakeSyncEngine = _FakeSyncEngine();
+
     getIt.registerLazySingleton<AppDatabase>(
       () => AppDatabase(NativeDatabase.memory()),
     );
+    getIt.registerLazySingleton<NetworkInfo>(() => fakeNetworkInfo);
+    getIt.registerLazySingleton<SyncEngine>(() => fakeSyncEngine);
+
     await initDependencies();
   });
 
   tearDown(() async {
+    fakeNetworkInfo.dispose();
+    fakeSyncEngine.dispose();
     if (getIt.isRegistered<AppDatabase>()) {
       await getIt<AppDatabase>().close();
     }
@@ -39,8 +94,14 @@ void main() {
         await tester.pumpWidget(const LaundryManagementApp());
         await tester.pumpAndSettle();
 
-        // App Name should appear in the branding header
-        expect(find.text(AppConstants.appName), findsOneWidget);
+        // App branding should appear in the branding header
+        expect(
+          find.descendant(
+            of: find.byType(AppSidebar),
+            matching: find.byType(SvgPicture),
+          ),
+          findsOneWidget,
+        );
 
         // Verify RTL text directionality is enforced
         final BuildContext shellContext = tester.element(find.byType(AppShell));

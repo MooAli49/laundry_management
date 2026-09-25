@@ -71,6 +71,8 @@ class AppStrings {
   static const String customerNameHint = 'مثال: محمد أحمد';
   static const String customerPhoneLabel = 'رقم الهاتف *';
   static const String customerPhoneHint = 'مثال: 01012345678';
+  static const String customerAddressLabel = 'العنوان';
+  static const String customerAddressHint = 'مثال: 12 شارع الجمهورية';
   static const String notesLabel = 'ملاحظات';
   static const String customerNotesHint = 'أي ملاحظات خاصة بالعميل';
   static const String saveChanges = 'حفظ التعديلات';
@@ -94,12 +96,18 @@ class AppStrings {
   static const String completedOrders = 'طلبات مكتملة';
   static const String totalPaid = 'إجمالي المدفوع';
   static const String totalRemaining = 'إجمالي المتبقي';
+  static const String totalPayments = 'إجمالي المدفوعات';
+  static const String totalRefunds = 'إجمالي الاستردادات';
+  static const String netPaid = 'صافي المدفوع';
+  static const String outstandingAmounts = 'المبالغ المستحقة';
   static String orderHistoryWithCount(int count) => 'سجل الطلبات ($count)';
   static const String noOrdersForCustomer = 'لا توجد طلبات لهذا العميل';
   static const String createFirstOrderForCustomerPrompt =
       'يمكنك إنشاء طلب جديد لهذا العميل بالضغط على زر إنشاء طلب.';
   static const String fullyPaid = 'مدفوع بالكامل';
+  static String totalAmount(String amount) => 'الإجمالي: $amount ج.م';
   static String paidAmount(String amount) => 'المدفوع: $amount ج.م';
+  static String refundedAmount(String amount) => 'المسترد: $amount ج.م';
   static String remainingAmount(String amount) => 'المتبقي: $amount ج.م';
   static const String loadMoreOrders = 'تحميل المزيد من الطلبات';
   static const String customerUpdatedSuccessfully =

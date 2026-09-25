@@ -1518,7 +1518,7 @@ Possible future additions include:
 
 - Multi-branch
 - Delivery management
-- Refunds
+- Advanced refund capabilities (item-level refunds, store credit, gateway reconciliation)
 - Advanced reporting
 - Barcode support
 - Multi-tenant / SaaS platform administration

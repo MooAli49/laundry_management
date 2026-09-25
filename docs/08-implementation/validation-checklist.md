@@ -1494,7 +1494,7 @@ Never silently invent a new rule during implementation.
   - `test/features/dashboard/presentation/cubit/record_payment_cubit_test.dart`: 13/13 passing (search normalization, balance validation, payment).
   - `test/features/dashboard/presentation/widgets/record_payment_dialog_test.dart`: 5/5 passing (two-step dialog interactions, filters).
   - `test/widget_test.dart`: 4/4 passing (app bootstrap, sidebar navigation, responsive layout).
-  - Full Flutter test suite: 735/735 passing (100%).
+  - Full Flutter test suite: 1,188/1,188 passing (`flutter test --concurrency=1`).
   - `flutter analyze`: 0 issues found.
   - `git diff --check`: clean (0 trailing whitespace or format issues).
 
@@ -1519,7 +1519,7 @@ Never silently invent a new rule during implementation.
 - [x] Single-flight coalescing: `SyncEngine` collapses overlapping triggers into a single active sync loop.
 - [x] Test verification:
   - Dedicated C4-C Two-Device Bidirectional Sync Test (`test/data/sync/two_device_bidirectional_sync_integration_test.dart`): 1/1 passed (1 test passed).
-  - Step 13 SyncEngine Integration Suite (`test/data/sync/step13_sync_engine_integration_test.dart`): 4/4 passed (4 tests passed).
+  - Step 13 Realtime Pull Integration Suite (`test/data/sync/step13_live_realtime_pull_integration_test.dart`): 4/4 passed (4 tests passed).
   - Step 9 Live Supabase Integration Suite (`test/data/sync/step9_live_supabase_integration_test.dart`): 14/14 passed (14 tests passed).
   - Master Live Supabase Integration Suite (`test/data/sync/live_supabase_integration_suite_test.dart`): 78/78 passed (78 tests passed).
   - SyncEngine Unit Tests (`test/data/sync/sync_engine_test.dart`): 28/28 passed (28 tests passed).

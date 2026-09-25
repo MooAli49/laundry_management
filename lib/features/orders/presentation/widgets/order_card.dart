@@ -64,6 +64,7 @@ class OrderCard extends StatelessWidget {
                   children: [
                     Text(
                       '#${order.orderNumber}',
+                      textDirection: TextDirection.ltr,
                       style: AppTextStyles.titleMedium.copyWith(
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,

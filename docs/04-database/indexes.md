@@ -513,6 +513,34 @@ The implementation should avoid duplicate indexing.
 
 ---
 
+## 24A. Refund Order Index
+
+Required:
+
+    INDEX refunds(order_id)
+
+This supports:
+
+    Load Order Refunds
+    Calculate Refundable Balance
+    Display Refund History in Order Details
+
+---
+
+## 24B. Refund Refunded At Index
+
+Required:
+
+    INDEX refunds(refunded_at)
+
+This supports:
+
+    Refunds by Date
+    Financial Report Total Refunds
+    Net Payments Calculation
+
+---
+
 ## 25. Storage Location Indexes
 
 Storage Locations are master data.
@@ -2442,7 +2470,7 @@ Do not add indexes for:
 
     delivery_routes
 
-    refunds
+    payment_gateway_refunds
 
     loyalty_accounts
 

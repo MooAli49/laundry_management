@@ -6,6 +6,7 @@ import 'package:laundry_management/domain/entities/item_type.dart';
 import 'package:laundry_management/domain/entities/service.dart';
 import 'package:laundry_management/domain/repositories/item_type_repository.dart';
 import 'package:laundry_management/domain/repositories/service_repository.dart';
+import 'package:laundry_management/domain/value_objects/money.dart';
 import 'package:laundry_management/features/settings/presentation/cubit/services_management_cubit.dart';
 import 'package:laundry_management/features/settings/presentation/widgets/service_form_dialog.dart';
 
@@ -147,6 +148,32 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(AppStrings.servicePriceMustBePositive), findsWidgets);
+    });
+
+    testWidgets('UAT-B — dialog renders without fixed 720px height and submits valid service', (tester) async {
+      await tester.pumpWidget(buildDialog());
+      await tester.pumpAndSettle();
+
+      // Enter valid name
+      final nameField = find.widgetWithText(TextFormField, '');
+      await tester.enterText(nameField.first, 'خدمة غسيل خاصة');
+
+      // Enter valid price
+      final priceField = find.widgetWithText(TextFormField, '0.00');
+      await tester.enterText(priceField, '45.00');
+
+      // Select item type
+      await tester.ensureVisible(find.text('ملابس'));
+      await tester.tap(find.text('ملابس'));
+      await tester.pumpAndSettle();
+
+      // Submit
+      await tester.tap(find.text(AppStrings.save));
+      await tester.pumpAndSettle();
+
+      expect(serviceRepo.services.length, 1);
+      expect(serviceRepo.services.first.name, 'خدمة غسيل خاصة');
+      expect(serviceRepo.services.first.price, Money.fromEgp(45));
     });
   });
 }

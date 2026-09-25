@@ -4,7 +4,9 @@ import '../../core/errors/failures.dart';
 import '../../domain/entities/carpet_item_data.dart';
 import '../../domain/entities/order.dart';
 import '../../domain/entities/order_item.dart';
+import '../../domain/entities/payment.dart';
 import '../../domain/enums/order_status.dart';
+import '../../domain/enums/payment_method.dart';
 import '../../domain/enums/pricing_type.dart';
 import '../../domain/repositories/customer_repository.dart';
 import '../../domain/repositories/item_definition_repository.dart';
@@ -46,6 +48,16 @@ class CarpetItemInput {
   });
 }
 
+class InitialPaymentInput {
+  final Money amount;
+  final PaymentMethod paymentMethod;
+
+  const InitialPaymentInput({
+    required this.amount,
+    this.paymentMethod = PaymentMethod.cash,
+  });
+}
+
 class CreateOrderInput {
   final String customerId;
   final OrderDate expectedPickupDate;
@@ -55,7 +67,9 @@ class CreateOrderInput {
   final bool customerDeliveryRequested;
   final Money customerDeliveryFee;
   final Money discount;
+  final Money tax;
   final List<CreateOrderItemInput> items;
+  final InitialPaymentInput? initialPayment;
 
   const CreateOrderInput({
     required this.customerId,
@@ -66,7 +80,9 @@ class CreateOrderInput {
     this.customerDeliveryRequested = false,
     this.customerDeliveryFee = Money.zero,
     this.discount = Money.zero,
+    this.tax = Money.zero,
     required this.items,
+    this.initialPayment,
   });
 }
 
@@ -296,7 +312,11 @@ class CreateOrderUseCase {
       throw const BusinessRuleFailure('Discount cannot exceed subtotal');
     }
 
-    const tax = Money.zero;
+    if (input.tax.isNegative) {
+      throw const ValidationFailure('Tax cannot be negative');
+    }
+
+    final tax = input.tax;
     final total =
         subtotal -
         input.discount +
@@ -325,9 +345,34 @@ class CreateOrderUseCase {
       updatedAt: now,
     );
 
+    Payment? initialPaymentEntity;
+    if (input.initialPayment != null) {
+      final paymentAmount = input.initialPayment!.amount;
+      if (paymentAmount.isNegative) {
+        throw const ValidationFailure('Initial payment cannot be negative');
+      }
+      if (paymentAmount > total) {
+        throw const BusinessRuleFailure(
+          'Initial payment cannot exceed order total',
+        );
+      }
+      if (paymentAmount > Money.zero) {
+        initialPaymentEntity = Payment(
+          id: _uuid.v4(),
+          orderId: orderId,
+          amount: paymentAmount,
+          paymentMethod: input.initialPayment!.paymentMethod,
+          paidAt: now,
+          createdAt: now,
+          updatedAt: now,
+        );
+      }
+    }
+
     return await _orderRepository.createOrder(
       order: order,
       items: expandedItems,
+      initialPayment: initialPaymentEntity,
     );
   }
 }

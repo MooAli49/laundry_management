@@ -9,6 +9,8 @@ import 'package:laundry_management/domain/entities/order_item.dart';
 import 'package:laundry_management/domain/entities/service.dart';
 import 'package:laundry_management/domain/enums/order_status.dart';
 import 'package:laundry_management/domain/enums/pricing_type.dart';
+import 'package:laundry_management/domain/entities/payment.dart';
+import 'package:laundry_management/domain/enums/payment_method.dart';
 import 'package:laundry_management/domain/repositories/customer_repository.dart';
 import 'package:laundry_management/domain/repositories/item_definition_repository.dart';
 import 'package:laundry_management/domain/repositories/item_type_repository.dart';
@@ -20,14 +22,17 @@ import 'package:laundry_management/domain/value_objects/order_date.dart';
 class FakeOrderRepository implements OrderRepository {
   Order? lastCreatedOrder;
   List<OrderItem>? lastCreatedItems;
+  Payment? lastCreatedInitialPayment;
 
   @override
   Future<Order> createOrder({
     required Order order,
     required List<OrderItem> items,
+    Payment? initialPayment,
   }) async {
     lastCreatedOrder = order.copyWith(orderNumber: '26-001');
     lastCreatedItems = items;
+    lastCreatedInitialPayment = initialPayment;
     return lastCreatedOrder!;
   }
 
@@ -677,5 +682,216 @@ void main() {
         throwsA(isA<BusinessRuleFailure>()),
       );
     });
+
+    group('Advance Payment (Initial Payment)', () {
+      test('passes null initialPayment to repository when not provided', () async {
+        final result = await useCase.execute(
+          CreateOrderInput(
+            customerId: 'cust-1',
+            expectedPickupDate: OrderDate.today(),
+            items: [
+              const CreateOrderItemInput(
+                itemTypeId: 'type-clothes',
+                serviceId: 'srv-wash-iron',
+                physicalQuantity: 1,
+              ),
+            ],
+          ),
+        );
+
+        expect(result, isNotNull);
+        expect(orderRepo.lastCreatedInitialPayment, isNull);
+      });
+
+      test('passes null initialPayment to repository when amount is zero', () async {
+        final result = await useCase.execute(
+          CreateOrderInput(
+            customerId: 'cust-1',
+            expectedPickupDate: OrderDate.today(),
+            initialPayment: const InitialPaymentInput(
+              amount: Money.zero,
+              paymentMethod: PaymentMethod.cash,
+            ),
+            items: [
+              const CreateOrderItemInput(
+                itemTypeId: 'type-clothes',
+                serviceId: 'srv-wash-iron',
+                physicalQuantity: 1,
+              ),
+            ],
+          ),
+        );
+
+        expect(result, isNotNull);
+        expect(orderRepo.lastCreatedInitialPayment, isNull);
+      });
+
+      test('rejects negative initial payment with ValidationFailure', () async {
+        expect(
+          () => useCase.execute(
+            CreateOrderInput(
+              customerId: 'cust-1',
+              expectedPickupDate: OrderDate.today(),
+              initialPayment: const InitialPaymentInput(
+                amount: Money.fromPiastres(-100),
+                paymentMethod: PaymentMethod.cash,
+              ),
+              items: [
+                const CreateOrderItemInput(
+                  itemTypeId: 'type-clothes',
+                  serviceId: 'srv-wash-iron',
+                  physicalQuantity: 1,
+                ),
+              ],
+            ),
+          ),
+          throwsA(
+            isA<ValidationFailure>().having(
+              (f) => f.message,
+              'message',
+              'Initial payment cannot be negative',
+            ),
+          ),
+        );
+      });
+
+      test('rejects initial payment exceeding order total with BusinessRuleFailure', () async {
+        // Total = 1500 piastres
+        expect(
+          () => useCase.execute(
+            CreateOrderInput(
+              customerId: 'cust-1',
+              expectedPickupDate: OrderDate.today(),
+              initialPayment: const InitialPaymentInput(
+                amount: Money.fromPiastres(2000), // > 1500
+                paymentMethod: PaymentMethod.cash,
+              ),
+              items: [
+                const CreateOrderItemInput(
+                  itemTypeId: 'type-clothes',
+                  serviceId: 'srv-wash-iron',
+                  physicalQuantity: 1,
+                ),
+              ],
+            ),
+          ),
+          throwsA(
+            isA<BusinessRuleFailure>().having(
+              (f) => f.message,
+              'message',
+              'Initial payment cannot exceed order total',
+            ),
+          ),
+        );
+      });
+
+      test('creates and passes Payment entity to repository for valid partial initial payment', () async {
+        // Total = 1500 piastres (15 EGP)
+        final result = await useCase.execute(
+          CreateOrderInput(
+            customerId: 'cust-1',
+            expectedPickupDate: OrderDate.today(),
+            initialPayment: const InitialPaymentInput(
+              amount: Money.fromPiastres(500),
+              paymentMethod: PaymentMethod.instapay,
+            ),
+            items: [
+              const CreateOrderItemInput(
+                itemTypeId: 'type-clothes',
+                serviceId: 'srv-wash-iron',
+                physicalQuantity: 1,
+              ),
+            ],
+          ),
+        );
+
+        expect(result, isNotNull);
+        final payment = orderRepo.lastCreatedInitialPayment;
+        expect(payment, isNotNull);
+        expect(payment!.amount, const Money.fromPiastres(500));
+        expect(payment.paymentMethod, PaymentMethod.instapay);
+        expect(payment.orderId, result.id);
+      });
+
+      test('creates and passes Payment entity for full initial payment (100% total)', () async {
+        // Total = 1500 piastres
+        final result = await useCase.execute(
+          CreateOrderInput(
+            customerId: 'cust-1',
+            expectedPickupDate: OrderDate.today(),
+            initialPayment: const InitialPaymentInput(
+              amount: Money.fromPiastres(1500),
+              paymentMethod: PaymentMethod.ewallet,
+            ),
+            items: [
+              const CreateOrderItemInput(
+                itemTypeId: 'type-clothes',
+                serviceId: 'srv-wash-iron',
+                physicalQuantity: 1,
+              ),
+            ],
+          ),
+        );
+
+        expect(result, isNotNull);
+        final payment = orderRepo.lastCreatedInitialPayment;
+        expect(payment, isNotNull);
+        expect(payment!.amount, const Money.fromPiastres(1500));
+        expect(payment.paymentMethod, PaymentMethod.ewallet);
+        expect(payment.orderId, result.id);
+      });
+
+      test('creates and passes Payment entity for full initial payment including tax', () async {
+        // Subtotal = 1500, Tax = 210, Total = 1710 piastres
+        final result = await useCase.execute(
+          CreateOrderInput(
+            customerId: 'cust-1',
+            expectedPickupDate: OrderDate.today(),
+            tax: const Money.fromPiastres(210),
+            initialPayment: const InitialPaymentInput(
+              amount: Money.fromPiastres(1710),
+              paymentMethod: PaymentMethod.instapay,
+            ),
+            items: [
+              const CreateOrderItemInput(
+                itemTypeId: 'type-clothes',
+                serviceId: 'srv-wash-iron',
+                physicalQuantity: 1,
+              ),
+            ],
+          ),
+        );
+
+        expect(result, isNotNull);
+        expect(result.tax, const Money.fromPiastres(210));
+        expect(result.total, const Money.fromPiastres(1710));
+        final payment = orderRepo.lastCreatedInitialPayment;
+        expect(payment, isNotNull);
+        expect(payment!.amount, const Money.fromPiastres(1710));
+        expect(payment.paymentMethod, PaymentMethod.instapay);
+        expect(payment.orderId, result.id);
+      });
+
+      test('rejects negative tax with ValidationFailure', () async {
+        expect(
+          () => useCase.execute(
+            CreateOrderInput(
+              customerId: 'cust-1',
+              expectedPickupDate: OrderDate.today(),
+              tax: const Money.fromPiastres(-100),
+              items: [
+                const CreateOrderItemInput(
+                  itemTypeId: 'type-clothes',
+                  serviceId: 'srv-wash-iron',
+                  physicalQuantity: 1,
+                ),
+              ],
+            ),
+          ),
+          throwsA(isA<ValidationFailure>()),
+        );
+      });
+    });
   });
 }
+

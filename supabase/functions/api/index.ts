@@ -38,12 +38,24 @@ function mapPostgresError(error: { code?: string; message: string }, requestId: 
     return errorResponse("CONCURRENCY_CONFLICT", msg, requestId, 409);
   }
 
-  // 2. Cursor Too Old (P0005 or CURSOR_TOO_OLD message)
-  if (code === "P0005" || msg.includes("CURSOR_TOO_OLD")) {
-    return errorResponse("CURSOR_TOO_OLD", msg, requestId, 410);
+  // Storage Record Deletion Guard (P0006 or EDIT_BLOCKED_ITEM_HAS_STORAGE_RECORDS)
+  if (code === "P0006" || msg.includes("EDIT_BLOCKED_ITEM_HAS_STORAGE_RECORDS")) {
+    return errorResponse("EDIT_BLOCKED_ITEM_HAS_STORAGE_RECORDS", msg, requestId, 409);
   }
 
-  // 3. Payment Balance Exceeded
+  // 2. Cursor Too Old (P0005 or CURSOR_TOO_OLD message)
+  if (code === "P0005" || msg.includes("CURSOR_TOO_OLD")) {
+    return errorResponse("CURSOR_TOO_OLD", msg, requestId, 410); \
+    
+  }
+
+  // 3. Refund Balance Exceeded / Payment Balance Exceeded
+  if (
+    msg.includes("REFUND_BALANCE_EXCEEDED") ||
+    msg.includes("refundable balance")
+  ) {
+    return errorResponse("REFUND_BALANCE_EXCEEDED", msg, requestId, 409);
+  }
   if (
     msg.includes("exceeds") ||
     msg.includes("remaining order balance") ||
@@ -57,6 +69,8 @@ function mapPostgresError(error: { code?: string; message: string }, requestId: 
     msg.includes("Cannot update order in status") ||
     msg.includes("Cannot add payment to cancelled") ||
     msg.includes("Invalid lifecycle transition") ||
+    msg.includes("INVALID_LIFECYCLE_TRANSITION") ||
+    msg.includes("Cannot edit order in terminal status") ||
     msg.includes("cancelled")
   ) {
     return errorResponse("INVALID_LIFECYCLE_TRANSITION", msg, requestId, 409);
@@ -298,6 +312,18 @@ Deno.serve(async (req: Request) => {
       }
 
       if (method === "PATCH" && orderId) {
+        if (parts[2] === "edit-aggregate") {
+          const body = await req.json();
+          const items = body.items || [];
+          const result = await supabase.rpc("sync_update_order_aggregate", {
+            p_op_id: operationId,
+            p_order_id: orderId,
+            p_order: body,
+            p_items: items,
+          });
+          return handleMutation(result, 200);
+        }
+
         const body = await req.json();
         const baseVersion = getBaseVersion(req, body);
         if (baseVersion !== null) {
@@ -463,6 +489,20 @@ Deno.serve(async (req: Request) => {
         const result = await supabase.rpc("sync_create_payment", {
           p_op_id: operationId,
           p_payment: body,
+        });
+        return handleMutation(result, 201);
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Refunds API (Append-only & Idempotent in V1 — Phase 1: POST only)
+    // -------------------------------------------------------------------------
+    if (path === "/refunds") {
+      if (method === "POST") {
+        const body = await req.json();
+        const result = await supabase.rpc("sync_create_refund", {
+          p_op_id: operationId,
+          p_refund: body,
         });
         return handleMutation(result, 201);
       }

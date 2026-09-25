@@ -193,12 +193,13 @@ Infrastructure entities support bidirectional synchronization and application be
 
 ## 6. Main Database Tables
 
-The V1 logical database consists of the following main tables:
+The V1 logical database consists of the following 17 main business tables:
 
     customers
     orders
     order_items
     payments
+    refunds
     storage_records
     storage_locations
     item_types
@@ -217,7 +218,12 @@ The bidirectional synchronization mechanism uses internal local infrastructure t
     sync_operations (local outgoing mutation queue)
     sync_state (local pull cursor: last_applied_sequence)
 
-These local infrastructure tables are part of the Data Layer and do not represent business entities. The remote change log (`sync_changes`) resides exclusively on the remote Supabase PostgreSQL database.
+Together, the local Drift database manages 19 tables at **schema version 6**.
+
+Key entity attributes and rules:
+- `customers`: includes optional `address TEXT NULL` (nullable profile attribute; whitespace normalizes to NULL; no delivery routing in V1).
+- `refunds`: append-only, immutable order-level financial records (`amount > 0`, `order_id` FK to orders, no `payment_id`, method: cash/insta_pay/e_wallet). Refunds do not use `server_version`.
+- Remote change log: `sync_changes` resides exclusively on the remote Supabase PostgreSQL database.
 
 ---
 
@@ -693,7 +699,8 @@ Partial payments are supported.
 
 Payment history must remain preserved.
 
-There is no V1 refund workflow.
+Refund V1 is supported at the order level for cancelled orders via the `refunds` table and `sync_create_refund` RPC.
+Cancellation does not trigger an automatic refund.
 
 ---
 
@@ -1868,7 +1875,7 @@ The database must not introduce dedicated V1 business tables for:
     Roles
     Permissions
     Branches
-    Refunds
+    Payment Gateway Refunds and Item-Level Refunds
     Loyalty
     Storage Movement History
     Storage Capacity

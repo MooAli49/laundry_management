@@ -1821,7 +1821,7 @@ Possible future additions include:
 - Advanced conflict handling
 - Multi-branch
 - Delivery management
-- Refunds
+- Advanced refund capabilities (item-level refunds, store credit, gateway reconciliation)
 - Advanced reporting
 - Barcode support
 - Advanced Expense workflows

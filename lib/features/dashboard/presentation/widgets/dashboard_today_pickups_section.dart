@@ -135,6 +135,7 @@ class DashboardTodayPickupsSection extends StatelessWidget {
                       ),
                       child: Text(
                         displayNumber,
+                        textDirection: TextDirection.ltr,
                         style: AppTextStyles.labelMedium.copyWith(
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,

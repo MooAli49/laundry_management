@@ -69,6 +69,7 @@ The application does not attempt to model a large enterprise laundry operation.
 - Start a new order from customer details
 - Validate phone numbers
 - Prevent duplicate customers based on phone number
+- Optional customer address (`Customer.address` nullable profile text; no separate entity; no delivery routing in V1)
 
 ## Not Included
 
@@ -79,7 +80,7 @@ The application does not attempt to model a large enterprise laundry operation.
 - Customer levels
 - Marketing campaigns
 - Customer segmentation
-- Customer addresses as a delivery management system
+- Customer addresses as a delivery routing / dispatch management system (address is a profile attribute only; delivery routing is out of scope)
 - Customer notifications
 - Email management
 
@@ -114,13 +115,19 @@ The application does not attempt to model a large enterprise laundry operation.
 
 Every order must have a unique human-readable Order Number.
 
-The approved V1 display format is:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length:
 
-    YY-XXX
+- Minimum width of 3 digits (zero-padded below 1000).
+- No maximum length (expands to 4+ digits when reaching 1000+).
+- Numeric sequence only.
+- The sequence generator must ignore non-business test identifiers such as `ORD-TEST-...` when calculating the next sequence number. These synthetic test identifiers must never inflate or distort the business order sequence.
 
-Example:
+Examples:
 
     26-001
+    26-999
+    26-1000
+    26-10000
 
 The Order Number is separate from the internal database identifier.
 
@@ -136,6 +143,11 @@ V1 supports only:
 - Cancelled
 
 No additional operational statuses should be introduced.
+
+Status Transition Rules:
+- `Completed -> Processing` is supported ONLY as an explicit administrative correction (requires non-empty reason, clears `completed_at`, preserves existing payments, leaves storage inactive; order must be explicitly re-stored before becoming Ready again).
+- `Completed -> Ready` and `Completed -> Cancelled` remain forbidden.
+- `Cancelled` status remains strictly terminal.
 
 ---
 
@@ -341,7 +353,7 @@ Tax is disabled.
 - Online payment gateway
 - Card terminal integration
 - Automatic bank reconciliation
-- Refund workflow
+- Automated payment gateway refunds
 - Chargeback handling
 - Payment settlement system
 
@@ -371,13 +383,22 @@ Being Ready or fully paid alone must not automatically mark the order as Complet
 - Preserve cancelled order history
 - Deactivate active storage records
 - Preserve payment history
+- Refund workflow (order-level Refund V1 for cancelled orders)
+- First-class immutable financial transactions (no `payment_id`, order-level)
+- Only cancelled orders are eligible for refunds
+- Refundable balance tracking (`Total Paid - Total Refunded`)
+- Multiple partial refunds and full refunds up to refundable balance
+- Refund methods: Cash, InstaPay, E-Wallet
+- Immutable refund history
+- Financial reporting: Total Refunds by `refundedAt`, Net Payments (`Total Payments - Total Refunds`)
 
 ## Not Included
 
-- Refund workflow
-- Automatic refund
-- Refund approvals
-- Refund reports
+- Automatic refund upon cancellation (cancellation and refund are separate operations)
+- Refund approvals / multi-tier authorization
+- Payment gateway refund integration
+- Item-level refunds
+- Refunds on active orders (Processing, Ready, Completed)
 
 ---
 
@@ -691,23 +712,20 @@ Includes:
 
 Includes:
 
-- Sales
-- Payments recorded
-- Expenses
-- Outstanding amounts
-- Discounts
-- Payment method breakdown
-- Net Profit
+- **Total Sales**: Sum of non-cancelled order totals (`status != cancelled`) created in the selected period.
+- **Total Payments**: Historical payments recorded in the selected period based on `Payment.paidAt`.
+- **Total Refunds**: Sum of refunds recorded in the selected period based on `Refund.refundedAt`.
+- **Net Payments**: Net cash movement calculated as `Total Payments - Total Refunds`.
+- **Outstanding**: Unpaid balance on non-cancelled orders created in the selected period.
+- **Discounts**: Total discounts applied to non-cancelled orders in the selected period.
+- **Payment Method Breakdown**: Breakdown by Cash, InstaPay, and E-Wallet.
+- **Operating Expenses**: Total expenses recorded for the period based on `Expense.expenseDate`.
+- **Net Profit**: Derived financial result calculated as:
+      Net Profit = Total Sales - Operating Expenses
 
-Expenses are included according to their Expense Date.
+Important: Refunds are NOT operating expenses and are not subtracted from Total Sales.
 
-Net Profit is a derived reporting value.
-
-The calculation is:
-
-    Net Profit = Sales - Operating Expenses
-
-Net Profit is not a separate transaction or entity.
+Net Profit is a derived reporting value and not a separate transaction or entity.
 
 The system does not require:
 
@@ -976,7 +994,7 @@ The following are outside the V1 scope:
 - Employee management
 - Loyalty system
 - Advanced notifications
-- Refund workflow
+- Automated payment gateway refunds and line-item refunds (order-level Refund V1 is included)
 - Advanced reporting
 - Advanced warehouse management
 - Storage movement history

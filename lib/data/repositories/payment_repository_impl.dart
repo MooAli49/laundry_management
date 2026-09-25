@@ -8,6 +8,7 @@ import '../../domain/repositories/payment_repository.dart';
 import '../../domain/value_objects/money.dart';
 import '../local/daos/orders_dao.dart';
 import '../local/daos/payments_dao.dart';
+import '../local/daos/refunds_dao.dart';
 import '../local/daos/sync_operations_dao.dart';
 import '../local/database/app_database.dart' as app_db;
 import '../sync/sync_payload_builder.dart';
@@ -134,9 +135,12 @@ class PaymentRepositoryImpl implements PaymentRepository {
       if (order == null) {
         throw ValidationFailure('Order with id $orderId not found');
       }
+      if (order.status == 'cancelled') {
+        return Money.zero;
+      }
       final paidPiastres = await _paymentsDao.getTotalPaidForOrder(orderId);
       final remaining = order.total - paidPiastres;
-      return Money.fromPiastres(remaining);
+      return Money.fromPiastres(remaining > 0 ? remaining : 0);
     } catch (e) {
       if (e is Failure) rethrow;
       throw DatabaseFailure(e.toString());
@@ -150,14 +154,20 @@ class PaymentRepositoryImpl implements PaymentRepository {
     try {
       if (orderIds.isEmpty) return {};
       final paidMap = await _paymentsDao.getTotalPaidForOrders(orderIds);
+      final refundedMap = await RefundsDao(
+        _db,
+      ).getTotalRefundedForOrders(orderIds);
       final orders = await _ordersDao.getOrdersByIds(orderIds);
       final summaries = <String, OrderPaymentSummary>{};
 
       for (final order in orders) {
         final paidPiastres = paidMap[order.id] ?? 0;
-        final remainingPiastres = order.total - paidPiastres;
+        final refundedPiastres = refundedMap[order.id] ?? 0;
+        final isCancelled = order.status == 'cancelled';
+        final remainingPiastres = isCancelled ? 0 : (order.total - paidPiastres);
         summaries[order.id] = OrderPaymentSummary(
           totalPaid: Money.fromPiastres(paidPiastres),
+          totalRefunded: Money.fromPiastres(refundedPiastres),
           remaining: Money.fromPiastres(
             remainingPiastres > 0 ? remainingPiastres : 0,
           ),

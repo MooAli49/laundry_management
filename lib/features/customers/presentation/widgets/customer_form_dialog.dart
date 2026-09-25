@@ -15,6 +15,7 @@ class CustomerFormDialog extends StatefulWidget {
   final Future<void> Function({
     required String name,
     required String phone,
+    String? address,
     String? notes,
   })
   onSave;
@@ -36,6 +37,7 @@ class CustomerFormDialog extends StatefulWidget {
 class _CustomerFormDialogState extends State<CustomerFormDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
+  late final TextEditingController _addressController;
   late final TextEditingController _notesController;
 
   bool _isLoading = false;
@@ -51,6 +53,9 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
     _phoneController = TextEditingController(
       text: widget.customer?.phone ?? '',
     );
+    _addressController = TextEditingController(
+      text: widget.customer?.address ?? '',
+    );
     _notesController = TextEditingController(
       text: widget.customer?.notes ?? '',
     );
@@ -60,6 +65,7 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _addressController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -97,10 +103,14 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
       _duplicateCustomer = null;
     });
 
+    final rawAddress = _addressController.text.trim();
+    final address = rawAddress.isNotEmpty ? rawAddress : null;
+
     try {
       await widget.onSave(
         name: name,
         phone: phone,
+        address: address,
         notes: _notesController.text.trim().isNotEmpty
             ? _notesController.text.trim()
             : null,
@@ -238,6 +248,14 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
                 label: AppStrings.customerPhoneLabel,
                 hintText: AppStrings.customerPhoneHint,
                 keyboardType: TextInputType.phone,
+              ),
+              AppSpacing.gapMd,
+
+              AppTextField(
+                controller: _addressController,
+                label: AppStrings.customerAddressLabel,
+                hintText: AppStrings.customerAddressHint,
+                maxLines: 2,
               ),
               AppSpacing.gapMd,
 

@@ -10,6 +10,7 @@ import 'package:laundry_management/data/local/daos/customers_dao.dart';
 import 'package:laundry_management/data/local/daos/item_definitions_dao.dart';
 import 'package:laundry_management/data/local/daos/item_types_dao.dart';
 import 'package:laundry_management/data/local/daos/orders_dao.dart';
+import 'package:laundry_management/data/local/daos/payments_dao.dart';
 import 'package:laundry_management/data/local/daos/services_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
@@ -80,6 +81,7 @@ void main() {
 
     orderRepository = OrderRepositoryImpl(
       ordersDao: ordersDao,
+      paymentsDao: PaymentsDao(db),
       storageRecordsDao: storageRecordsDao,
       syncOperationsDao: syncOperationsDao,
       db: db,

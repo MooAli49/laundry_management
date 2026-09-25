@@ -5,6 +5,7 @@ import 'package:laundry_management/data/datasources/remote/expense_remote_api.da
 import 'package:laundry_management/data/datasources/remote/master_data_remote_api.dart';
 import 'package:laundry_management/data/datasources/remote/order_remote_api.dart';
 import 'package:laundry_management/data/datasources/remote/payment_remote_api.dart';
+import 'package:laundry_management/data/datasources/remote/refund_remote_api.dart';
 import 'package:laundry_management/data/datasources/remote/storage_remote_api.dart';
 
 void main() {
@@ -130,6 +131,34 @@ void main() {
           expect(lastRequest?.data, equals(payload));
         },
       );
+
+      test(
+        'editOrderAggregate issues PATCH /api/v1/orders/{id}/edit-aggregate with X-Operation-ID header',
+        () async {
+          final payload = {
+            'notes': 'updated notes',
+            'items': [
+              {'id': 'oi-1', 'unit_price': 1500}
+            ],
+          };
+          await api.editOrderAggregate(
+            'op-uuid-order-edit',
+            'ord-123',
+            payload,
+          );
+
+          expect(lastRequest?.method, equals('PATCH'));
+          expect(
+            lastRequest?.path,
+            equals('/api/v1/orders/ord-123/edit-aggregate'),
+          );
+          expect(
+            lastRequest?.headers['X-Operation-ID'],
+            equals('op-uuid-order-edit'),
+          );
+          expect(lastRequest?.data, equals(payload));
+        },
+      );
     });
 
     group('PaymentRemoteApi', () {
@@ -165,6 +194,37 @@ void main() {
         expect(lastRequest?.method, equals('GET'));
         expect(lastRequest?.path, equals('/api/v1/payments/p-123'));
       });
+    });
+
+    group('RefundRemoteApi', () {
+      late RefundRemoteApi api;
+
+      setUp(() {
+        api = RefundRemoteApi(dio);
+      });
+
+      test(
+        'createRefund issues POST /api/v1/refunds with X-Operation-ID header and payload',
+        () async {
+          final payload = {
+            'id': 'ref-uuid-1',
+            'order_id': 'ord-uuid-1',
+            'amount': 3000,
+            'refund_method': 'cash',
+            'reason': 'Customer returned item',
+            'refunded_at': '2026-09-24T12:00:00.000Z',
+          };
+          await api.createRefund('op-uuid-refund', payload);
+
+          expect(lastRequest?.method, equals('POST'));
+          expect(lastRequest?.path, equals('/api/v1/refunds'));
+          expect(
+            lastRequest?.headers['X-Operation-ID'],
+            equals('op-uuid-refund'),
+          );
+          expect(lastRequest?.data, equals(payload));
+        },
+      );
     });
 
     group('StorageRemoteApi', () {

@@ -40,6 +40,12 @@ class CustomerDetailViewModel {
              totalRemaining: remainingAmounts != null
                  ? remainingAmounts.values.fold(Money.zero, (sum, r) => sum + r)
                  : Money.zero,
+             totalRefunds: paymentSummaries != null
+                 ? paymentSummaries.values.fold(
+                     Money.zero,
+                     (sum, s) => sum + s.totalRefunded,
+                   )
+                 : Money.zero,
            ),
        paymentSummaries =
            paymentSummaries ??
@@ -48,6 +54,7 @@ class CustomerDetailViewModel {
                order.id: OrderPaymentSummary(
                  totalPaid: paidAmounts?[order.id] ?? Money.zero,
                  remaining: remainingAmounts?[order.id] ?? Money.zero,
+                 totalRefunded: Money.zero,
                ),
            };
 
@@ -58,6 +65,8 @@ class CustomerDetailViewModel {
 
   Money get totalPaid => aggregate.totalPaid;
   Money get totalRemaining => aggregate.totalRemaining;
+  Money get totalRefunds => aggregate.totalRefunds;
+  Money get netPaid => aggregate.netPaid;
 
   Map<String, Money> get remainingAmounts => {
     for (final entry in paymentSummaries.entries)

@@ -8,6 +8,7 @@ import '../../../../domain/entities/customer.dart';
 import '../../../../domain/entities/item_definition.dart';
 import '../../../../domain/entities/item_type.dart';
 import '../../../../domain/entities/service.dart';
+import '../../../../domain/enums/payment_method.dart';
 import '../../../../domain/enums/pricing_type.dart';
 import '../../../../domain/repositories/carpet_size_repository.dart';
 import '../../../../domain/repositories/customer_repository.dart';
@@ -119,10 +120,13 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
   Future<Customer> addNewCustomer({
     required String name,
     required String phone,
+    String? address,
     String? notes,
   }) async {
     final trimmedName = name.trim();
     final trimmedPhone = phone.trim();
+    final trimmedAddress =
+        address?.trim().isNotEmpty == true ? address!.trim() : null;
 
     if (trimmedName.isEmpty) {
       throw const ValidationFailure('اسم العميل مطلوب');
@@ -141,6 +145,7 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
       id: _uuid.v4(),
       name: trimmedName,
       phone: trimmedPhone,
+      address: trimmedAddress,
       notes: notes?.trim().isNotEmpty == true ? notes!.trim() : null,
       createdAt: now,
       updatedAt: now,
@@ -305,19 +310,21 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
     final updatedItems = List<OrderItemDraft>.from(state.items)..add(draftItem);
 
     emit(
-      state.copyWith(
-        items: updatedItems,
-        clearDraftItemType: true,
-        clearDraftItemDefinition: true,
-        clearDraftService: true,
-        clearDraftCarpetSize: true,
-        draftCarpetLength: 0.0,
-        draftCarpetWidth: 0.0,
-        clearDraftNotes: true,
-        draftQuantity: 1,
-        compatibleServices: [],
-        itemDefinitions: [],
-        clearErrorMessage: true,
+      _enforcePaymentInvariant(
+        state.copyWith(
+          items: updatedItems,
+          clearDraftItemType: true,
+          clearDraftItemDefinition: true,
+          clearDraftService: true,
+          clearDraftCarpetSize: true,
+          draftCarpetLength: 0.0,
+          draftCarpetWidth: 0.0,
+          clearDraftNotes: true,
+          draftQuantity: 1,
+          compatibleServices: [],
+          itemDefinitions: [],
+          clearErrorMessage: true,
+        ),
       ),
     );
   }
@@ -326,7 +333,7 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
     if (index >= 0 && index < state.items.length) {
       final updatedItems = List<OrderItemDraft>.from(state.items)
         ..removeAt(index);
-      emit(state.copyWith(items: updatedItems));
+      emit(_enforcePaymentInvariant(state.copyWith(items: updatedItems)));
     }
   }
 
@@ -345,7 +352,11 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
       emit(state.copyWith(errorMessage: 'الخصم لا يمكن أن يكون سالباً'));
       return;
     }
-    emit(state.copyWith(discount: discount, clearErrorMessage: true));
+    emit(
+      _enforcePaymentInvariant(
+        state.copyWith(discount: discount, clearErrorMessage: true),
+      ),
+    );
   }
 
   void updateOrderNotes(String? notes) {
@@ -359,15 +370,69 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
     Money? deliveryFee,
   }) {
     emit(
-      state.copyWith(
-        customerPickupRequested:
-            pickupRequested ?? state.customerPickupRequested,
-        customerPickupFee: pickupFee ?? state.customerPickupFee,
-        customerDeliveryRequested:
-            deliveryRequested ?? state.customerDeliveryRequested,
-        customerDeliveryFee: deliveryFee ?? state.customerDeliveryFee,
+      _enforcePaymentInvariant(
+        state.copyWith(
+          customerPickupRequested:
+              pickupRequested ?? state.customerPickupRequested,
+          customerPickupFee: pickupFee ?? state.customerPickupFee,
+          customerDeliveryRequested:
+              deliveryRequested ?? state.customerDeliveryRequested,
+          customerDeliveryFee: deliveryFee ?? state.customerDeliveryFee,
+        ),
       ),
     );
+  }
+
+  void toggleInitialPayment(bool enabled) {
+    emit(
+      state.copyWith(
+        isInitialPaymentEnabled: enabled,
+        initialPaymentAmount: enabled ? state.initialPaymentAmount : Money.zero,
+      ),
+    );
+  }
+
+  void updateInitialPaymentAmount(Money amount) {
+    if (amount.isNegative) {
+      emit(
+        state.copyWith(
+          initialPaymentAmount: Money.zero,
+          errorMessage: 'مبلغ الدفعة لا يمكن أن يكون سالباً',
+        ),
+      );
+      return;
+    }
+    if (amount > state.total) {
+      emit(
+        state.copyWith(
+          initialPaymentAmount: state.total,
+          errorMessage: 'مبلغ الدفعة لا يمكن أن يتجاوز إجمالي الطلب',
+        ),
+      );
+      return;
+    }
+    emit(state.copyWith(initialPaymentAmount: amount, clearErrorMessage: true));
+  }
+
+  void setFullInitialPayment() {
+    emit(
+      state.copyWith(
+        isInitialPaymentEnabled: true,
+        initialPaymentAmount: state.total,
+        clearErrorMessage: true,
+      ),
+    );
+  }
+
+  void updateInitialPaymentMethod(PaymentMethod method) {
+    emit(state.copyWith(initialPaymentMethod: method));
+  }
+
+  CreateOrderState _enforcePaymentInvariant(CreateOrderState s) {
+    if (s.isInitialPaymentEnabled && s.initialPaymentAmount > s.total) {
+      return s.copyWith(initialPaymentAmount: s.total);
+    }
+    return s;
   }
 
   Future<void> submitOrder() async {
@@ -390,6 +455,15 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
     if (state.discount > state.subtotal) {
       emit(
         state.copyWith(errorMessage: 'الخصم لا يمكن أن يتجاوز المجموع الفرعي'),
+      );
+      return;
+    }
+    if (state.isInitialPaymentEnabled &&
+        state.initialPaymentAmount > state.total) {
+      emit(
+        state.copyWith(
+          errorMessage: 'مبلغ الدفعة المقدمة لا يمكن أن يتجاوز إجمالي الطلب',
+        ),
       );
       return;
     }
@@ -418,6 +492,15 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
         );
       }).toList();
 
+      InitialPaymentInput? initialPaymentInput;
+      if (state.isInitialPaymentEnabled &&
+          state.initialPaymentAmount > Money.zero) {
+        initialPaymentInput = InitialPaymentInput(
+          amount: state.initialPaymentAmount,
+          paymentMethod: state.initialPaymentMethod,
+        );
+      }
+
       final input = CreateOrderInput(
         customerId: state.selectedCustomer!.id,
         expectedPickupDate: state.expectedPickupDate,
@@ -429,7 +512,9 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
         customerDeliveryRequested: state.customerDeliveryRequested,
         customerDeliveryFee: state.effectiveDeliveryFee,
         discount: state.discount,
+        tax: state.tax, // V1: always Money.zero — see CreateOrderState.tax
         items: createOrderItemsInput,
+        initialPayment: initialPaymentInput,
       );
 
       final order = await _createOrderUseCase.execute(input);

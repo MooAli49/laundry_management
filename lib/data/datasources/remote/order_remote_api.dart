@@ -31,4 +31,11 @@ abstract class OrderRemoteApi {
     @Path('id') String id,
     @Body() Map<String, dynamic> body,
   );
+
+  @PATCH('/api/v1/orders/{id}/edit-aggregate')
+  Future<dynamic> editOrderAggregate(
+    @Header('X-Operation-ID') String operationId,
+    @Path('id') String id,
+    @Body() Map<String, dynamic> body,
+  );
 }

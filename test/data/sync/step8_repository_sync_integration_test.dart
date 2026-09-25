@@ -9,10 +9,12 @@ import 'package:laundry_management/data/datasources/remote/expense_remote_api.da
 import 'package:laundry_management/data/datasources/remote/master_data_remote_api.dart';
 import 'package:laundry_management/data/datasources/remote/order_remote_api.dart';
 import 'package:laundry_management/data/datasources/remote/payment_remote_api.dart';
+import 'package:laundry_management/data/datasources/remote/refund_remote_api.dart';
 import 'package:laundry_management/data/datasources/remote/remote_api_dispatcher.dart';
 import 'package:laundry_management/data/datasources/remote/storage_remote_api.dart';
 import 'package:laundry_management/data/local/daos/customers_dao.dart';
 import 'package:laundry_management/data/local/daos/orders_dao.dart';
+import 'package:laundry_management/data/local/daos/payments_dao.dart';
 import 'package:laundry_management/data/local/daos/services_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_locations_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
@@ -121,6 +123,15 @@ class FakeOrderRemoteApi implements OrderRemoteApi {
   }
 
   @override
+  Future editOrderAggregate(
+    String operationId,
+    String id,
+    Map<String, dynamic> body,
+  ) async {
+    return {'status': 'ok'};
+  }
+
+  @override
   Future getOrderById(String id) async => null;
 
   @override
@@ -183,6 +194,11 @@ class FakePaymentRemoteApi implements PaymentRemoteApi {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class FakeRefundRemoteApi implements RefundRemoteApi {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 class FakeExpenseRemoteApi implements ExpenseRemoteApi {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -229,6 +245,7 @@ void main() {
 
     orderRepo = OrderRepositoryImpl(
       ordersDao: ordersDao,
+      paymentsDao: PaymentsDao(db),
       storageRecordsDao: storageRecordsDao,
       syncOperationsDao: syncOperationsDao,
       db: db,
@@ -257,6 +274,7 @@ void main() {
       customerApi: customerApi,
       orderApi: orderApi,
       paymentApi: FakePaymentRemoteApi(),
+      refundApi: FakeRefundRemoteApi(),
       storageApi: storageApi,
       expenseApi: FakeExpenseRemoteApi(),
       masterDataApi: masterDataApi,

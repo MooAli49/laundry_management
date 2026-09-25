@@ -650,9 +650,7 @@ Implement:
 
 ## Order Number
 
-Format:
-
-YY-XXX (e.g. 26-001)
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length (e.g. 26-001, 26-999, 26-1000).
 
 ## Order Requirements
 

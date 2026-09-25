@@ -16,6 +16,7 @@ import '../tables/order_item_carpets_table.dart';
 import '../tables/order_items_table.dart';
 import '../tables/orders_table.dart';
 import '../tables/payments_table.dart';
+import '../tables/refunds_table.dart';
 import '../tables/service_item_types_table.dart';
 import '../tables/services_table.dart';
 import '../tables/storage_location_item_types_table.dart';
@@ -34,6 +35,7 @@ part 'app_database.g.dart';
     OrderItems,
     OrderItemCarpets,
     Payments,
+    Refunds,
     StorageLocations,
     StorageRecords,
     ItemTypes,
@@ -53,7 +55,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -101,6 +103,18 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 4) {
         await m.createTable(syncStates);
+      }
+      if (from < 5) {
+        await m.createTable(refunds);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_refunds_order_id ON refunds(order_id);',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_refunds_refunded_at ON refunds(refunded_at);',
+        );
+      }
+      if (from < 6) {
+        await m.addColumn(customers, customers.address);
       }
     },
     beforeOpen: (OpeningDetails details) async {
@@ -150,6 +164,13 @@ class AppDatabase extends _$AppDatabase {
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_payments_paid_at ON payments(paid_at);',
+    );
+
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_refunds_order_id ON refunds(order_id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_refunds_refunded_at ON refunds(refunded_at);',
     );
 
     await customStatement(

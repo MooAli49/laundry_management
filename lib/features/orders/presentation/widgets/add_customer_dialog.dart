@@ -11,6 +11,7 @@ class AddCustomerDialog extends StatefulWidget {
   final Future<void> Function({
     required String name,
     required String phone,
+    String? address,
     String? notes,
   })
   onSave;
@@ -24,6 +25,7 @@ class AddCustomerDialog extends StatefulWidget {
 class _AddCustomerDialogState extends State<AddCustomerDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
+  final TextEditingController _addressController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
 
   String? _errorMessage;
@@ -43,6 +45,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _addressController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -50,6 +53,8 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
   Future<void> _handleSave() async {
     final name = _nameController.text.trim();
     final phone = _phoneController.text.trim();
+    final rawAddress = _addressController.text.trim();
+    final address = rawAddress.isNotEmpty ? rawAddress : null;
 
     if (name.isEmpty) {
       setState(() => _errorMessage = 'اسم العميل مطلوب');
@@ -69,6 +74,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       await widget.onSave(
         name: name,
         phone: phone,
+        address: address,
         notes: _notesController.text.trim().isNotEmpty
             ? _notesController.text.trim()
             : null,
@@ -145,6 +151,14 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                 label: 'رقم الهاتف *',
                 hintText: 'مثال: 01012345678',
                 keyboardType: TextInputType.phone,
+              ),
+              AppSpacing.gapMd,
+
+              AppTextField(
+                controller: _addressController,
+                label: 'العنوان',
+                hintText: 'مثال: 12 شارع الجمهورية',
+                maxLines: 2,
               ),
               AppSpacing.gapMd,
 
