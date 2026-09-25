@@ -63,3 +63,53 @@ dart run build_runner build --delete-conflicting-outputs
   ```
   > [!IMPORTANT]
   > Live Supabase integration tests execute against a shared development backend instance. Running the full suite with `--concurrency=1` prevents database row contention and race conditions during live synchronization and RPC verification.
+
+---
+
+## Building & Release
+
+### Debug / Development Mode
+In debug and profile modes, the app automatically falls back to development Supabase credentials without requiring flags:
+```bash
+flutter run
+```
+
+### Release Mode (RISK-002 Security Rule)
+To prevent accidental connection to development backends in production environments, release builds strictly require explicit compile-time Supabase configuration via `--dart-define`. Building or running in release mode without these values throws a `StateError` during startup.
+
+#### 1. Build Release APK (Direct Command)
+```bash
+flutter build apk --release \
+  --dart-define=SUPABASE_URL_ROOT=https://<your-project>.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=<your-anon-key>
+```
+
+#### 2. Run in Release Mode
+```bash
+flutter run --release \
+  --dart-define=SUPABASE_URL_ROOT=https://<your-project>.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=<your-anon-key>
+```
+
+#### 3. Using Define Files (`--dart-define-from-file`)
+Copy `scripts/release_env.json.example` to `scripts/release_env.json` (ignored by git):
+```json
+{
+  "SUPABASE_URL_ROOT": "https://<your-project>.supabase.co",
+  "SUPABASE_ANON_KEY": "<your-anon-key>"
+}
+```
+And build using:
+```bash
+flutter build apk --release --dart-define-from-file=scripts/release_env.json
+```
+
+#### 4. Helper Build Scripts
+- **PowerShell (Windows)**:
+  ```powershell
+  .\scripts\build_release.ps1 -SupabaseUrlRoot "https://<your-project>.supabase.co" -SupabaseAnonKey "<your-anon-key>"
+  ```
+- **Bash (Linux/macOS)**:
+  ```bash
+  ./scripts/build_release.sh "https://<your-project>.supabase.co" "<your-anon-key>"
+  ```

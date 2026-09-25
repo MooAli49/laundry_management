@@ -188,6 +188,34 @@ void main() {
           expect(config.anonKey, equals('prod-public-anon-key-67890'));
         },
       );
+
+      test(
+        'resolve(isRelease: true) isolates release configuration from development defaults',
+        () {
+          expect(SupabaseConfig.envUrlRoot, isA<String>());
+          expect(SupabaseConfig.envUrl, isA<String>());
+          expect(SupabaseConfig.envAnonKey, isA<String>());
+
+          final config = SupabaseConfig.resolve(
+            customUrlRoot: 'https://prod-project.supabase.co',
+            customAnonKey: 'prod-public-anon-key-12345',
+            isRelease: true,
+          );
+
+          expect(
+            config.urlRoot,
+            isNot(equals(SupabaseConfig.defaultDevUrlRoot)),
+          );
+          expect(
+            config.apiUrl,
+            isNot(equals(SupabaseConfig.defaultDevApiUrl)),
+          );
+          expect(
+            config.anonKey,
+            isNot(equals(SupabaseConfig.defaultDevAnonKey)),
+          );
+        },
+      );
     });
 
     group('URL Format Validation', () {

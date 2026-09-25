@@ -121,3 +121,25 @@ The following items are intentionally deferred from V1 and are documented as out
 ## 8. Known Informational Observations
 
 - **Emulator Cold-Start Performance**: On initial cold launch under Debug mode on the Android emulator, the Choreographer logs minor initial frame skips (`Skipped 69 frames` / `Width is zero`) during Impeller OpenGL shader compilation. This is an emulator/debug-only compilation artifact. Background sync runs asynchronously without blocking the UI thread, and the dashboard renders smoothly and responsively.
+
+---
+
+## 9. Release Build Configuration (RISK-002)
+
+To satisfy security requirement RISK-002, [SupabaseConfig](file:///d:/projects/laundry_management/lib/core/config/supabase_config.dart) strictly prevents release builds from falling back to development credentials. Launching a release build without explicit credentials throws a `StateError` during startup.
+
+### Required Compile-Time Environment Variables
+- `SUPABASE_URL_ROOT`: Supabase project URL root (or `SUPABASE_URL`)
+- `SUPABASE_ANON_KEY`: Supabase public anonymous API key
+
+### Exact Build Command
+```bash
+flutter build apk --release \
+  --dart-define=SUPABASE_URL_ROOT=https://<your-project>.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=<your-production-anon-key>
+```
+
+### Reproducible Build Scripts
+- PowerShell: `.\scripts\build_release.ps1 -SupabaseUrlRoot "..." -SupabaseAnonKey "..."`
+- Bash: `./scripts/build_release.sh "..." "..."`
+- Configuration File: `scripts/release_env.json` (template in `scripts/release_env.json.example`, ignored by git) via `--dart-define-from-file=scripts/release_env.json`
