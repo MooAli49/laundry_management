@@ -1,6 +1,8 @@
+import '../../application/use_cases/edit_processing_order_use_case.dart';
 import '../entities/customer_order_aggregate.dart';
 import '../entities/order.dart';
 import '../entities/order_item.dart';
+import '../entities/payment.dart';
 import '../enums/order_status.dart';
 import '../value_objects/order_date.dart';
 
@@ -8,7 +10,10 @@ abstract class OrderRepository {
   Future<Order> createOrder({
     required Order order,
     required List<OrderItem> items,
+    Payment? initialPayment,
   });
+
+  Future<Order> editProcessingOrder(EditProcessingOrderInput input);
 
   Future<Order> updateOrder(Order order);
 
@@ -25,6 +30,7 @@ abstract class OrderRepository {
     List<OrderStatus>? excludedStatuses,
     OrderDate? expectedPickupDate,
     bool? isOverdue,
+    DateTime? referenceDate,
     DateTime? createdFrom,
     DateTime? createdTo,
     String? customerId,
@@ -43,6 +49,8 @@ abstract class OrderRepository {
   Stream<List<Order>> watchRecentOrders({int limit = 20});
 
   Stream<Order?> watchOrderById(String id);
+
+  Stream<void> watchOrderTableUpdates();
 
   Future<Order> markOrderReady(String orderId);
 
@@ -66,7 +74,9 @@ abstract class OrderRepository {
 
   Future<Map<String, int>> getOrderCountsByCustomer();
 
-  Future<Map<String, int>> getOrderCountsByCustomerIds(List<String> customerIds);
+  Future<Map<String, int>> getOrderCountsByCustomerIds(
+    List<String> customerIds,
+  );
 
   Future<CustomerOrderAggregate> getCustomerOrderAggregate(String customerId);
 }

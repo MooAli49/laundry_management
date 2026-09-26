@@ -5,6 +5,7 @@ import '../../../../domain/entities/item_definition.dart';
 import '../../../../domain/entities/item_type.dart';
 import '../../../../domain/entities/order.dart';
 import '../../../../domain/entities/service.dart';
+import '../../../../domain/enums/payment_method.dart';
 import '../../../../domain/value_objects/money.dart';
 import '../../../../domain/value_objects/order_date.dart';
 import '../models/order_item_draft.dart';
@@ -44,6 +45,11 @@ class CreateOrderState {
   final bool customerDeliveryRequested;
   final Money customerDeliveryFee;
 
+  // Initial Payment Fields
+  final bool isInitialPaymentEnabled;
+  final Money initialPaymentAmount;
+  final PaymentMethod initialPaymentMethod;
+
   final bool isSubmitting;
   final String? errorMessage;
   final Order? createdOrder;
@@ -75,6 +81,9 @@ class CreateOrderState {
     this.customerPickupFee = Money.zero,
     this.customerDeliveryRequested = false,
     this.customerDeliveryFee = Money.zero,
+    this.isInitialPaymentEnabled = false,
+    this.initialPaymentAmount = Money.zero,
+    this.initialPaymentMethod = PaymentMethod.cash,
     this.isSubmitting = false,
     this.errorMessage,
     this.createdOrder,
@@ -96,22 +105,31 @@ class CreateOrderState {
 
   Money get totalDeliveryFees => effectivePickupFee + effectiveDeliveryFee;
 
-  Money get tax {
-    if (settings != null && settings!.taxEnabled && settings!.taxRate > 0) {
-      final taxableBase = subtotal - discount;
-      if (taxableBase.isPositive) {
-        return Money.fromPiastres(
-          (taxableBase.piastres * (settings!.taxRate / 100.0)).round(),
-        );
-      }
-    }
-    return Money.zero;
-  }
+  /// V1: Tax is always zero — tax is architecturally supported but disabled
+  /// for V1. When tax is re-enabled (future), restore the computation below
+  /// and guard it with [settings.taxEnabled] && [settings.taxRate] > 0.
+  ///
+  /// Future implementation (do NOT activate in V1):
+  ///   if (settings != null && settings!.taxEnabled && settings!.taxRate > 0) {
+  ///     final taxableBase = subtotal - discount;
+  ///     if (taxableBase.isPositive) {
+  ///       return Money.fromPiastres(
+  ///         (taxableBase.piastres * (settings!.taxRate / 100.0)).round(),
+  ///       );
+  ///     }
+  ///   }
+  Money get tax => Money.zero;
 
   Money get total {
     final base = subtotal - discount;
     final nonNegativeBase = base.isNegative ? Money.zero : base;
     return nonNegativeBase + totalDeliveryFees + tax;
+  }
+
+  Money get remainingAmount {
+    final paid = isInitialPaymentEnabled ? initialPaymentAmount : Money.zero;
+    final rem = total - paid;
+    return rem.isNegative ? Money.zero : rem;
   }
 
   CreateOrderState copyWith({
@@ -147,6 +165,9 @@ class CreateOrderState {
     Money? customerPickupFee,
     bool? customerDeliveryRequested,
     Money? customerDeliveryFee,
+    bool? isInitialPaymentEnabled,
+    Money? initialPaymentAmount,
+    PaymentMethod? initialPaymentMethod,
     bool? isSubmitting,
     String? errorMessage,
     bool clearErrorMessage = false,
@@ -165,13 +186,15 @@ class CreateOrderState {
       itemDefinitions: itemDefinitions ?? this.itemDefinitions,
       carpetSizes: carpetSizes ?? this.carpetSizes,
       settings: settings ?? this.settings,
-      draftItemType:
-          clearDraftItemType ? null : (draftItemType ?? this.draftItemType),
+      draftItemType: clearDraftItemType
+          ? null
+          : (draftItemType ?? this.draftItemType),
       draftItemDefinition: clearDraftItemDefinition
           ? null
           : (draftItemDefinition ?? this.draftItemDefinition),
-      draftService:
-          clearDraftService ? null : (draftService ?? this.draftService),
+      draftService: clearDraftService
+          ? null
+          : (draftService ?? this.draftService),
       draftUnitPrice: draftUnitPrice ?? this.draftUnitPrice,
       draftQuantity: draftQuantity ?? this.draftQuantity,
       draftCarpetSize: clearDraftCarpetSize
@@ -179,8 +202,7 @@ class CreateOrderState {
           : (draftCarpetSize ?? this.draftCarpetSize),
       draftCarpetLength: draftCarpetLength ?? this.draftCarpetLength,
       draftCarpetWidth: draftCarpetWidth ?? this.draftCarpetWidth,
-      draftNotes:
-          clearDraftNotes ? null : (draftNotes ?? this.draftNotes),
+      draftNotes: clearDraftNotes ? null : (draftNotes ?? this.draftNotes),
       items: items ?? this.items,
       expectedPickupDate: expectedPickupDate ?? this.expectedPickupDate,
       discount: discount ?? this.discount,
@@ -191,9 +213,14 @@ class CreateOrderState {
       customerDeliveryRequested:
           customerDeliveryRequested ?? this.customerDeliveryRequested,
       customerDeliveryFee: customerDeliveryFee ?? this.customerDeliveryFee,
+      isInitialPaymentEnabled:
+          isInitialPaymentEnabled ?? this.isInitialPaymentEnabled,
+      initialPaymentAmount: initialPaymentAmount ?? this.initialPaymentAmount,
+      initialPaymentMethod: initialPaymentMethod ?? this.initialPaymentMethod,
       isSubmitting: isSubmitting ?? this.isSubmitting,
-      errorMessage:
-          clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
       createdOrder: createdOrder ?? this.createdOrder,
     );
   }

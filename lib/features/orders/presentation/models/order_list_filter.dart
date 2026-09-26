@@ -37,7 +37,7 @@ enum OrderListFilter {
   static OrderListFilter fromString(String? val) {
     if (val == null) return OrderListFilter.all;
     for (final f in OrderListFilter.values) {
-      if (f.name == val) return f;
+      if (f.name == val || f.label == val) return f;
     }
     return OrderListFilter.all;
   }

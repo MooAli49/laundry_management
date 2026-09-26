@@ -712,21 +712,17 @@ Do not introduce network calls into local workflows simply to validate or persis
 
 ## 38. Synchronization
 
-Synchronization execution is deferred.
+The project has entered the Offline / Sync Integration phase.
 
-The codebase may contain synchronization-ready infrastructure.
+Core synchronization infrastructure (Sync Queue, atomic enqueue, Sync Engine, Retrofit + Dio remote communication, idempotent retries) is now active.
 
-Do not implement advanced synchronization behavior before the synchronization phase is explicitly started.
-
-Do not add:
+The following remain deferred from this phase:
 
 - Real-time sync
-- Background sync
+- Platform-specific background sync
 - CRDTs
-- Advanced conflict resolution
+- Advanced multi-device distributed conflict resolution
 - Distributed locking
-
-without approval.
 
 ## 39. Logging
 
@@ -883,9 +879,18 @@ Do not implement active Tax calculation.
 
 ## 48. Order Number
 
-Order numbers follow:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length:
 
-YY-XXX (e.g. 26-001)
+- YY = 2-digit year prefix.
+- Numeric sequence only with minimum 3 digits (values below 1000 are zero-padded).
+- No maximum length (valid values include 26-001, 26-999, 26-1000, 26-10000).
+- Non-numeric or alphanumeric values (e.g. 26-T123) are not valid business order numbers.
+
+Examples:
+
+    26-001
+    26-999
+    26-1000
 
 Do not change the approved format.
 

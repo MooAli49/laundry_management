@@ -4,7 +4,9 @@ import '../../core/errors/failures.dart';
 import '../../domain/entities/carpet_item_data.dart';
 import '../../domain/entities/order.dart';
 import '../../domain/entities/order_item.dart';
+import '../../domain/entities/payment.dart';
 import '../../domain/enums/order_status.dart';
+import '../../domain/enums/payment_method.dart';
 import '../../domain/enums/pricing_type.dart';
 import '../../domain/repositories/customer_repository.dart';
 import '../../domain/repositories/item_definition_repository.dart';
@@ -46,6 +48,16 @@ class CarpetItemInput {
   });
 }
 
+class InitialPaymentInput {
+  final Money amount;
+  final PaymentMethod paymentMethod;
+
+  const InitialPaymentInput({
+    required this.amount,
+    this.paymentMethod = PaymentMethod.cash,
+  });
+}
+
 class CreateOrderInput {
   final String customerId;
   final OrderDate expectedPickupDate;
@@ -55,7 +67,9 @@ class CreateOrderInput {
   final bool customerDeliveryRequested;
   final Money customerDeliveryFee;
   final Money discount;
+  final Money tax;
   final List<CreateOrderItemInput> items;
+  final InitialPaymentInput? initialPayment;
 
   const CreateOrderInput({
     required this.customerId,
@@ -66,7 +80,9 @@ class CreateOrderInput {
     this.customerDeliveryRequested = false,
     this.customerDeliveryFee = Money.zero,
     this.discount = Money.zero,
+    this.tax = Money.zero,
     required this.items,
+    this.initialPayment,
   });
 }
 
@@ -85,12 +101,12 @@ class CreateOrderUseCase {
     required ItemTypeRepository itemTypeRepository,
     required ItemDefinitionRepository itemDefinitionRepository,
     Uuid? uuid,
-  })  : _orderRepository = orderRepository,
-        _customerRepository = customerRepository,
-        _serviceRepository = serviceRepository,
-        _itemTypeRepository = itemTypeRepository,
-        _itemDefinitionRepository = itemDefinitionRepository,
-        _uuid = uuid ?? const Uuid();
+  }) : _orderRepository = orderRepository,
+       _customerRepository = customerRepository,
+       _serviceRepository = serviceRepository,
+       _itemTypeRepository = itemTypeRepository,
+       _itemDefinitionRepository = itemDefinitionRepository,
+       _uuid = uuid ?? const Uuid();
 
   Future<Order> execute(CreateOrderInput input) async {
     if (input.items.isEmpty) {
@@ -98,10 +114,14 @@ class CreateOrderUseCase {
     }
 
     if (input.expectedPickupDate.isBeforeToday) {
-      throw const ValidationFailure('Expected pickup date cannot be in the past');
+      throw const ValidationFailure(
+        'Expected pickup date cannot be in the past',
+      );
     }
 
-    final customer = await _customerRepository.getCustomerById(input.customerId);
+    final customer = await _customerRepository.getCustomerById(
+      input.customerId,
+    );
     if (customer == null) {
       throw const ValidationFailure('Customer not found');
     }
@@ -112,11 +132,17 @@ class CreateOrderUseCase {
     if (input.customerDeliveryFee.isNegative) {
       throw const ValidationFailure('Delivery fee cannot be negative');
     }
-    if (!input.customerPickupRequested && input.customerPickupFee > Money.zero) {
-      throw const ValidationFailure('Pickup fee must be zero when pickup is not requested');
+    if (!input.customerPickupRequested &&
+        input.customerPickupFee > Money.zero) {
+      throw const ValidationFailure(
+        'Pickup fee must be zero when pickup is not requested',
+      );
     }
-    if (!input.customerDeliveryRequested && input.customerDeliveryFee > Money.zero) {
-      throw const ValidationFailure('Delivery fee must be zero when delivery is not requested');
+    if (!input.customerDeliveryRequested &&
+        input.customerDeliveryFee > Money.zero) {
+      throw const ValidationFailure(
+        'Delivery fee must be zero when delivery is not requested',
+      );
     }
 
     final orderId = _uuid.v4();
@@ -125,10 +151,14 @@ class CreateOrderUseCase {
 
     for (final itemInput in input.items) {
       if (itemInput.physicalQuantity <= 0) {
-        throw const ValidationFailure('Physical quantity must be greater than zero');
+        throw const ValidationFailure(
+          'Physical quantity must be greater than zero',
+        );
       }
 
-      final itemType = await _itemTypeRepository.getItemTypeById(itemInput.itemTypeId);
+      final itemType = await _itemTypeRepository.getItemTypeById(
+        itemInput.itemTypeId,
+      );
       if (itemType == null) {
         throw const ValidationFailure('Item type not found');
       }
@@ -138,7 +168,9 @@ class CreateOrderUseCase {
 
       String? itemDefinitionName;
       if (itemInput.itemDefinitionId != null) {
-        final itemDef = await _itemDefinitionRepository.getItemDefinitionById(itemInput.itemDefinitionId!);
+        final itemDef = await _itemDefinitionRepository.getItemDefinitionById(
+          itemInput.itemDefinitionId!,
+        );
         if (itemDef == null) {
           throw const ValidationFailure('Item definition not found');
         }
@@ -146,12 +178,16 @@ class CreateOrderUseCase {
           throw const BusinessRuleFailure('Item definition is inactive');
         }
         if (itemDef.itemTypeId != itemInput.itemTypeId) {
-          throw const BusinessRuleFailure('Item definition does not belong to the selected item type');
+          throw const BusinessRuleFailure(
+            'Item definition does not belong to the selected item type',
+          );
         }
         itemDefinitionName = itemDef.name;
       }
 
-      final service = await _serviceRepository.getServiceById(itemInput.serviceId);
+      final service = await _serviceRepository.getServiceById(
+        itemInput.serviceId,
+      );
       if (service == null) {
         throw const ValidationFailure('Service not found');
       }
@@ -159,7 +195,8 @@ class CreateOrderUseCase {
         throw const BusinessRuleFailure('Service is inactive');
       }
 
-      final compatibleServices = await _serviceRepository.getServicesForItemType(itemType.id);
+      final compatibleServices = await _serviceRepository
+          .getServicesForItemType(itemType.id);
       final isCompatible = compatibleServices.any((s) => s.id == service.id);
       if (!isCompatible) {
         throw IncompatibleServiceFailure(
@@ -168,16 +205,15 @@ class CreateOrderUseCase {
         );
       }
 
-      if (service.pricingType == PricingType.perKilogram) {
-        throw const BusinessRuleFailure('Per-Kilogram pricing is not supported in V1');
-      }
-
       final unitPrice = itemInput.customUnitPrice ?? service.price;
       if (unitPrice <= Money.zero) {
-        throw const ValidationFailure('Unit price must be strictly greater than zero');
+        throw const ValidationFailure(
+          'Unit price must be strictly greater than zero',
+        );
       }
 
-      if (service.pricingType != PricingType.perSquareMeter && itemInput.carpetData != null) {
+      if (service.pricingType != PricingType.perSquareMeter &&
+          itemInput.carpetData != null) {
         throw const ValidationFailure(
           'Carpet data is not allowed for non-carpet pricing types',
         );
@@ -185,14 +221,21 @@ class CreateOrderUseCase {
 
       if (service.pricingType == PricingType.perSquareMeter) {
         if (itemInput.carpetData == null) {
-          throw const ValidationFailure('Carpet data is required for per-square-meter services');
+          throw const ValidationFailure(
+            'Carpet data is required for per-square-meter services',
+          );
         }
-        if (itemInput.carpetData!.length <= 0 || itemInput.carpetData!.width <= 0) {
-          throw const ValidationFailure('Carpet dimensions must be greater than zero');
+        if (itemInput.carpetData!.length <= 0 ||
+            itemInput.carpetData!.width <= 0) {
+          throw const ValidationFailure(
+            'Carpet dimensions must be greater than zero',
+          );
         }
 
         final area = itemInput.carpetData!.length * itemInput.carpetData!.width;
-        final calculatedTotal = Money.fromPiastres((unitPrice.piastres * area).round());
+        final calculatedTotal = Money.fromPiastres(
+          (unitPrice.piastres * area).round(),
+        );
 
         for (var i = 0; i < itemInput.physicalQuantity; i++) {
           final itemId = _uuid.v4();
@@ -269,8 +312,17 @@ class CreateOrderUseCase {
       throw const BusinessRuleFailure('Discount cannot exceed subtotal');
     }
 
-    const tax = Money.zero;
-    final total = subtotal - input.discount + input.customerPickupFee + input.customerDeliveryFee + tax;
+    if (input.tax.isNegative) {
+      throw const ValidationFailure('Tax cannot be negative');
+    }
+
+    final tax = input.tax;
+    final total =
+        subtotal -
+        input.discount +
+        input.customerPickupFee +
+        input.customerDeliveryFee +
+        tax;
 
     final order = Order(
       id: orderId,
@@ -293,9 +345,34 @@ class CreateOrderUseCase {
       updatedAt: now,
     );
 
+    Payment? initialPaymentEntity;
+    if (input.initialPayment != null) {
+      final paymentAmount = input.initialPayment!.amount;
+      if (paymentAmount.isNegative) {
+        throw const ValidationFailure('Initial payment cannot be negative');
+      }
+      if (paymentAmount > total) {
+        throw const BusinessRuleFailure(
+          'Initial payment cannot exceed order total',
+        );
+      }
+      if (paymentAmount > Money.zero) {
+        initialPaymentEntity = Payment(
+          id: _uuid.v4(),
+          orderId: orderId,
+          amount: paymentAmount,
+          paymentMethod: input.initialPayment!.paymentMethod,
+          paidAt: now,
+          createdAt: now,
+          updatedAt: now,
+        );
+      }
+    }
+
     return await _orderRepository.createOrder(
       order: order,
       items: expandedItems,
+      initialPayment: initialPaymentEntity,
     );
   }
 }

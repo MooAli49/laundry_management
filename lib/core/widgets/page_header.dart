@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:laundry_management/core/theme/app_colors.dart';
-import 'package:laundry_management/core/theme/app_spacing.dart';
-import 'package:laundry_management/core/theme/app_text_styles.dart';
+
+import '../theme/app_colors.dart';
+import '../theme/app_spacing.dart';
+import '../theme/app_text_styles.dart';
 
 /// Reusable, lightweight page header adhering to the Laundry Design System.
 ///
@@ -32,10 +33,7 @@ class PageHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  title,
-                  style: AppTextStyles.headlineLarge,
-                ),
+                Text(title, style: AppTextStyles.headlineLarge),
                 if (subtitle != null) ...[
                   AppSpacing.gapXs,
                   Text(

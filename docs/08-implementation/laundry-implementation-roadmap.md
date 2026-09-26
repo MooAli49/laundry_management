@@ -23,15 +23,15 @@ The implementation workflow remains:
 | Task #05 | Core Presentation Foundation | Establish the core Flutter presentation foundation and prepare the first production-ready screen flow. | Completed / Locked |
 | Task #06 | Orders — End-to-End | Implement the core Order experience from creation through order management, using the existing business workflows. | Completed / Locked |
 | Task #07 | Customers | Implement customer management and its integration with Orders. | Completed / Locked |
-| Task #08 | Storage | Implement the operational storage workflow for physical OrderItems, including storing and moving items. | Completed / Locked |
-| Task #09 | Payments | Implement the payment workflow and payment-related Order experience. | Completed / Locked |
-| **Task #10** | **Expenses & Reports** | Implement operational expense management and operational/financial reporting as a tightly coupled unified feature. | **In Progress** |
-| Task #11 | Services & Pricing / Settings | Implement management of services, pricing/master data, and approved Settings workflows. | Planned |
-| Task #12 | Dashboard | Implement the operational Dashboard using real data from the completed workflows. | Planned |
+| Task #08 | Storage | Implement physical OrderItem storage workflows and location management. | Completed / Locked |
+| Task #09 | Payments | Implement the payment workflow, payment-related Order experience, and Step 10 Live Supabase backend synchronization. | Completed / Locked |
+| Task #10 | Expenses & Reports | Implement operational expense management and operational/financial reporting as a tightly coupled unified feature, and Step 11 Live Supabase backend synchronization. | Completed / Locked |
+| Task #11 | Services & Pricing / Settings | Implement management of services, pricing/master data, and approved Settings workflows, and Step 12 Live Supabase backend synchronization. | Completed / Locked |
+| Task #12 | Dashboard | Implement the operational Dashboard using real data from the completed workflows. | Completed / Locked |
 | Task #13 | Reports | *(Merged into Task #10 — Expenses & Reports)* | Merged into Task #10 |
-| Task #14 | Invoice / Receipt | Implement invoice/receipt viewing and printing using historical Order information. | Planned |
-| Task #15 | Offline / Sync Integration | Integrate and verify synchronization after the core local workflows are stable. | Planned |
-| Task #16 | Full Integration / QA / Hardening | Perform end-to-end verification, business-rule audit, offline testing, UI/RTL/responsive checks, and release hardening. | Planned |
+| Task #14 | Invoice / Receipt | Implement invoice/receipt viewing and printing using historical Order information. | Completed / Locked |
+| Task #15 | Offline / Sync Integration | Integrate and verify bidirectional synchronization (Push + Pull + Realtime Signal) for 2-device terminal operation. | Completed / Locked |
+| Task #16 | Full Integration / QA / Hardening | Perform end-to-end verification, business-rule audit, offline testing, UI/RTL/responsive checks, and release hardening. | Completed / Locked |
 
 ---
 
@@ -186,33 +186,35 @@ Services and pricing are master/configuration data used by operational workflows
 
 They belong under Settings rather than the primary navigation.
 
-This task should provide the approved management experience without expanding the V1 configuration scope.
+This task provides the approved management experience without expanding the V1 configuration scope, coupled with Step 12 Live Supabase Backend Synchronization:
+- **Local Persistence & Sync Enqueue**: `ItemType`, `ItemDefinition`, `CarpetSize`, `StorageLocation`, and `BusinessSettings` persist locally via Drift transactions and enqueue non-null, self-contained JSON sync payloads.
+- **Remote Supabase Schema**: Migration `20260916000004_master_data_schema.sql` creates tables `item_types`, `item_definitions`, `carpet_sizes`, `storage_locations`, `storage_location_item_types`, and `business_settings` with default-deny RLS.
+- **Transactional RPCs**: 9 `SECURITY DEFINER` RPCs handle idempotency logging (`sync_idempotency_log`), FK integrity, check constraints, and atomic mutations.
+- **Edge Function API**: Deployed and active on `/item-types`, `/item-definitions`, `/carpet-sizes`, `/storage-locations`, and `/business-settings`.
+- **Status**: Completed / Locked. Next task is Task #12 — Dashboard.
 
 ---
 
 ## Task #12 — Dashboard
 
-The Dashboard should come after the core transactional workflows because it is an operational overview of real system data.
-
-It should not become a replacement for Orders, Storage, Customers, or Reports.
-
-Approved Dashboard focus includes:
-
-- Orders created today
-- Orders Ready
-- Items/orders requiring storage
-- Outstanding payments
-- Overdue orders
-- Today's expected pickups
-- Recent orders
-- Quick actions
-
-Approved Quick Actions:
-
-- Add Order
-- Add Customer
-- Record Payment
-- Add Expense
+The Dashboard provides an operational overview of real system data without replacing Orders, Storage, Customers, or Reports:
+- **Operational Overview Metrics**: All 7 operational metrics implemented via optimized Drift database-side aggregations:
+  1. Orders created today (`today_orders_count` using local midnight boundaries `00:00:00.000` to `23:59:59.999`)
+  2. Ready orders (`ready_orders_count` matching `OrderStatus.ready`)
+  3. Items requiring storage (`itemsRequiringStorageCount` matching active orders with no active storage records via `StorageRepository.countItemsRequiringStorage()`)
+  4. Outstanding payments (`totalRemaining` in piastres + `unpaidOrdersCount` for non-cancelled orders with `total - paid > 0`)
+  5. Overdue orders (`overdueOrdersCount` where `expectedPickupDate < today` and order not completed or cancelled)
+  6. Today's expected pickups (`todayPickupOrdersCount` count + list capped at 5 active orders due today)
+  7. Recent orders (latest 5 orders with `PaymentSummary` remaining amount enrichment)
+- **Reactive Stream**: `DashboardRepository.watchDashboardData()` reactive via Drift `db.tableUpdates` monitoring `orders`, `payments`, `storage_records`, and `order_items` tables with zero polling and zero pending timers.
+- **Quick Actions**: All 4 actions operational:
+  1. Add Order (`/orders/new`)
+  2. Add Customer (`CustomerFormDialog` with duplicate handling & `onViewExisting` navigation)
+  3. Record Payment (`RecordPaymentDialog` two-step flow: search/select order + record payment with live balance validation)
+  4. Add Expense (`AddExpenseDialog` with active category selection and expense recording)
+- **Responsive Layout & Design**: Single-column mobile layout, two-column responsive tablet/desktop layout with full Arabic RTL support.
+- **Verification**: 100% test pass rate across unit, repository, cubit, widget, and integration suites (735/735 passing, `flutter analyze` 0 issues, `git diff --check` clean).
+- **Status**: Completed / Locked. Next task is Task #15 — Offline / Sync Integration.
 
 ---
 
@@ -228,30 +230,34 @@ Invoice/Receipt functionality depends on stable Order and Payment information.
 
 Historical Order information must remain authoritative when displaying an invoice or receipt. Current master-data changes must not cause historical Orders to be recalculated.
 
+- **Status**: Completed / Locked via PR #6 (`9586658`) with `invoice_printer.dart` and `invoice_preview_dialog.dart` fully implemented and verified with automated test suites.
+
 ---
 
 ## Task #15 — Offline / Sync Integration
 
-Synchronization should be integrated after the major local workflows are stable.
+Task #15 is **Completed / Locked** (verified and accepted through C1 Remote Sync Foundation, C1.5 Forensic Audit, C1.6 Migration Hardening, C2 Local Pull Foundation, C3 Sync Orchestration, C3.1 Realtime Broadcast, C4-A Release Safety, C4-B Pull/Test Hardening, and C4-C Two-Device Bidirectional Sync E2E).
 
-The product is Offline-First, but Sync depends on stable entities, relationships, and transaction behavior.
+The architecture officially supports **Bidirectional Push + Pull Synchronization** across two terminal devices sharing a single remote Supabase backend:
 
-The Sync scope includes the approved V1 business data such as:
-
-- Customers
-- Orders
-- OrderItems
-- Payments
-- Expenses
-- Storage
-- Services & Pricing
-- Approved configuration data
-
-Advanced conflict-resolution workflows and multi-device administration remain outside V1.
+- **Local Source of Truth**: Local Drift/SQLite database remains the primary operational source of truth for the UI on each device.
+- **Push Pipeline**: Local business mutation commits atomically with `sync_operations` entry in SQLite. `SyncEngine` dispatches operations sequentially with `X-Operation-ID` through `RemoteApiDispatcher` to Supabase Edge Functions. PostgreSQL transactional RPCs apply business mutation, append to remote `sync_changes`, and log idempotency.
+- **Pull Pipeline**: Remote changes in `sync_changes` are pulled via cursor-based pagination `GET /sync/changes?after=<sequence>&limit=<limit>`. `RemoteChangeApplier` applies changes directly to local DAOs without creating outgoing `SyncOperations` (echo loop prevention) and updates `sync_state.last_applied_sequence` in the **same local transaction**.
+- **Realtime Wake-Up Signal**: Ephemeral wake-up notifications via Supabase Realtime Broadcast (`laundry:sync` / `sync_available`) trigger `SyncEngine.pull()`. Realtime payload is NOT authoritative data; Pull API remains the authoritative retrieval mechanism. (Realtime CDC publication migration on `sync_changes` exists as dormant infrastructure).
+- **Triggers & Coalescing**: `SyncEngine` orchestrates sync cycles across manual sync, startup sync, app resume, connectivity restoration, Realtime wake-up, and 15-minute periodic foreground safety pull. Push and Pull triggers are coalesced in a single-flight execution loop.
+- **Two-Device E2E Validation (C4-C)**: Verified end-to-end with two independent SQLite terminals synchronizing bidirectionally through live Supabase (Device A: Customer + Order → Supabase → Device B; Device B: Payment + Storage → Supabase → Device A).
+- **Change Granularity**: Hybrid model. Order Creation is represented as an aggregate change payload containing all items and carpet data; subsequent status transitions, payments, storage moves, and customer/expense/master data updates are entity-specific.
+- **Conflict Handling**: Domain-aware conflict resolution (no generic LWW). Payments are append-oriented and idempotent; Storage enforces at most one active record per `OrderItem` and rejects stale moves via server concurrency checks; Order status transitions follow lifecycle rules.
+- **Known Deferred Limitations**:
+  - *Optimistic Concurrency Propagation*: Remote backend supports `server_version`, but Flutter client currently does NOT maintain local `server_version` columns and does NOT propagate `base_version` through `SyncOperation` (Deferred V1 Limitation).
+  - *Recovery & Bootstrap*: `CURSOR_TOO_OLD` is detected (`CursorTooOldException`). Full automatic resync / initial bootstrap recovery is deferred; current implementation guarantees locally pending operations in `sync_operations` are never deleted.
+  - *Retention*: Synced operations retained for 90 days; automatic background purge is deferred (manual maintenance).
 
 ---
 
 ## Task #16 — Full Integration / QA / Hardening
+
+Task #16 is **Completed / Locked**.
 
 The final implementation phase should verify the complete system as one product.
 
@@ -349,7 +355,7 @@ Do not introduce features such as:
 - Roles/Permissions
 - Loyalty
 - Advanced notifications
-- Refund workflow
+- Automated payment gateway refunds and item-level refunds
 - Advanced warehouse management
 - Storage movement history
 - Storage capacity management
@@ -415,13 +421,15 @@ Task #05  Core Presentation Foundation     ✅ LOCKED
 Task #06  Orders — End-to-End              ✅ LOCKED
 Task #07  Customers                        ✅ LOCKED
 Task #08  Storage                          ✅ LOCKED
+Task #09  Payments                         ✅ LOCKED (Step 10 Backend Sync Complete)
+Task #10  Expenses & Reports               ✅ LOCKED (Step 11 Backend Sync Complete)
 
-Task #09  Payments                         ← CURRENT NEXT TASK
-Task #10  Expenses
-Task #11  Services & Pricing / Settings
-Task #12  Dashboard
-Task #13  Reports
-Task #14  Invoice / Receipt
-Task #15  Offline / Sync Integration
-Task #16  Full Integration / QA / Hardening
+Task #11  Services & Pricing / Settings    ✅ LOCKED (Step 12 Backend Sync Complete)
+Task #12  Dashboard                        ✅ LOCKED
+Task #13  Reports (Merged into #10)        ✅ LOCKED
+Task #14  Invoice / Receipt                ✅ LOCKED (PR #6 Merged)
+Task #15  Offline / Sync Integration       ✅ LOCKED (C1–C4-C Bidirectional Sync E2E Complete)
+Task #16  Full Integration / QA / Hardening ✅ LOCKED (Phase 3A-C Hardening, Fresh Bootstrap & Manual QA Complete)
 ```
+
+**V1 Status**: All Tasks #01 through #16 are Completed and Locked. Current V1 implementation is complete.

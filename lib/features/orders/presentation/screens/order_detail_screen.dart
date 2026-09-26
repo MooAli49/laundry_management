@@ -15,15 +15,18 @@ import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../core/widgets/order_status_badge.dart';
 import '../../../../domain/entities/order_item.dart';
 import '../../../../domain/entities/payment.dart';
+import '../../../../domain/entities/refund.dart';
 import '../../../../domain/enums/order_status.dart';
 import '../../../../domain/enums/payment_method.dart';
 import '../../../../domain/enums/pricing_type.dart';
+import '../../../../domain/enums/refund_method.dart';
 import '../../../../domain/value_objects/money.dart';
 import '../cubit/order_detail_cubit.dart';
 import '../cubit/order_detail_state.dart';
 import '../widgets/add_payment_dialog.dart';
 import '../widgets/cancel_order_dialog.dart';
 import '../widgets/invoice_preview_dialog.dart';
+import '../widgets/refund_dialog.dart';
 import '../widgets/status_change_dialog.dart';
 import '../widgets/store_items_dialog.dart';
 
@@ -108,7 +111,14 @@ class _OrderDetailView extends StatelessWidget {
             title: Row(
               children: [
                 Text(
-                  'طلب #${order.orderNumber}',
+                  'طلب ',
+                  style: AppTextStyles.titleLarge.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  '#${order.orderNumber}',
+                  textDirection: TextDirection.ltr,
                   style: AppTextStyles.titleLarge.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -118,6 +128,27 @@ class _OrderDetailView extends StatelessWidget {
               ],
             ),
             actions: [
+              if (order.status == OrderStatus.processing)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs,
+                  ),
+                  child: AppButton(
+                    label: 'تعديل الطلب',
+                    icon: Icons.edit_outlined,
+                    variant: AppButtonVariant.secondary,
+                    onPressed: () async {
+                      final updated = await context.push<bool>(
+                        AppRoutes.orderEditPath(order.id),
+                      );
+                      if (context.mounted && updated == true) {
+                        context.read<OrderDetailCubit>().loadOrderDetail(
+                          order.id,
+                        );
+                      }
+                    },
+                  ),
+                ),
               // Cancelled orders MUST NOT have any invoice actions!
               if (!isCancelled)
                 Padding(
@@ -126,7 +157,6 @@ class _OrderDetailView extends StatelessWidget {
                   ),
                   child: AppButton(
                     label: 'معاينة الفاتورة',
-                    variant: AppButtonVariant.secondary,
                     onPressed: () {
                       showDialog(
                         context: context,
@@ -239,6 +269,10 @@ class _OrderDetailView extends StatelessWidget {
 
                       // Payment History Card
                       _buildPaymentHistoryCard(context, state),
+                      if (state.refunds.isNotEmpty || isCancelled) ...[
+                        AppSpacing.gapLg,
+                        _buildRefundHistoryCard(context, state),
+                      ],
                     ],
                   ),
                 ),
@@ -440,6 +474,25 @@ class _OrderDetailView extends StatelessWidget {
                   ],
                 ),
               ),
+              if (customer?.address != null &&
+                  customer!.address!.trim().isNotEmpty) ...[
+                Row(
+                  children: [
+                    Text(
+                      customer.address!.trim(),
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    AppSpacing.gapHorizontalXs,
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
           if (customer?.notes != null && customer!.notes!.isNotEmpty) ...[
@@ -787,6 +840,7 @@ class _OrderDetailView extends StatelessWidget {
     final isFinal =
         order.status == OrderStatus.completed ||
         order.status == OrderStatus.cancelled;
+    final isCancelled = order.status == OrderStatus.cancelled;
 
     return AppCard(
       child: Column(
@@ -830,12 +884,30 @@ class _OrderDetailView extends StatelessWidget {
             '${state.totalPaid.toEgp.toStringAsFixed(2)} ج.م',
             color: AppColors.success,
           ),
-          _buildSummaryRow(
-            'المتبقي',
-            '${state.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
-            isBold: true,
-            color: state.isFullyPaid ? AppColors.success : AppColors.warning,
-          ),
+          if (isCancelled) ...[
+            _buildSummaryRow(
+              'المسترد',
+              '${state.totalRefunded.toEgp.toStringAsFixed(2)} ج.م',
+              color: state.totalRefunded > Money.zero
+                  ? AppColors.error
+                  : AppColors.textSecondary,
+            ),
+            _buildSummaryRow(
+              'القابل للاسترداد',
+              '${state.remainingRefundable.toEgp.toStringAsFixed(2)} ج.م',
+              isBold: true,
+              color: state.remainingRefundable > Money.zero
+                  ? AppColors.warning
+                  : AppColors.textSecondary,
+            ),
+          ] else ...[
+            _buildSummaryRow(
+              'المتبقي',
+              '${state.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
+              isBold: true,
+              color: state.isFullyPaid ? AppColors.success : AppColors.warning,
+            ),
+          ],
           AppSpacing.gapLg,
 
           // Add Payment Button
@@ -858,6 +930,18 @@ class _OrderDetailView extends StatelessWidget {
                     ),
                   );
                 },
+              ),
+            ),
+
+          // Refund Button in summary card for cancelled orders
+          if (isCancelled && state.remainingRefundable > Money.zero)
+            SizedBox(
+              width: double.infinity,
+              child: AppButton(
+                label: 'استرداد المبلغ',
+                icon: Icons.replay,
+                variant: AppButtonVariant.primary,
+                onPressed: () => _openRefundDialog(context, state),
               ),
             ),
         ],
@@ -909,23 +993,104 @@ class _OrderDetailView extends StatelessWidget {
     final order = state.order!;
 
     if (order.status == OrderStatus.cancelled) {
+      final hasRefundable = state.remainingRefundable > Money.zero;
       return AppCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'حالة الطلب نهائية (ملغي)',
-              style: AppTextStyles.titleMedium.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                const Icon(
+                  Icons.cancel_outlined,
+                  color: AppColors.error,
+                  size: 20,
+                ),
+                AppSpacing.gapHorizontalSm,
+                Text(
+                  'حالة الطلب نهائية (ملغي)',
+                  style: AppTextStyles.titleMedium.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
             AppSpacing.gapSm,
             Text(
-              'تم إلغاء هذا الطلب (${order.cancellationReason ?? ''}). الطلب ملغي للقراءة التاريخية فقط ولا يمكن إجراء أي عمليات عليه.',
+              order.cancellationReason != null &&
+                      order.cancellationReason!.isNotEmpty
+                  ? 'سبب الإلغاء: ${order.cancellationReason}'
+                  : 'تم إلغاء هذا الطلب.',
               style: AppTextStyles.bodyMedium.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
+            if (hasRefundable) ...[
+              AppSpacing.gapLg,
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.warningLight,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      color: AppColors.warning,
+                      size: 20,
+                    ),
+                    AppSpacing.gapHorizontalSm,
+                    Expanded(
+                      child: Text(
+                        'يوجد رصيد قابل للاسترداد للعميل بقيمة ${state.remainingRefundable.toEgp.toStringAsFixed(2)} ج.م',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              AppSpacing.gapMd,
+              SizedBox(
+                width: double.infinity,
+                child: AppButton(
+                  label: 'استرداد المبلغ',
+                  icon: Icons.replay,
+                  variant: AppButtonVariant.primary,
+                  onPressed: () => _openRefundDialog(context, state),
+                ),
+              ),
+            ] else if (state.totalPaid > Money.zero) ...[
+              AppSpacing.gapMd,
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.successLight,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle_outline,
+                      color: AppColors.success,
+                      size: 20,
+                    ),
+                    AppSpacing.gapHorizontalSm,
+                    Expanded(
+                      child: Text(
+                        'تم استرداد كامل المبلغ المدفوع بنجاح.',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.success,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       );
@@ -1206,6 +1371,156 @@ class _OrderDetailView extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  void _openRefundDialog(BuildContext context, OrderDetailState state) {
+    final order = state.order;
+    if (order == null) return;
+    if (order.status != OrderStatus.cancelled) return;
+    if (state.remainingRefundable <= Money.zero) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('لا يوجد مبلغ قابل للاسترداد لهذا الطلب'),
+          backgroundColor: AppColors.warning,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final cubit = context.read<OrderDetailCubit>();
+
+    showDialog(
+      context: context,
+      builder: (_) => RefundDialog(
+        orderId: order.id,
+        refundBalance: state.refundBalance,
+        onRefundSuccess: () {
+          cubit.loadOrderDetail(order.id);
+        },
+      ),
+    );
+  }
+
+  Widget _buildRefundHistoryCard(BuildContext context, OrderDetailState state) {
+    final refunds = state.refunds;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'سجل المبالغ المستردة',
+                style: AppTextStyles.titleMedium.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              if (refunds.isNotEmpty)
+                Text(
+                  '${refunds.length} عملية',
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+            ],
+          ),
+          AppSpacing.gapMd,
+          if (refunds.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+              child: Center(
+                child: Text(
+                  'لم يتم تسجيل أي مبالغ مستردة بعد.',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: refunds.length,
+              separatorBuilder: (_, __) => const Divider(
+                height: AppSpacing.md,
+                color: AppColors.divider,
+              ),
+              itemBuilder: (context, index) {
+                final refund = refunds[index];
+                return _buildRefundRow(context, refund);
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRefundRow(BuildContext context, Refund refund) {
+    final methodLabel = switch (refund.refundMethod) {
+      RefundMethod.cash => 'نقدي',
+      RefundMethod.instaPay => 'InstaPay',
+      RefundMethod.eWallet => 'محفظة إلكترونية',
+    };
+
+    final date = refund.refundedAt;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            const CircleAvatar(
+              radius: 16,
+              backgroundColor: AppColors.errorLight,
+              child: Icon(Icons.replay, size: 16, color: AppColors.error),
+            ),
+            AppSpacing.gapHorizontalSm,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      methodLabel,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (refund.reason != null && refund.reason!.isNotEmpty) ...[
+                      AppSpacing.gapHorizontalSm,
+                      Text(
+                        '(${refund.reason})',
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                AppSpacing.gapXs,
+                Text(
+                  DateFormatter.formatArabicDateTime(date),
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        Text(
+          '- ${refund.amount.toEgp.toStringAsFixed(2)} ج.م',
+          style: AppTextStyles.bodyMedium.copyWith(
+            fontWeight: FontWeight.bold,
+            color: AppColors.error,
+          ),
+        ),
+      ],
     );
   }
 }

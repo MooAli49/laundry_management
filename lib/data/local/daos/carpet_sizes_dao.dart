@@ -12,11 +12,15 @@ class CarpetSizesDao extends DatabaseAccessor<app_db.AppDatabase> {
   }
 
   Future<void> updateCarpetSize(app_db.CarpetSizesCompanion companion) async {
-    await (update(db.carpetSizes)..where((t) => t.id.equals(companion.id.value))).write(companion);
+    await (update(
+      db.carpetSizes,
+    )..where((t) => t.id.equals(companion.id.value))).write(companion);
   }
 
   Future<app_db.CarpetSize?> getCarpetSizeById(String id) async {
-    return (select(db.carpetSizes)..where((t) => t.id.equals(id))).getSingleOrNull();
+    return (select(
+      db.carpetSizes,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
   Future<List<app_db.CarpetSize>> getActiveCarpetSizes() async {
@@ -27,10 +31,16 @@ class CarpetSizesDao extends DatabaseAccessor<app_db.AppDatabase> {
   }
 
   Future<List<app_db.CarpetSize>> getAllCarpetSizes() async {
-    return (select(db.carpetSizes)..orderBy([(t) => OrderingTerm.asc(t.area)])).get();
+    return (select(
+      db.carpetSizes,
+    )..orderBy([(t) => OrderingTerm.asc(t.area)])).get();
   }
 
-  Future<void> setActiveStatus(String id, bool isActive, DateTime updatedAt) async {
+  Future<void> setActiveStatus(
+    String id,
+    bool isActive,
+    DateTime updatedAt,
+  ) async {
     await (update(db.carpetSizes)..where((t) => t.id.equals(id))).write(
       app_db.CarpetSizesCompanion(
         isActive: Value(isActive),

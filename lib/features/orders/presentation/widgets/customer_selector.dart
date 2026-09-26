@@ -18,8 +18,10 @@ class CustomerSelector extends StatefulWidget {
   final Future<void> Function({
     required String name,
     required String phone,
+    String? address,
     String? notes,
-  }) onAddNewCustomer;
+  })
+  onAddNewCustomer;
 
   const CustomerSelector({
     super.key,
@@ -80,7 +82,9 @@ class _CustomerSelectorState extends State<CustomerSelector> {
                 children: [
                   Text(
                     customer.name,
-                    style: AppTextStyles.titleSmall.copyWith(fontWeight: FontWeight.bold),
+                    style: AppTextStyles.titleSmall.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Row(
@@ -100,6 +104,27 @@ class _CustomerSelectorState extends State<CustomerSelector> {
                       ),
                     ],
                   ),
+                  if (customer.address != null &&
+                      customer.address!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          size: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          customer.address!.trim(),
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -145,14 +170,17 @@ class _CustomerSelectorState extends State<CustomerSelector> {
             child: ListView.separated(
               shrinkWrap: true,
               itemCount: widget.searchResults.length,
-              separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.divider),
+              separatorBuilder: (_, __) =>
+                  const Divider(height: 1, color: AppColors.divider),
               itemBuilder: (context, index) {
                 final customer = widget.searchResults[index];
                 return ListTile(
                   title: Text(customer.name, style: AppTextStyles.bodyMedium),
                   subtitle: Text(
                     customer.phone,
-                    style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   onTap: () {
                     _searchController.clear();

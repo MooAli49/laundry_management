@@ -13,7 +13,10 @@ void main() {
       final theme = AppTheme.lightTheme;
 
       expect(theme.useMaterial3, isTrue);
-      expect(theme.textTheme.bodyLarge?.fontFamily, equals(AppConstants.fontFamily));
+      expect(
+        theme.textTheme.bodyLarge?.fontFamily,
+        equals(AppConstants.fontFamily),
+      );
       expect(theme.colorScheme.primary, equals(AppColors.primary));
       expect(theme.colorScheme.secondary, equals(AppColors.secondary));
       expect(theme.colorScheme.error, equals(AppColors.error));
@@ -52,75 +55,99 @@ void main() {
       expect(AppSpacing.paddingPage, equals(const EdgeInsets.all(48.0)));
     });
 
-    test('AppTextStyles bodySmall is 13px and caption is 12px per design system', () {
-      expect(AppTextStyles.bodySmall.fontSize, equals(13.0));
-      expect(AppTextStyles.caption.fontSize, equals(12.0));
-    });
+    test(
+      'AppTextStyles bodySmall is 13px and caption is 12px per design system',
+      () {
+        expect(AppTextStyles.bodySmall.fontSize, equals(13.0));
+        expect(AppTextStyles.caption.fontSize, equals(12.0));
+      },
+    );
 
-    test('AppColorsExtension is registered in ThemeData and implements copyWith & lerp', () {
-      final theme = AppTheme.lightTheme;
-      final ext = theme.extension<AppColorsExtension>();
+    test(
+      'AppColorsExtension is registered in ThemeData and implements copyWith & lerp',
+      () {
+        final theme = AppTheme.lightTheme;
+        final ext = theme.extension<AppColorsExtension>();
 
-      expect(ext, isNotNull);
-      expect(ext!.success, equals(AppColors.success));
-      expect(ext.warning, equals(AppColors.warning));
-      expect(ext.error, equals(AppColors.error));
-      expect(ext.info, equals(AppColors.info));
-      expect(ext.disabledBackground, equals(AppColors.disabledBackground));
+        expect(ext, isNotNull);
+        expect(ext!.success, equals(AppColors.success));
+        expect(ext.warning, equals(AppColors.warning));
+        expect(ext.error, equals(AppColors.error));
+        expect(ext.info, equals(AppColors.info));
+        expect(ext.disabledBackground, equals(AppColors.disabledBackground));
 
-      // Test copyWith
-      final customSuccess = const Color(0xFF00FF00);
-      final copied = ext.copyWith(success: customSuccess);
-      expect(copied.success, equals(customSuccess));
-      expect(copied.warning, equals(ext.warning));
+        // Test copyWith
+        final customSuccess = const Color(0xFF00FF00);
+        final copied = ext.copyWith(success: customSuccess);
+        expect(copied.success, equals(customSuccess));
+        expect(copied.warning, equals(ext.warning));
 
-      // Test lerp
-      final lerped = ext.lerp(copied, 0.5);
-      expect(lerped.success, equals(Color.lerp(ext.success, customSuccess, 0.5)));
-      expect(lerped.warning, equals(ext.warning));
-    });
+        // Test lerp
+        final lerped = ext.lerp(copied, 0.5);
+        expect(
+          lerped.success,
+          equals(Color.lerp(ext.success, customSuccess, 0.5)),
+        );
+        expect(lerped.warning, equals(ext.warning));
+      },
+    );
 
-    test('InputDecorationTheme is centralized in ThemeData with all required borders', () {
-      final theme = AppTheme.lightTheme;
-      final inputTheme = theme.inputDecorationTheme;
+    test(
+      'InputDecorationTheme is centralized in ThemeData with all required borders',
+      () {
+        final theme = AppTheme.lightTheme;
+        final inputTheme = theme.inputDecorationTheme;
 
-      expect(inputTheme.filled, isTrue);
-      expect(inputTheme.fillColor, equals(AppColors.surface));
-      expect(inputTheme.border, isA<OutlineInputBorder>());
-      expect(inputTheme.enabledBorder, isA<OutlineInputBorder>());
-      expect(inputTheme.focusedBorder, isA<OutlineInputBorder>());
-      expect(inputTheme.errorBorder, isA<OutlineInputBorder>());
-      expect(inputTheme.focusedErrorBorder, isA<OutlineInputBorder>());
-      expect(inputTheme.disabledBorder, isA<OutlineInputBorder>());
-    });
+        expect(inputTheme.filled, isTrue);
+        expect(inputTheme.fillColor, equals(AppColors.surface));
+        expect(inputTheme.border, isA<OutlineInputBorder>());
+        expect(inputTheme.enabledBorder, isA<OutlineInputBorder>());
+        expect(inputTheme.focusedBorder, isA<OutlineInputBorder>());
+        expect(inputTheme.errorBorder, isA<OutlineInputBorder>());
+        expect(inputTheme.focusedErrorBorder, isA<OutlineInputBorder>());
+        expect(inputTheme.disabledBorder, isA<OutlineInputBorder>());
+      },
+    );
 
-    test('DialogThemeData and BottomSheetThemeData are minimally configured', () {
-      final theme = AppTheme.lightTheme;
-      expect(theme.dialogTheme.backgroundColor, equals(AppColors.surface));
-      expect(theme.bottomSheetTheme.backgroundColor, equals(AppColors.surface));
-    });
+    test(
+      'DialogThemeData and BottomSheetThemeData are minimally configured',
+      () {
+        final theme = AppTheme.lightTheme;
+        expect(theme.dialogTheme.backgroundColor, equals(AppColors.surface));
+        expect(
+          theme.bottomSheetTheme.backgroundColor,
+          equals(AppColors.surface),
+        );
+      },
+    );
 
-    testWidgets('AppColorsExtension can be retrieved from BuildContext at runtime', (
-      WidgetTester tester,
-    ) async {
-      AppColorsExtension? retrievedExt;
+    testWidgets(
+      'AppColorsExtension can be retrieved from BuildContext at runtime',
+      (WidgetTester tester) async {
+        AppColorsExtension? retrievedExt;
 
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.lightTheme,
-          home: Builder(
-            builder: (context) {
-              retrievedExt = Theme.of(context).extension<AppColorsExtension>();
-              return const SizedBox.shrink();
-            },
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: Builder(
+              builder: (context) {
+                retrievedExt = Theme.of(
+                  context,
+                ).extension<AppColorsExtension>();
+                return const SizedBox.shrink();
+              },
+            ),
           ),
-        ),
-      );
+        );
 
-      expect(retrievedExt, isNotNull);
-      expect(retrievedExt!.success, equals(AppColors.success));
-      expect(retrievedExt!.error, equals(AppColors.error));
-      expect(retrievedExt!.disabledBackground, equals(AppColors.disabledBackground));
-    });
+        expect(retrievedExt, isNotNull);
+        expect(retrievedExt!.success, equals(AppColors.success));
+        expect(retrievedExt!.error, equals(AppColors.error));
+        expect(
+          retrievedExt!.disabledBackground,
+          equals(AppColors.disabledBackground),
+        );
+      },
+    );
   });
 }

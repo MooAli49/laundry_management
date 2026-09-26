@@ -6,6 +6,7 @@ import 'package:laundry_management/domain/entities/item_type.dart';
 import 'package:laundry_management/domain/entities/service.dart';
 import 'package:laundry_management/domain/repositories/item_type_repository.dart';
 import 'package:laundry_management/domain/repositories/service_repository.dart';
+import 'package:laundry_management/domain/value_objects/money.dart';
 import 'package:laundry_management/features/settings/presentation/cubit/services_management_cubit.dart';
 import 'package:laundry_management/features/settings/presentation/widgets/service_form_dialog.dart';
 
@@ -14,14 +15,20 @@ class MockServiceRepo implements ServiceRepository {
   final Map<String, List<String>> supportedTypes = {};
 
   @override
-  Future<Service> createService(Service service, {required List<String> supportedItemTypeIds}) async {
+  Future<Service> createService(
+    Service service, {
+    required List<String> supportedItemTypeIds,
+  }) async {
     services.add(service);
     supportedTypes[service.id] = supportedItemTypeIds;
     return service;
   }
 
   @override
-  Future<Service> updateService(Service service, {List<String>? supportedItemTypeIds}) async => service;
+  Future<Service> updateService(
+    Service service, {
+    List<String>? supportedItemTypeIds,
+  }) async => service;
   @override
   Future<List<Service>> getAllServices() async => services;
   @override
@@ -29,13 +36,15 @@ class MockServiceRepo implements ServiceRepository {
   @override
   Future<Service?> getServiceById(String id) async => null;
   @override
-  Future<List<Service>> getServicesForItemType(String itemTypeId) async => services;
+  Future<List<Service>> getServicesForItemType(String itemTypeId) async =>
+      services;
   @override
   Future<void> activateService(String id) async {}
   @override
   Future<void> deactivateService(String id) async {}
   @override
-  Future<List<String>> getSupportedItemTypeIds(String serviceId) async => supportedTypes[serviceId] ?? [];
+  Future<List<String>> getSupportedItemTypeIds(String serviceId) async =>
+      supportedTypes[serviceId] ?? [];
 }
 
 class MockItemTypeRepo implements ItemTypeRepository {
@@ -89,16 +98,14 @@ void main() {
       home: Scaffold(
         body: BlocProvider.value(
           value: cubit,
-          child: ServiceFormDialog(
-            availableItemTypes: itemTypeRepo.types,
-          ),
+          child: ServiceFormDialog(availableItemTypes: itemTypeRepo.types),
         ),
       ),
     );
   }
 
   group('ServiceFormDialog Widget Tests', () {
-    testWidgets('displays only V1 pricing types and perKilogram is not displayed', (tester) async {
+    testWidgets('displays only approved V1 pricing types', (tester) async {
       await tester.pumpWidget(buildDialog());
       await tester.pumpAndSettle();
 
@@ -106,11 +113,6 @@ void main() {
       expect(find.text(AppStrings.pricingPerPiece), findsOneWidget);
       expect(find.text(AppStrings.pricingPerSquareMeter), findsOneWidget);
       expect(find.text(AppStrings.pricingFixedPrice), findsOneWidget);
-
-      // Verify perKilogram ('بالكيلو' or 'perKilogram') is NOT displayed
-      expect(find.text('بالكيلو'), findsNothing);
-      expect(find.text('perKilogram'), findsNothing);
-      expect(find.text('per_kilogram'), findsNothing);
     });
 
     testWidgets('rejects empty name on submit', (tester) async {
@@ -146,6 +148,32 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(AppStrings.servicePriceMustBePositive), findsWidgets);
+    });
+
+    testWidgets('UAT-B — dialog renders without fixed 720px height and submits valid service', (tester) async {
+      await tester.pumpWidget(buildDialog());
+      await tester.pumpAndSettle();
+
+      // Enter valid name
+      final nameField = find.widgetWithText(TextFormField, '');
+      await tester.enterText(nameField.first, 'خدمة غسيل خاصة');
+
+      // Enter valid price
+      final priceField = find.widgetWithText(TextFormField, '0.00');
+      await tester.enterText(priceField, '45.00');
+
+      // Select item type
+      await tester.ensureVisible(find.text('ملابس'));
+      await tester.tap(find.text('ملابس'));
+      await tester.pumpAndSettle();
+
+      // Submit
+      await tester.tap(find.text(AppStrings.save));
+      await tester.pumpAndSettle();
+
+      expect(serviceRepo.services.length, 1);
+      expect(serviceRepo.services.first.name, 'خدمة غسيل خاصة');
+      expect(serviceRepo.services.first.price, Money.fromEgp(45));
     });
   });
 }

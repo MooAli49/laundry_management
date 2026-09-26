@@ -548,7 +548,7 @@ rather than:
 
 The displayed Order Number remains:
 
-    YY-XXX
+    YY-<numeric sequence> (e.g. 26-001, 26-1000)
 
 but the stable UUID remains the technical entity identity.
 

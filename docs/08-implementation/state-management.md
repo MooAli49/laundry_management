@@ -2799,11 +2799,13 @@ The application is Local-First.
 
 ---
 
-## 184. AI Must Not Add Sync Logic
+## 184. AI Must Not Add Sync Logic to Cubits
 
-Do not add synchronization behavior to Cubits during V1.
+Do not add synchronization behavior to Cubits.
 
-Backend and synchronization are deferred.
+Synchronization belongs strictly to the Data / Infrastructure layer (Sync Queue + Sync Engine).
+
+Cubits communicate strictly through Repository contracts and remain unaware of sync execution.
 
 ---
 

@@ -25,8 +25,9 @@ class FakeStorageRepository implements StorageRepository {
   bool moveItemCalled = false;
 
   @override
-  Future<StorageRecord?> getActiveRecordForOrderItem(String orderItemId) async =>
-      activeRecords[orderItemId];
+  Future<StorageRecord?> getActiveRecordForOrderItem(
+    String orderItemId,
+  ) async => activeRecords[orderItemId];
 
   @override
   Future<StorageRecord> moveItem({
@@ -56,11 +57,13 @@ class FakeStorageLocationRepository implements StorageLocationRepository {
   final Map<String, List<StorageLocation>> compatibleByItemType = {};
 
   @override
-  Future<StorageLocation?> getStorageLocationById(String id) async => locations[id];
+  Future<StorageLocation?> getStorageLocationById(String id) async =>
+      locations[id];
 
   @override
-  Future<List<StorageLocation>> getCompatibleLocationsForItemType(String itemTypeId) async =>
-      compatibleByItemType[itemTypeId] ?? [];
+  Future<List<StorageLocation>> getCompatibleLocationsForItemType(
+    String itemTypeId,
+  ) async => compatibleByItemType[itemTypeId] ?? [];
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -171,34 +174,53 @@ void main() {
     test('rejects empty inputs', () async {
       expect(
         () => useCase.execute(
-          const MoveStoredItemInput(orderItemId: '', newStorageLocationId: 'loc-2'),
+          const MoveStoredItemInput(
+            orderItemId: '',
+            newStorageLocationId: 'loc-2',
+          ),
         ),
         throwsA(isA<ValidationFailure>()),
       );
 
       expect(
         () => useCase.execute(
-          const MoveStoredItemInput(orderItemId: 'item-1', newStorageLocationId: ''),
+          const MoveStoredItemInput(
+            orderItemId: 'item-1',
+            newStorageLocationId: '',
+          ),
         ),
         throwsA(isA<ValidationFailure>()),
       );
     });
 
-    test('Case A: rejects non-existent OrderItem with Order item not found', () async {
-      expect(
-        () => useCase.execute(
-          const MoveStoredItemInput(orderItemId: 'non-existent-item', newStorageLocationId: 'loc-2'),
-        ),
-        throwsA(
-          isA<ValidationFailure>().having((e) => e.message, 'message', contains('Order item not found')),
-        ),
-      );
-    });
+    test(
+      'Case A: rejects non-existent OrderItem with Order item not found',
+      () async {
+        expect(
+          () => useCase.execute(
+            const MoveStoredItemInput(
+              orderItemId: 'non-existent-item',
+              newStorageLocationId: 'loc-2',
+            ),
+          ),
+          throwsA(
+            isA<ValidationFailure>().having(
+              (e) => e.message,
+              'message',
+              contains('Order item not found'),
+            ),
+          ),
+        );
+      },
+    );
 
     test('rejects non-existent target location', () async {
       expect(
         () => useCase.execute(
-          const MoveStoredItemInput(orderItemId: 'item-1', newStorageLocationId: 'non-existent-loc'),
+          const MoveStoredItemInput(
+            orderItemId: 'item-1',
+            newStorageLocationId: 'non-existent-loc',
+          ),
         ),
         throwsA(isA<ValidationFailure>()),
       );
@@ -207,61 +229,88 @@ void main() {
     test('rejects inactive target location', () async {
       expect(
         () => useCase.execute(
-          const MoveStoredItemInput(orderItemId: 'item-1', newStorageLocationId: 'loc-inactive'),
+          const MoveStoredItemInput(
+            orderItemId: 'item-1',
+            newStorageLocationId: 'loc-inactive',
+          ),
         ),
         throwsA(isA<BusinessRuleFailure>()),
       );
     });
 
-    test('Test A: rejects target location incompatible with item ItemType', () async {
-      expect(
-        () => useCase.execute(
-          const MoveStoredItemInput(orderItemId: 'item-1', newStorageLocationId: 'loc-carpet-only'),
-        ),
-        throwsA(isA<IncompatibleStorageLocationFailure>()),
-      );
-      expect(storageRepo.moveItemCalled, false);
-    });
-
-    test('Case B: rejects existing item without active storage record', () async {
-      expect(
-        () => useCase.execute(
-          const MoveStoredItemInput(orderItemId: 'item-unstored', newStorageLocationId: 'loc-2'),
-        ),
-        throwsA(
-          isA<BusinessRuleFailure>().having(
-            (e) => e.message,
-            'message',
-            contains('Item has no active storage location to move from'),
+    test(
+      'Test A: rejects target location incompatible with item ItemType',
+      () async {
+        expect(
+          () => useCase.execute(
+            const MoveStoredItemInput(
+              orderItemId: 'item-1',
+              newStorageLocationId: 'loc-carpet-only',
+            ),
           ),
-        ),
-      );
-      expect(storageRepo.moveItemCalled, false);
-    });
+          throwsA(isA<IncompatibleStorageLocationFailure>()),
+        );
+        expect(storageRepo.moveItemCalled, false);
+      },
+    );
 
-    test('Test E: rejects moving to same location with BusinessRuleFailure', () async {
-      expect(
-        () => useCase.execute(
-          const MoveStoredItemInput(orderItemId: 'item-1', newStorageLocationId: 'loc-1'),
-        ),
-        throwsA(
-          isA<BusinessRuleFailure>().having(
-            (e) => e.message,
-            'message',
-            contains('لا يمكن نقل العنصر إلى نفس الموقع'),
+    test(
+      'Case B: rejects existing item without active storage record',
+      () async {
+        expect(
+          () => useCase.execute(
+            const MoveStoredItemInput(
+              orderItemId: 'item-unstored',
+              newStorageLocationId: 'loc-2',
+            ),
           ),
-        ),
-      );
-      expect(storageRepo.moveItemCalled, false);
-    });
+          throwsA(
+            isA<BusinessRuleFailure>().having(
+              (e) => e.message,
+              'message',
+              contains('Item has no active storage location to move from'),
+            ),
+          ),
+        );
+        expect(storageRepo.moveItemCalled, false);
+      },
+    );
 
-    test('Test D: successfully moves item to compatible active location', () async {
-      final result = await useCase.execute(
-        const MoveStoredItemInput(orderItemId: 'item-1', newStorageLocationId: 'loc-2'),
-      );
+    test(
+      'Test E: rejects moving to same location with BusinessRuleFailure',
+      () async {
+        expect(
+          () => useCase.execute(
+            const MoveStoredItemInput(
+              orderItemId: 'item-1',
+              newStorageLocationId: 'loc-1',
+            ),
+          ),
+          throwsA(
+            isA<BusinessRuleFailure>().having(
+              (e) => e.message,
+              'message',
+              contains('لا يمكن نقل العنصر إلى نفس الموقع'),
+            ),
+          ),
+        );
+        expect(storageRepo.moveItemCalled, false);
+      },
+    );
 
-      expect(result.storageLocationId, 'loc-2');
-      expect(storageRepo.moveItemCalled, true);
-    });
+    test(
+      'Test D: successfully moves item to compatible active location',
+      () async {
+        final result = await useCase.execute(
+          const MoveStoredItemInput(
+            orderItemId: 'item-1',
+            newStorageLocationId: 'loc-2',
+          ),
+        );
+
+        expect(result.storageLocationId, 'loc-2');
+        expect(storageRepo.moveItemCalled, true);
+      },
+    );
   });
 }

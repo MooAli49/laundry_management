@@ -11,11 +11,7 @@ class CustomerCard extends StatelessWidget {
   final CustomerListItemViewModel item;
   final VoidCallback? onTap;
 
-  const CustomerCard({
-    super.key,
-    required this.item,
-    this.onTap,
-  });
+  const CustomerCard({super.key, required this.item, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -109,7 +105,9 @@ class CustomerCard extends StatelessWidget {
                     ? AppStrings.customerOrdersCount(orderCount)
                     : AppStrings.noOrdersYet,
                 style: AppTextStyles.bodySmall.copyWith(
-                  color: orderCount > 0 ? AppColors.primary : AppColors.textTertiary,
+                  color: orderCount > 0
+                      ? AppColors.primary
+                      : AppColors.textTertiary,
                   fontWeight: FontWeight.w500,
                 ),
               ),

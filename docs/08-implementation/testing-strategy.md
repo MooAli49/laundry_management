@@ -60,19 +60,17 @@ Integration tests should cover important end-to-end workflows rather than every 
 
 ## 4. Current Testing Scope
 
-The current implementation phase is local-first.
+The current implementation covers the full offline-first Flutter client and two-way Supabase synchronization.
 
-Therefore, priority is given to:
+Testing validates:
 
-- Domain/business rules
-- Database behavior
-- Data Layer behavior
-- Repository behavior
-- Cubit state transitions
-- Important UI behavior
-- Local transactional behavior
-
-Networking and synchronization tests are documented now but implemented later when those components are introduced.
+- Domain and business rules (Order numbers, status lifecycle, item snapshots, financial calculations, overdue boundary)
+- Database schema (Drift schema version 6, 19 tables, foreign keys, migrations)
+- Data layer and repositories (offline persistence, aggregate writes)
+- Cubit state management (reactive flows, optimistic updates)
+- UI and Widget behavior (Arabic RTL, forms, validation, dialogs)
+- Sync Engine & Outbox (two-way synchronization, conflict resolution, realtime pull, offline resilience)
+- Live cloud integration (Supabase Edge Functions, Postgres triggers, multi-device sync, row-level locking)
 
 ---
 
@@ -1283,3 +1281,57 @@ The test suite must protect the application's most important guarantees:
 - Safe future synchronization
 
 Testing must support the architecture rather than becoming a second architecture.
+
+---
+
+## 63. Test Execution and Verification Metrics
+
+### Execution Modes and Commands
+
+1. **Full Test Suite (including Live Cloud Integration)**:
+   ```bash
+   flutter test --concurrency=1
+   ```
+   *Concurrency Constraint*: When running the entire suite including live Supabase integration tests, concurrency MUST be set to 1 (`--concurrency=1`). Running live multi-device sync integration suites concurrently causes database lock contention and race conditions on shared remote cloud resources.
+
+2. **Offline / Non-Live Suite**:
+   ```bash
+   flutter test test/features/ test/core/
+   ```
+   Runs completely offline against in-memory/mock Drift databases without requiring network connectivity or Supabase cloud access.
+
+3. **Controlled Live Integration Batch**:
+   ```bash
+   flutter test test/data/sync/
+   ```
+   Runs live integration tests sequentially against the configured Supabase development project.
+
+4. **Targeted Validation**:
+   ```bash
+   flutter test test/features/orders/ test/features/customers/ test/features/reports/
+   ```
+
+### Verified Test Baseline
+
+The test suite baseline has been rigorously validated:
+- **Full Suite**: 1,188 / 1,188 passed (`flutter test --concurrency=1`)
+- **Offline / Non-Live Suite**: 773 / 773 passed
+- **Controlled Live Integration Batch**: 128 / 128 passed
+- **Targeted Validation Suite**: 341 / 341 passed
+- **Static Analysis (`flutter analyze`)**: 0 issues
+
+### Distinction Between Verification Layers
+
+To maintain rigorous quality engineering, the project strictly distinguishes three distinct verification layers:
+1. **Automated Unit & Widget Tests**:
+   - Fast, local, deterministic execution.
+   - Validates domain entities, pricing calculations, business rules, Drift database migrations, Cubit state machines, and Arabic RTL widget rendering.
+2. **Live Cloud Integration Tests**:
+   - Executes against the active Supabase project.
+   - Validates two-way sync, realtime pull, edge functions, optimistic conflict resolution, and two-device synchronization.
+   - Subject to network latency and cloud contention; requires sequential concurrency (`--concurrency=1`).
+3. **Manual User Acceptance Testing (UAT)**:
+   - Evaluates end-to-end human workflows, physical thermal printer outputs, Arabic visual layout on target POS hardware, and real-world multi-step operations.
+   - Automated tests verify invariant correctness; manual UAT verifies ergonomic and operational suitability in a laundry shop environment.
+
+*Note on Coverage*: The project does not claim artificial "100% test coverage" across all lines of code. Automated testing is focused on high-risk business logic, financial math, offline-first sync engine integrity, and database constraints.

@@ -56,7 +56,8 @@ class ItemDefinition {
           updatedAt == other.updatedAt;
 
   @override
-  int get hashCode => Object.hash(id, itemTypeId, name, isActive, createdAt, updatedAt);
+  int get hashCode =>
+      Object.hash(id, itemTypeId, name, isActive, createdAt, updatedAt);
 
   @override
   String toString() =>

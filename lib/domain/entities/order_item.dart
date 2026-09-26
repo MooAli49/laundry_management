@@ -57,13 +57,25 @@ class OrderItem {
       throw ArgumentError('OrderItem serviceNameSnapshot cannot be empty');
     }
     if (quantity <= 0) {
-      throw ArgumentError.value(quantity, 'quantity', 'Quantity must be greater than 0');
+      throw ArgumentError.value(
+        quantity,
+        'quantity',
+        'Quantity must be greater than 0',
+      );
     }
     if (unitPrice.isNegative) {
-      throw ArgumentError.value(unitPrice, 'unitPrice', 'UnitPrice cannot be negative');
+      throw ArgumentError.value(
+        unitPrice,
+        'unitPrice',
+        'UnitPrice cannot be negative',
+      );
     }
     if (calculatedTotal.isNegative) {
-      throw ArgumentError.value(calculatedTotal, 'calculatedTotal', 'CalculatedTotal cannot be negative');
+      throw ArgumentError.value(
+        calculatedTotal,
+        'calculatedTotal',
+        'CalculatedTotal cannot be negative',
+      );
     }
   }
 
@@ -130,23 +142,23 @@ class OrderItem {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        orderId,
-        itemTypeId,
-        itemDefinitionId,
-        serviceId,
-        itemTypeNameSnapshot,
-        itemDefinitionNameSnapshot,
-        serviceNameSnapshot,
-        pricingType,
-        quantity,
-        unitPrice,
-        calculatedTotal,
-        notes,
-        carpetData,
-        createdAt,
-        updatedAt,
-      );
+    id,
+    orderId,
+    itemTypeId,
+    itemDefinitionId,
+    serviceId,
+    itemTypeNameSnapshot,
+    itemDefinitionNameSnapshot,
+    serviceNameSnapshot,
+    pricingType,
+    quantity,
+    unitPrice,
+    calculatedTotal,
+    notes,
+    carpetData,
+    createdAt,
+    updatedAt,
+  );
 
   @override
   String toString() =>

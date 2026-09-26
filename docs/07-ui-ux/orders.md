@@ -109,13 +109,17 @@ The list must remain visually concise.
 
 ## 6. Order Number
 
-The approved Order Number format is:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length:
 
-    YY-XXX
+- Minimum width of 3 digits (zero-padded below 1000).
+- No maximum length (26-001, 26-999, 26-1000, 26-10000 are all valid).
+- Numeric sequence only; non-numeric values are not valid business order numbers.
 
-Example:
+Examples:
 
     26-001
+    26-999
+    26-1000
 
 The Order Number is:
 
@@ -906,6 +910,27 @@ must update immediately from local application state.
 
 ---
 
+## 51A. Refund Action
+
+When an Order has received payments and refundable balance (`totalPaid - totalRefunded`) is greater than zero, Order Details exposes the Refund action:
+
+    استرداد المبلغ
+
+This action is available in active states (Processing, Ready) as well as Completed and Cancelled states.
+
+Triggering the action opens the Refund Dialog:
+- Displays current Total Paid, already Refunded amount, and Max Refundable amount.
+- Amount input (supports full or partial refund; must be > 0 and <= Max Refundable).
+- Reason input (required non-empty Arabic explanation).
+
+Upon confirmation:
+- The refund is recorded locally as an append-only transaction.
+- Net payments and outstanding balances update immediately.
+- The refund is queued for synchronization (`POST /api/v1/refunds`).
+- The Refund History section on Order Details lists the refund amount, date, and reason.
+
+---
+
 ## 52. Completion Action
 
 The completion action should be visible only when meaningful.
@@ -981,6 +1006,13 @@ Example:
 
 The Order remains part of the historical data.
 
+On Cancelled orders:
+- Historical order information, items, pricing, and payment history remain visible for record-keeping.
+- If the order has payments and the refundable balance (`totalPaid - totalRefunded`) is greater than zero, the Refund action (`استرداد المبلغ`) remains available.
+- Triggering Refund opens the refund dialog allowing full or partial refunds with a required non-empty reason.
+- Once refunded, the refund history and updated net balance are displayed.
+- Operational actions like item editing, status progression, or delivery completion are disabled.
+
 ---
 
 ## 56. Order Editing
@@ -1022,11 +1054,24 @@ The primary lifecycle is:
         ↓
     Completed
 
+Administrative Correction:
+
+    Completed
+        ↓
+    Processing
+
+A completed order may transition back to `Processing` exclusively as an administrative correction. This action:
+- Requires providing an explicit, non-empty correction reason (e.g., 'إعادة معالجة - تصحيح إداري').
+- Clears the order's `completed_at` timestamp.
+- Storage records associated with the completed order remain inactive/cleared. Re-storing items requires the operator to explicitly assign storage locations afresh.
+
 Cancellation is a separate terminal state:
 
     Processing / Ready
         ↓
     Cancelled
+
+`Cancelled` is strictly terminal. Cancelled orders cannot transition to any active state.
 
 The UI must reflect the actual Domain state.
 
@@ -1059,18 +1104,23 @@ Conceptually:
         → Edit where allowed
         → Storage
         → Payment
+        → Refund (if refundable balance > 0)
         → Cancel
 
     Ready
         → Payment
+        → Refund (if refundable balance > 0)
         → Handover / Complete
         → Other allowed actions
 
     Completed
         → View historical information
+        → Refund (if refundable balance > 0)
+        → Administrative status correction to Processing (with explicit reason)
 
     Cancelled
-        → View historical information
+        → View historical information (read-only)
+        → Refund (if refundable balance > 0)
 
 The exact action availability must follow the approved Domain rules.
 

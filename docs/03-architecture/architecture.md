@@ -478,21 +478,51 @@ Internet connectivity is required for synchronization, not for normal local oper
 
 ## 20. Synchronization
 
-Synchronization is a Data-layer responsibility.
+Synchronization is a Data-layer responsibility operating bidirectionally across two devices:
 
-Conceptually:
+### Outgoing (Push):
 
-    Local Database
+    Local Drift Database
           ↓
-    Pending Changes
+    Sync Queue (sync_operations) [enqueued atomically with business write]
           ↓
-    Sync Engine
+    Sync Engine (single-flight loop)
           ↓
-    Remote API
+    Remote API (X-Operation-ID)
+          ↓
+    Supabase Edge Functions & PostgreSQL Transactional RPCs
+          ↓
+    Remote Database (sync_changes + sync_idempotency_log)
+
+*Note: Remote backend supports server_version checks, but Flutter client propagation of base_version is a known deferred V1 limitation.*
+
+### Incoming (Pull):
+
+    Realtime Wake-up Signal (laundry:sync / sync_available) / Foreground Triggers (15-min periodic, resume, startup, manual)
+          ↓
+    Sync Engine.pull() (single-flight coalescing guard)
+          ↓
+    Remote API (GET /sync/changes?after=<sequence>&limit=<limit>)
+          ↓
+    RemoteChangeApplier (validates strict sequence monotonicity)
+          ↓
+    Local Drift Database (DAO upsert + sync_state advance in SAME local SQLite Tx, zero SyncOperations enqueued)
+          ↓
+    Reactive Streams (db.tableUpdates)
+          ↓
+    Flutter UI
+
+### Architectural Rules:
+
+1. **Local Operation First**: The local database is the operational source of truth. Normal business operations do not require network connectivity.
+2. **Realtime is Signal-Only**: Supabase Realtime Broadcast on topic `laundry:sync` (`sync_available` event) is strictly an ephemeral wake-up notification. Realtime payloads contain no authoritative business data.
+3. **Pull API is Authoritative**: Authoritative remote data is retrieved exclusively via the cursor-based Pull API (`GET /sync/changes?after=<sequence>`).
+4. **Zero-Echo Ingestion**: `RemoteChangeApplier` writes directly to local Drift DAOs, bypassing repository mutation paths and never generating outgoing `SyncOperation` records.
+5. **Two-Device Verified**: Bidirectional synchronization has been validated end-to-end between two independent local SQLite devices operating against live Supabase (Device A: Customer + Order → Supabase → Device B; Device B: Payment + Storage → Supabase → Device A).
 
 The UI does not need to know the technical details of synchronization.
 
-The repository and synchronization infrastructure coordinate local and remote persistence.
+The repository, `RemoteChangeApplier`, and synchronization infrastructure coordinate local and remote persistence.
 
 ---
 
@@ -1482,15 +1512,16 @@ Introduce abstraction when there is an actual problem to solve.
 
 The architecture may evolve when the product grows.
 
+*Note: Two-device bidirectional synchronization and Realtime wake-up signal are approved as part of the V1 baseline.*
+
 Possible future additions include:
 
-- Multi-device synchronization
-- Advanced conflict handling
 - Multi-branch
 - Delivery management
-- Refunds
+- Advanced refund capabilities (item-level refunds, store credit, gateway reconciliation)
 - Advanced reporting
 - Barcode support
+- Multi-tenant / SaaS platform administration
 
 These should be added only when approved as requirements.
 
@@ -1515,34 +1546,48 @@ Documentation and code must remain aligned.
 
 ## 70. Final Architecture
 
-The final V1 architecture is intentionally simple:
+The high-level architecture separates layers cleanly, keeping Domain independent from infrastructure:
 
-    ┌──────────────────────────────────────────┐
-    │                Features                  │
-    │                                          │
-    │ Screens / Widgets / Cubits / Blocs       │
-    └────────────────────┬─────────────────────┘
-                         ↓
-    ┌──────────────────────────────────────────┐
-    │                  Domain                  │
-    │                                          │
-    │ Entities / Enums / Repository Contracts  │
-    │ / Business Rules                         │
-    └────────────────────┬─────────────────────┘
-                         ↓
-    ┌──────────────────────────────────────────┐
-    │                   Data                   │
-    │                                          │
-    │ Repositories / Local / Remote / Models   │
-    └──────────────┬─────────────────┬─────────┘
-                   │                 │
-                   ↓                 ↓
-          ┌────────────────┐  ┌────────────────┐
-          │ Local Database │  │   Remote API   │
-          │                │  │                │
-          │ Primary for    │  │ Synchronization│
-          │ daily operation│  │ & persistence  │
-          └────────────────┘  └────────────────┘
+                          SUPABASE
+                    ┌──────────────────┐
+                    │ Remote DB        │
+                    │ sync_changes     │
+                    │ Edge Functions   │
+                    │ Realtime         │
+                    └─────────┬────────┘
+                              ↕
+                     Sync Infrastructure
+                 (SyncEngine / Applier / Adapters)
+                              ↕
+                    ┌──────────────────┐
+                    │ Local SQLite     │
+                    │ Drift Database   │
+                    │ Operational Truth│
+                    └─────────┬────────┘
+                              ↕
+                    ┌──────────────────┐
+                    │   Repositories   │
+                    │   (Data Layer)   │
+                    └─────────┬────────┘
+                              ↕
+                    ┌──────────────────┐
+                    │      Domain      │
+                    │ Entities / Rules │
+                    │ Repository Cont. │
+                    └─────────┬────────┘
+                              ↕
+                    ┌──────────────────┐
+                    │   Presentation   │
+                    │  Cubit / Screen  │
+                    │  Widgets / RTL   │
+                    └──────────────────┘
+
+Key Architectural Invariants:
+- **Local DB is Operational Source**: All reads and business transactions are served from the local SQLite/Drift database.
+- **Remote Backend is Shared Sync Source**: Supabase persists remote changes, enforces server validation, and coordinates multi-terminal state via `sync_changes`.
+- **Sync Infrastructure Handles Push/Pull**: `SyncEngine` and `RemoteChangeApplier` mediate between local SQLite and remote APIs with zero UI coupling.
+- **Realtime is Signal-Only**: Supabase Realtime Broadcast provides low-latency wake-up notifications; the Pull API remains the sole authoritative data retrieval path.
+- **Domain Independence**: Domain entities, value objects, and business rules have zero dependencies on Supabase, Drift, or Flutter.
 
 The Core layer provides shared infrastructure:
 

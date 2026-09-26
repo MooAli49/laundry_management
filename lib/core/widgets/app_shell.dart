@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-import 'package:laundry_management/core/constants/app_constants.dart';
-import 'package:laundry_management/core/localization/app_strings.dart';
-import 'package:laundry_management/core/routing/app_routes.dart';
-import 'package:laundry_management/core/theme/app_colors.dart';
-import 'package:laundry_management/core/theme/app_spacing.dart';
-import 'package:laundry_management/core/theme/app_text_styles.dart';
+
+import '../constants/app_constants.dart';
+import '../localization/app_strings.dart';
+import '../routing/app_routes.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_spacing.dart';
+import '../theme/app_text_styles.dart';
+import 'sync_status_indicator.dart';
 
 class AppShell extends StatelessWidget {
   final Widget mainContent;
@@ -69,11 +72,13 @@ class AppShell extends StatelessWidget {
 class AppSidebar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
+  final bool isCollapsed;
 
   const AppSidebar({
     super.key,
     required this.selectedIndex,
     required this.onDestinationSelected,
+    this.isCollapsed = false,
   });
 
   static const List<_SidebarDestination> _destinations = [
@@ -111,42 +116,48 @@ class AppSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showCompact = isCollapsed;
     return Container(
-      width: 220,
+      width: showCompact ? 72 : 220,
       color: AppColors.surface,
       child: LayoutBuilder(
         builder: (context, constraints) {
+          final isNarrow = showCompact || constraints.maxWidth < 140;
           return SingleChildScrollView(
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                minHeight: constraints.maxHeight.isFinite ? constraints.maxHeight : 0.0,
+                minHeight: constraints.maxHeight.isFinite
+                    ? constraints.maxHeight
+                    : 0.0,
               ),
               child: IntrinsicHeight(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(
+                      padding: EdgeInsets.symmetric(
                         vertical: AppSpacing.lg,
-                        horizontal: AppSpacing.md,
+                        horizontal: isNarrow ? AppSpacing.sm : AppSpacing.md,
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.local_laundry_service,
-                            color: AppColors.primary,
-                            size: AppSpacing.xxxl,
-                          ),
-                          AppSpacing.gapHorizontalMd,
-                          Expanded(
-                            child: Text(
-                              AppConstants.appName,
-                              style: AppTextStyles.titleLarge,
-                              overflow: TextOverflow.ellipsis,
+                      child: isNarrow
+                          ? Center(
+                              child: SvgPicture.asset(
+                                'assets/images/logo_primary_mark.svg',
+                                height: 32,
+                                width: 32,
+                                fit: BoxFit.contain,
+                                semanticsLabel: AppConstants.appName,
+                              ),
+                            )
+                          : Align(
+                              alignment: AlignmentDirectional.centerStart,
+                              child: SvgPicture.asset(
+                                'assets/images/logo_primary_wordmark.svg',
+                                height: 36,
+                                fit: BoxFit.contain,
+                                semanticsLabel: AppConstants.appName,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
                     ),
                     AppSpacing.gapSm,
                     ...List.generate(_destinations.length, (index) {
@@ -157,31 +168,13 @@ class AppSidebar extends StatelessWidget {
                         index: index,
                         destination: destination,
                         isSelected: isSelected,
+                        isCollapsed: isNarrow,
                       );
                     }),
                     const Spacer(),
-                    Padding(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: AppColors.success,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          AppSpacing.gapHorizontalSm,
-                          Text(
-                            'متصل',
-                            style: AppTextStyles.labelSmall.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    isNarrow
+                        ? const Center(child: SyncStatusIndicator())
+                        : const SyncStatusIndicator(),
                   ],
                 ),
               ),
@@ -197,7 +190,42 @@ class AppSidebar extends StatelessWidget {
     required int index,
     required _SidebarDestination destination,
     required bool isSelected,
+    bool isCollapsed = false,
   }) {
+    if (isCollapsed) {
+      return Container(
+        margin: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: 3.0,
+        ),
+        child: Tooltip(
+          message: destination.label,
+          child: InkWell(
+            onTap: () => onDestinationSelected(index),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+            hoverColor: isSelected ? null : AppColors.secondary,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 10.0),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.primaryLighter
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+              ),
+              child: Center(
+                child: Icon(
+                  isSelected ? destination.selectedIcon : destination.icon,
+                  size: 22,
+                  color: isSelected
+                      ? AppColors.primary
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return Container(
       margin: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,

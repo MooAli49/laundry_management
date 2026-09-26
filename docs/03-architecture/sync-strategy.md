@@ -64,33 +64,62 @@ The application is:
 
 Offline-first
 
-This means:
+The system officially supports **Bidirectional Push + Pull Synchronization** across two terminal devices sharing a single remote Supabase backend.
 
-User Action
+The local SQLite/Drift database remains the operational source of truth for each device.
 
-↓
+### PUSH Flow:
 
-Local Database
+    Local Business Mutation
+        ↓
+    Local SQLite Transaction
+        ├── Apply business mutation locally
+        └── Insert SyncOperation (atomic)
+        ↓
+    UI Updates Immediately
+        ↓
+    SyncEngine (Single-flight loop)
+        ↓
+    Remote API (X-Operation-ID)
+        ↓
+    Remote PostgreSQL Transaction (ACID)
+        ├── Idempotency check (sync_idempotency_log)
+        ├── Business rule validation
+        ├── Apply remote business mutation
+        ├── Increment server_version where applicable (backend OCC)
+        ├── Append to sync_changes (monotonically increasing sequence)
+        └── Commit
 
-↓
+*Note: The backend maintains and increments server_version, while the Flutter client relies on the monotonic sync sequence/cursor (sync_state.last_applied_sequence) for remote change application. The Edit Order V3 client contract intentionally does not send base_version, and client-side optimistic concurrency via base_version is a documented deferred V1 limitation.*
 
-UI Updates Immediately
+### PULL Flow:
 
-↓
+    Realtime wake-up signal / periodic foreground pull (15 min) / startup / resume / connectivity / manual
+        ↓
+    SyncEngine.pull() (Single-flight coalescing guard)
+        ↓
+    Cursor-based Pull API (GET /sync/changes?after=<last_applied_sequence>&limit=<limit>)
+        ↓
+    Remote changes retrieved in deterministic sequence order (bounded pagination)
+        ↓
+    RemoteChangeApplier
+        ↓
+    Local SQLite Transaction (ACID)
+        ├── Apply changes directly to Drift DAOs (zero SyncOperations enqueued)
+        └── Advance sync_state.last_applied_sequence
+        ↓
+    Reactive Drift Queries (db.tableUpdates) update UI automatically
 
-Sync Queue
+### Critical Rules for Realtime & Pull:
 
-↓
+1. **Realtime is ONLY a wake-up signal**: Supabase Realtime Broadcast on topic `laundry:sync` (`sync_available` event) is strictly an ephemeral wake-up notification adapter.
+2. **No Authoritative Data in Realtime**: Realtime payloads do NOT contain authoritative business data.
+3. **Pull API is Authoritative**: The actual remote changes must be retrieved through the cursor-based Pull API (`GET /sync/changes?after=<sequence>&limit=<limit>`).
+4. **Adapter Isolation**: There is no raw WebSocket infrastructure exposed to feature code. Supabase Realtime remains behind an infrastructure adapter (`RealtimeSyncAdapter`).
+5. **Dormant Publication**: The Supabase Realtime CDC publication migration on `sync_changes` exists as dormant/redundant infrastructure; Broadcast is the active mechanism.
+6. **Two-Device Verified**: Bidirectional synchronization has been verified end-to-end between two independent local SQLite devices sharing the live Supabase backend (Device A: Customer + Order → Supabase → Device B; Device B: Payment + Storage → Supabase → Device A).
 
-Remote Backend
-
-↓
-
-Synchronization Result
-
-The UI must not require a successful network request before considering a valid local operation complete when the operation is supported offline.
-
-\---
+---
 
 **# 3. Local Database as Operational Source**
 
@@ -312,41 +341,41 @@ Temporary failures should be retried.
 
 Examples:
 
-\- No Internet
-
-\- Timeout
-
-\- Temporary server error
-
-\- Connection reset
+- No Internet
+- Timeout
+- Temporary server error
+- Connection reset
 
 Permanent validation failures should not be retried indefinitely.
 
 Examples:
 
-\- Invalid request
+- Invalid request
+- Invalid entity state
+- Rejected business rule
+- Unauthorized operation
 
-\- Invalid entity state
+The synchronization layer distinguishes retryable failures from permanent failures.
 
-\- Rejected business rule
+---
 
-\- Unauthorized operation
+**# 12. Approved Retry Policy**
 
-The synchronization layer should distinguish retryable failures from permanent failures.
+Each `SyncOperation` maintains:
 
-\---
+    retry_count
 
-**# 12. Retry Count**
+The value increments when an attempted synchronization fails due to a retryable error.
 
-Each SyncOperation maintains:
+The approved retry policy is:
 
-retry\_count
+- **Initial delay**: 5 seconds
+- **Multiplier**: 2 (exponential backoff)
+- **Maximum delay**: 300 seconds
+- **Maximum retries**: 5 retries after the initial attempt (6 total attempts maximum)
+- **Jitter**: Bounded additive jitter from 0 to 1 second
 
-The value increases when an attempted synchronization fails.
-
-The system should use controlled retry behavior.
-
-The exact maximum retry policy belongs to the synchronization implementation and may use exponential backoff.
+Permanent failures (e.g., business rule violation, invalid payload) transition the operation to `Failed` immediately without retry.
 
 \---
 
@@ -929,73 +958,65 @@ Synchronization must preserve the resulting state remotely.
 
 The system must avoid silently overwriting valid user changes.
 
-When two devices modify the same entity, the synchronization layer must identify the conflict.
+When two devices modify the same entity or state concurrently, the synchronization layer must identify and isolate the conflict.
 
-The exact conflict resolution strategy depends on the final backend capabilities.
+The synchronization model does NOT use generic Last-Write-Wins.
 
-V1 should prefer deterministic conflict handling over silent data loss.
+Conflict handling is deterministic, domain-aware, and entity-specific.
 
-\---
+---
 
-**# 35. Last-Write-Wins**
+**# 35. No Generic Last-Write-Wins**
 
-Last-write-wins may be used for simple configuration fields where appropriate.
+Generic Last-Write-Wins is strictly prohibited across business and transactional state.
 
-However, it must not blindly be applied to complex business state.
+Different domain entities require specific conflict and concurrency models:
 
-Examples requiring additional care:
+- **Order Creation**: Synchronized as an aggregate change payload containing all items.
+- **Order Lifecycle Transitions**: Governed by the strict domain transition matrix (`Processing → Ready → Completed` or `Cancelled`). Stale pulls must never resurrect cancelled or completed orders.
+- **Payments**: Append-only immutable financial records.
+- **Storage Moves**: Domain-aware movement tracking with single active location invariant.
+- **Mutable Master Data & Settings**: Optimistic concurrency using `server_version`.
 
-\- Order status
+---
 
-\- Payments
+**# 36. Optimistic Concurrency & Server Versioning**
 
-\- Storage state
+For mutable entities where concurrent edits can occur (Orders, Customers, Expenses, Expense Categories, Master Data, Business Settings):
 
-\- Financial totals
+- **Backend Architecture**: The remote table maintains an integer `server_version`, incremented upon each accepted mutation. The backend RPCs and transaction logic verify `server_version == base_version` whenever `base_version` is supplied, rejecting mismatches with `CONCURRENCY_CONFLICT`.
+- **Flutter Client Architecture**: The Flutter client currently relies on the monotonic sync sequence/cursor (`sync_state.last_applied_sequence`) for remote change application via `RemoteChangeApplier`. The client does not perform local optimistic concurrency using `base_version`.
+- **Edit Order V3 Contract**: The Edit Order V3 client contract intentionally does NOT send `base_version`. The client does not maintain local `server_version` columns, and propagation of `base_version` remains a documented deferred V1 limitation without introducing a new concurrency mechanism.
 
-These concepts may require domain-aware conflict handling.
+---
 
-\---
+**# 37. Storage Move Conflict Semantics**
 
-**# 36. Expense Conflict Handling**
+Storage state represents physical item location:
 
-Expenses are relatively simple transactional records.
+- There must be at most one active `StorageRecord` per `OrderItem`.
+- A Storage Move consists of deactivating the existing active record and creating a new active record.
+- `sync_changes.sequence` provides **committed ordering only**; it is NOT a generic LWW conflict resolver.
+- If Device A and Device B concurrently attempt to move the same `OrderItem` from Location X:
+  - The first transaction to commit on the server deactivates Location X and creates the new location.
+  - The second transaction receives `CONCURRENCY_CONFLICT` on the server because Location X is no longer active.
+  - The winning committed change is propagated to all devices through the normal pull mechanism.
+  - Pull application on clients deterministically applies the latest committed storage state.
 
-If the same Expense is edited on two devices, the system must preserve a deterministic result.
+---
 
-Possible strategy:
+**# 37.1. Payment Conflict Handling**
 
-Latest valid update wins
+Payments require strict financial integrity:
 
-provided that:
+- Payments are append-only financial transaction records.
+- Stable client-generated Payment UUIDs provide duplicate protection.
+- Retries must be idempotent via `sync_idempotency_log`.
+- Server RPC enforces `SELECT ... FOR UPDATE` row locks on the parent `orders` record to authoritatively validate remaining balance (`paid_amount + payment_amount <= total`).
+- If payment exceeds remaining balance, the server rejects with `PAYMENT_BALANCE_EXCEEDED`.
+- Payments must never be silently overwritten or transformed into Expenses.
 
-\- Entity identity is the same
-
-\- Version/timestamp rules are respected
-
-\- The update does not violate domain constraints
-
-The final backend conflict contract determines the exact implementation.
-
-\---
-
-**# 37. Payment Conflict Handling**
-
-Payments require stronger protection because they represent financial transactions.
-
-The synchronization layer must avoid:
-
-\- Duplicate Payments
-
-\- Accidental overwriting
-
-\- Duplicate synchronization
-
-Stable Payment UUIDs are essential.
-
-If the same Payment is retried after a network failure, the backend must recognize the existing identity rather than create a second Payment.
-
-\---
+---
 
 **# 38. Expense Duplicate Prevention**
 
@@ -1063,79 +1084,56 @@ This is particularly important for unreliable network connections.
 
 **# 41. Pull Synchronization**
 
-Synchronization is not only:
+Synchronization is bidirectional:
 
-Local
+    Local → Remote (Push)
+    Remote → Local (Pull)
 
-↓
+The client pulls remote changes using a cursor-based pull API:
 
-Remote
+    GET /sync/changes?after=<last_applied_sequence>
 
-The system may also need:
+The server returns changes from `sync_changes` in strict monotonically increasing sequence order.
 
-Remote
+The local database applies these changes through controlled transactions.
 
-↓
-
-Local
-
-for changes created or modified elsewhere.
-
-The local database must apply remote changes through controlled transactions.
-
-\---
+---
 
 **# 42. Remote Change Application**
 
 When applying a remote change:
 
-1\. Validate entity identity.
+1. Validate entity identity and payload.
+2. Validate relationships and relational integrity.
+3. Apply the change directly to local Drift DAOs via `RemoteChangeApplier`.
+4. Update `sync_state.last_applied_sequence` to the sequence of the applied change.
+5. Invariant: Change application + cursor advancement MUST occur within the **SAME local SQLite transaction**.
+6. Do NOT call repository mutation methods that generate outgoing `SyncOperations`.
 
-2\. Validate relationships.
+---
 
-3\. Validate business constraints where required.
+**# 43. Sync Loop Prevention & RemoteChangeApplier**
 
-4\. Apply the change locally.
+A remote change must never trigger an outgoing synchronization operation.
 
-5\. Update synchronization metadata.
+To guarantee echo-loop prevention:
 
-6\. Avoid creating an unnecessary outgoing sync operation for the same remote change.
+- The application layer maintains a dedicated `RemoteChangeApplier`.
+- `RemoteChangeApplier` writes incoming data directly to local Drift DAOs.
+- Repository mutation methods (which atomically call `syncOperationsDao.recordOperation()`) are strictly bypassed during remote change ingestion.
+- This breaks the ping-pong cycle:
 
-A remote update must not trigger an infinite:
+    Remote change
+        ↓
+    RemoteChangeApplier
+        ↓
+    Local DAO write (no SyncOperation created)
+        ↓
+    Reactive queries update UI
+        ↓
+    (Loop terminates safely)
 
-Remote
-
-→
-
-Local
-
-→
-
-Remote
-
-→
-
-Local
-
-loop.
-
-\---
-
-**# 43. Sync Loop Prevention**
-
-When a remote change is applied locally:
-
-The Data Layer must distinguish:
-
-Remote-originated change
-
-from:
-
-User-originated local change
-
-The remote application must not automatically enqueue the same change for upload again.
-
-\---
+---
 
 **# 44. Sync Ordering**
 
@@ -1855,21 +1853,31 @@ Business entities should remain focused on business meaning.
 
 \---
 
-**# 78. Sync Metadata Separation**
+**# 78. Sync Metadata Separation & Local Sync State**
 
-Infrastructure data:
+Synchronization infrastructure data must remain strictly outside Domain entities.
 
-sync\_operations
+The local database maintains two separate infrastructure components:
 
-must remain separate from business tables.
+1. **Outgoing Queue**: `sync_operations`
+   - Stores locally committed changes waiting to be pushed.
+2. **Incoming Position**: `sync_state`
+   - Stores `last_applied_sequence` (the authoritative local pull cursor).
+   - Stores `last_sync_at` and `updated_at`.
 
-Avoid adding:
+### Atomic Pull Invariant:
 
-sync\_status
+    Apply remote changes
+        +
+    Advance sync_state.last_applied_sequence
+        ↓
+    SAME LOCAL SQLITE TRANSACTION
 
-directly to every business entity unless a future technical decision explicitly requires it.
+This guarantees crash safety: either both the changes and the cursor advance, or the transaction rolls back cleanly with cursor unchanged.
 
-\---
+Neither `sync_operations` nor business tables store the pull cursor.
+
+---
 
 **# 79. Conflict Logging**
 
@@ -2123,113 +2131,60 @@ Only changed entities should be synchronized where the backend supports incremen
 
 \---
 
-**# 92. Pull Increment Strategy**
+**# 92. Pull Increment Strategy & Global Sequence Cursor**
 
-If the backend supports change tracking, the client should use an incremental mechanism such as:
+Incremental synchronization uses a server-assigned, monotonically increasing sequence:
 
-last\_sync\_timestamp
+    sync_changes.sequence (BIGINT)
 
-or:
+Rules:
 
-server change token/version
+- The client sends `GET /sync/changes?after=<last_applied_sequence>&limit=<limit>` (paginated with bounded pages).
+- The server returns matching changes ordered by `sequence ASC`.
+- The sequence represents committed remote change ordering; it is NOT a Last-Write-Wins mechanism.
+- Wall-clock timestamps (`updated_at`, `last_sync_timestamp`) must NEVER be used as the authoritative synchronization cursor.
+- The client advances `sync_state.last_applied_sequence` atomically with each applied batch in the same SQLite transaction.
 
-The exact mechanism depends on the backend API.
+---
 
-The local database should retain enough synchronization metadata to continue from the last successful synchronization point.
+**# 93. Bootstrap & CURSOR_TOO_OLD Recovery Contract**
 
-\---
+If a device cursor falls behind the retained change history in `sync_changes`:
 
-**# 93. Full Resynchronization**
+1. The server returns HTTP 410 with error code `CURSOR_TOO_OLD`.
+2. The Flutter client detects this response and raises a `CursorTooOldException`.
+3. **CRITICAL INVARIANT**: A full resync or bootstrap must **NEVER delete or overwrite locally pending unsynced business data** stored in `sync_operations`.
+4. Locally pending operations remain preserved in `sync_operations` and are drained through normal push after the baseline is refreshed.
 
-A full resynchronization may be required in exceptional cases.
+> **Known Deferred Limitation (Automatic Resync / Bootstrap)**:
+> Full automatic device bootstrap and automated `CURSOR_TOO_OLD` resync recovery are **deferred** in V1. The detection and safety contracts exist, but automatic reconciliation is not implemented in this phase.
 
-Examples:
+---
 
-\- First login on a new device
+**# 93.1. Sync Operations Retention**
 
-\- Local database restoration
+- Successfully synchronized operations in `sync_operations` (`status = 'synced'`) are retained for **90 days**.
+- Automatic background purge of historical sync operations is NOT implemented in V1; retention cleanup is manual.
 
-\- Corrupted sync state
+---
 
-\- Server-requested reset
+**# 94. Structured Semantic Error Classification & Queue Isolation**
 
-A full resync must preserve local unsynchronized business data or explicitly protect it before replacement.
+The remote API must expose structured semantic error codes instead of generic HTTP 409 responses:
 
-It must never blindly delete local pending changes.
+- `DUPLICATE_ENTITY`: Entity already exists remotely with conflicting identity.
+- `CONCURRENCY_CONFLICT`: Base version mismatch on mutable entity.
+- `BUSINESS_RULE_VIOLATION`: Domain rule constraint failed on server.
+- `INVALID_REFERENCE`: Referenced parent entity does not exist remotely.
+- `PAYMENT_BALANCE_EXCEEDED`: Payment amount exceeds order's remaining balance.
+- `INVALID_LIFECYCLE_TRANSITION`: Order status change violates domain lifecycle matrix.
 
-\---
+### Conflict Isolation in SyncEngine:
+- An operation encountering a permanent semantic error or concurrency conflict is marked as `Failed` with structured error details.
+- The `SyncEngine` isolates the failed operation and **continues processing independent, unrelated operations** in the queue.
+- A single entity failure must NOT cause head-of-line blocking for the entire application.
 
-**# 94. Sync Error Recovery**
-
-When synchronization fails:
-
-1\. Preserve local business data.
-
-2\. Preserve SyncOperation.
-
-3\. Increment retry count where appropriate.
-
-4\. Store error information.
-
-5\. Retry if the error is temporary.
-
-6\. Stop automatic retries for permanent validation errors.
-
-7\. Surface actionable information when necessary.
-
-\---
-
-**# 95. Sync Error Examples**
-
-**## Temporary**
-
-Network unavailable
-
-Action:
-
-Retry later.
-
-**## Temporary**
-
-Timeout
-
-Action:
-
-Retry.
-
-**## Temporary**
-
-Server unavailable
-
-Action:
-
-Retry later.
-
-**## Permanent**
-
-Invalid Expense Category
-
-Action:
-
-Mark failure and require correction.
-
-**## Permanent**
-
-Invalid Order state
-
-Action:
-
-Mark failure and require resolution.
-
-**## Authentication**
-
-Expired token
-
-Action:
-
-Refresh authentication and retry if possible.
-
-\---
+---
 
 **# 96. Sync and Local Editing While Pending**
 
@@ -2425,63 +2380,57 @@ AI coding tools implementing synchronization must:
 
 **# 102. Final Synchronization Architecture**
 
-The approved V1 synchronization flow is:
+The approved V1 synchronization architecture is:
 
-User
+### Push Path:
 
-↓
+    User Action
+        ↓
+    Flutter UI
+        ↓
+    Domain / Application Workflow
+        ↓
+    Local Drift Database (SQLite)
+        ├── Business table write
+        └── sync_operations insert (atomic)
+        ↓
+    Immediate UI Update (Reactive Queries)
+        ↓
+    SyncEngine (Single-flight loop)
+        ↓
+    RemoteApiDispatcher (X-Operation-ID)
+        ↓
+    Supabase Edge Function (/api/v1/...)
+        ↓
+    PostgreSQL Transactional RPC
+        ├── Idempotency check (sync_idempotency_log)
+        ├── Business mutation
+        ├── sync_changes append (sequence)
+        └── Commit
 
-Flutter UI
+*Note: The backend maintains and increments server_version, while the Flutter client relies on the monotonic sync sequence/cursor for remote change application. The Edit Order V3 client contract intentionally does not send base_version.*
 
-↓
+### Pull Path:
 
-Domain/Application Layer
+    Realtime Signal (sync_available) OR App Resume / Connectivity / 15-min Periodic / Startup / Manual
+        ↓
+    SyncEngine.pull() (Single-flight coalescing guard)
+        ↓
+    Edge Function (GET /api/v1/sync/changes?after=<cursor>&limit=<limit>)
+        ↓
+    sync_changes records returned in sequence order (bounded pages)
+        ↓
+    RemoteChangeApplier
+        ↓
+    Local Drift Transaction (ACID)
+        ├── Upsert local table (via DAOs, zero SyncOperations generated)
+        └── Advance sync_state.last_applied_sequence
+        ↓
+    Reactive Drift Streams (db.tableUpdates)
+        ↓
+    Flutter UI updates automatically
 
-↓
-
-Local Drift Database
-
-↓
-
-Immediate UI Update
-
-↓
-
-SyncOperation
-
-↓
-
-Synchronization Worker
-
-↓
-
-Remote API
-
-↓
-
-Backend Database
-
-For remote changes:
-
-Remote API
-
-↓
-
-Synchronization Worker
-
-↓
-
-Local Drift Database
-
-↓
-
-Reactive Queries
-
-↓
-
-Flutter UI
-
-\---
+---
 
 **# 103. Final Expense Synchronization Flow**
 

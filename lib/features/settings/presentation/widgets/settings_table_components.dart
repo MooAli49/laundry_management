@@ -156,11 +156,7 @@ class SettingsCard extends StatelessWidget {
                 color: const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
               ),
-              child: Icon(
-                icon,
-                size: 22,
-                color: const Color(0xFF475569),
-              ),
+              child: Icon(icon, size: 22, color: const Color(0xFF475569)),
             ),
             const SizedBox(width: 14),
           ],
@@ -190,7 +186,8 @@ class SettingsCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (secondarySubtitle != null && secondarySubtitle!.isNotEmpty) ...[
+                if (secondarySubtitle != null &&
+                    secondarySubtitle!.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(
                     secondarySubtitle!,
@@ -211,9 +208,14 @@ class SettingsCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 3.5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8.0,
+                  vertical: 3.5,
+                ),
                 decoration: BoxDecoration(
-                  color: isActive ? AppColors.successLight : const Color(0xFFF1F5F9),
+                  color: isActive
+                      ? AppColors.successLight
+                      : const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(
                     color: isActive
@@ -228,15 +230,21 @@ class SettingsCard extends StatelessWidget {
                       width: 6.0,
                       height: 6.0,
                       decoration: BoxDecoration(
-                        color: isActive ? AppColors.success : const Color(0xFF94A3B8),
+                        color: isActive
+                            ? AppColors.success
+                            : const Color(0xFF94A3B8),
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 5.0),
                     Text(
-                      isActive ? AppStrings.statusActive : AppStrings.statusInactive,
+                      isActive
+                          ? AppStrings.statusActive
+                          : AppStrings.statusInactive,
                       style: AppTextStyles.labelSmall.copyWith(
-                        color: isActive ? AppColors.successDark : const Color(0xFF64748B),
+                        color: isActive
+                            ? AppColors.successDark
+                            : const Color(0xFF64748B),
                         fontWeight: FontWeight.w700,
                         fontSize: 11.0,
                       ),
@@ -267,7 +275,10 @@ class SettingsCard extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4.5,
+                    ),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
@@ -395,9 +406,7 @@ class SettingsTableHelper {
   }
 
   static const BoxDecoration rowDecoration = BoxDecoration(
-    border: Border(
-      bottom: BorderSide(color: AppColors.divider, width: 1.0),
-    ),
+    border: Border(bottom: BorderSide(color: AppColors.divider, width: 1.0)),
   );
 }
 

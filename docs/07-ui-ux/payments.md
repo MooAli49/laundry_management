@@ -443,22 +443,20 @@ The normal V1 UI should not provide:
 Payments are historical transactions and should not be casually deleted
 from the operational interface.
 
-Any future correction/refund/void workflow must be explicitly designed
-as a separate Product and Domain decision.
+Payment records are immutable; refunds for cancelled orders are handled separately through the Refund V1 workflow and never delete or alter payment records.
 
 ---
 
 ## 27. Refunds
 
-V1 does not define a Refund workflow.
+Refund V1 is implemented as an Order-level workflow for Cancelled orders.
 
-The Payment UI must not introduce:
-
-    Refund
-    Partial Refund
-    Refund History
-
-unless these are explicitly added to Product/Domain scope.
+Key UI/UX distinctions:
+- The Refund action is accessible from the Order Details screen for cancelled orders with a positive refundable balance (`Total Paid - Total Refunded > 0`).
+- Refund entry is performed via a dedicated Refund Dialog (`استرداد المبلغ`), not by modifying existing payment records.
+- Refund history is displayed in its own dedicated card in Order Details (`سجل الاستردادات`).
+- Payment records themselves remain strictly immutable and are never deleted, reduced, or modified when a refund occurs.
+- The standalone Payment entry UI (e.g., Record Payment Dialog) remains exclusively for recording customer payments.
 
 ---
 

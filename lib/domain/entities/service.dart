@@ -28,7 +28,11 @@ class Service {
       throw ArgumentError('Service name cannot be empty');
     }
     if (price.isNegative) {
-      throw ArgumentError.value(price, 'price', 'Service price cannot be negative');
+      throw ArgumentError.value(
+        price,
+        'price',
+        'Service price cannot be negative',
+      );
     }
   }
 
@@ -69,9 +73,18 @@ class Service {
           updatedAt == other.updatedAt;
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, description, pricingType, price, isActive, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    description,
+    pricingType,
+    price,
+    isActive,
+    createdAt,
+    updatedAt,
+  );
 
   @override
-  String toString() => 'Service(id: $id, name: $name, price: $price, active: $isActive)';
+  String toString() =>
+      'Service(id: $id, name: $name, price: $price, active: $isActive)';
 }

@@ -33,10 +33,7 @@ void main() {
         DateFormatter.formatDateTime(testDate),
         equals('2026-09-04 14:30'),
       );
-      expect(
-        DateFormatter.formatDMYTime(testDate),
-        equals('04/09/2026 14:30'),
-      );
+      expect(DateFormatter.formatDMYTime(testDate), equals('04/09/2026 14:30'));
     });
   });
 }

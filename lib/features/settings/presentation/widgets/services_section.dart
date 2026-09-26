@@ -25,8 +25,6 @@ class ServicesSection extends StatelessWidget {
         return AppStrings.pricingPerSquareMeter;
       case PricingType.fixedPrice:
         return AppStrings.pricingFixedPrice;
-      case PricingType.perKilogram:
-        return '';
     }
   }
 
@@ -51,7 +49,10 @@ class ServicesSection extends StatelessWidget {
     }
   }
 
-  Future<void> _handleToggleStatus(BuildContext context, Service service) async {
+  Future<void> _handleToggleStatus(
+    BuildContext context,
+    Service service,
+  ) async {
     final cubit = context.read<ServicesManagementCubit>();
     if (service.isActive) {
       final confirmed = await DeactivationConfirmDialog.show(
@@ -74,8 +75,6 @@ class ServicesSection extends StatelessWidget {
         return 'م²';
       case PricingType.fixedPrice:
         return 'الخدمة';
-      case PricingType.perKilogram:
-        return 'كجم';
     }
   }
 

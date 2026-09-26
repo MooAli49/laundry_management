@@ -15,7 +15,10 @@ class FakeServiceRepository implements ServiceRepository {
   final Map<String, List<String>> supportedTypes = {};
 
   @override
-  Future<Service> createService(Service service, {required List<String> supportedItemTypeIds}) async {
+  Future<Service> createService(
+    Service service, {
+    required List<String> supportedItemTypeIds,
+  }) async {
     if (shouldThrow) throw const DatabaseFailure('DB error');
     services.add(service);
     supportedTypes[service.id] = supportedItemTypeIds;
@@ -23,7 +26,10 @@ class FakeServiceRepository implements ServiceRepository {
   }
 
   @override
-  Future<Service> updateService(Service service, {List<String>? supportedItemTypeIds}) async {
+  Future<Service> updateService(
+    Service service, {
+    List<String>? supportedItemTypeIds,
+  }) async {
     if (shouldThrow) throw const DatabaseFailure('DB error');
     final idx = services.indexWhere((s) => s.id == service.id);
     if (idx != -1) {
@@ -202,21 +208,24 @@ void main() {
       expect(cubit.state.services.first.name, 'غسيل مستعجل');
     });
 
-    test('deactivateService and activateService change active status', () async {
-      await cubit.createService(
-        name: 'سرفيس',
-        pricingType: PricingType.perPiece,
-        price: const Money.fromPiastres(1500),
-        supportedItemTypeIds: ['t-1'],
-      );
+    test(
+      'deactivateService and activateService change active status',
+      () async {
+        await cubit.createService(
+          name: 'سرفيس',
+          pricingType: PricingType.perPiece,
+          price: const Money.fromPiastres(1500),
+          supportedItemTypeIds: ['t-1'],
+        );
 
-      final id = cubit.state.services.first.id;
+        final id = cubit.state.services.first.id;
 
-      await cubit.deactivateService(id);
-      expect(cubit.state.services.first.isActive, isFalse);
+        await cubit.deactivateService(id);
+        expect(cubit.state.services.first.isActive, isFalse);
 
-      await cubit.activateService(id);
-      expect(cubit.state.services.first.isActive, isTrue);
-    });
+        await cubit.activateService(id);
+        expect(cubit.state.services.first.isActive, isTrue);
+      },
+    );
   });
 }

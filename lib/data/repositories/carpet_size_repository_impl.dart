@@ -6,6 +6,7 @@ import '../../domain/repositories/carpet_size_repository.dart';
 import '../local/daos/carpet_sizes_dao.dart';
 import '../local/daos/sync_operations_dao.dart';
 import '../local/database/app_database.dart' as app_db;
+import '../sync/sync_payload_builder.dart';
 
 class CarpetSizeRepositoryImpl implements CarpetSizeRepository {
   final CarpetSizesDao _carpetSizesDao;
@@ -16,9 +17,9 @@ class CarpetSizeRepositoryImpl implements CarpetSizeRepository {
     required CarpetSizesDao carpetSizesDao,
     required SyncOperationsDao syncOperationsDao,
     required app_db.AppDatabase db,
-  })  : _carpetSizesDao = carpetSizesDao,
-        _syncOperationsDao = syncOperationsDao,
-        _db = db;
+  }) : _carpetSizesDao = carpetSizesDao,
+       _syncOperationsDao = syncOperationsDao,
+       _db = db;
 
   @override
   Future<CarpetSize> createCarpetSize(CarpetSize carpetSize) async {
@@ -40,6 +41,7 @@ class CarpetSizeRepositoryImpl implements CarpetSizeRepository {
           entityType: 'carpet_size',
           entityId: carpetSize.id,
           operationType: 'create',
+          payload: SyncPayloadBuilder.buildCarpetSizePayload(carpetSize),
         );
 
         return carpetSize;
@@ -77,6 +79,7 @@ class CarpetSizeRepositoryImpl implements CarpetSizeRepository {
           entityType: 'carpet_size',
           entityId: carpetSize.id,
           operationType: 'update',
+          payload: SyncPayloadBuilder.buildCarpetSizeUpdatePayload(carpetSize),
         );
 
         return carpetSize;
@@ -131,11 +134,17 @@ class CarpetSizeRepositoryImpl implements CarpetSizeRepository {
           throw ValidationFailure('CarpetSize not found');
         }
 
-        await _carpetSizesDao.setActiveStatus(id, true, DateTime.now());
+        final now = DateTime.now();
+        await _carpetSizesDao.setActiveStatus(id, true, now);
         await _syncOperationsDao.recordOperation(
           entityType: 'carpet_size',
           entityId: id,
           operationType: 'activate',
+          payload: SyncPayloadBuilder.buildCarpetSizeStatusPayload(
+            id,
+            true,
+            updatedAt: now,
+          ),
         );
       });
     } catch (e) {
@@ -153,11 +162,17 @@ class CarpetSizeRepositoryImpl implements CarpetSizeRepository {
           throw ValidationFailure('CarpetSize not found');
         }
 
-        await _carpetSizesDao.setActiveStatus(id, false, DateTime.now());
+        final now = DateTime.now();
+        await _carpetSizesDao.setActiveStatus(id, false, now);
         await _syncOperationsDao.recordOperation(
           entityType: 'carpet_size',
           entityId: id,
           operationType: 'deactivate',
+          payload: SyncPayloadBuilder.buildCarpetSizeStatusPayload(
+            id,
+            false,
+            updatedAt: now,
+          ),
         );
       });
     } catch (e) {

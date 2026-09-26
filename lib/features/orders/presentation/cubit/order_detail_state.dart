@@ -3,6 +3,8 @@ import '../../../../domain/entities/customer.dart';
 import '../../../../domain/entities/order.dart';
 import '../../../../domain/entities/order_item.dart';
 import '../../../../domain/entities/payment.dart';
+import '../../../../domain/entities/refund.dart';
+import '../../../../domain/entities/refund_balance_summary.dart';
 import '../../../../domain/entities/storage_location.dart';
 import '../../../../domain/entities/storage_record.dart';
 import '../../../../domain/value_objects/money.dart';
@@ -13,13 +15,18 @@ class OrderDetailState {
   final Order? order;
   final Customer? customer;
   final List<OrderItem> items;
-  final Map<String, StorageRecord> activeStorageRecords; // orderItemId -> StorageRecord
-  final Map<String, StorageLocation> storageLocations; // locationId -> StorageLocation
+  final Map<String, StorageRecord>
+  activeStorageRecords; // orderItemId -> StorageRecord
+  final Map<String, StorageLocation>
+  storageLocations; // locationId -> StorageLocation
   final List<StorageLocation> allActiveLocations;
-  final Map<String, List<StorageLocation>> compatibleLocationsByItemType; // itemTypeId -> compatible locations
+  final Map<String, List<StorageLocation>>
+  compatibleLocationsByItemType; // itemTypeId -> compatible locations
   final List<Payment> payments;
   final Money totalPaid;
   final Money remainingAmount;
+  final List<Refund> refunds;
+  final RefundBalanceSummary refundBalance;
   final BusinessSettings? settings;
   final String? errorMessage;
   final String? actionSuccessMessage;
@@ -37,20 +44,27 @@ class OrderDetailState {
     this.payments = const [],
     this.totalPaid = Money.zero,
     this.remainingAmount = Money.zero,
+    this.refunds = const [],
+    this.refundBalance = RefundBalanceSummary.zero,
     this.settings,
     this.errorMessage,
     this.actionSuccessMessage,
   });
 
   bool get isFullyPaid => remainingAmount.isZero || remainingAmount.isNegative;
+  Money get totalRefunded => refundBalance.totalRefunded;
+  Money get remainingRefundable => refundBalance.remainingRefundable;
   bool get allItemsStored =>
-      items.isNotEmpty && items.every((i) => activeStorageRecords.containsKey(i.id));
+      items.isNotEmpty &&
+      items.every((i) => activeStorageRecords.containsKey(i.id));
   bool get areAllItemsStored => allItemsStored;
   List<OrderItem> get unstoredItems =>
       items.where((i) => !activeStorageRecords.containsKey(i.id)).toList();
 
   /// Returns the intersection of compatible active locations for the given items.
-  List<StorageLocation> compatibleLocationsForItems(List<OrderItem> targetItems) {
+  List<StorageLocation> compatibleLocationsForItems(
+    List<OrderItem> targetItems,
+  ) {
     if (targetItems.isEmpty || compatibleLocationsByItemType.isEmpty) {
       return allActiveLocations;
     }
@@ -60,7 +74,9 @@ class OrderDetailState {
       if (intersection == null) {
         intersection = List.of(compatible);
       } else {
-        intersection = intersection.where((loc) => compatible.any((c) => c.id == loc.id)).toList();
+        intersection = intersection
+            .where((loc) => compatible.any((c) => c.id == loc.id))
+            .toList();
       }
     }
     return intersection ?? [];
@@ -79,6 +95,8 @@ class OrderDetailState {
     List<Payment>? payments,
     Money? totalPaid,
     Money? remainingAmount,
+    List<Refund>? refunds,
+    RefundBalanceSummary? refundBalance,
     BusinessSettings? settings,
     String? errorMessage,
     bool clearErrorMessage = false,
@@ -99,9 +117,12 @@ class OrderDetailState {
       payments: payments ?? this.payments,
       totalPaid: totalPaid ?? this.totalPaid,
       remainingAmount: remainingAmount ?? this.remainingAmount,
+      refunds: refunds ?? this.refunds,
+      refundBalance: refundBalance ?? this.refundBalance,
       settings: settings ?? this.settings,
-      errorMessage:
-          clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
       actionSuccessMessage: clearActionSuccessMessage
           ? null
           : (actionSuccessMessage ?? this.actionSuccessMessage),

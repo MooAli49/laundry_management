@@ -67,483 +67,547 @@ void main() {
   });
 
   group('InvoicePreviewDialog Tests', () {
-    testWidgets('renders business header, customer info, item table and totals', (tester) async {
-      final order = Order(
-        id: 'ord-1',
-        orderNumber: '26-001',
-        customerId: 'cust-1',
-        customerNameSnapshot: 'عميل الفاتورة',
-        customerPhoneSnapshot: '01012345678',
-        status: OrderStatus.ready,
-        expectedPickupDate: orderDate,
-        subtotal: const Money.fromPiastres(10000), // 100 EGP
-        total: const Money.fromPiastres(10000),
-        createdAt: now,
-        updatedAt: now,
-      );
+    testWidgets(
+      'renders business header, customer info, item table and totals',
+      (tester) async {
+        final order = Order(
+          id: 'ord-1',
+          orderNumber: '26-001',
+          customerId: 'cust-1',
+          customerNameSnapshot: 'عميل الفاتورة',
+          customerPhoneSnapshot: '01012345678',
+          status: OrderStatus.ready,
+          expectedPickupDate: orderDate,
+          subtotal: const Money.fromPiastres(10000), // 100 EGP
+          total: const Money.fromPiastres(10000),
+          createdAt: now,
+          updatedAt: now,
+        );
 
-      final customer = Customer(
-        id: 'cust-1',
-        name: 'عميل الفاتورة',
-        phone: '01012345678',
-        createdAt: now,
-        updatedAt: now,
-      );
+        final customer = Customer(
+          id: 'cust-1',
+          name: 'عميل الفاتورة',
+          phone: '01012345678',
+          createdAt: now,
+          updatedAt: now,
+        );
 
-      final item = OrderItem(
-        id: 'item-1',
-        orderId: 'ord-1',
-        itemTypeId: 'type-1',
-        serviceId: 'srv-1',
-        itemTypeNameSnapshot: 'قميص',
-        serviceNameSnapshot: 'غسيل',
-        pricingType: PricingType.perPiece,
-        quantity: 1.0,
-        unitPrice: const Money.fromPiastres(10000),
-        calculatedTotal: const Money.fromPiastres(10000),
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      final settings = BusinessSettings(
-        id: 'settings-1',
-        businessName: 'مغسلة النقاء المتطورة',
-        address: 'شارع النصر، القاهرة',
-        phone: '01000000000',
-        invoiceFooterText: 'شكراً لزيارتكم',
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Directionality(
-            textDirection: TextDirection.rtl,
-            child: Scaffold(
-              body: InvoicePreviewDialog(
-                order: order,
-                customer: customer,
-                items: [item],
-                totalPaid: const Money.fromPiastres(6000),
-                remainingAmount: const Money.fromPiastres(4000),
-                settings: settings,
-              ),
-            ),
-          ),
-        ),
-      );
-
-      expect(find.text('مغسلة النقاء المتطورة'), findsOneWidget);
-      expect(find.text('فاتورة #26-001'), findsOneWidget);
-      expect(find.text('عميل الفاتورة'), findsOneWidget);
-      expect(find.text('قميص - غسيل'), findsOneWidget);
-      expect(find.text('100.00 ج.م'), findsWidgets);
-      expect(find.text('60.00 ج.م'), findsOneWidget);
-      expect(find.text('40.00 ج.م'), findsOneWidget);
-      expect(find.text('طباعة الفاتورة'), findsOneWidget);
-      expect(find.text('إغلاق'), findsOneWidget);
-    });
-
-    testWidgets('displays historical snapshot even if current customer is mutated', (tester) async {
-      final historicalOrder = Order(
-        id: 'ord-hist',
-        orderNumber: '26-005',
-        customerId: 'cust-1',
-        customerNameSnapshot: 'العميل الأصلي (أ)',
-        customerPhoneSnapshot: '01011112222',
-        status: OrderStatus.processing,
-        expectedPickupDate: orderDate,
-        subtotal: const Money.fromPiastres(5000),
-        total: const Money.fromPiastres(5000),
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      final mutatedCustomer = Customer(
-        id: 'cust-1',
-        name: 'العميل الجديد (ب)',
-        phone: '01099998888',
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Directionality(
-            textDirection: TextDirection.rtl,
-            child: Scaffold(
-              body: InvoicePreviewDialog(
-                order: historicalOrder,
-                customer: mutatedCustomer,
-                items: const [],
-                totalPaid: Money.zero,
-                remainingAmount: const Money.fromPiastres(5000),
-              ),
-            ),
-          ),
-        ),
-      );
-
-      // Must display historical snapshots
-      expect(find.text('العميل الأصلي (أ)'), findsOneWidget);
-      expect(find.text('01011112222'), findsOneWidget);
-
-      // Must NOT display mutated current customer info
-      expect(find.text('العميل الجديد (ب)'), findsNothing);
-      expect(find.text('01099998888'), findsNothing);
-    });
-
-    testWidgets('displays piece quantity correctly as integer count (e.g. 2, not hardcoded 1)', (tester) async {
-      final order = Order(
-        id: 'ord-piece',
-        orderNumber: '26-010',
-        customerId: 'cust-1',
-        customerNameSnapshot: 'أحمد',
-        customerPhoneSnapshot: '01011111111',
-        status: OrderStatus.processing,
-        expectedPickupDate: orderDate,
-        subtotal: const Money.fromPiastres(6000),
-        total: const Money.fromPiastres(6000),
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      final item = OrderItem(
-        id: 'item-2',
-        orderId: 'ord-piece',
-        itemTypeId: 't-1',
-        serviceId: 's-1',
-        itemTypeNameSnapshot: 'بنطلون',
-        serviceNameSnapshot: 'غسيل',
-        pricingType: PricingType.perPiece,
-        quantity: 2.0,
-        unitPrice: const Money.fromPiastres(3000),
-        calculatedTotal: const Money.fromPiastres(6000),
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Directionality(
-            textDirection: TextDirection.rtl,
-            child: Scaffold(
-              body: InvoicePreviewDialog(
-                order: order,
-                items: [item],
-                totalPaid: Money.zero,
-                remainingAmount: const Money.fromPiastres(6000),
-              ),
-            ),
-          ),
-        ),
-      );
-
-      // Quantity column must show '2 قطع'
-      expect(find.text('2 قطع'), findsOneWidget);
-      expect(find.text('1'), findsNothing);
-    });
-
-    testWidgets('displays carpet quantity with piece count and dimensions sub-detail', (tester) async {
-      final order = Order(
-        id: 'ord-carpet',
-        orderNumber: '26-020',
-        customerId: 'cust-1',
-        customerNameSnapshot: 'محمود',
-        customerPhoneSnapshot: '01022222222',
-        status: OrderStatus.processing,
-        expectedPickupDate: orderDate,
-        subtotal: const Money.fromPiastres(13750),
-        total: const Money.fromPiastres(13750),
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      final carpetData = CarpetItemData(
-        id: 'c-1',
-        orderItemId: 'item-carpet',
-        length: 2.0,
-        width: 1.375,
-        area: 2.75,
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      final carpetItem = OrderItem(
-        id: 'item-carpet',
-        orderId: 'ord-carpet',
-        itemTypeId: 't-carpet',
-        serviceId: 's-carpet',
-        itemTypeNameSnapshot: 'سجاد',
-        serviceNameSnapshot: 'غسيل',
-        pricingType: PricingType.perSquareMeter,
-        quantity: 1.0,
-        unitPrice: const Money.fromPiastres(5000),
-        calculatedTotal: const Money.fromPiastres(13750),
-        carpetData: carpetData,
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Directionality(
-            textDirection: TextDirection.rtl,
-            child: Scaffold(
-              body: InvoicePreviewDialog(
-                order: order,
-                items: [carpetItem],
-                totalPaid: Money.zero,
-                remainingAmount: const Money.fromPiastres(13750),
-              ),
-            ),
-          ),
-        ),
-      );
-
-      // Primary quantity shows piece count: 1 قطعة
-      expect(find.text('1 قطعة'), findsOneWidget);
-      // Dimensions sub-text includes area per piece: (2 × 1.375 م) — 2.75 م²/قطعة
-      expect(find.text('(2 × 1.375 م) — 2.75 م²/قطعة'), findsOneWidget);
-    });
-
-    testWidgets('displays decimal quantity preserving precision (e.g. 2.75 is never truncated to 2)', (tester) async {
-      final order = Order(
-        id: 'ord-dec',
-        orderNumber: '26-030',
-        customerId: 'cust-1',
-        customerNameSnapshot: 'خالد',
-        customerPhoneSnapshot: '01033333333',
-        status: OrderStatus.processing,
-        expectedPickupDate: orderDate,
-        subtotal: const Money.fromPiastres(10000),
-        total: const Money.fromPiastres(10000),
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      final decimalItem = OrderItem(
-        id: 'item-dec',
-        orderId: 'ord-dec',
-        itemTypeId: 't-1',
-        serviceId: 's-1',
-        itemTypeNameSnapshot: 'قماش',
-        serviceNameSnapshot: 'تنظيف',
-        pricingType: PricingType.perPiece,
-        quantity: 2.75,
-        unitPrice: const Money.fromPiastres(10000),
-        calculatedTotal: const Money.fromPiastres(10000),
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Directionality(
-            textDirection: TextDirection.rtl,
-            child: Scaffold(
-              body: InvoicePreviewDialog(
-                order: order,
-                items: [decimalItem],
-                totalPaid: Money.zero,
-                remainingAmount: const Money.fromPiastres(10000),
-              ),
-            ),
-          ),
-        ),
-      );
-
-      expect(find.text('2.75 قطعة'), findsOneWidget);
-      expect(find.text('2'), findsNothing);
-    });
-
-    testWidgets('groups 3 identical normal items into a single preview row with quantity 3 قطع and sum total', (tester) async {
-      final order = Order(
-        id: 'ord-group-normal',
-        orderNumber: '26-031',
-        customerId: 'cust-1',
-        customerNameSnapshot: 'خالد',
-        customerPhoneSnapshot: '01033333333',
-        status: OrderStatus.processing,
-        expectedPickupDate: orderDate,
-        subtotal: const Money.fromPiastres(6000),
-        total: const Money.fromPiastres(6000),
-        createdAt: now,
-        updatedAt: now,
-      );
-
-      final items = [
-        OrderItem(
+        final item = OrderItem(
           id: 'item-1',
-          orderId: 'ord-group-normal',
-          itemTypeId: 't-1',
-          serviceId: 's-1',
+          orderId: 'ord-1',
+          itemTypeId: 'type-1',
+          serviceId: 'srv-1',
           itemTypeNameSnapshot: 'قميص',
           serviceNameSnapshot: 'غسيل',
           pricingType: PricingType.perPiece,
           quantity: 1.0,
-          unitPrice: const Money.fromPiastres(2000),
-          calculatedTotal: const Money.fromPiastres(2000),
+          unitPrice: const Money.fromPiastres(10000),
+          calculatedTotal: const Money.fromPiastres(10000),
           createdAt: now,
           updatedAt: now,
-        ),
-        OrderItem(
-          id: 'item-2',
-          orderId: 'ord-group-normal',
-          itemTypeId: 't-1',
-          serviceId: 's-1',
-          itemTypeNameSnapshot: 'قميص',
-          serviceNameSnapshot: 'غسيل',
-          pricingType: PricingType.perPiece,
-          quantity: 1.0,
-          unitPrice: const Money.fromPiastres(2000),
-          calculatedTotal: const Money.fromPiastres(2000),
-          createdAt: now,
-          updatedAt: now,
-        ),
-        OrderItem(
-          id: 'item-3',
-          orderId: 'ord-group-normal',
-          itemTypeId: 't-1',
-          serviceId: 's-1',
-          itemTypeNameSnapshot: 'قميص',
-          serviceNameSnapshot: 'غسيل',
-          pricingType: PricingType.perPiece,
-          quantity: 1.0,
-          unitPrice: const Money.fromPiastres(2000),
-          calculatedTotal: const Money.fromPiastres(2000),
-          createdAt: now,
-          updatedAt: now,
-        ),
-      ];
+        );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Directionality(
-            textDirection: TextDirection.rtl,
-            child: Scaffold(
-              body: InvoicePreviewDialog(
-                order: order,
-                items: items,
-                totalPaid: Money.zero,
-                remainingAmount: const Money.fromPiastres(6000),
+        final settings = BusinessSettings(
+          id: 'settings-1',
+          businessName: 'مغسلة النقاء المتطورة',
+          address: 'شارع النصر، القاهرة',
+          phone: '01000000000',
+          invoiceFooterText: 'شكراً لزيارتكم',
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Scaffold(
+                body: InvoicePreviewDialog(
+                  order: order,
+                  customer: customer,
+                  items: [item],
+                  totalPaid: const Money.fromPiastres(6000),
+                  remainingAmount: const Money.fromPiastres(4000),
+                  settings: settings,
+                ),
               ),
             ),
           ),
-        ),
-      );
+        );
 
-      // Should show '3 قطع'
-      expect(find.descendant(of: find.byType(Table), matching: find.text('3 قطع')), findsOneWidget);
-      // Unit price: 20.00 ج.م
-      expect(find.descendant(of: find.byType(Table), matching: find.text('20.00 ج.م')), findsOneWidget);
-      // Line total: 60.00 ج.م inside the table
-      expect(find.descendant(of: find.byType(Table), matching: find.text('60.00 ج.م')), findsOneWidget);
-      // Item name appears once in table
-      expect(find.descendant(of: find.byType(Table), matching: find.text('قميص - غسيل')), findsOneWidget);
-    });
+        expect(find.text('مغسلة النقاء المتطورة'), findsOneWidget);
+        expect(find.text('فاتورة '), findsOneWidget);
+        expect(find.text('#26-001'), findsOneWidget);
+        expect(find.text('عميل الفاتورة'), findsOneWidget);
+        expect(find.text('قميص - غسيل'), findsOneWidget);
+        expect(find.text('100.00 ج.م'), findsWidgets);
+        expect(find.text('60.00 ج.م'), findsOneWidget);
+        expect(find.text('40.00 ج.م'), findsOneWidget);
+        expect(find.text('طباعة الفاتورة'), findsOneWidget);
+        expect(find.text('إغلاق'), findsOneWidget);
+      },
+    );
 
-    testWidgets('groups 3 identical carpets into a single preview row with 3 قطع, piece unit price, and dimensions', (tester) async {
-      final order = Order(
-        id: 'ord-group-carpet',
-        orderNumber: '26-032',
-        customerId: 'cust-1',
-        customerNameSnapshot: 'خالد',
-        customerPhoneSnapshot: '01033333333',
-        status: OrderStatus.processing,
-        expectedPickupDate: orderDate,
-        subtotal: const Money.fromPiastres(36000),
-        total: const Money.fromPiastres(36000),
-        createdAt: now,
-        updatedAt: now,
-      );
+    testWidgets(
+      'displays historical snapshot even if current customer is mutated',
+      (tester) async {
+        final historicalOrder = Order(
+          id: 'ord-hist',
+          orderNumber: '26-005',
+          customerId: 'cust-1',
+          customerNameSnapshot: 'العميل الأصلي (أ)',
+          customerPhoneSnapshot: '01011112222',
+          status: OrderStatus.processing,
+          expectedPickupDate: orderDate,
+          subtotal: const Money.fromPiastres(5000),
+          total: const Money.fromPiastres(5000),
+          createdAt: now,
+          updatedAt: now,
+        );
 
-      CarpetItemData makeCarpet(String id) => CarpetItemData(
-            id: id,
-            orderItemId: 'item-$id',
-            length: 2.0,
-            width: 3.0,
-            area: 6.0,
+        final mutatedCustomer = Customer(
+          id: 'cust-1',
+          name: 'العميل الجديد (ب)',
+          phone: '01099998888',
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Scaffold(
+                body: InvoicePreviewDialog(
+                  order: historicalOrder,
+                  customer: mutatedCustomer,
+                  items: const [],
+                  totalPaid: Money.zero,
+                  remainingAmount: const Money.fromPiastres(5000),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        // Must display historical snapshots
+        expect(find.text('العميل الأصلي (أ)'), findsOneWidget);
+        expect(find.text('01011112222'), findsOneWidget);
+
+        // Must NOT display mutated current customer info
+        expect(find.text('العميل الجديد (ب)'), findsNothing);
+        expect(find.text('01099998888'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'displays piece quantity correctly as integer count (e.g. 2, not hardcoded 1)',
+      (tester) async {
+        final order = Order(
+          id: 'ord-piece',
+          orderNumber: '26-010',
+          customerId: 'cust-1',
+          customerNameSnapshot: 'أحمد',
+          customerPhoneSnapshot: '01011111111',
+          status: OrderStatus.processing,
+          expectedPickupDate: orderDate,
+          subtotal: const Money.fromPiastres(6000),
+          total: const Money.fromPiastres(6000),
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        final item = OrderItem(
+          id: 'item-2',
+          orderId: 'ord-piece',
+          itemTypeId: 't-1',
+          serviceId: 's-1',
+          itemTypeNameSnapshot: 'بنطلون',
+          serviceNameSnapshot: 'غسيل',
+          pricingType: PricingType.perPiece,
+          quantity: 2.0,
+          unitPrice: const Money.fromPiastres(3000),
+          calculatedTotal: const Money.fromPiastres(6000),
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Scaffold(
+                body: InvoicePreviewDialog(
+                  order: order,
+                  items: [item],
+                  totalPaid: Money.zero,
+                  remainingAmount: const Money.fromPiastres(6000),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        // Quantity column must show '2 قطع'
+        expect(find.text('2 قطع'), findsOneWidget);
+        expect(find.text('1'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'displays carpet quantity with piece count and dimensions sub-detail',
+      (tester) async {
+        final order = Order(
+          id: 'ord-carpet',
+          orderNumber: '26-020',
+          customerId: 'cust-1',
+          customerNameSnapshot: 'محمود',
+          customerPhoneSnapshot: '01022222222',
+          status: OrderStatus.processing,
+          expectedPickupDate: orderDate,
+          subtotal: const Money.fromPiastres(13750),
+          total: const Money.fromPiastres(13750),
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        final carpetData = CarpetItemData(
+          id: 'c-1',
+          orderItemId: 'item-carpet',
+          length: 2.0,
+          width: 1.375,
+          area: 2.75,
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        final carpetItem = OrderItem(
+          id: 'item-carpet',
+          orderId: 'ord-carpet',
+          itemTypeId: 't-carpet',
+          serviceId: 's-carpet',
+          itemTypeNameSnapshot: 'سجاد',
+          serviceNameSnapshot: 'غسيل',
+          pricingType: PricingType.perSquareMeter,
+          quantity: 1.0,
+          unitPrice: const Money.fromPiastres(5000),
+          calculatedTotal: const Money.fromPiastres(13750),
+          carpetData: carpetData,
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Scaffold(
+                body: InvoicePreviewDialog(
+                  order: order,
+                  items: [carpetItem],
+                  totalPaid: Money.zero,
+                  remainingAmount: const Money.fromPiastres(13750),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        // Primary quantity shows piece count: 1 قطعة
+        expect(find.text('1 قطعة'), findsOneWidget);
+        // Dimensions sub-text includes area per piece: (2 × 1.375 م) — 2.75 م²/قطعة
+        expect(find.text('(2 × 1.375 م) — 2.75 م²/قطعة'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'displays decimal quantity preserving precision (e.g. 2.75 is never truncated to 2)',
+      (tester) async {
+        final order = Order(
+          id: 'ord-dec',
+          orderNumber: '26-030',
+          customerId: 'cust-1',
+          customerNameSnapshot: 'خالد',
+          customerPhoneSnapshot: '01033333333',
+          status: OrderStatus.processing,
+          expectedPickupDate: orderDate,
+          subtotal: const Money.fromPiastres(10000),
+          total: const Money.fromPiastres(10000),
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        final decimalItem = OrderItem(
+          id: 'item-dec',
+          orderId: 'ord-dec',
+          itemTypeId: 't-1',
+          serviceId: 's-1',
+          itemTypeNameSnapshot: 'قماش',
+          serviceNameSnapshot: 'تنظيف',
+          pricingType: PricingType.perPiece,
+          quantity: 2.75,
+          unitPrice: const Money.fromPiastres(10000),
+          calculatedTotal: const Money.fromPiastres(10000),
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Scaffold(
+                body: InvoicePreviewDialog(
+                  order: order,
+                  items: [decimalItem],
+                  totalPaid: Money.zero,
+                  remainingAmount: const Money.fromPiastres(10000),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        expect(find.text('2.75 قطعة'), findsOneWidget);
+        expect(find.text('2'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'groups 3 identical normal items into a single preview row with quantity 3 قطع and sum total',
+      (tester) async {
+        final order = Order(
+          id: 'ord-group-normal',
+          orderNumber: '26-031',
+          customerId: 'cust-1',
+          customerNameSnapshot: 'خالد',
+          customerPhoneSnapshot: '01033333333',
+          status: OrderStatus.processing,
+          expectedPickupDate: orderDate,
+          subtotal: const Money.fromPiastres(6000),
+          total: const Money.fromPiastres(6000),
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        final items = [
+          OrderItem(
+            id: 'item-1',
+            orderId: 'ord-group-normal',
+            itemTypeId: 't-1',
+            serviceId: 's-1',
+            itemTypeNameSnapshot: 'قميص',
+            serviceNameSnapshot: 'غسيل',
+            pricingType: PricingType.perPiece,
+            quantity: 1.0,
+            unitPrice: const Money.fromPiastres(2000),
+            calculatedTotal: const Money.fromPiastres(2000),
             createdAt: now,
             updatedAt: now,
-          );
+          ),
+          OrderItem(
+            id: 'item-2',
+            orderId: 'ord-group-normal',
+            itemTypeId: 't-1',
+            serviceId: 's-1',
+            itemTypeNameSnapshot: 'قميص',
+            serviceNameSnapshot: 'غسيل',
+            pricingType: PricingType.perPiece,
+            quantity: 1.0,
+            unitPrice: const Money.fromPiastres(2000),
+            calculatedTotal: const Money.fromPiastres(2000),
+            createdAt: now,
+            updatedAt: now,
+          ),
+          OrderItem(
+            id: 'item-3',
+            orderId: 'ord-group-normal',
+            itemTypeId: 't-1',
+            serviceId: 's-1',
+            itemTypeNameSnapshot: 'قميص',
+            serviceNameSnapshot: 'غسيل',
+            pricingType: PricingType.perPiece,
+            quantity: 1.0,
+            unitPrice: const Money.fromPiastres(2000),
+            calculatedTotal: const Money.fromPiastres(2000),
+            createdAt: now,
+            updatedAt: now,
+          ),
+        ];
 
-      final items = [
-        OrderItem(
-          id: 'c-item-1',
-          orderId: 'ord-group-carpet',
-          itemTypeId: 't-carpet',
-          itemDefinitionNameSnapshot: 'سجادة صوف',
-          serviceId: 's-carpet',
-          itemTypeNameSnapshot: 'سجاد',
-          serviceNameSnapshot: 'غسيل سجاد',
-          pricingType: PricingType.perSquareMeter,
-          quantity: 1.0,
-          unitPrice: const Money.fromPiastres(2000), // 20 EGP/m²
-          calculatedTotal: const Money.fromPiastres(12000), // 120 EGP / piece
-          carpetData: makeCarpet('1'),
-          createdAt: now,
-          updatedAt: now,
-        ),
-        OrderItem(
-          id: 'c-item-2',
-          orderId: 'ord-group-carpet',
-          itemTypeId: 't-carpet',
-          itemDefinitionNameSnapshot: 'سجادة صوف',
-          serviceId: 's-carpet',
-          itemTypeNameSnapshot: 'سجاد',
-          serviceNameSnapshot: 'غسيل سجاد',
-          pricingType: PricingType.perSquareMeter,
-          quantity: 1.0,
-          unitPrice: const Money.fromPiastres(2000),
-          calculatedTotal: const Money.fromPiastres(12000),
-          carpetData: makeCarpet('2'),
-          createdAt: now,
-          updatedAt: now,
-        ),
-        OrderItem(
-          id: 'c-item-3',
-          orderId: 'ord-group-carpet',
-          itemTypeId: 't-carpet',
-          itemDefinitionNameSnapshot: 'سجادة صوف',
-          serviceId: 's-carpet',
-          itemTypeNameSnapshot: 'سجاد',
-          serviceNameSnapshot: 'غسيل سجاد',
-          pricingType: PricingType.perSquareMeter,
-          quantity: 1.0,
-          unitPrice: const Money.fromPiastres(2000),
-          calculatedTotal: const Money.fromPiastres(12000),
-          carpetData: makeCarpet('3'),
-          createdAt: now,
-          updatedAt: now,
-        ),
-      ];
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Directionality(
-            textDirection: TextDirection.rtl,
-            child: Scaffold(
-              body: InvoicePreviewDialog(
-                order: order,
-                items: items,
-                totalPaid: Money.zero,
-                remainingAmount: const Money.fromPiastres(36000),
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Scaffold(
+                body: InvoicePreviewDialog(
+                  order: order,
+                  items: items,
+                  totalPaid: Money.zero,
+                  remainingAmount: const Money.fromPiastres(6000),
+                ),
               ),
             ),
           ),
-        ),
-      );
+        );
 
-      // Primary quantity displays '3 قطع'
-      expect(find.descendant(of: find.byType(Table), matching: find.text('3 قطع')), findsOneWidget);
-      // Unit price displays price for 1 piece: 120.00 ج.م
-      expect(find.descendant(of: find.byType(Table), matching: find.text('120.00 ج.م')), findsOneWidget);
-      // Total displays: 360.00 ج.م inside the table
-      expect(find.descendant(of: find.byType(Table), matching: find.text('360.00 ج.م')), findsOneWidget);
-      // Dimensions sub-detail: (2 × 3 م) — 6 م²/قطعة
-      expect(find.descendant(of: find.byType(Table), matching: find.text('(2 × 3 م) — 6 م²/قطعة')), findsOneWidget);
-    });
+        // Should show '3 قطع'
+        expect(
+          find.descendant(of: find.byType(Table), matching: find.text('3 قطع')),
+          findsOneWidget,
+        );
+        // Unit price: 20.00 ج.م
+        expect(
+          find.descendant(
+            of: find.byType(Table),
+            matching: find.text('20.00 ج.م'),
+          ),
+          findsOneWidget,
+        );
+        // Line total: 60.00 ج.م inside the table
+        expect(
+          find.descendant(
+            of: find.byType(Table),
+            matching: find.text('60.00 ج.م'),
+          ),
+          findsOneWidget,
+        );
+        // Item name appears once in table
+        expect(
+          find.descendant(
+            of: find.byType(Table),
+            matching: find.text('قميص - غسيل'),
+          ),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'groups 3 identical carpets into a single preview row with 3 قطع, piece unit price, and dimensions',
+      (tester) async {
+        final order = Order(
+          id: 'ord-group-carpet',
+          orderNumber: '26-032',
+          customerId: 'cust-1',
+          customerNameSnapshot: 'خالد',
+          customerPhoneSnapshot: '01033333333',
+          status: OrderStatus.processing,
+          expectedPickupDate: orderDate,
+          subtotal: const Money.fromPiastres(36000),
+          total: const Money.fromPiastres(36000),
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        CarpetItemData makeCarpet(String id) => CarpetItemData(
+          id: id,
+          orderItemId: 'item-$id',
+          length: 2.0,
+          width: 3.0,
+          area: 6.0,
+          createdAt: now,
+          updatedAt: now,
+        );
+
+        final items = [
+          OrderItem(
+            id: 'c-item-1',
+            orderId: 'ord-group-carpet',
+            itemTypeId: 't-carpet',
+            itemDefinitionNameSnapshot: 'سجادة صوف',
+            serviceId: 's-carpet',
+            itemTypeNameSnapshot: 'سجاد',
+            serviceNameSnapshot: 'غسيل سجاد',
+            pricingType: PricingType.perSquareMeter,
+            quantity: 1.0,
+            unitPrice: const Money.fromPiastres(2000), // 20 EGP/m²
+            calculatedTotal: const Money.fromPiastres(12000), // 120 EGP / piece
+            carpetData: makeCarpet('1'),
+            createdAt: now,
+            updatedAt: now,
+          ),
+          OrderItem(
+            id: 'c-item-2',
+            orderId: 'ord-group-carpet',
+            itemTypeId: 't-carpet',
+            itemDefinitionNameSnapshot: 'سجادة صوف',
+            serviceId: 's-carpet',
+            itemTypeNameSnapshot: 'سجاد',
+            serviceNameSnapshot: 'غسيل سجاد',
+            pricingType: PricingType.perSquareMeter,
+            quantity: 1.0,
+            unitPrice: const Money.fromPiastres(2000),
+            calculatedTotal: const Money.fromPiastres(12000),
+            carpetData: makeCarpet('2'),
+            createdAt: now,
+            updatedAt: now,
+          ),
+          OrderItem(
+            id: 'c-item-3',
+            orderId: 'ord-group-carpet',
+            itemTypeId: 't-carpet',
+            itemDefinitionNameSnapshot: 'سجادة صوف',
+            serviceId: 's-carpet',
+            itemTypeNameSnapshot: 'سجاد',
+            serviceNameSnapshot: 'غسيل سجاد',
+            pricingType: PricingType.perSquareMeter,
+            quantity: 1.0,
+            unitPrice: const Money.fromPiastres(2000),
+            calculatedTotal: const Money.fromPiastres(12000),
+            carpetData: makeCarpet('3'),
+            createdAt: now,
+            updatedAt: now,
+          ),
+        ];
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Scaffold(
+                body: InvoicePreviewDialog(
+                  order: order,
+                  items: items,
+                  totalPaid: Money.zero,
+                  remainingAmount: const Money.fromPiastres(36000),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        // Primary quantity displays '3 قطع'
+        expect(
+          find.descendant(of: find.byType(Table), matching: find.text('3 قطع')),
+          findsOneWidget,
+        );
+        // Unit price displays price for 1 piece: 120.00 ج.م
+        expect(
+          find.descendant(
+            of: find.byType(Table),
+            matching: find.text('120.00 ج.م'),
+          ),
+          findsOneWidget,
+        );
+        // Total displays: 360.00 ج.م inside the table
+        expect(
+          find.descendant(
+            of: find.byType(Table),
+            matching: find.text('360.00 ج.م'),
+          ),
+          findsOneWidget,
+        );
+        // Dimensions sub-detail: (2 × 3 م) — 6 م²/قطعة
+        expect(
+          find.descendant(
+            of: find.byType(Table),
+            matching: find.text('(2 × 3 م) — 6 م²/قطعة'),
+          ),
+          findsOneWidget,
+        );
+      },
+    );
 
     testWidgets('tax row is hidden when tax is zero', (tester) async {
       final order = Order(
@@ -672,56 +736,64 @@ void main() {
       expect(find.byType(InvoicePreviewDialog), findsNothing);
     });
 
-    testWidgets('print workflow success: invokes printing and keeps dialog open', (tester) async {
-      final order = Order(
-        id: 'ord-print-ok',
-        orderNumber: '26-070',
-        customerId: 'cust-1',
-        customerNameSnapshot: 'عميل',
-        customerPhoneSnapshot: '01055555555',
-        status: OrderStatus.processing,
-        expectedPickupDate: orderDate,
-        subtotal: const Money.fromPiastres(5000),
-        total: const Money.fromPiastres(5000),
-        createdAt: now,
-        updatedAt: now,
-      );
+    testWidgets(
+      'print workflow success: invokes printing and keeps dialog open',
+      (tester) async {
+        final order = Order(
+          id: 'ord-print-ok',
+          orderNumber: '26-070',
+          customerId: 'cust-1',
+          customerNameSnapshot: 'عميل',
+          customerPhoneSnapshot: '01055555555',
+          status: OrderStatus.processing,
+          expectedPickupDate: orderDate,
+          subtotal: const Money.fromPiastres(5000),
+          total: const Money.fromPiastres(5000),
+          createdAt: now,
+          updatedAt: now,
+        );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Directionality(
-            textDirection: TextDirection.rtl,
-            child: Scaffold(
-              body: InvoicePreviewDialog(
-                order: order,
-                items: const [],
-                totalPaid: Money.zero,
-                remainingAmount: const Money.fromPiastres(5000),
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Scaffold(
+                body: InvoicePreviewDialog(
+                  order: order,
+                  items: const [],
+                  totalPaid: Money.zero,
+                  remainingAmount: const Money.fromPiastres(5000),
+                ),
               ),
             ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('طباعة الفاتورة'), findsOneWidget);
+        expect(find.text('طباعة الفاتورة'), findsOneWidget);
 
-      // Tap print button
-      await tester.tap(find.text('طباعة الفاتورة'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
+        // Tap print button
+        await tester.tap(find.text('طباعة الفاتورة'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
 
-      expect(mockPlatform.callCount, 1);
-      expect(mockPlatform.receivedFormat, PdfPageFormat.roll80);
-      expect(mockPlatform.receivedDynamicLayout, isFalse);
+        expect(mockPlatform.callCount, 1);
+        expect(mockPlatform.receivedFormat, PdfPageFormat.roll80);
+        expect(mockPlatform.receivedDynamicLayout, isFalse);
 
-      // Dialog must remain open
-      expect(find.byType(InvoicePreviewDialog), findsOneWidget);
-      expect(find.text('طباعة الفاتورة'), findsOneWidget);
-      // No error SnackBar
-      expect(find.text('تعذر بدء عملية الطباعة. حاول مرة أخرى.'), findsNothing);
-    });
+        // Dialog must remain open
+        expect(find.byType(InvoicePreviewDialog), findsOneWidget);
+        expect(find.text('طباعة الفاتورة'), findsOneWidget);
+        // No error SnackBar
+        expect(
+          find.text('تعذر بدء عملية الطباعة. حاول مرة أخرى.'),
+          findsNothing,
+        );
+      },
+    );
 
-    testWidgets('print workflow duplicate taps are prevented while busy', (tester) async {
+    testWidgets('print workflow duplicate taps are prevented while busy', (
+      tester,
+    ) async {
       mockPlatform.delay = const Duration(milliseconds: 200);
 
       final order = Order(
@@ -769,93 +841,102 @@ void main() {
       expect(mockPlatform.callCount, 1);
     });
 
-    testWidgets('print workflow handles platform exception with Arabic SnackBar and keeps dialog open', (tester) async {
-      mockPlatform.shouldThrow = true;
+    testWidgets(
+      'print workflow handles platform exception with Arabic SnackBar and keeps dialog open',
+      (tester) async {
+        mockPlatform.shouldThrow = true;
 
-      final order = Order(
-        id: 'ord-print-err',
-        orderNumber: '26-072',
-        customerId: 'cust-1',
-        customerNameSnapshot: 'عميل',
-        customerPhoneSnapshot: '01055555555',
-        status: OrderStatus.processing,
-        expectedPickupDate: orderDate,
-        subtotal: const Money.fromPiastres(5000),
-        total: const Money.fromPiastres(5000),
-        createdAt: now,
-        updatedAt: now,
-      );
+        final order = Order(
+          id: 'ord-print-err',
+          orderNumber: '26-072',
+          customerId: 'cust-1',
+          customerNameSnapshot: 'عميل',
+          customerPhoneSnapshot: '01055555555',
+          status: OrderStatus.processing,
+          expectedPickupDate: orderDate,
+          subtotal: const Money.fromPiastres(5000),
+          total: const Money.fromPiastres(5000),
+          createdAt: now,
+          updatedAt: now,
+        );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Directionality(
-            textDirection: TextDirection.rtl,
-            child: Scaffold(
-              body: InvoicePreviewDialog(
-                order: order,
-                items: const [],
-                totalPaid: Money.zero,
-                remainingAmount: const Money.fromPiastres(5000),
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Scaffold(
+                body: InvoicePreviewDialog(
+                  order: order,
+                  items: const [],
+                  totalPaid: Money.zero,
+                  remainingAmount: const Money.fromPiastres(5000),
+                ),
               ),
             ),
           ),
-        ),
-      );
+        );
 
-      await tester.tap(find.text('طباعة الفاتورة'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
+        await tester.tap(find.text('طباعة الفاتورة'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
 
-      // Error SnackBar shown
-      expect(find.text('تعذر بدء عملية الطباعة. حاول مرة أخرى.'), findsOneWidget);
+        // Error SnackBar shown
+        expect(
+          find.text('تعذر بدء عملية الطباعة. حاول مرة أخرى.'),
+          findsOneWidget,
+        );
 
-      // Dialog must remain open
-      expect(find.byType(InvoicePreviewDialog), findsOneWidget);
-      expect(find.text('طباعة الفاتورة'), findsOneWidget);
-    });
+        // Dialog must remain open
+        expect(find.byType(InvoicePreviewDialog), findsOneWidget);
+        expect(find.text('طباعة الفاتورة'), findsOneWidget);
+      },
+    );
 
-    testWidgets('uses fallback footer when invoiceFooterText is empty or whitespace', (tester) async {
-      final order = Order(
-        id: 'ord-footer',
-        orderNumber: '26-080',
-        customerId: 'cust-1',
-        customerNameSnapshot: 'عميل',
-        customerPhoneSnapshot: '01055555555',
-        status: OrderStatus.processing,
-        expectedPickupDate: orderDate,
-        subtotal: const Money.fromPiastres(5000),
-        total: const Money.fromPiastres(5000),
-        createdAt: now,
-        updatedAt: now,
-      );
+    testWidgets(
+      'uses fallback footer when invoiceFooterText is empty or whitespace',
+      (tester) async {
+        final order = Order(
+          id: 'ord-footer',
+          orderNumber: '26-080',
+          customerId: 'cust-1',
+          customerNameSnapshot: 'عميل',
+          customerPhoneSnapshot: '01055555555',
+          status: OrderStatus.processing,
+          expectedPickupDate: orderDate,
+          subtotal: const Money.fromPiastres(5000),
+          total: const Money.fromPiastres(5000),
+          createdAt: now,
+          updatedAt: now,
+        );
 
-      final settingsWithWhitespaceFooter = BusinessSettings(
-        id: 'settings-2',
-        businessName: 'مغسلة النقاء',
-        invoiceFooterText: '   ',
-        createdAt: now,
-        updatedAt: now,
-      );
+        final settingsWithWhitespaceFooter = BusinessSettings(
+          id: 'settings-2',
+          businessName: 'مغسلة النقاء',
+          invoiceFooterText: '   ',
+          createdAt: now,
+          updatedAt: now,
+        );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Directionality(
-            textDirection: TextDirection.rtl,
-            child: Scaffold(
-              body: InvoicePreviewDialog(
-                order: order,
-                items: const [],
-                totalPaid: Money.zero,
-                remainingAmount: const Money.fromPiastres(5000),
-                settings: settingsWithWhitespaceFooter,
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Scaffold(
+                body: InvoicePreviewDialog(
+                  order: order,
+                  items: const [],
+                  totalPaid: Money.zero,
+                  remainingAmount: const Money.fromPiastres(5000),
+                  settings: settingsWithWhitespaceFooter,
+                ),
               ),
             ),
           ),
-        ),
-      );
+        );
 
-      // Must fall back to default footer
-      expect(find.text('شكراً لتعاملكم معنا!'), findsOneWidget);
-    });
+        // Must fall back to default footer
+        expect(find.text('شكراً لتعاملكم معنا!'), findsOneWidget);
+      },
+    );
   });
 }

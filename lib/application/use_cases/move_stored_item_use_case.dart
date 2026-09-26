@@ -23,9 +23,9 @@ class MoveStoredItemUseCase {
     required OrderRepository orderRepository,
     required StorageRepository storageRepository,
     required StorageLocationRepository storageLocationRepository,
-  })  : _orderRepository = orderRepository,
-        _storageRepository = storageRepository,
-        _storageLocationRepository = storageLocationRepository;
+  }) : _orderRepository = orderRepository,
+       _storageRepository = storageRepository,
+       _storageLocationRepository = storageLocationRepository;
 
   Future<StorageRecord> execute(MoveStoredItemInput input) async {
     if (input.orderItemId.trim().isEmpty) {
@@ -35,25 +35,29 @@ class MoveStoredItemUseCase {
       throw const ValidationFailure('Storage location id cannot be empty');
     }
 
-    final orderItem = await _orderRepository.getOrderItemById(input.orderItemId);
+    final orderItem = await _orderRepository.getOrderItemById(
+      input.orderItemId,
+    );
     if (orderItem == null) {
       throw const ValidationFailure('Order item not found');
     }
 
-    final targetLocation = await _storageLocationRepository.getStorageLocationById(
-      input.newStorageLocationId,
-    );
+    final targetLocation = await _storageLocationRepository
+        .getStorageLocationById(input.newStorageLocationId);
     if (targetLocation == null) {
       throw const ValidationFailure('New storage location not found');
     }
     if (!targetLocation.isActive) {
-      throw const BusinessRuleFailure('Cannot move item to an inactive storage location');
+      throw const BusinessRuleFailure(
+        'Cannot move item to an inactive storage location',
+      );
     }
 
-    final compatibleLocations = await _storageLocationRepository.getCompatibleLocationsForItemType(
-      orderItem.itemTypeId,
+    final compatibleLocations = await _storageLocationRepository
+        .getCompatibleLocationsForItemType(orderItem.itemTypeId);
+    final isCompatible = compatibleLocations.any(
+      (loc) => loc.id == input.newStorageLocationId,
     );
-    final isCompatible = compatibleLocations.any((loc) => loc.id == input.newStorageLocationId);
     if (!isCompatible) {
       throw IncompatibleStorageLocationFailure(
         storageLocationId: input.newStorageLocationId,
@@ -65,7 +69,9 @@ class MoveStoredItemUseCase {
       input.orderItemId,
     );
     if (activeRecord == null) {
-      throw const BusinessRuleFailure('Item has no active storage location to move from');
+      throw const BusinessRuleFailure(
+        'Item has no active storage location to move from',
+      );
     }
 
     if (activeRecord.storageLocationId == input.newStorageLocationId) {

@@ -85,8 +85,9 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
         supportedItemTypeIds: _selectedTypeIds.toList(),
       );
     } else {
-      final updated =
-          widget.location!.copyWith(name: _nameController.text.trim());
+      final updated = widget.location!.copyWith(
+        name: _nameController.text.trim(),
+      );
       success = await cubit.updateStorageLocation(
         location: updated,
         supportedItemTypeIds: _selectedTypeIds.toList(),
@@ -113,9 +114,10 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
       backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480, maxHeight: 680),
-        child: Padding(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppSpacing.xl),
+          physics: const BouncingScrollPhysics(),
           child: Form(
             key: _formKey,
             child: Column(
@@ -132,125 +134,114 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
                   ),
                 ),
                 AppSpacing.gapLg,
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                if (_inlineError != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColors.errorLight,
+                      borderRadius: BorderRadius.circular(
+                        AppSpacing.radiusMd,
+                      ),
+                      border: Border.all(
+                        color: AppColors.error.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
                       children: [
-                        if (_inlineError != null) ...[
-                          Container(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            decoration: BoxDecoration(
-                              color: AppColors.errorLight,
-                              borderRadius:
-                                  BorderRadius.circular(AppSpacing.radiusMd),
-                              border: Border.all(
-                                color: AppColors.error.withValues(alpha: 0.3),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.error_outline,
-                                  color: AppColors.error,
-                                  size: 20,
-                                ),
-                                AppSpacing.gapHorizontalSm,
-                                Expanded(
-                                  child: Text(
-                                    _inlineError!,
-                                    style: AppTextStyles.bodySmall.copyWith(
-                                      color: AppColors.error,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          AppSpacing.gapMd,
-                        ],
-                        AppTextField(
-                          controller: _nameController,
-                          label: AppStrings.storageLocationNameLabel,
-                          hintText: AppStrings.storageLocationNameHint,
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return AppStrings.storageLocationNameRequired;
-                            }
-                            return null;
-                          },
+                        const Icon(
+                          Icons.error_outline,
+                          color: AppColors.error,
+                          size: 20,
                         ),
-                        AppSpacing.gapLg,
-                        Text(
-                          AppStrings.supportedItemTypesLabel,
-                          style: AppTextStyles.labelLarge.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        AppSpacing.gapSm,
-                        if (widget.availableItemTypes.isEmpty)
-                          Text(
-                            AppStrings.noItemTypes,
+                        AppSpacing.gapHorizontalSm,
+                        Expanded(
+                          child: Text(
+                            _inlineError!,
                             style: AppTextStyles.bodySmall.copyWith(
-                              color: AppColors.textSecondary,
+                              color: AppColors.error,
+                              fontWeight: FontWeight.w600,
                             ),
-                          )
-                        else
-                          Wrap(
-                            spacing: AppSpacing.sm,
-                            runSpacing: AppSpacing.sm,
-                            children: widget.availableItemTypes.map((type) {
-                              final isSelected =
-                                  _selectedTypeIds.contains(type.id);
-                              return FilterChip(
-                                label: Text(type.name),
-                                selected: isSelected,
-                                onSelected: (selected) {
-                                  setState(() {
-                                    if (selected) {
-                                      _selectedTypeIds.add(type.id);
-                                    } else {
-                                      _selectedTypeIds.remove(type.id);
-                                    }
-                                  });
-                                },
-                                selectedColor: AppColors.primaryLighter,
-                                backgroundColor: AppColors.surface,
-                                labelStyle: AppTextStyles.labelMedium.copyWith(
-                                  color: isSelected
-                                      ? AppColors.primaryDark
-                                      : AppColors.textPrimary,
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppSpacing.radiusMd),
-                                  side: BorderSide(
-                                    color: isSelected
-                                        ? AppColors.primary
-                                        : AppColors.border,
-                                  ),
-                                ),
-                              );
-                            }).toList(),
                           ),
-                        AppSpacing.gapMd,
+                        ),
                       ],
                     ),
                   ),
+                  AppSpacing.gapMd,
+                ],
+                AppTextField(
+                  controller: _nameController,
+                  label: AppStrings.storageLocationNameLabel,
+                  hintText: AppStrings.storageLocationNameHint,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return AppStrings.storageLocationNameRequired;
+                    }
+                    return null;
+                  },
                 ),
+                AppSpacing.gapLg,
+                Text(
+                  AppStrings.supportedItemTypesLabel,
+                  style: AppTextStyles.labelLarge.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                AppSpacing.gapSm,
+                if (widget.availableItemTypes.isEmpty)
+                  Text(
+                    AppStrings.noItemTypes,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  )
+                else
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: widget.availableItemTypes.map((type) {
+                      final isSelected = _selectedTypeIds.contains(
+                        type.id,
+                      );
+                      return FilterChip(
+                        label: Text(type.name),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected) {
+                              _selectedTypeIds.add(type.id);
+                            } else {
+                              _selectedTypeIds.remove(type.id);
+                            }
+                          });
+                        },
+                        selectedColor: AppColors.primaryLighter,
+                        backgroundColor: AppColors.surface,
+                        labelStyle: AppTextStyles.labelMedium.copyWith(
+                          color: isSelected
+                              ? AppColors.primaryDark
+                              : AppColors.textPrimary,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
+                          side: BorderSide(
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.border,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 AppSpacing.gapLg,
                 Row(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    AppButton(
-                      label: AppStrings.save,
-                      onPressed: _handleSubmit,
-                    ),
+                    AppButton(label: AppStrings.save, onPressed: _handleSubmit),
                     AppSpacing.gapHorizontalMd,
                     AppButton(
                       label: AppStrings.cancel,

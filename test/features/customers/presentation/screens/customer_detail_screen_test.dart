@@ -2,8 +2,10 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/core/di/injection.dart';
+import 'package:laundry_management/core/theme/app_colors.dart';
 import 'package:laundry_management/core/theme/app_theme.dart';
-import 'package:laundry_management/data/local/database/app_database.dart' as db_pkg;
+import 'package:laundry_management/data/local/database/app_database.dart'
+    as db_pkg;
 import 'package:laundry_management/data/local/database/dev_test_data.dart';
 import 'package:laundry_management/domain/entities/customer.dart';
 import 'package:laundry_management/domain/entities/order.dart';
@@ -20,10 +22,7 @@ import 'package:laundry_management/features/customers/presentation/widgets/custo
 Widget testBoilerplate(Widget child) {
   return MaterialApp(
     theme: AppTheme.lightTheme,
-    home: Directionality(
-      textDirection: TextDirection.rtl,
-      child: child,
-    ),
+    home: Directionality(textDirection: TextDirection.rtl, child: child),
   );
 }
 
@@ -45,7 +44,33 @@ void main() {
   });
 
   group('CustomerDetailScreen Tests', () {
-    testWidgets('renders customer details, KPI cards, and empty order state', (tester) async {
+    testWidgets('renders customer address only when non-null and non-empty', (
+      tester,
+    ) async {
+      final repo = getIt<CustomerRepository>();
+      final now = DateTime.now();
+      final customerWithAddr = await repo.createCustomer(
+        Customer(
+          id: 'c-test-addr-1',
+          name: 'عميل مع عنوان',
+          phone: '01012345699',
+          address: 'شارع عباس العقاد، مدينة نصر',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      await tester.pumpWidget(
+        testBoilerplate(CustomerDetailScreen(customerId: customerWithAddr.id)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('شارع عباس العقاد، مدينة نصر'), findsOneWidget);
+      expect(find.byIcon(Icons.location_on_outlined), findsOneWidget);
+    });
+    testWidgets('renders customer details, KPI cards, and empty order state', (
+      tester,
+    ) async {
       final repo = getIt<CustomerRepository>();
       final now = DateTime.now();
       final customer = await repo.createCustomer(
@@ -59,31 +84,38 @@ void main() {
         ),
       );
 
-      await tester.pumpWidget(testBoilerplate(
-        CustomerDetailScreen(customerId: customer.id),
-      ));
+      await tester.pumpWidget(
+        testBoilerplate(CustomerDetailScreen(customerId: customer.id)),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('ياسر عرفات'), findsOneWidget);
       expect(find.text('01012345678'), findsOneWidget);
       expect(find.text('ملاحظة تجريبية للعميل'), findsOneWidget);
 
-      // KPI Cards (5 metrics)
+      // KPI Cards
       expect(find.text('إجمالي الطلبات'), findsOneWidget);
       expect(find.text('طلبات جارية'), findsOneWidget);
       expect(find.text('طلبات مكتملة'), findsOneWidget);
-      expect(find.text('إجمالي المدفوع'), findsOneWidget);
-      expect(find.text('إجمالي المتبقي'), findsOneWidget);
+      expect(find.text('إجمالي المدفوعات'), findsOneWidget);
+      expect(find.text('إجمالي الاستردادات'), findsOneWidget);
+      expect(find.text('صافي المدفوع'), findsOneWidget);
+      expect(find.text('المبالغ المستحقة'), findsOneWidget);
 
       // Empty Order State
       expect(find.text('لا توجد طلبات لهذا العميل'), findsOneWidget);
 
       // Actions
       expect(find.text('تعديل العميل'), findsOneWidget);
-      expect(find.text('إنشاء طلب'), findsNWidgets(2)); // Header action + empty state action
+      expect(
+        find.text('إنشاء طلب'),
+        findsNWidgets(2),
+      ); // Header action + empty state action
     });
 
-    testWidgets('renders order cards with status badges and totals', (tester) async {
+    testWidgets('renders order cards with status badges and totals', (
+      tester,
+    ) async {
       final custRepo = getIt<CustomerRepository>();
       final orderRepo = getIt<OrderRepository>();
       final db = getIt<db_pkg.AppDatabase>();
@@ -109,7 +141,9 @@ void main() {
         customerNameSnapshot: customer.name,
         customerPhoneSnapshot: customer.phone,
         status: OrderStatus.processing,
-        expectedPickupDate: OrderDate.fromDate(now.add(const Duration(days: 4))),
+        expectedPickupDate: OrderDate.fromDate(
+          now.add(const Duration(days: 4)),
+        ),
         subtotal: const Money.fromPiastres(12000),
         discount: Money.zero,
         tax: Money.zero,
@@ -135,19 +169,31 @@ void main() {
 
       await orderRepo.createOrder(order: order, items: [item]);
 
-      await tester.pumpWidget(testBoilerplate(
-        CustomerDetailScreen(customerId: customer.id),
-      ));
+      await tester.pumpWidget(
+        testBoilerplate(CustomerDetailScreen(customerId: customer.id)),
+      );
       await tester.pumpAndSettle();
 
-      expect(find.text('26-777'), findsOneWidget);
+      expect(find.text('#26-777'), findsOneWidget);
       expect(find.text('قيد التجهيز'), findsOneWidget);
-      expect(find.text('120.00 ج.م'), findsNWidgets(2)); // Order total and KPI remaining total
+      expect(find.text('الإجمالي: 120.00 ج.م'), findsOneWidget); // Order total
+      expect(find.text('120.00 ج.م'), findsOneWidget); // KPI remaining total
       expect(find.text('المدفوع: 0.00 ج.م'), findsOneWidget);
       expect(find.text('المتبقي: 120.00 ج.م'), findsOneWidget);
+
+      // Verify outstanding amount uses AppColors.warning (amber) and NOT AppColors.error (red)
+      final remainingText =
+          tester.widget<Text>(find.text('المتبقي: 120.00 ج.م'));
+      expect(remainingText.style?.color, AppColors.warning);
+
+      final outstandingKpiText = tester.widget<Text>(find.text('120.00 ج.م'));
+      expect(outstandingKpiText.style?.color, AppColors.warning);
+      expect(outstandingKpiText.style?.color, isNot(AppColors.error));
     });
 
-    testWidgets('tapping edit customer opens CustomerFormDialog', (tester) async {
+    testWidgets('tapping edit customer opens CustomerFormDialog', (
+      tester,
+    ) async {
       final custRepo = getIt<CustomerRepository>();
       final now = DateTime.now();
 
@@ -161,9 +207,9 @@ void main() {
         ),
       );
 
-      await tester.pumpWidget(testBoilerplate(
-        CustomerDetailScreen(customerId: customer.id),
-      ));
+      await tester.pumpWidget(
+        testBoilerplate(CustomerDetailScreen(customerId: customer.id)),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('تعديل العميل'));
@@ -173,117 +219,125 @@ void main() {
       expect(find.text('تعديل بيانات العميل'), findsOneWidget);
     });
 
-    testWidgets('editing customer displays success snackbar exactly once and not duplicate', (tester) async {
-      final custRepo = getIt<CustomerRepository>();
-      final now = DateTime.now();
+    testWidgets(
+      'editing customer displays success snackbar exactly once and not duplicate',
+      (tester) async {
+        final custRepo = getIt<CustomerRepository>();
+        final now = DateTime.now();
 
-      final customer = await custRepo.createCustomer(
-        Customer(
-          id: 'c-test-snack',
-          name: 'سمير غانم',
-          phone: '01011112222',
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-
-      await tester.pumpWidget(testBoilerplate(
-        CustomerDetailScreen(customerId: customer.id),
-      ));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('تعديل العميل'));
-      await tester.pumpAndSettle();
-
-      // Enter new name and save
-      final nameField = find.widgetWithText(TextField, 'سمير غانم');
-      await tester.enterText(nameField, 'سمير غانم المعدل');
-      await tester.pump();
-
-      await tester.tap(find.text('حفظ التعديلات'));
-      await tester.pumpAndSettle();
-
-      // Ensure success snackbar appears exactly ONCE
-      expect(find.text('تم تحديث بيانات العميل بنجاح'), findsOneWidget);
-    });
-
-    testWidgets('displays load-more button when customer has more than 20 orders', (tester) async {
-      final custRepo = getIt<CustomerRepository>();
-      final orderRepo = getIt<OrderRepository>();
-      final db = getIt<db_pkg.AppDatabase>();
-      final now = DateTime.now();
-
-      final customer = await custRepo.createCustomer(
-        Customer(
-          id: 'c-test-paginated',
-          name: 'عميل الصفحات',
-          phone: '01099998888',
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-
-      final itemTypes = await db.select(db.itemTypes).get();
-      final services = await db.select(db.services).get();
-
-      // Create 22 orders
-      for (var i = 0; i < 22; i++) {
-        final order = Order(
-          id: 'ord-page-$i',
-          orderNumber: '26-${(500 + i).toString()}',
-          customerId: customer.id,
-          customerNameSnapshot: customer.name,
-          customerPhoneSnapshot: customer.phone,
-          status: OrderStatus.processing,
-          expectedPickupDate: OrderDate.fromDate(now.add(const Duration(days: 2))),
-          subtotal: const Money.fromPiastres(1000),
-          discount: Money.zero,
-          tax: Money.zero,
-          total: const Money.fromPiastres(1000),
-          createdAt: now.subtract(Duration(minutes: 25 - i)),
-          updatedAt: now,
+        final customer = await custRepo.createCustomer(
+          Customer(
+            id: 'c-test-snack',
+            name: 'سمير غانم',
+            phone: '01011112222',
+            createdAt: now,
+            updatedAt: now,
+          ),
         );
-        final item = OrderItem(
-          id: 'itm-page-$i',
-          orderId: order.id,
-          itemTypeId: itemTypes.first.id,
-          serviceId: services.first.id,
-          itemTypeNameSnapshot: itemTypes.first.name,
-          serviceNameSnapshot: services.first.name,
-          pricingType: PricingType.fixedPrice,
-          quantity: 1,
-          unitPrice: const Money.fromPiastres(1000),
-          calculatedTotal: const Money.fromPiastres(1000),
-          createdAt: now,
-          updatedAt: now,
+
+        await tester.pumpWidget(
+          testBoilerplate(CustomerDetailScreen(customerId: customer.id)),
         );
-        await orderRepo.createOrder(order: order, items: [item]);
-      }
+        await tester.pumpAndSettle();
 
-      await tester.pumpWidget(testBoilerplate(
-        CustomerDetailScreen(customerId: customer.id),
-      ));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('تعديل العميل'));
+        await tester.pumpAndSettle();
 
-      // Authoritative count is displayed in header
-      expect(find.text('سجل الطلبات (22)'), findsOneWidget);
-      expect(find.text('22'), findsNWidgets(2));
+        // Enter new name and save
+        final nameField = find.widgetWithText(TextField, 'سمير غانم');
+        await tester.enterText(nameField, 'سمير غانم المعدل');
+        await tester.pump();
 
-      // Load-more button is present because 20 loaded < 22 total
-      final loadMoreFinder = find.text('تحميل المزيد من الطلبات');
-      await tester.scrollUntilVisible(
-        loadMoreFinder,
-        300,
-        scrollable: find.byType(Scrollable).first,
-      );
-      expect(loadMoreFinder, findsOneWidget);
+        await tester.tap(find.text('حفظ التعديلات'));
+        await tester.pumpAndSettle();
 
-      // Tap load more
-      await tester.tap(loadMoreFinder);
-      await tester.pumpAndSettle();
+        // Ensure success snackbar appears exactly ONCE
+        expect(find.text('تم تحديث بيانات العميل بنجاح'), findsOneWidget);
+      },
+    );
 
-      // After loading more, all 22 orders are displayed and load-more button disappears
-      expect(find.text('تحميل المزيد من الطلبات'), findsNothing);
-    });
+    testWidgets(
+      'displays load-more button when customer has more than 20 orders',
+      (tester) async {
+        final custRepo = getIt<CustomerRepository>();
+        final orderRepo = getIt<OrderRepository>();
+        final db = getIt<db_pkg.AppDatabase>();
+        final now = DateTime.now();
+
+        final customer = await custRepo.createCustomer(
+          Customer(
+            id: 'c-test-paginated',
+            name: 'عميل الصفحات',
+            phone: '01099998888',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+
+        final itemTypes = await db.select(db.itemTypes).get();
+        final services = await db.select(db.services).get();
+
+        // Create 22 orders
+        for (var i = 0; i < 22; i++) {
+          final order = Order(
+            id: 'ord-page-$i',
+            orderNumber: '26-${(500 + i).toString()}',
+            customerId: customer.id,
+            customerNameSnapshot: customer.name,
+            customerPhoneSnapshot: customer.phone,
+            status: OrderStatus.processing,
+            expectedPickupDate: OrderDate.fromDate(
+              now.add(const Duration(days: 2)),
+            ),
+            subtotal: const Money.fromPiastres(1000),
+            discount: Money.zero,
+            tax: Money.zero,
+            total: const Money.fromPiastres(1000),
+            createdAt: now.subtract(Duration(minutes: 25 - i)),
+            updatedAt: now,
+          );
+          final item = OrderItem(
+            id: 'itm-page-$i',
+            orderId: order.id,
+            itemTypeId: itemTypes.first.id,
+            serviceId: services.first.id,
+            itemTypeNameSnapshot: itemTypes.first.name,
+            serviceNameSnapshot: services.first.name,
+            pricingType: PricingType.fixedPrice,
+            quantity: 1,
+            unitPrice: const Money.fromPiastres(1000),
+            calculatedTotal: const Money.fromPiastres(1000),
+            createdAt: now,
+            updatedAt: now,
+          );
+          await orderRepo.createOrder(order: order, items: [item]);
+        }
+
+        await tester.pumpWidget(
+          testBoilerplate(CustomerDetailScreen(customerId: customer.id)),
+        );
+        await tester.pumpAndSettle();
+
+        // Authoritative count is displayed in header
+        expect(find.text('سجل الطلبات (22)'), findsOneWidget);
+        expect(find.text('22'), findsNWidgets(2));
+
+        // Load-more button is present because 20 loaded < 22 total
+        final loadMoreFinder = find.text('تحميل المزيد من الطلبات');
+        await tester.scrollUntilVisible(
+          loadMoreFinder,
+          300,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(loadMoreFinder, findsOneWidget);
+
+        // Tap load more
+        await tester.tap(loadMoreFinder);
+        await tester.pumpAndSettle();
+
+        // After loading more, all 22 orders are displayed and load-more button disappears
+        expect(find.text('تحميل المزيد من الطلبات'), findsNothing);
+      },
+    );
   });
 }

@@ -5,7 +5,8 @@ import 'package:laundry_management/data/local/daos/orders_dao.dart';
 import 'package:laundry_management/data/local/daos/payments_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
-import 'package:laundry_management/data/local/database/app_database.dart' hide Order, OrderItem, Payment;
+import 'package:laundry_management/data/local/database/app_database.dart'
+    hide Order, OrderItem, Payment;
 import 'package:laundry_management/data/repositories/order_repository_impl.dart';
 import 'package:laundry_management/data/repositories/payment_repository_impl.dart';
 import 'package:laundry_management/domain/entities/order.dart';
@@ -35,6 +36,7 @@ void main() {
 
     orderRepository = OrderRepositoryImpl(
       ordersDao: ordersDao,
+      paymentsDao: paymentsDao,
       storageRecordsDao: storageRecordsDao,
       syncOperationsDao: syncOperationsDao,
       db: db,
@@ -54,7 +56,14 @@ void main() {
     );
     await db.customStatement(
       'INSERT INTO services (id, name, pricing_type, price, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?);',
-      ['srv-comp', 'خدمة التسليم', 'perPiece', 5000, nowTimestamp, nowTimestamp],
+      [
+        'srv-comp',
+        'خدمة التسليم',
+        'perPiece',
+        5000,
+        nowTimestamp,
+        nowTimestamp,
+      ],
     );
     await db.customStatement(
       'INSERT INTO storage_locations (id, name, is_active, created_at, updated_at) VALUES (?, ?, 1, ?, ?);',
@@ -109,14 +118,24 @@ void main() {
       await db.customStatement(
         'INSERT INTO storage_records (id, order_item_id, storage_location_id, is_active, created_at, updated_at) '
         'VALUES (?, ?, ?, 1, ?, ?);',
-        ['rec-$orderId', 'item-$orderId', 'loc-comp', nowTimestamp, nowTimestamp],
+        [
+          'rec-$orderId',
+          'item-$orderId',
+          'loc-comp',
+          nowTimestamp,
+          nowTimestamp,
+        ],
       );
     }
   }
 
   group('OrderRepositoryImpl Completion Hardening Tests', () {
     test('status != Ready is rejected with BusinessRuleFailure', () async {
-      await setupOrder(orderId: 'ord-proc', initialStatus: OrderStatus.processing, totalPiastres: 5000);
+      await setupOrder(
+        orderId: 'ord-proc',
+        initialStatus: OrderStatus.processing,
+        totalPiastres: 5000,
+      );
 
       expect(
         () => orderRepository.completeOrder(
@@ -134,7 +153,11 @@ void main() {
     });
 
     test('remaining > 0 is rejected with BusinessRuleFailure', () async {
-      await setupOrder(orderId: 'ord-unpaid', initialStatus: OrderStatus.ready, totalPiastres: 5000);
+      await setupOrder(
+        orderId: 'ord-unpaid',
+        initialStatus: OrderStatus.ready,
+        totalPiastres: 5000,
+      );
 
       // Attempt completion when 0 paid out of 5000
       expect(
@@ -175,97 +198,127 @@ void main() {
       );
     });
 
-    test('handoverConfirmed == false is rejected with BusinessRuleFailure', () async {
-      await setupOrder(orderId: 'ord-no-handover', initialStatus: OrderStatus.ready, totalPiastres: 5000);
-
-      final now = DateTime.now();
-      await paymentRepository.recordPayment(
-        Payment(
-          id: 'pay-full1',
+    test(
+      'handoverConfirmed == false is rejected with BusinessRuleFailure',
+      () async {
+        await setupOrder(
           orderId: 'ord-no-handover',
-          amount: const Money.fromPiastres(5000),
-          paymentMethod: PaymentMethod.cash,
-          paidAt: now,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
+          initialStatus: OrderStatus.ready,
+          totalPiastres: 5000,
+        );
 
-      expect(
-        () => orderRepository.completeOrder(
-          orderId: 'ord-no-handover',
-          handoverConfirmed: false,
-        ),
-        throwsA(
-          isA<BusinessRuleFailure>().having(
-            (e) => e.message,
-            'message',
-            contains('handover confirmation is required'),
+        final now = DateTime.now();
+        await paymentRepository.recordPayment(
+          Payment(
+            id: 'pay-full1',
+            orderId: 'ord-no-handover',
+            amount: const Money.fromPiastres(5000),
+            paymentMethod: PaymentMethod.cash,
+            paidAt: now,
+            createdAt: now,
+            updatedAt: now,
           ),
-        ),
-      );
-    });
+        );
 
-    test('successful completion sets status Completed, completedAt, Option A getter, and deactivates storage', () async {
-      await setupOrder(orderId: 'ord-success', initialStatus: OrderStatus.ready, totalPiastres: 5000);
+        expect(
+          () => orderRepository.completeOrder(
+            orderId: 'ord-no-handover',
+            handoverConfirmed: false,
+          ),
+          throwsA(
+            isA<BusinessRuleFailure>().having(
+              (e) => e.message,
+              'message',
+              contains('handover confirmation is required'),
+            ),
+          ),
+        );
+      },
+    );
 
-      final now = DateTime.now();
-      await paymentRepository.recordPayment(
-        Payment(
-          id: 'pay-success',
+    test(
+      'successful completion sets status Completed, completedAt, Option A getter, and deactivates storage',
+      () async {
+        await setupOrder(
           orderId: 'ord-success',
-          amount: const Money.fromPiastres(5000),
-          paymentMethod: PaymentMethod.cash,
-          paidAt: now,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
+          initialStatus: OrderStatus.ready,
+          totalPiastres: 5000,
+        );
 
-      // Verify storage record is active before completion
-      final activeBefore = await storageRecordsDao.getActiveRecordForOrderItem('item-ord-success');
-      expect(activeBefore, isNotNull);
+        final now = DateTime.now();
+        await paymentRepository.recordPayment(
+          Payment(
+            id: 'pay-success',
+            orderId: 'ord-success',
+            amount: const Money.fromPiastres(5000),
+            paymentMethod: PaymentMethod.cash,
+            paidAt: now,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
 
-      final completed = await orderRepository.completeOrder(
-        orderId: 'ord-success',
-        handoverConfirmed: true,
-      );
+        // Verify storage record is active before completion
+        final activeBefore = await storageRecordsDao
+            .getActiveRecordForOrderItem('item-ord-success');
+        expect(activeBefore, isNotNull);
 
-      expect(completed.status, OrderStatus.completed);
-      expect(completed.completedAt, isNotNull);
-      expect(completed.customerHandoverConfirmedAt, completed.completedAt);
+        final completed = await orderRepository.completeOrder(
+          orderId: 'ord-success',
+          handoverConfirmed: true,
+        );
 
-      // Storage record MUST be deactivated
-      final activeAfter = await storageRecordsDao.getActiveRecordForOrderItem('item-ord-success');
-      expect(activeAfter, isNull);
+        expect(completed.status, OrderStatus.completed);
+        expect(completed.completedAt, isNotNull);
+        expect(completed.customerHandoverConfirmedAt, completed.completedAt);
 
-      // Historical storage record is preserved
-      final allRecords = await (db.select(db.storageRecords)
-            ..where((t) => t.orderItemId.equals('item-ord-success')))
-          .get();
-      expect(allRecords.length, 1);
-      expect(allRecords.first.isActive, isFalse);
-    });
+        // Storage record MUST be deactivated
+        final activeAfter = await storageRecordsDao.getActiveRecordForOrderItem(
+          'item-ord-success',
+        );
+        expect(activeAfter, isNull);
 
-    test('completion is atomic: if payment check or invariant fails, no changes persist', () async {
-      await setupOrder(orderId: 'ord-atomic', initialStatus: OrderStatus.ready, totalPiastres: 5000);
+        // Historical storage record is preserved
+        final allRecords = await (db.select(
+          db.storageRecords,
+        )..where((t) => t.orderItemId.equals('item-ord-success'))).get();
+        expect(allRecords.length, 1);
+        expect(allRecords.first.isActive, isFalse);
+      },
+    );
 
-      // Storage is active
-      final activeBefore = await storageRecordsDao.getActiveRecordForOrderItem('item-ord-atomic');
-      expect(activeBefore, isNotNull);
+    test(
+      'completion is atomic: if payment check or invariant fails, no changes persist',
+      () async {
+        await setupOrder(
+          orderId: 'ord-atomic',
+          initialStatus: OrderStatus.ready,
+          totalPiastres: 5000,
+        );
 
-      // Attempt completion while unpaid
-      try {
-        await orderRepository.completeOrder(orderId: 'ord-atomic', handoverConfirmed: true);
-      } catch (_) {}
+        // Storage is active
+        final activeBefore = await storageRecordsDao
+            .getActiveRecordForOrderItem('item-ord-atomic');
+        expect(activeBefore, isNotNull);
 
-      // Order must still be Ready, completedAt null, storage STILL active
-      final orderAfter = await ordersDao.getOrderById('ord-atomic');
-      expect(orderAfter!.status, 'ready');
-      expect(orderAfter.completedAt, isNull);
+        // Attempt completion while unpaid
+        try {
+          await orderRepository.completeOrder(
+            orderId: 'ord-atomic',
+            handoverConfirmed: true,
+          );
+        } catch (_) {}
 
-      final activeAfter = await storageRecordsDao.getActiveRecordForOrderItem('item-ord-atomic');
-      expect(activeAfter, isNotNull);
-    });
+        // Order must still be Ready, completedAt null, storage STILL active
+        final orderAfter = await ordersDao.getOrderById('ord-atomic');
+        expect(orderAfter!.status, 'ready');
+        expect(orderAfter.completedAt, isNull);
+
+        final activeAfter = await storageRecordsDao.getActiveRecordForOrderItem(
+          'item-ord-atomic',
+        );
+        expect(activeAfter, isNotNull);
+      },
+    );
   });
 }

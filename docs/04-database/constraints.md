@@ -918,6 +918,25 @@ This preserves financial history.
 
 ---
 
+## 32A. Refund Constraints
+
+Every Refund must satisfy:
+
+1. Foreign Key:
+   `refunds.order_id → orders.id` with `ON DELETE RESTRICT`.
+2. Amount:
+   `CHECK (amount > 0)`.
+3. Method:
+   `CHECK (refund_method IN ('cash', 'insta_pay', 'e_wallet'))`.
+4. Order Lifecycle Invariant:
+   Only `cancelled` orders can receive refunds (enforced server-side in `sync_create_refund`).
+5. Refundable Balance Invariant:
+   Cumulative refunds must not exceed total payments (`amount <= Total Paid - Total Refunded`).
+6. Append-Only:
+   Refund records are immutable and must not be updated or deleted.
+
+---
+
 ## 33. Storage Location Constraints
 
 Every Storage Location must have:
@@ -3261,7 +3280,7 @@ The database must not introduce constraints for unsupported V1 features such as:
     Delivery Routes
     Driver Assignment
     Delivery Tracking
-    Refunds
+    Payment Gateway Refunds and Item-Level Refunds
     Loyalty
     Employee Permissions
     Multi-Branch
@@ -3427,3 +3446,40 @@ and:
     Foreign Key
 
 This is an intentional exception to the default table.id Primary Key convention and must be preserved throughout the Drift schema, repositories, migrations, synchronization model, and tests.
+
+---
+
+## 131. Remote PostgreSQL Foreign Key Integrity Hardening (Phase 3B)
+
+While the local database uses SQLite/Drift with active foreign keys (`PRAGMA foreign_keys = ON;`), the remote Supabase PostgreSQL schema was formally hardened in Phase 3B to mirror these structural referential integrity rules.
+
+**Migration Reference**: [`supabase/migrations/20260919000000_enforce_master_foreign_keys.sql`](file:///d:/projects/laundry_management/supabase/migrations/20260919000000_enforce_master_foreign_keys.sql)
+
+### 131.1 Remote Referential Integrity Constraints
+
+| Table | Column | References | Action | Purpose / Rationale |
+| :--- | :--- | :--- | :--- | :--- |
+| `order_items` | `item_type_id` | `item_types(id)` | `ON DELETE RESTRICT` | Prevents deletion of an item type while referenced by order items. |
+| `order_items` | `item_definition_id` | `item_definitions(id)` | `ON DELETE SET NULL` | Allows retiring/deleting specific item definition without breaking historical order lines. |
+| `order_item_carpets` | `carpet_size_id` | `carpet_sizes(id)` | `ON DELETE SET NULL` | Preserves carpet dimensions and area snapshot even if predefined standard size is removed. |
+| `storage_records` | `storage_location_id` | `storage_locations(id)` | `ON DELETE RESTRICT` | Prevents deleting a physical storage rack/section with active or historical item custody. |
+| `service_item_types` | `item_type_id` | `item_types(id)` | `ON DELETE RESTRICT` | Prevents breaking service catalog capabilities by deleting an active item category. |
+
+### 131.2 Native UUID Column Conversions
+In addition to foreign key constraints, the remote migration converted legacy `TEXT` columns in these tables to native PostgreSQL `UUID` types with explicit casts (`USING column::UUID`):
+- `order_items.item_type_id`
+- `order_items.item_definition_id`
+- `order_item_carpets.carpet_size_id`
+- `storage_records.storage_location_id`
+- `service_item_types.item_type_id`
+
+### 131.3 Supporting Remote Performance Indexes
+Dedicated B-tree indexes were added to optimize foreign key join lookups and reverse-referential checks:
+- `idx_order_items_item_type_id` ON `order_items(item_type_id)`
+- `idx_order_items_item_definition_id` ON `order_items(item_definition_id)`
+- `idx_order_item_carpets_carpet_size_id` ON `order_item_carpets(carpet_size_id)`
+- `idx_storage_records_storage_location_id` ON `storage_records(storage_location_id)`
+
+### 131.4 Distinction Between Local and Remote Constraints
+- **Local Drift (SQLite)**: Operates client-side as the immediate source of truth. Enforces local foreign keys, partial indexes (`idx_storage_records_active_item`), and local unique constraints (`services.name`).
+- **Remote Supabase (PostgreSQL)**: Operates server-side behind transactional RPCs (`SECURITY DEFINER`). Foreign keys ensure that corrupted or out-of-order mutations cannot be inserted into relational tables. RPC write paths cast incoming JSONB UUID fields explicitly to match these typed columns.

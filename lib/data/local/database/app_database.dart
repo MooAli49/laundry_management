@@ -16,12 +16,14 @@ import '../tables/order_item_carpets_table.dart';
 import '../tables/order_items_table.dart';
 import '../tables/orders_table.dart';
 import '../tables/payments_table.dart';
+import '../tables/refunds_table.dart';
 import '../tables/service_item_types_table.dart';
 import '../tables/services_table.dart';
 import '../tables/storage_location_item_types_table.dart';
 import '../tables/storage_locations_table.dart';
 import '../tables/storage_records_table.dart';
 import '../tables/sync_operations_table.dart';
+import '../tables/sync_states_table.dart';
 import 'seed_data.dart';
 
 part 'app_database.g.dart';
@@ -33,6 +35,7 @@ part 'app_database.g.dart';
     OrderItems,
     OrderItemCarpets,
     Payments,
+    Refunds,
     StorageLocations,
     StorageRecords,
     ItemTypes,
@@ -45,13 +48,14 @@ part 'app_database.g.dart';
     Expenses,
     BusinessSettings,
     SyncOperations,
+    SyncStates,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -83,6 +87,34 @@ class AppDatabase extends _$AppDatabase {
           WHERE customer_name_snapshot = ''
              OR customer_name_snapshot IS NULL;
         ''');
+      }
+      if (from < 3) {
+        await m.addColumn(syncOperations, syncOperations.nextRetryAt);
+
+        await customStatement('''
+          UPDATE sync_operations
+          SET status = 'synced'
+          WHERE status = 'completed';
+        ''');
+
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_sync_operations_status_next_retry ON sync_operations(status, next_retry_at);',
+        );
+      }
+      if (from < 4) {
+        await m.createTable(syncStates);
+      }
+      if (from < 5) {
+        await m.createTable(refunds);
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_refunds_order_id ON refunds(order_id);',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS idx_refunds_refunded_at ON refunds(refunded_at);',
+        );
+      }
+      if (from < 6) {
+        await m.addColumn(customers, customers.address);
       }
     },
     beforeOpen: (OpeningDetails details) async {
@@ -132,6 +164,13 @@ class AppDatabase extends _$AppDatabase {
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_payments_paid_at ON payments(paid_at);',
+    );
+
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_refunds_order_id ON refunds(order_id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_refunds_refunded_at ON refunds(refunded_at);',
     );
 
     await customStatement(
@@ -203,6 +242,9 @@ class AppDatabase extends _$AppDatabase {
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_sync_operations_status_created_at ON sync_operations(status, created_at);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_sync_operations_status_next_retry ON sync_operations(status, next_retry_at);',
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_sync_operations_entity ON sync_operations(entity_type, entity_id);',

@@ -107,6 +107,19 @@ If customer deactivation is introduced in the future, it must not remove histori
 
 ---
 
+## BR-010A — Customer Address
+
+Customer address is optional profile information:
+
+- `Customer.address` is optional and nullable.
+- Stored directly on the Customer record only (no separate Address entity or table).
+- Whitespace-only values normalize to NULL.
+- No address snapshot is added to Order.
+- No customer address search in V1.
+- Address is profile/contact information; full delivery routing and dispatch management remain out of scope.
+
+---
+
 # 4. Order Creation Rules
 
 ## BR-011 — Order Must Have Items
@@ -165,13 +178,21 @@ Every order must have a unique human-readable Order Number.
 
 ## BR-017 — Order Number Format
 
-The intended format is:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length:
 
-> YY-XXX
+- YY = 2-digit year prefix.
+- Sequence contains digits only.
+- Sequence has a minimum display width of 3 digits (zero-padded below 1000).
+- Sequence has no maximum length (supports 26-001, 26-999, 26-1000, 26-10000).
+- Non-numeric or alphanumeric values (e.g. 26-T123) are not valid business order numbers.
+- The sequence generator must ignore non-business test identifiers such as `ORD-TEST-...` when calculating the next sequence number. These synthetic test identifiers must never inflate or distort the business order sequence.
 
-Example:
+Examples:
 
 > 26-001
+> 26-999
+> 26-1000
+> 26-10000
 
 The exact generation mechanism is an implementation detail, but uniqueness is mandatory.
 
@@ -180,7 +201,7 @@ The exact generation mechanism is an implementation detail, but uniqueness is ma
 ## BR-018 — Order Number Immutability & Concurrency Retry
 
 - Once an Order Number is assigned, it must never change. Updating an order must always preserve the existing Order Number, and attempting to mutate it is strictly rejected with a `BusinessRuleFailure`.
-- Final Order Number format is strictly `YY-XXX` (e.g. `26-001`).
+- Final Order Number format is `YY-<numeric sequence>` (minimum 3 digits, no maximum length; e.g. `26-001`, `26-999`, `26-1000`, `26-10000`).
 - During order creation, order number collision against the UNIQUE database constraint on `orders.order_number` triggers an immediate rollback and a whole-transaction retry from the beginning (up to 5 attempts), generating a fresh order number.
 
 ---
@@ -290,10 +311,14 @@ Status changes follow strict operational rules:
    - Strictly FORBIDDEN through generic/manual status change.
    - Completion is ONLY allowed through `CompleteOrderUseCase` / `OrderRepository.completeOrder` when Ready, remaining == 0, and customer handover is confirmed.
 
-4. **Completed → Processing (Operational Correction)**:
+4. **Completed → Processing (Administrative Correction)**:
+   - Supported ONLY as an administrative status correction.
    - Requires an explicit, non-empty operational reason.
-   - Status becomes `Processing`, and `completedAt` is cleared.
-   - Storage records remain inactive; items must be explicitly stored again if needed.
+   - Status becomes `Processing`, and `completedAt` is cleared (`completed_at = NULL`).
+   - Existing payments remain unchanged and paid amount is preserved.
+   - Previous storage records remain inactive; storage is NOT automatically reactivated.
+   - Items must be explicitly stored again if the order needs to become Ready.
+   - Direct transitions from `Completed → Ready` and `Completed → Cancelled` remain strictly forbidden.
 
 5. **Cancelled is Terminal**:
    - Cancelled orders cannot transition to any other status.
@@ -349,7 +374,13 @@ Completed orders are historical records.
 
 They should be read-only through the normal UI.
 
-If a correction is required, the system may allow controlled manual status correction according to the documented status rules.
+Completed → Processing is supported ONLY as an administrative correction:
+- Requires an explicit, non-empty operational reason.
+- `completedAt` is cleared to `null` (`completed_at = NULL`).
+- Existing payments remain unchanged.
+- Previous storage records remain inactive and storage is NOT automatically reactivated; items must be explicitly stored again if the order needs to become Ready.
+- Cancelled status remains strictly terminal.
+- Direct transitions from `Completed → Ready` and `Completed → Cancelled` remain forbidden.
 
 ---
 
@@ -431,7 +462,7 @@ Cancellation does not automatically delete payment history.
 
 Cancellation does not trigger an automatic refund.
 
-There is no V1 refund workflow.
+Cancellation and refund are separate operations. Cancelled orders with recorded payments may receive manual refunds through the approved Refund V1 workflow.
 
 ---
 
@@ -529,6 +560,18 @@ Existing orders using an inactive service must remain valid.
 ## BR-052 — Service Price Snapshot
 
 When a service is selected for an OrderItem, the price used at that time must be preserved in the OrderItem.
+
+---
+
+## BR-052A — OrderItem Name Snapshots Invariant
+
+Historical OrderItems must capture and preserve explicit name snapshots:
+- `itemTypeNameSnapshot` is required and non-empty.
+- `serviceNameSnapshot` is required and non-empty.
+- They are historical snapshots captured at order item creation.
+- Empty or whitespace-only snapshots are invalid domain data and rejected by validation.
+- The application must NOT fabricate fallback names such as `ملابس` or `غسيل`.
+- Test fixtures must always provide valid, non-empty snapshot values.
 
 ---
 
@@ -749,9 +792,20 @@ V1 supports:
 
 ---
 
-## BR-076 — No Refund Workflow
+## BR-076 — Refund V1 Workflow
 
-V1 does not implement a refund workflow.
+Refund is a first-class immutable financial transaction at the order level.
+
+1. Only Cancelled orders can receive refunds.
+2. Processing, Ready, and Completed orders cannot receive refunds.
+3. Refundable amount equals Total Paid minus Total Refunded.
+4. Refund amount must be greater than zero and less than or equal to the remaining refundable balance.
+5. Multiple partial refunds and full refunds are supported up to the total paid amount.
+6. Once an order is fully refunded, subsequent refunds are rejected.
+7. Supported refund methods: Cash, InstaPay, E-Wallet.
+8. Existing Payment records remain immutable and are neither deleted nor updated upon refund.
+9. Refunds are distinct from operating expenses and do not alter Net Profit directly.
+10. Refund creation works offline via local database and outbox synchronization.
 
 ---
 
@@ -902,9 +956,20 @@ No pickup time is required.
 
 ## BR-096 — Overdue Order
 
-An order is considered overdue when:
+An active order is overdue only when:
 
-Expected Pickup Date < Today AND Status != Completed AND Status != Cancelled
+expected_pickup_date < start_of_today
+
+The comparison is strictly calendar-date based.
+
+Therefore:
+- Yesterday → overdue
+- Today → NOT overdue
+- Tomorrow → NOT overdue
+- Completed orders → NOT overdue
+- Cancelled orders → NOT overdue
+
+The system must never describe an order with expected pickup date of "today" as overdue.
 
 ---
 
@@ -1831,7 +1896,11 @@ The custom name recorded for an Expense using أخرى must remain part of that 
 
 ## BR-191 — Total Sales
 
-Total Sales / Order Value is based on the applicable historical Order totals for the selected reporting period.
+Total Sales / Order Value is based on the applicable historical Order totals for non-cancelled orders (`status != cancelled`) created during the selected reporting period (`Order.createdAt`).
+
+Cancelled orders contribute 0 to Total Sales.
+
+Refunds are not subtracted from Total Sales.
 
 Current Service prices must not be used to reconstruct historical Order totals.
 
@@ -1839,21 +1908,43 @@ Current Service prices must not be used to reconstruct historical Order totals.
 
 ## BR-192 — Total Payments
 
-Total Payments are based on payments recorded during the selected reporting period.
+Total Payments are based on historical payments recorded during the selected reporting period according to `Payment.paidAt`.
+
+Cancelled-order payments remain included in historical Total Payments.
+
+---
+
+## BR-192A — Total Refunds
+
+Total Refunds are based on refunds recorded during the selected reporting period according to `Refund.refundedAt`.
+
+Refunds are distinct from operating expenses and are not subtracted from Total Sales.
+
+---
+
+## BR-192B — Net Payments
+
+Net Payments represents net cash movement in the selected reporting period, calculated as:
+
+Net Payments = Total Payments - Total Refunds
 
 ---
 
 ## BR-193 — Outstanding Amounts
 
-Outstanding Amounts are based on Orders where:
+Outstanding Amounts are based on non-cancelled orders created within the selected reporting period where:
 
 Remaining Amount > 0
+
+Cancelled orders contribute 0 to Outstanding Amounts. Refunds do not reduce or alter outstanding amounts.
 
 ---
 
 ## BR-194 — Total Operating Expenses
 
-Total Operating Expenses are based on Expenses recorded for the selected Expense Date range.
+Total Operating Expenses are based on Expenses recorded for the selected Expense Date range (`Expense.expenseDate`).
+
+Refunds are not operating expenses and must not be added to Expenses.
 
 ---
 
@@ -1865,7 +1956,7 @@ Total Sales
 -
 Total Operating Expenses
 
-Payments and Outstanding Amounts remain separate report metrics.
+Refunds do not directly alter this formula. Payments and Outstanding Amounts remain separate report metrics.
 
 ---
 
@@ -2015,15 +2106,21 @@ The Expense system follows the same principles.
 The key financial separation is:
 
 Payment
-→ Money received from customer
+→ Money received from customer (immutable historical transaction)
+
+Refund
+→ Money returned to customer for cancelled orders (order-level immutable transaction)
+
+Net Payments
+→ Total Payments - Total Refunds
 
 Expense
-→ Money spent by business
+→ Money spent by business (independent transaction)
 
 Net Profit
 → Total Sales - Total Operating Expenses
 
 Outstanding Amount
-→ Customer money still due
+→ Customer money still due on non-cancelled orders
 
 These concepts must never be merged or treated as interchangeable.

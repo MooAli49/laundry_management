@@ -16,15 +16,12 @@ class ItemTypesManagementCubit extends Cubit<ItemTypesManagementState> {
   ItemTypesManagementCubit({
     required ItemTypeRepository itemTypeRepository,
     required ItemDefinitionRepository itemDefinitionRepository,
-  })  : _itemTypeRepository = itemTypeRepository,
-        _itemDefinitionRepository = itemDefinitionRepository,
-        super(const ItemTypesManagementState());
+  }) : _itemTypeRepository = itemTypeRepository,
+       _itemDefinitionRepository = itemDefinitionRepository,
+       super(const ItemTypesManagementState());
 
   void clearMessages() {
-    emit(state.copyWith(
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(state.copyWith(clearErrorMessage: true, clearSuccessMessage: true));
   }
 
   void selectFilterItemType(String? itemTypeId) {
@@ -36,30 +33,33 @@ class ItemTypesManagementCubit extends Cubit<ItemTypesManagementState> {
   }
 
   Future<void> loadData() async {
-    emit(state.copyWith(
-      isLoading: true,
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        isLoading: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
 
     try {
       final types = await _itemTypeRepository.getAllItemTypes();
       final definitions = await _itemDefinitionRepository.getAllDefinitions();
-      emit(state.copyWith(
-        isLoading: false,
-        itemTypes: types,
-        definitions: definitions,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          itemTypes: types,
+          definitions: definitions,
+        ),
+      );
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isLoading: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isLoading: false, errorMessage: f.message));
     } catch (e) {
-      emit(state.copyWith(
-        isLoading: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 
@@ -72,11 +72,13 @@ class ItemTypesManagementCubit extends Cubit<ItemTypesManagementState> {
       return false;
     }
 
-    emit(state.copyWith(
-      isActionInProgress: true,
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        isActionInProgress: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
 
     try {
       final now = DateTime.now();
@@ -90,22 +92,23 @@ class ItemTypesManagementCubit extends Cubit<ItemTypesManagementState> {
 
       await _itemTypeRepository.createItemType(itemType);
       final types = await _itemTypeRepository.getAllItemTypes();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        itemTypes: types,
-      ));
+      emit(state.copyWith(isActionInProgress: false, itemTypes: types));
       return true;
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: _normalizeError(f.message),
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: _normalizeError(f.message),
+        ),
+      );
       return false;
     } catch (e) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
       return false;
     }
   }
@@ -117,11 +120,13 @@ class ItemTypesManagementCubit extends Cubit<ItemTypesManagementState> {
       return false;
     }
 
-    emit(state.copyWith(
-      isActionInProgress: true,
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        isActionInProgress: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
 
     try {
       final updated = itemType.copyWith(
@@ -131,22 +136,23 @@ class ItemTypesManagementCubit extends Cubit<ItemTypesManagementState> {
 
       await _itemTypeRepository.updateItemType(updated);
       final types = await _itemTypeRepository.getAllItemTypes();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        itemTypes: types,
-      ));
+      emit(state.copyWith(isActionInProgress: false, itemTypes: types));
       return true;
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: _normalizeError(f.message),
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: _normalizeError(f.message),
+        ),
+      );
       return false;
     } catch (e) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
       return false;
     }
   }
@@ -156,20 +162,16 @@ class ItemTypesManagementCubit extends Cubit<ItemTypesManagementState> {
     try {
       await _itemTypeRepository.activateItemType(id);
       final types = await _itemTypeRepository.getAllItemTypes();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        itemTypes: types,
-      ));
+      emit(state.copyWith(isActionInProgress: false, itemTypes: types));
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isActionInProgress: false, errorMessage: f.message));
     } catch (e) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 
@@ -178,20 +180,16 @@ class ItemTypesManagementCubit extends Cubit<ItemTypesManagementState> {
     try {
       await _itemTypeRepository.deactivateItemType(id);
       final types = await _itemTypeRepository.getAllItemTypes();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        itemTypes: types,
-      ));
+      emit(state.copyWith(isActionInProgress: false, itemTypes: types));
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isActionInProgress: false, errorMessage: f.message));
     } catch (e) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 
@@ -207,11 +205,13 @@ class ItemTypesManagementCubit extends Cubit<ItemTypesManagementState> {
       return false;
     }
 
-    emit(state.copyWith(
-      isActionInProgress: true,
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        isActionInProgress: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
 
     try {
       final now = DateTime.now();
@@ -226,22 +226,23 @@ class ItemTypesManagementCubit extends Cubit<ItemTypesManagementState> {
 
       await _itemDefinitionRepository.createItemDefinition(def);
       final definitions = await _itemDefinitionRepository.getAllDefinitions();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        definitions: definitions,
-      ));
+      emit(state.copyWith(isActionInProgress: false, definitions: definitions));
       return true;
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: _normalizeError(f.message),
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: _normalizeError(f.message),
+        ),
+      );
       return false;
     } catch (e) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
       return false;
     }
   }
@@ -253,36 +254,36 @@ class ItemTypesManagementCubit extends Cubit<ItemTypesManagementState> {
       return false;
     }
 
-    emit(state.copyWith(
-      isActionInProgress: true,
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        isActionInProgress: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
 
     try {
-      final updated = def.copyWith(
-        name: trimmed,
-        updatedAt: DateTime.now(),
-      );
+      final updated = def.copyWith(name: trimmed, updatedAt: DateTime.now());
 
       await _itemDefinitionRepository.updateItemDefinition(updated);
       final definitions = await _itemDefinitionRepository.getAllDefinitions();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        definitions: definitions,
-      ));
+      emit(state.copyWith(isActionInProgress: false, definitions: definitions));
       return true;
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: _normalizeError(f.message),
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: _normalizeError(f.message),
+        ),
+      );
       return false;
     } catch (e) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
       return false;
     }
   }
@@ -292,20 +293,16 @@ class ItemTypesManagementCubit extends Cubit<ItemTypesManagementState> {
     try {
       await _itemDefinitionRepository.activateItemDefinition(id);
       final definitions = await _itemDefinitionRepository.getAllDefinitions();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        definitions: definitions,
-      ));
+      emit(state.copyWith(isActionInProgress: false, definitions: definitions));
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isActionInProgress: false, errorMessage: f.message));
     } catch (e) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 
@@ -314,26 +311,24 @@ class ItemTypesManagementCubit extends Cubit<ItemTypesManagementState> {
     try {
       await _itemDefinitionRepository.deactivateItemDefinition(id);
       final definitions = await _itemDefinitionRepository.getAllDefinitions();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        definitions: definitions,
-      ));
+      emit(state.copyWith(isActionInProgress: false, definitions: definitions));
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isActionInProgress: false, errorMessage: f.message));
     } catch (e) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 
   String _normalizeError(String message) {
     final lower = message.toLowerCase();
-    if (lower.contains('unique') || lower.contains('constraint') || lower.contains('duplicate')) {
+    if (lower.contains('unique') ||
+        lower.contains('constraint') ||
+        lower.contains('duplicate')) {
       return AppStrings.duplicateNameError;
     }
     return message;

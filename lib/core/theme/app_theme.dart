@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:laundry_management/core/constants/app_constants.dart';
-import 'package:laundry_management/core/theme/app_colors.dart';
-import 'package:laundry_management/core/theme/app_colors_extension.dart';
-import 'package:laundry_management/core/theme/app_spacing.dart';
-import 'package:laundry_management/core/theme/app_text_styles.dart';
+
+import '../constants/app_constants.dart';
+import 'app_colors.dart';
+import 'app_colors_extension.dart';
+import 'app_spacing.dart';
+import 'app_text_styles.dart';
 
 class AppTheme {
   AppTheme._();
@@ -61,9 +62,7 @@ class AppTheme {
         thickness: 1,
         space: 1,
       ),
-      extensions: const [
-        AppColorsExtension.light,
-      ],
+      extensions: const [AppColorsExtension.light],
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surface,
@@ -74,9 +73,7 @@ class AppTheme {
         hintStyle: AppTextStyles.bodyMedium.copyWith(
           color: AppColors.textTertiary,
         ),
-        errorStyle: AppTextStyles.bodySmall.copyWith(
-          color: AppColors.error,
-        ),
+        errorStyle: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
           borderSide: const BorderSide(color: AppColors.border),

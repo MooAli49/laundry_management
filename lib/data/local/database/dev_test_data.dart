@@ -8,7 +8,10 @@ import 'seed_data.dart';
 /// Production seed remains clean and never creates customers, orders,
 /// payments, or storage records.
 class DevTestData {
-  static const bool isEnabled = bool.fromEnvironment('ENABLE_DEV_TEST_DATA', defaultValue: false);
+  static const bool isEnabled = bool.fromEnvironment(
+    'ENABLE_DEV_TEST_DATA',
+    defaultValue: false,
+  );
 
   // Master Data IDs
   static const String srvWashIronId = '00000000-0000-0000-0002-000000000001';
@@ -25,10 +28,13 @@ class DevTestData {
   static const String idefShirtId = '00000000-0000-0000-0005-000000000001';
   static const String idefPantsId = '00000000-0000-0000-0005-000000000002';
   static const String idefSuitId = '00000000-0000-0000-0005-000000000003';
-  static const String idefSingleBlanketId = '00000000-0000-0000-0005-000000000004';
-  static const String idefDoubleBlanketId = '00000000-0000-0000-0005-000000000005';
+  static const String idefSingleBlanketId =
+      '00000000-0000-0000-0005-000000000004';
+  static const String idefDoubleBlanketId =
+      '00000000-0000-0000-0005-000000000005';
   static const String idefWoolCarpetId = '00000000-0000-0000-0005-000000000006';
-  static const String idefRunnerCarpetId = '00000000-0000-0000-0005-000000000007';
+  static const String idefRunnerCarpetId =
+      '00000000-0000-0000-0005-000000000007';
   static const String idefDuvetCoverId = '00000000-0000-0000-0005-000000000008';
   static const String idefBedspreadId = '00000000-0000-0000-0005-000000000009';
   static const String idefSilkCarpetId = '00000000-0000-0000-0005-000000000010';
@@ -36,11 +42,14 @@ class DevTestData {
   static const String locRackA1Id = '00000000-0000-0000-0006-000000000001';
   static const String locRackA2Id = '00000000-0000-0000-0006-000000000002';
   static const String locRackB1Id = '00000000-0000-0000-0006-000000000003';
-  static const String locCarpetSectionId = '00000000-0000-0000-0006-000000000004';
-  static const String locBlanketSectionId = '00000000-0000-0000-0006-000000000005';
+  static const String locCarpetSectionId =
+      '00000000-0000-0000-0006-000000000004';
+  static const String locBlanketSectionId =
+      '00000000-0000-0000-0006-000000000005';
 
   static const String carpetSize2x3Id = '00000000-0000-0000-0007-000000000001';
-  static const String carpetSize1_5x2Id = '00000000-0000-0000-0007-000000000002';
+  static const String carpetSize1_5x2Id =
+      '00000000-0000-0000-0007-000000000002';
   static const String carpetSize1x4Id = '00000000-0000-0000-0007-000000000003';
 
   static const List<String> customerNames = [
@@ -74,7 +83,14 @@ class DevTestData {
       await db.customStatement(
         'INSERT OR IGNORE INTO customers (id, name, phone, notes, created_at, updated_at) '
         'VALUES (?, ?, ?, ?, ?, ?);',
-        [custId, customerNames[i - 1], phone, 'عميل تجريبي للتطوير #$i', nowTimestamp, nowTimestamp],
+        [
+          custId,
+          customerNames[i - 1],
+          phone,
+          'عميل تجريبي للتطوير #$i',
+          nowTimestamp,
+          nowTimestamp,
+        ],
       );
     }
 
@@ -82,21 +98,57 @@ class DevTestData {
     await _seedOrders(db, nowDt, nowTimestamp);
   }
 
-  static Future<void> _seedMasterData(GeneratedDatabase db, int nowTimestamp) async {
+  static Future<void> _seedMasterData(
+    GeneratedDatabase db,
+    int nowTimestamp,
+  ) async {
     // Services
     final services = [
-      {'id': srvWashIronId, 'name': 'غسيل ومكوى', 'pricing_type': 'perPiece', 'price': 2500},
-      {'id': srvDryCleanId, 'name': 'دراي كلين', 'pricing_type': 'perPiece', 'price': 4500},
-      {'id': srvCarpetWashId, 'name': 'غسيل سجاد', 'pricing_type': 'perSquareMeter', 'price': 6000},
-      {'id': srvBlanketId, 'name': 'تنظيف بطاطين', 'pricing_type': 'fixedPrice', 'price': 8000},
-      {'id': srvCoverId, 'name': 'غسيل أغطية', 'pricing_type': 'fixedPrice', 'price': 3500},
+      {
+        'id': srvWashIronId,
+        'name': 'غسيل ومكوى',
+        'pricing_type': 'perPiece',
+        'price': 2500,
+      },
+      {
+        'id': srvDryCleanId,
+        'name': 'دراي كلين',
+        'pricing_type': 'perPiece',
+        'price': 4500,
+      },
+      {
+        'id': srvCarpetWashId,
+        'name': 'غسيل سجاد',
+        'pricing_type': 'perSquareMeter',
+        'price': 6000,
+      },
+      {
+        'id': srvBlanketId,
+        'name': 'تنظيف بطاطين',
+        'pricing_type': 'fixedPrice',
+        'price': 8000,
+      },
+      {
+        'id': srvCoverId,
+        'name': 'غسيل أغطية',
+        'pricing_type': 'fixedPrice',
+        'price': 3500,
+      },
     ];
 
     for (final s in services) {
       await db.customStatement(
         'INSERT OR IGNORE INTO services (id, name, description, pricing_type, price, is_active, created_at, updated_at) '
         'VALUES (?, ?, ?, ?, ?, 1, ?, ?);',
-        [s['id'], s['name'], 'خدمة تجريبية', s['pricing_type'], s['price'], nowTimestamp, nowTimestamp],
+        [
+          s['id'],
+          s['name'],
+          'خدمة تجريبية',
+          s['pricing_type'],
+          s['price'],
+          nowTimestamp,
+          nowTimestamp,
+        ],
       );
     }
 
@@ -124,20 +176,50 @@ class DevTestData {
       {'id': idefShirtId, 'item_type_id': typeClothingId, 'name': 'قميص'},
       {'id': idefPantsId, 'item_type_id': typeClothingId, 'name': 'بنطلون'},
       {'id': idefSuitId, 'item_type_id': typeClothingId, 'name': 'بدلة'},
-      {'id': idefSingleBlanketId, 'item_type_id': typeBlanketsId, 'name': 'بطانية مفرد'},
-      {'id': idefDoubleBlanketId, 'item_type_id': typeBlanketsId, 'name': 'بطانية دبل'},
-      {'id': idefWoolCarpetId, 'item_type_id': typeCarpetsId, 'name': 'سجادة صوف'},
-      {'id': idefRunnerCarpetId, 'item_type_id': typeCarpetsId, 'name': 'مشاية'},
-      {'id': idefDuvetCoverId, 'item_type_id': typeCoversId, 'name': 'غطاء لحاف'},
+      {
+        'id': idefSingleBlanketId,
+        'item_type_id': typeBlanketsId,
+        'name': 'بطانية مفرد',
+      },
+      {
+        'id': idefDoubleBlanketId,
+        'item_type_id': typeBlanketsId,
+        'name': 'بطانية دبل',
+      },
+      {
+        'id': idefWoolCarpetId,
+        'item_type_id': typeCarpetsId,
+        'name': 'سجادة صوف',
+      },
+      {
+        'id': idefRunnerCarpetId,
+        'item_type_id': typeCarpetsId,
+        'name': 'مشاية',
+      },
+      {
+        'id': idefDuvetCoverId,
+        'item_type_id': typeCoversId,
+        'name': 'غطاء لحاف',
+      },
       {'id': idefBedspreadId, 'item_type_id': typeCoversId, 'name': 'كوفرتة'},
-      {'id': idefSilkCarpetId, 'item_type_id': typeCarpetsId, 'name': 'سجادة حرير'},
+      {
+        'id': idefSilkCarpetId,
+        'item_type_id': typeCarpetsId,
+        'name': 'سجادة حرير',
+      },
     ];
 
     for (final def in itemDefs) {
       await db.customStatement(
         'INSERT OR IGNORE INTO item_definitions (id, item_type_id, name, is_active, created_at, updated_at) '
         'VALUES (?, ?, ?, 1, ?, ?);',
-        [def['id'], def['item_type_id'], def['name'], nowTimestamp, nowTimestamp],
+        [
+          def['id'],
+          def['item_type_id'],
+          def['name'],
+          nowTimestamp,
+          nowTimestamp,
+        ],
       );
     }
 
@@ -161,17 +243,53 @@ class DevTestData {
     // Storage Location Item Type Compatibility
     final storageCompatibilities = [
       // Clothes Racks compatible with Clothing and Covers
-      {'id': '00000000-0000-0000-0008-000000000001', 'loc_id': locRackA1Id, 'type_id': typeClothingId},
-      {'id': '00000000-0000-0000-0008-000000000002', 'loc_id': locRackA1Id, 'type_id': typeCoversId},
-      {'id': '00000000-0000-0000-0008-000000000003', 'loc_id': locRackA2Id, 'type_id': typeClothingId},
-      {'id': '00000000-0000-0000-0008-000000000004', 'loc_id': locRackA2Id, 'type_id': typeCoversId},
-      {'id': '00000000-0000-0000-0008-000000000005', 'loc_id': locRackB1Id, 'type_id': typeClothingId},
-      {'id': '00000000-0000-0000-0008-000000000006', 'loc_id': locRackB1Id, 'type_id': typeCoversId},
+      {
+        'id': '00000000-0000-0000-0008-000000000001',
+        'loc_id': locRackA1Id,
+        'type_id': typeClothingId,
+      },
+      {
+        'id': '00000000-0000-0000-0008-000000000002',
+        'loc_id': locRackA1Id,
+        'type_id': typeCoversId,
+      },
+      {
+        'id': '00000000-0000-0000-0008-000000000003',
+        'loc_id': locRackA2Id,
+        'type_id': typeClothingId,
+      },
+      {
+        'id': '00000000-0000-0000-0008-000000000004',
+        'loc_id': locRackA2Id,
+        'type_id': typeCoversId,
+      },
+      {
+        'id': '00000000-0000-0000-0008-000000000005',
+        'loc_id': locRackB1Id,
+        'type_id': typeClothingId,
+      },
+      {
+        'id': '00000000-0000-0000-0008-000000000006',
+        'loc_id': locRackB1Id,
+        'type_id': typeCoversId,
+      },
       // Carpet Section compatible with Carpets
-      {'id': '00000000-0000-0000-0008-000000000007', 'loc_id': locCarpetSectionId, 'type_id': typeCarpetsId},
+      {
+        'id': '00000000-0000-0000-0008-000000000007',
+        'loc_id': locCarpetSectionId,
+        'type_id': typeCarpetsId,
+      },
       // Blanket Section compatible with Blankets and Covers
-      {'id': '00000000-0000-0000-0008-000000000008', 'loc_id': locBlanketSectionId, 'type_id': typeBlanketsId},
-      {'id': '00000000-0000-0000-0008-000000000009', 'loc_id': locBlanketSectionId, 'type_id': typeCoversId},
+      {
+        'id': '00000000-0000-0000-0008-000000000008',
+        'loc_id': locBlanketSectionId,
+        'type_id': typeBlanketsId,
+      },
+      {
+        'id': '00000000-0000-0000-0008-000000000009',
+        'loc_id': locBlanketSectionId,
+        'type_id': typeCoversId,
+      },
     ];
 
     for (final compat in storageCompatibilities) {
@@ -193,14 +311,26 @@ class DevTestData {
       await db.customStatement(
         'INSERT OR IGNORE INTO carpet_sizes (id, length, width, area, is_active, created_at, updated_at) '
         'VALUES (?, ?, ?, ?, 1, ?, ?);',
-        [cs['id'], cs['length'], cs['width'], cs['area'], nowTimestamp, nowTimestamp],
+        [
+          cs['id'],
+          cs['length'],
+          cs['width'],
+          cs['area'],
+          nowTimestamp,
+          nowTimestamp,
+        ],
       );
     }
   }
 
-  static Future<void> _seedOrders(GeneratedDatabase db, DateTime nowDt, int nowTimestamp) async {
+  static Future<void> _seedOrders(
+    GeneratedDatabase db,
+    DateTime nowDt,
+    int nowTimestamp,
+  ) async {
     final expectedPickupDt = nowDt.add(const Duration(days: 3));
-    final expectedPickupTimestamp = expectedPickupDt.toUtc().millisecondsSinceEpoch ~/ 1000;
+    final expectedPickupTimestamp =
+        expectedPickupDt.toUtc().millisecondsSinceEpoch ~/ 1000;
 
     // Helper for inserting an order
     Future<void> insertOrder({
@@ -218,7 +348,8 @@ class DevTestData {
       int? cancelledAtTimestamp,
       String? cancellationReason,
     }) async {
-      final total = subtotal - discount + customerPickupFee + customerDeliveryFee;
+      final total =
+          subtotal - discount + customerPickupFee + customerDeliveryFee;
       final custIndex = int.tryParse(customerId.split('-').last) ?? 1;
       final custName = (custIndex >= 1 && custIndex <= customerNames.length)
           ? customerNames[custIndex - 1]
@@ -311,7 +442,16 @@ class DevTestData {
         'INSERT OR IGNORE INTO order_item_carpets ('
         'id, order_item_id, carpet_size_id, length, width, area, created_at, updated_at'
         ') VALUES (?, ?, ?, ?, ?, ?, ?, ?);',
-        [id, orderItemId, carpetSizeId, length, width, area, nowTimestamp, nowTimestamp],
+        [
+          id,
+          orderItemId,
+          carpetSizeId,
+          length,
+          width,
+          area,
+          nowTimestamp,
+          nowTimestamp,
+        ],
       );
     }
 
@@ -341,7 +481,14 @@ class DevTestData {
         'INSERT OR IGNORE INTO storage_records ('
         'id, order_item_id, storage_location_id, is_active, created_at, updated_at'
         ') VALUES (?, ?, ?, ?, ?, ?);',
-        [id, orderItemId, storageLocationId, isActive ? 1 : 0, nowTimestamp, nowTimestamp],
+        [
+          id,
+          orderItemId,
+          storageLocationId,
+          isActive ? 1 : 0,
+          nowTimestamp,
+          nowTimestamp,
+        ],
       );
     }
 

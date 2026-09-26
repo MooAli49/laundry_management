@@ -51,5 +51,6 @@ class StorageLocation {
   int get hashCode => Object.hash(id, name, isActive, createdAt, updatedAt);
 
   @override
-  String toString() => 'StorageLocation(id: $id, name: $name, active: $isActive)';
+  String toString() =>
+      'StorageLocation(id: $id, name: $name, active: $isActive)';
 }

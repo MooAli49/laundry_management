@@ -19,7 +19,8 @@ class AppStrings {
 
   // Technical Errors / Failures
   static const String errorTitle = 'حدث خطأ ما';
-  static const String errorDescription = 'تعذر إتمام العملية، يرجى المحاولة مرة أخرى';
+  static const String errorDescription =
+      'تعذر إتمام العملية، يرجى المحاولة مرة أخرى';
   static const String serverError = 'حدث خطأ في الاتصال بالخادم';
   static const String cacheError = 'حدث خطأ في الوصول إلى البيانات المحلية';
   static const String networkError = 'يرجى التحقق من الاتصال بالإنترنت';
@@ -37,15 +38,24 @@ class AppStrings {
   static const String noData = 'لا توجد بيانات';
   static const String emptyStateDefaultTitle = 'لا توجد عناصر لعرضها';
 
+  // Sync Status
+  static const String syncConnected = 'متصل';
+  static const String syncSyncing = 'جاري المزامنة';
+  static const String syncOffline = 'غير متصل';
+  static const String syncError = 'فشل المزامنة';
+
   // Customers — Header, List & Search
   static const String addCustomer = 'إضافة عميل';
   static String totalCustomersCount(int count) => 'إجمالي $count عميل';
-  static const String searchCustomerPlaceholder = 'بحث باسم العميل أو رقم الهاتف...';
+  static const String searchCustomerPlaceholder =
+      'بحث باسم العميل أو رقم الهاتف...';
   static const String failedToLoadCustomers = 'تعذر تحميل العملاء';
   static const String noMatchingResults = 'لا توجد نتائج مطابقة';
   static const String noCustomersYet = 'لا يوجد عملاء حتى الآن';
-  static const String noMatchingCustomersMessage = 'لم يتم العثور على عملاء مطابقين لنص البحث.';
-  static const String addFirstCustomerPrompt = 'قم بإضافة عميلك الأول لبدء إدارة الطلبات.';
+  static const String noMatchingCustomersMessage =
+      'لم يتم العثور على عملاء مطابقين لنص البحث.';
+  static const String addFirstCustomerPrompt =
+      'قم بإضافة عميلك الأول لبدء إدارة الطلبات.';
   static const String clearSearch = 'مسح البحث';
   static const String loadMoreCustomers = 'تحميل المزيد من العملاء';
 
@@ -61,6 +71,8 @@ class AppStrings {
   static const String customerNameHint = 'مثال: محمد أحمد';
   static const String customerPhoneLabel = 'رقم الهاتف *';
   static const String customerPhoneHint = 'مثال: 01012345678';
+  static const String customerAddressLabel = 'العنوان';
+  static const String customerAddressHint = 'مثال: 12 شارع الجمهورية';
   static const String notesLabel = 'ملاحظات';
   static const String customerNotesHint = 'أي ملاحظات خاصة بالعميل';
   static const String saveChanges = 'حفظ التعديلات';
@@ -84,19 +96,28 @@ class AppStrings {
   static const String completedOrders = 'طلبات مكتملة';
   static const String totalPaid = 'إجمالي المدفوع';
   static const String totalRemaining = 'إجمالي المتبقي';
+  static const String totalPayments = 'إجمالي المدفوعات';
+  static const String totalRefunds = 'إجمالي الاستردادات';
+  static const String netPaid = 'صافي المدفوع';
+  static const String outstandingAmounts = 'المبالغ المستحقة';
   static String orderHistoryWithCount(int count) => 'سجل الطلبات ($count)';
   static const String noOrdersForCustomer = 'لا توجد طلبات لهذا العميل';
-  static const String createFirstOrderForCustomerPrompt = 'يمكنك إنشاء طلب جديد لهذا العميل بالضغط على زر إنشاء طلب.';
+  static const String createFirstOrderForCustomerPrompt =
+      'يمكنك إنشاء طلب جديد لهذا العميل بالضغط على زر إنشاء طلب.';
   static const String fullyPaid = 'مدفوع بالكامل';
+  static String totalAmount(String amount) => 'الإجمالي: $amount ج.م';
   static String paidAmount(String amount) => 'المدفوع: $amount ج.م';
+  static String refundedAmount(String amount) => 'المسترد: $amount ج.م';
   static String remainingAmount(String amount) => 'المتبقي: $amount ج.م';
   static const String loadMoreOrders = 'تحميل المزيد من الطلبات';
-  static const String customerUpdatedSuccessfully = 'تم تحديث بيانات العميل بنجاح';
+  static const String customerUpdatedSuccessfully =
+      'تم تحديث بيانات العميل بنجاح';
 
   // Storage
   static const String itemsRequiringStorage = 'تحتاج إلى تخزين';
   static const String currentStorage = 'مخزنة حاليًا';
-  static const String searchStoragePlaceholder = 'بحث برقم الطلب، اسم العميل، أو رقم الهاتف...';
+  static const String searchStoragePlaceholder =
+      'بحث برقم الطلب، اسم العميل، أو رقم الهاتف...';
   static const String storeAction = 'تخزين';
   static const String storeItemsAction = 'تخزين العناصر';
   static const String moveAction = 'نقل';
@@ -122,8 +143,10 @@ class AppStrings {
   static const String newLocationLabel = 'الموقع الجديد *';
   static const String confirmStore = 'تأكيد التخزين';
   static const String confirmMove = 'تأكيد النقل';
-  static const String cannotMoveToSameLocation = 'لا يمكن نقل العنصر إلى نفس الموقع';
-  static const String incompatibleLocation = 'الموقع المحدد غير متوافق مع نوع العنصر';
+  static const String cannotMoveToSameLocation =
+      'لا يمكن نقل العنصر إلى نفس الموقع';
+  static const String incompatibleLocation =
+      'الموقع المحدد غير متوافق مع نوع العنصر';
   static const String conflictingTypesWarning =
       'القطع المحددة تتطلب أماكن تخزين مختلفة (أنواع مختلفة). يرجى تخزين كل نوع على حدة.';
   static const String loadMoreStorageItems = 'تحميل المزيد';
@@ -141,7 +164,8 @@ class AppStrings {
   static const String orderNumberPrefix = 'طلب #';
 
   // Settings — Navigation Tabs
-  static const String settingsSubtitle = 'إدارة البيانات الأساسية وإعدادات النظام';
+  static const String settingsSubtitle =
+      'إدارة البيانات الأساسية وإعدادات النظام';
   static const String tabBusinessInfo = 'بيانات النشاط';
   static const String tabInvoice = 'الفاتورة';
   static const String tabServices = 'الخدمات';
@@ -158,10 +182,13 @@ class AppStrings {
   static const String businessPhoneLabel = 'رقم الهاتف';
   static const String businessPhoneHint = 'مثال: 01012345678';
   static const String businessAddressLabel = 'العنوان';
-  static const String businessAddressHint = 'مثال: شارع الجمهورية، المعادي، القاهرة';
+  static const String businessAddressHint =
+      'مثال: شارع الجمهورية، المعادي، القاهرة';
   static const String invoiceFooterLabel = 'نص تذييل الفاتورة';
-  static const String invoiceFooterHint = 'مثال: شكراً لتعاملكم معنا، نسعد بخدمتكم دائماً';
-  static const String saveBusinessSettingsSuccess = 'تم حفظ بيانات النشاط بنجاح';
+  static const String invoiceFooterHint =
+      'مثال: شكراً لتعاملكم معنا، نسعد بخدمتكم دائماً';
+  static const String saveBusinessSettingsSuccess =
+      'تم حفظ بيانات النشاط بنجاح';
 
   // Settings — Invoice Preview
   static const String invoicePreviewTitle = 'معاينة الفاتورة الحرارية (80 مم)';
@@ -190,10 +217,12 @@ class AppStrings {
   static const String priceLabelPerSquareMeter = 'سعر المتر المربع';
   static const String priceLabelFixedPrice = 'السعر الثابت';
   static const String supportedItemTypesLabel = 'أنواع القطع المدعومة *';
-  static const String selectAtLeastOneItemType = 'يجب اختيار نوع قطعة واحد على الأقل';
+  static const String selectAtLeastOneItemType =
+      'يجب اختيار نوع قطعة واحد على الأقل';
   static const String serviceNameRequired = 'اسم الخدمة مطلوب';
   static const String servicePriceRequired = 'السعر مطلوب';
-  static const String servicePriceMustBePositive = 'السعر يجب أن يكون أكبر من صفر';
+  static const String servicePriceMustBePositive =
+      'السعر يجب أن يكون أكبر من صفر';
   static const String servicePriceChangeNotice =
       'سيتم تطبيق السعر الجديد على الطلبات الجديدة فقط. الطلبات الحالية لن تتأثر.';
   static const String duplicateNameError = 'هذا الاسم مستخدم بالفعل';
@@ -230,8 +259,10 @@ class AppStrings {
   static const String carpetLengthLabel = 'الطول (م) *';
   static const String carpetWidthLabel = 'العرض (م) *';
   static const String carpetAreaLabel = 'المساحة (م²)';
-  static const String carpetLengthRequired = 'الطول مطلوب ويجب أن يكون أكبر من صفر';
-  static const String carpetWidthRequired = 'العرض مطلوب ويجب أن يكون أكبر من صفر';
+  static const String carpetLengthRequired =
+      'الطول مطلوب ويجب أن يكون أكبر من صفر';
+  static const String carpetWidthRequired =
+      'العرض مطلوب ويجب أن يكون أكبر من صفر';
   static const String deactivateCarpetSizeConfirmMessage =
       'سيتم تعطيل مقاس السجاد ولن يظهر في الطلبات الجديدة.';
   static const String noCarpetSizes = 'لا توجد مقاسات سجاد مضافة';
@@ -252,7 +283,8 @@ class AppStrings {
   static const String addExpenseCategory = 'إضافة تصنيف مصروفات';
   static const String editExpenseCategory = 'تعديل تصنيف المصروفات';
   static const String expenseCategoryNameLabel = 'اسم التصنيف *';
-  static const String expenseCategoryNameHint = 'مثال: فواتير كهرباء، منظفات، صيانة';
+  static const String expenseCategoryNameHint =
+      'مثال: فواتير كهرباء، منظفات، صيانة';
   static const String expenseCategoryNameRequired = 'اسم التصنيف مطلوب';
   static const String deactivateExpenseCategoryConfirmMessage =
       'سيتم تعطيل تصنيف المصروفات ولن يظهر في تسجيل المصروفات الجديدة.';
@@ -275,4 +307,3 @@ class AppStrings {
   static const String tableHeaderArea = 'المساحة';
   static const String tableHeaderItemType = 'نوع القطعة';
 }
-

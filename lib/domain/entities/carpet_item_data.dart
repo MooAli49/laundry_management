@@ -25,13 +25,25 @@ class CarpetItemData {
       throw ArgumentError('CarpetItemData orderItemId cannot be empty');
     }
     if (length <= 0) {
-      throw ArgumentError.value(length, 'length', 'Carpet length must be greater than 0');
+      throw ArgumentError.value(
+        length,
+        'length',
+        'Carpet length must be greater than 0',
+      );
     }
     if (width <= 0) {
-      throw ArgumentError.value(width, 'width', 'Carpet width must be greater than 0');
+      throw ArgumentError.value(
+        width,
+        'width',
+        'Carpet width must be greater than 0',
+      );
     }
     if (area <= 0) {
-      throw ArgumentError.value(area, 'area', 'Carpet area must be greater than 0');
+      throw ArgumentError.value(
+        area,
+        'area',
+        'Carpet area must be greater than 0',
+      );
     }
     final expectedArea = length * width;
     if ((area - expectedArea).abs() > 0.001) {
@@ -79,15 +91,15 @@ class CarpetItemData {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        orderItemId,
-        carpetSizeId,
-        length,
-        width,
-        area,
-        createdAt,
-        updatedAt,
-      );
+    id,
+    orderItemId,
+    carpetSizeId,
+    length,
+    width,
+    area,
+    createdAt,
+    updatedAt,
+  );
 
   @override
   String toString() =>

@@ -38,9 +38,15 @@ class AppSpacing {
   static const EdgeInsets horizontalMd = EdgeInsets.symmetric(horizontal: md);
   static const EdgeInsets horizontalLg = EdgeInsets.symmetric(horizontal: lg);
   static const EdgeInsets horizontalXl = EdgeInsets.symmetric(horizontal: xl);
-  static const EdgeInsets horizontalSection = EdgeInsets.symmetric(horizontal: section);
-  static const EdgeInsets horizontalPage = EdgeInsets.symmetric(horizontal: page);
-  static const EdgeInsets horizontalMajor = EdgeInsets.symmetric(horizontal: major);
+  static const EdgeInsets horizontalSection = EdgeInsets.symmetric(
+    horizontal: section,
+  );
+  static const EdgeInsets horizontalPage = EdgeInsets.symmetric(
+    horizontal: page,
+  );
+  static const EdgeInsets horizontalMajor = EdgeInsets.symmetric(
+    horizontal: major,
+  );
 
   // Vertical Padding
   static const EdgeInsets verticalXs = EdgeInsets.symmetric(vertical: xs);
@@ -48,7 +54,9 @@ class AppSpacing {
   static const EdgeInsets verticalMd = EdgeInsets.symmetric(vertical: md);
   static const EdgeInsets verticalLg = EdgeInsets.symmetric(vertical: lg);
   static const EdgeInsets verticalXl = EdgeInsets.symmetric(vertical: xl);
-  static const EdgeInsets verticalSection = EdgeInsets.symmetric(vertical: section);
+  static const EdgeInsets verticalSection = EdgeInsets.symmetric(
+    vertical: section,
+  );
   static const EdgeInsets verticalPage = EdgeInsets.symmetric(vertical: page);
   static const EdgeInsets verticalMajor = EdgeInsets.symmetric(vertical: major);
 

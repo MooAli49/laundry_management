@@ -23,6 +23,10 @@ Required information:
 - Customer name
 - Customer phone number
 
+Optional information:
+
+- Customer address (`Customer.address` is optional and nullable text; stored on Customer profile only; no separate Address entity/table; whitespace-only values normalize to NULL; no address snapshot on Order; no address search in V1; full delivery routing/dispatch management remains out of scope).
+
 The system should validate the phone number format.
 
 The system should prevent duplicate customers based on an existing phone number.
@@ -46,6 +50,7 @@ The user must be able to edit:
 
 - Customer name
 - Customer phone number
+- Customer address
 
 Customer information may be updated without modifying historical order snapshots.
 
@@ -104,13 +109,21 @@ Every order must have a human-readable unique Order Number.
 
 The Order Number is separate from the internal database identifier.
 
-The approved V1 display format is:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length:
 
-    YY-XXX
+- YY = 2-digit year prefix.
+- The sequence contains digits only.
+- The sequence has a minimum display width of 3 digits (zero-padded below 1000).
+- There is no maximum length or 999 ceiling; once the sequence reaches 1000, it expands to 4 digits (e.g. 26-1000, 26-10000).
+- Non-numeric or alphanumeric values (e.g. 26-T123) are not valid business order numbers.
+- The sequence generator must ignore non-business test identifiers such as `ORD-TEST-...` when calculating the next sequence number. These synthetic test identifiers must never inflate or distort the business order sequence.
 
-Example:
+Examples:
 
     26-001
+    26-999
+    26-1000
+    26-10000
 
 The exact numbering implementation must guarantee uniqueness.
 
@@ -154,7 +167,7 @@ The system must not track individual laundry processing stages.
 
 ---
 
-## 3.5 Manual Status Changes
+## 3.5 Manual Status Changes & Administrative Correction
 
 The user must be able to manually change the order status when necessary to correct an operational mistake.
 
@@ -162,7 +175,14 @@ Manual status changes must respect the system's business rules and validations.
 
 The system must not silently perform unintended side effects when a status is manually changed.
 
-If a status change affects storage or other operational state, the behavior must follow the approved business rules.
+If a status change affects storage or other operational state, the behavior must follow the approved business rules:
+- Completed -> Processing is supported ONLY as an explicit administrative correction.
+- Administrative correction requires an explicit non-empty operational reason.
+- Upon correction, `completed_at` is cleared to NULL; existing payments remain unchanged.
+- Previous storage records remain inactive; storage is NOT automatically reactivated.
+- Items must be explicitly stored again before the order can transition back to Ready.
+- Completed -> Ready and Completed -> Cancelled remain strictly forbidden.
+- Cancelled status remains strictly terminal.
 
 ---
 
@@ -180,8 +200,12 @@ Editable information may include:
 - Delivery fees where applicable
 - Discount
 - Notes
-- Payments where applicable
 - Order item prices where permitted by the approved pricing behavior
+
+Payment rules during Edit Order:
+- Existing payments are immutable during Edit Order.
+- Edit Order must not add, modify, or delete payments.
+- The edited order total must remain >= totalPaid.
 
 Completed and Cancelled orders are considered historical records and should be read-only.
 
@@ -347,6 +371,14 @@ This information must be available in:
 - Storage
 
 The system must not rely on the Service name alone to identify the physical item.
+
+Snapshot rules:
+- `itemTypeNameSnapshot` is required and non-empty.
+- `serviceNameSnapshot` is required and non-empty.
+- They are historical snapshots captured with the OrderItem.
+- Empty or whitespace-only snapshots are invalid domain data.
+- The application must NOT fabricate fallback names such as `ملابس` or `غسيل`.
+- Test fixtures must provide valid snapshot values.
 
 ---
 
@@ -608,9 +640,24 @@ The system must prevent a payment from exceeding the current remaining amount.
 
 ## 9.6 Refunds
 
-A complete refund workflow is not required in V1.
+The system supports an order-level Refund V1 workflow for cancelled orders.
 
-There is no dedicated refund management system.
+Key business and domain rules:
+- Refund is a first-class immutable financial transaction.
+- Refund is ORDER-LEVEL in V1: belongs directly to an Order and has NO `payment_id`.
+- Only Cancelled orders can receive refunds. Processing, Ready, and Completed orders cannot receive refunds.
+- Cancelled status remains strictly terminal.
+- Original Payment records are immutable and are never modified or deleted upon refund.
+- Refundable amount is: `Total Paid - Total Refunded`.
+- Refund amount must be > 0 and cannot exceed the remaining refundable balance.
+- Multiple partial refunds are supported, as well as full refunds.
+- Cancellation does not trigger an automatic refund: cancellation and refund are separate operations.
+- Supported refund methods: Cash (`cash`), InstaPay (`insta_pay`), and E-Wallet (`e_wallet`).
+- Optional refund reason may be recorded.
+- Refund history is immutable: no editing or deletion of refund records.
+- Financial reporting: Total Refunds = sum of refunds by `refundedAt`. Net Payments = `Total Payments - Total Refunds`.
+- Refunds are NOT operating expenses. Net Profit remains: `Total Sales - Operating Expenses`.
+- Automated payment gateway refunds and item-level refunds are out of scope for V1.
 
 ---
 
@@ -759,7 +806,8 @@ If an order has active Storage Records when it is cancelled:
 
 Existing payment records remain stored as historical records.
 
-There is no automatic refund workflow.
+Cancellation does not trigger an automatic refund.
+Manual refunds may be issued for eligible cancelled orders through the Refund workflow.
 
 ---
 
@@ -886,7 +934,18 @@ Example:
 
 The system should allow filtering orders based on the Expected Pickup Date.
 
-Orders whose Expected Pickup Date has passed while they are not Completed or Cancelled are considered overdue.
+Overdue boundary semantics:
+An active order is overdue only when:
+`expected_pickup_date < start_of_today`
+The comparison is strictly calendar-date based.
+Therefore:
+- Yesterday → overdue
+- Today → NOT overdue
+- Tomorrow → NOT overdue
+- Completed orders → NOT overdue
+- Cancelled orders → NOT overdue
+
+The system must never describe orders with expected pickup date of "today" as overdue.
 
 ---
 
@@ -1065,25 +1124,24 @@ Must provide:
 
 Must provide:
 
-- Sales for the selected period
-- Payments recorded during the selected period
-- Expenses for the selected period
-- Outstanding amounts
-- Total discounts
-- Payment method breakdown
-- Net Profit
+- **Total Sales**: Sum of non-cancelled order totals (`status != cancelled`) created during the selected period. Cancelled orders are excluded.
+- **Total Payments**: Historical payments recorded during the selected period based on `Payment.paidAt`. Payments from cancelled orders remain historical payments.
+- **Total Refunds**: Sum of order-level refunds recorded during the selected period based on `Refund.refundedAt`.
+- **Net Payments**: Net payment movement for the period, calculated as:
+      Net Payments = Total Payments - Total Refunds
+- **Outstanding**: Sum of unpaid balances for non-cancelled orders only (`remaining > 0`, `status != cancelled`). Cancelled orders are excluded.
+- **Total Discounts**: Sum of discounts applied to non-cancelled orders in the selected period.
+- **Payment Method Breakdown**: Distribution of payments by payment method (Cash, InstaPay, E-Wallet).
+- **Operating Expenses**: Total expenses recorded for the period based on `Expense.expenseDate`.
+- **Net Profit**: Derived financial result calculated as:
+      Net Profit = Total Sales - Operating Expenses
 
-Expenses must be included according to their Expense Date.
-
-Net Profit is a derived reporting value.
-
-The calculation is:
-
-    Net Profit = Sales - Operating Expenses
-
-Net Profit is not a separate transaction or entity.
-
-The system must not require a separate profit table, profit snapshot, or analytics table for Net Profit.
+Important financial reporting rules:
+- Refunds are NOT operating expenses and must not be added to Expenses.
+- Refunds are not subtracted from Total Sales.
+- Payments and Outstanding amounts remain separate reporting metrics.
+- Net Profit is a derived reporting value and not a separate transaction or entity.
+- The system must not require a separate profit table, profit snapshot, or analytics table for Net Profit.
 
 ---
 
@@ -1238,6 +1296,7 @@ Synchronization must support the relevant transactional and master data required
 - OrderItems
 - Customers
 - Payments
+- Refunds
 - Expenses
 - Expense Categories
 - Storage
@@ -1340,7 +1399,7 @@ The following features must not be implemented unless explicitly added to the re
 - Delivery status management
 - Delivery optimization
 - Proof of delivery
-- Refund workflow
+- Automated payment gateway refunds and advanced refund workflows (order-level Refund V1 is in scope)
 - Loyalty program
 - Customer points
 - Multi-branch support
@@ -1353,7 +1412,7 @@ The following features must not be implemented unless explicitly added to the re
 - Storage capacity management
 - Complex notification system
 - Full accounting system
-- Full delivery management system
+- Full delivery management system and dispatch routing (customer address is an optional profile field only)
 - Separate profit management system
 
 ---

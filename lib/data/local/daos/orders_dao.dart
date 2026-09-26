@@ -16,26 +16,43 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     final yearPrefix = (now.year % 100).toString().padLeft(2, '0');
     final pattern = '$yearPrefix-%';
 
-    final query = select(db.orders)
-      ..where((t) => t.orderNumber.like(pattern))
-      ..orderBy([
-        (t) => OrderingTerm.desc(t.orderNumber.length),
-        (t) => OrderingTerm.desc(t.orderNumber),
-      ])
-      ..limit(1);
+    // 1. Query existing order numbers matching the year prefix pattern
+    final query = selectOnly(db.orders)
+      ..addColumns([db.orders.orderNumber])
+      ..where(db.orders.orderNumber.like(pattern));
 
-    final latest = await query.getSingleOrNull();
-    if (latest == null) {
-      return '$yearPrefix-001';
+    final rows = await query.get();
+
+    // 2. Strict canonical numeric regex: ^YY-(\d{3,})$
+    // Suffix contains digits only, with a minimum width of 3 digits and no maximum length.
+    // Suffixes shorter than 3 digits (e.g. 26-12), multi-hyphen, or alphanumeric strings are ignored.
+    final canonicalRegex = RegExp('^${RegExp.escape(yearPrefix)}-(\\d{3,})\$');
+    var maxSeq = 0;
+
+    for (final row in rows) {
+      final orderNum = row.read(db.orders.orderNumber);
+      if (orderNum == null) continue;
+
+      final match = canonicalRegex.firstMatch(orderNum);
+      if (match != null) {
+        final seq = int.tryParse(match.group(1)!);
+        if (seq != null && seq > maxSeq) {
+          maxSeq = seq;
+        }
+      }
     }
 
-    final parts = latest.orderNumber.split('-');
-    if (parts.length == 2) {
-      final currentSeq = int.tryParse(parts[1]) ?? 0;
-      final nextSeq = (currentSeq + 1).toString().padLeft(3, '0');
-      return '$yearPrefix-$nextSeq';
+    // 3. Next sequential candidate (YY-NNN format, min 3 digits with padLeft)
+    var candidateSeq = maxSeq + 1;
+    var candidate = '$yearPrefix-${candidateSeq.toString().padLeft(3, '0')}';
+
+    // 4. Collision safeguard against existing orders
+    while (await getOrderByNumber(candidate) != null) {
+      candidateSeq++;
+      candidate = '$yearPrefix-${candidateSeq.toString().padLeft(3, '0')}';
     }
-    return '$yearPrefix-001';
+
+    return candidate;
   }
 
   Future<void> insertOrder(app_db.OrdersCompanion order) async {
@@ -46,12 +63,16 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     await into(db.orderItems).insert(item);
   }
 
-  Future<void> insertOrderItemCarpet(app_db.OrderItemCarpetsCompanion carpet) async {
+  Future<void> insertOrderItemCarpet(
+    app_db.OrderItemCarpetsCompanion carpet,
+  ) async {
     await into(db.orderItemCarpets).insert(carpet);
   }
 
   Future<void> updateOrder(app_db.OrdersCompanion order) async {
-    await (update(db.orders)..where((t) => t.id.equals(order.id.value))).write(order);
+    await (update(
+      db.orders,
+    )..where((t) => t.id.equals(order.id.value))).write(order);
   }
 
   Future<app_db.Order?> getOrderById(String id) async {
@@ -59,16 +80,19 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
   }
 
   Future<app_db.Order?> getOrderByNumber(String orderNumber) async {
-    return (select(db.orders)..where((t) => t.orderNumber.equals(orderNumber))).getSingleOrNull();
+    return (select(
+      db.orders,
+    )..where((t) => t.orderNumber.equals(orderNumber))).getSingleOrNull();
   }
 
   Future<List<app_db.OrderItem>> getOrderItemsRaw(String orderId) async {
-    return (select(db.orderItems)..where((t) => t.orderId.equals(orderId))).get();
+    return (select(
+      db.orderItems,
+    )..where((t) => t.orderId.equals(orderId))).get();
   }
 
-  Future<List<({app_db.OrderItem item, app_db.OrderItemCarpet? carpet})>> getOrderItemsWithCarpets(
-    String orderId,
-  ) async {
+  Future<List<({app_db.OrderItem item, app_db.OrderItemCarpet? carpet})>>
+  getOrderItemsWithCarpets(String orderId) async {
     final query = select(db.orderItems).join([
       leftOuterJoin(
         db.orderItemCarpets,
@@ -85,9 +109,8 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     }).toList();
   }
 
-  Future<({app_db.OrderItem item, app_db.OrderItemCarpet? carpet})?> getOrderItemWithCarpetById(
-    String id,
-  ) async {
+  Future<({app_db.OrderItem item, app_db.OrderItemCarpet? carpet})?>
+  getOrderItemWithCarpetById(String id) async {
     final query = select(db.orderItems).join([
       leftOuterJoin(
         db.orderItemCarpets,
@@ -108,6 +131,7 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     List<String>? excludedStatuses,
     DateTime? expectedPickupDate,
     bool? isOverdue,
+    DateTime? referenceDate,
     DateTime? createdFrom,
     DateTime? createdTo,
     String? customerId,
@@ -121,7 +145,10 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
 
     if (hasSearchQuery) {
       final selectQuery = select(db.orders).join([
-        innerJoin(db.customers, db.customers.id.equalsExp(db.orders.customerId)),
+        innerJoin(
+          db.customers,
+          db.customers.id.equalsExp(db.orders.customerId),
+        ),
       ]);
 
       final orderNumberQuery = sanitizedQuery.startsWith('#')
@@ -141,18 +168,29 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
         selectQuery.where(db.orders.status.isNotIn(excludedStatuses));
       }
       if (expectedPickupDate != null) {
-        selectQuery.where(db.orders.expectedPickupDate.equals(expectedPickupDate));
+        final targetDateStr =
+            '${expectedPickupDate.year.toString().padLeft(4, '0')}-${expectedPickupDate.month.toString().padLeft(2, '0')}-${expectedPickupDate.day.toString().padLeft(2, '0')}';
+        selectQuery.where(
+          CustomExpression<bool>(
+            "date(orders.expected_pickup_date, 'unixepoch', 'localtime') = '$targetDateStr'",
+          ),
+        );
       }
       if (isOverdue == true) {
-        final now = DateTime.now();
-        final todayDate = DateTime.utc(now.year, now.month, now.day);
+        final ref = referenceDate ?? DateTime.now();
+        final todayStr =
+            '${ref.year.toString().padLeft(4, '0')}-${ref.month.toString().padLeft(2, '0')}-${ref.day.toString().padLeft(2, '0')}';
         selectQuery.where(
-          db.orders.expectedPickupDate.isSmallerThanValue(todayDate) &
+          CustomExpression<bool>(
+                "date(orders.expected_pickup_date, 'unixepoch', 'localtime') < '$todayStr'",
+              ) &
               db.orders.status.isNotIn(const ['completed', 'cancelled']),
         );
       }
       if (createdFrom != null) {
-        selectQuery.where(db.orders.createdAt.isBiggerOrEqualValue(createdFrom));
+        selectQuery.where(
+          db.orders.createdAt.isBiggerOrEqualValue(createdFrom),
+        );
       }
       if (createdTo != null) {
         selectQuery.where(db.orders.createdAt.isSmallerOrEqualValue(createdTo));
@@ -163,13 +201,13 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
       if (hasRemaining == true) {
         selectQuery.where(
           const CustomExpression<bool>(
-            'orders.total > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)',
+            "orders.status != 'cancelled' AND orders.total > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)",
           ),
         );
       } else if (hasRemaining == false) {
         selectQuery.where(
           const CustomExpression<bool>(
-            'orders.total <= (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)',
+            "orders.status = 'cancelled' OR orders.total <= (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)",
           ),
         );
       }
@@ -190,14 +228,25 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
         selectQuery.where((t) => t.status.isNotIn(excludedStatuses));
       }
       if (expectedPickupDate != null) {
-        selectQuery.where((t) => t.expectedPickupDate.equals(expectedPickupDate));
+        final targetDateStr =
+            '${expectedPickupDate.year.toString().padLeft(4, '0')}-${expectedPickupDate.month.toString().padLeft(2, '0')}-${expectedPickupDate.day.toString().padLeft(2, '0')}';
+        selectQuery.where(
+          (t) => CustomExpression<bool>(
+            "date(orders.expected_pickup_date, 'unixepoch', 'localtime') = '$targetDateStr'",
+          ),
+        );
       }
       if (isOverdue == true) {
-        final now = DateTime.now();
-        final todayDate = DateTime.utc(now.year, now.month, now.day);
-        selectQuery.where((t) =>
-            t.expectedPickupDate.isSmallerThanValue(todayDate) &
-            t.status.isNotIn(const ['completed', 'cancelled']));
+        final ref = referenceDate ?? DateTime.now();
+        final todayStr =
+            '${ref.year.toString().padLeft(4, '0')}-${ref.month.toString().padLeft(2, '0')}-${ref.day.toString().padLeft(2, '0')}';
+        selectQuery.where(
+          (t) =>
+              CustomExpression<bool>(
+                "date(orders.expected_pickup_date, 'unixepoch', 'localtime') < '$todayStr'",
+              ) &
+              t.status.isNotIn(const ['completed', 'cancelled']),
+        );
       }
       if (createdFrom != null) {
         selectQuery.where((t) => t.createdAt.isBiggerOrEqualValue(createdFrom));
@@ -211,13 +260,13 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
       if (hasRemaining == true) {
         selectQuery.where(
           (t) => const CustomExpression<bool>(
-            'orders.total > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)',
+            "orders.status != 'cancelled' AND orders.total > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)",
           ),
         );
       } else if (hasRemaining == false) {
         selectQuery.where(
           (t) => const CustomExpression<bool>(
-            'orders.total <= (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)',
+            "orders.status = 'cancelled' OR orders.total <= (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)",
           ),
         );
       }
@@ -246,7 +295,9 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
   }
 
   Stream<app_db.Order?> watchOrderById(String id) {
-    return (select(db.orders)..where((t) => t.id.equals(id))).watchSingleOrNull();
+    return (select(
+      db.orders,
+    )..where((t) => t.id.equals(id))).watchSingleOrNull();
   }
 
   Future<void> updateOrderStatus({
@@ -277,7 +328,9 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     return result ?? 0;
   }
 
-  Future<Map<String, int>> getOrderCountsGroupedByCustomer({List<String>? customerIds}) async {
+  Future<Map<String, int>> getOrderCountsGroupedByCustomer({
+    List<String>? customerIds,
+  }) async {
     if (customerIds != null && customerIds.isEmpty) return {};
     final countExp = db.orders.id.count();
     final query = selectOnly(db.orders)
@@ -294,7 +347,9 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     };
   }
 
-  Future<Map<String, int>> getOrderCountsByCustomerIds(List<String> customerIds) async {
+  Future<Map<String, int>> getOrderCountsByCustomerIds(
+    List<String> customerIds,
+  ) async {
     if (customerIds.isEmpty) return {};
     return getOrderCountsGroupedByCustomer(customerIds: customerIds);
   }
@@ -304,7 +359,9 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     return (select(db.orders)..where((t) => t.id.isIn(orderIds))).get();
   }
 
-  Future<CustomerOrderAggregateQueryResult> getCustomerOrderAggregate(String customerId) async {
+  Future<CustomerOrderAggregateQueryResult> getCustomerOrderAggregate(
+    String customerId,
+  ) async {
     final query = db.customSelect(
       '''
       SELECT 
@@ -315,19 +372,25 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
         COALESCE(SUM(CASE WHEN o.status = 'cancelled' THEN 1 ELSE 0 END), 0) AS cancelled_count,
         COALESCE(SUM(COALESCE(p.paid_amount, 0)), 0) AS total_paid,
         COALESCE(SUM(CASE 
-          WHEN o.total > COALESCE(p.paid_amount, 0) THEN o.total - COALESCE(p.paid_amount, 0) 
+          WHEN o.status != 'cancelled' AND o.total > COALESCE(p.paid_amount, 0) THEN o.total - COALESCE(p.paid_amount, 0) 
           ELSE 0 
-        END), 0) AS total_remaining
+        END), 0) AS total_remaining,
+        COALESCE(SUM(COALESCE(r.refund_amount, 0)), 0) AS total_refunds
       FROM orders o
       LEFT JOIN (
         SELECT order_id, SUM(amount) AS paid_amount
         FROM payments
         GROUP BY order_id
       ) p ON p.order_id = o.id
+      LEFT JOIN (
+        SELECT order_id, SUM(amount) AS refund_amount
+        FROM refunds
+        GROUP BY order_id
+      ) r ON r.order_id = o.id
       WHERE o.customer_id = ?
       ''',
       variables: [Variable.withString(customerId)],
-      readsFrom: {db.orders, db.payments},
+      readsFrom: {db.orders, db.payments, db.refunds},
     );
 
     final row = await query.getSingleOrNull();
@@ -348,6 +411,7 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
       cancelledOrders: row.read<int>('cancelled_count'),
       totalPaidPiastres: row.read<int>('total_paid'),
       totalRemainingPiastres: row.read<int>('total_remaining'),
+      totalRefundsPiastres: row.read<int>('total_refunds'),
     );
   }
 
@@ -356,11 +420,18 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     required DateTime endDate,
     required DateTime overdueCutoff,
   }) async {
+    final startOfToday = DateTime.utc(
+      overdueCutoff.year,
+      overdueCutoff.month,
+      overdueCutoff.day,
+    );
+
     final query = db.customSelect(
       '''
       SELECT 
         COUNT(o.id) AS total_orders,
         COALESCE(SUM(o.total), 0) AS total_order_value,
+        COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN o.total ELSE 0 END), 0) AS total_sales,
         COALESCE(SUM(o.discount), 0) AS total_discounts,
         COALESCE(SUM(CASE WHEN o.status = 'processing' THEN 1 ELSE 0 END), 0) AS processing_count,
         COALESCE(SUM(CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END), 0) AS ready_count,
@@ -375,7 +446,7 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
       WHERE o.created_at >= ? AND o.created_at <= ?
       ''',
       variables: [
-        Variable.withDateTime(overdueCutoff),
+        Variable.withDateTime(startOfToday),
         Variable.withDateTime(startDate),
         Variable.withDateTime(endDate),
       ],
@@ -390,6 +461,7 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     return OrdersReportAggregateQueryResult(
       totalOrders: row.read<int>('total_orders'),
       totalOrderValuePiastres: row.read<int>('total_order_value'),
+      totalSalesPiastres: row.read<int>('total_sales'),
       totalDiscountsPiastres: row.read<int>('total_discounts'),
       processingCount: row.read<int>('processing_count'),
       readyCount: row.read<int>('ready_count'),
@@ -451,7 +523,16 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     required DateTime todayStart,
     required DateTime todayEnd,
     required DateTime todayDate,
+    DateTime? tomorrowDate,
   }) async {
+    final startOfToday = todayDate.isUtc
+        ? DateTime.utc(todayDate.year, todayDate.month, todayDate.day)
+        : DateTime(todayDate.year, todayDate.month, todayDate.day);
+    final startOfNextDay = tomorrowDate ??
+        (todayDate.isUtc
+            ? DateTime.utc(todayDate.year, todayDate.month, todayDate.day + 1)
+            : DateTime(todayDate.year, todayDate.month, todayDate.day + 1));
+
     final query = db.customSelect(
       '''
       SELECT 
@@ -461,7 +542,7 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
         COALESCE(SUM(CASE WHEN o.status != 'cancelled' AND (o.total - COALESCE(p.paid_amount, 0)) > 0 THEN (o.total - COALESCE(p.paid_amount, 0)) ELSE 0 END), 0) AS total_remaining_piastres,
         COALESCE(SUM(CASE WHEN o.status != 'cancelled' AND (o.total - COALESCE(p.paid_amount, 0)) > 0 THEN 1 ELSE 0 END), 0) AS unpaid_orders_count,
         COALESCE(SUM(CASE WHEN o.expected_pickup_date < ? AND o.status != 'completed' AND o.status != 'cancelled' THEN 1 ELSE 0 END), 0) AS overdue_orders_count,
-        COALESCE(SUM(CASE WHEN o.expected_pickup_date = ? AND o.status != 'completed' AND o.status != 'cancelled' THEN 1 ELSE 0 END), 0) AS today_pickup_orders_count
+        COALESCE(SUM(CASE WHEN o.expected_pickup_date >= ? AND o.expected_pickup_date < ? AND o.status != 'completed' AND o.status != 'cancelled' THEN 1 ELSE 0 END), 0) AS today_pickup_orders_count
       FROM orders o
       LEFT JOIN (
         SELECT order_id, SUM(amount) AS paid_amount
@@ -472,8 +553,9 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
       variables: [
         Variable.withDateTime(todayStart),
         Variable.withDateTime(todayEnd),
-        Variable.withDateTime(todayDate),
-        Variable.withDateTime(todayDate),
+        Variable.withDateTime(startOfToday),
+        Variable.withDateTime(startOfToday),
+        Variable.withDateTime(startOfNextDay),
       ],
       readsFrom: {db.orders, db.payments},
     );
@@ -491,6 +573,19 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
       unpaidOrdersCount: row.read<int>('unpaid_orders_count'),
       overdueOrdersCount: row.read<int>('overdue_orders_count'),
       todayPickupOrdersCount: row.read<int>('today_pickup_orders_count'),
+    );
+  }
+
+  Stream<void> watchDashboardUpdates() {
+    final watchedTables = {
+      'orders',
+      'payments',
+      'storage_records',
+      'order_items',
+      'customers',
+    };
+    return db.tableUpdates().where(
+      (updates) => updates.any((u) => watchedTables.contains(u.table)),
     );
   }
 }

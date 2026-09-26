@@ -116,28 +116,42 @@ The current implementation phase includes:
 - Seed data
 - Offline-first local operation
 
-### 4.2 Deferred Implementation Scope
+### 4.2 Completed Sync and Active / Deferred Implementation Scope
 
-The following are intentionally deferred until the local Flutter implementation is complete and the corresponding requirements are approved:
+The **Offline / Sync Integration** phase (Task #15) is **completed and locked** (verified through C1 Remote Sync Foundation, C1.5 Forensic Audit, C1.6 Migration Hardening, C2 Local Pull Foundation, C3 Sync Orchestration, C3.1 Realtime Broadcast, C4-A Release Safety, C4-B Pull/Test Hardening, and C4-C Two-Device Bidirectional Sync E2E).
 
-- Backend implementation
-- Production remote API integration
-- Production synchronization execution
-- Advanced multi-device conflict resolution
-- Real-time synchronization
-- Complex background synchronization
-- Distributed locking
-- CRDTs
-- Event sourcing
-- Advanced caching architecture
-- Authentication implementation unless explicitly required
-- Advanced delivery management
-- Advanced analytics
-- AI assistant
-- Barcode workflows
-- Other future features not approved for V1
+The current active phase is **Task #16 (Full Integration / QA / Hardening)**.
 
-The implementation agent must not begin deferred functionality simply because the architecture is synchronization-ready or because corresponding folders exist.
+The following synchronization architecture is completed and verified:
+
+- **Bidirectional 2-Device Synchronization**: Two independent terminal devices operating against the shared Supabase backend.
+- **Push Pipeline**: Durable local Sync Queue (`sync_operations`), atomic enqueue with business mutation, `SyncEngine` single-flight push, `RemoteApiDispatcher` with `X-Operation-ID`.
+- **Remote Persistence & Change Log**: Supabase Edge Functions proxying to PostgreSQL transactional RPCs with idempotency logging (`sync_idempotency_log`) and append-only `sync_changes` (monotonically increasing `sequence` cursor).
+- **Pull Pipeline & Ingestion**: Cursor-based pull API (`GET /sync/changes?after=<sequence>&limit=<limit>`), local infrastructure `sync_state` (`last_applied_sequence`), and `RemoteChangeApplier` writing directly to DAOs without creating outgoing sync operations (zero echo).
+- **Realtime Signal**: Supabase Realtime wake-up notification adapter (`laundry:sync` / `sync_available`) triggering `SyncEngine.pull()` with single-flight concurrency protection.
+- **Conflict Handling**: Domain-aware conflict handling (no generic LWW). Payments append-oriented and idempotent; Storage enforces at most one active record per `OrderItem` and rejects stale moves via server concurrency checks.
+- **Recovery & Replay Safety**: Detection of `CURSOR_TOO_OLD` (`CursorTooOldException`). Transactional rollback safety on remote apply. Pending local operations in `sync_operations` are strictly protected.
+
+The following remain intentionally deferred:
+
+- Complex distributed merge algorithms & CRDTs.
+- Raw WebSocket / full real-time collaborative document editing (note: Realtime Broadcast wake-up signal adapter is approved & implemented).
+- Full automatic CURSOR_TOO_OLD bootstrap / resync recovery.
+- Flutter client OCC (server_version/base_version) propagation.
+- Automatic background sync operations purge (retention is 90 days, manual maintenance).
+- Multi-tenant / SaaS / multi-branch administration.
+- Complex platform background synchronization (OS-level background execution).
+- Distributed locking.
+- Event sourcing.
+- Advanced caching architecture.
+- Authentication implementation unless explicitly required.
+- Advanced delivery management.
+- Advanced analytics.
+- AI assistant.
+- Barcode workflows.
+- Other future features not approved for V1.
+
+The implementation agent must not implement deferred functionality simply because the architecture is synchronization-ready or because corresponding folders exist.
 
 ---
 
@@ -602,30 +616,35 @@ First launch must not require internet access simply to initialize the local app
 
 ---
 
-## 18. Synchronization Readiness
+## 18. Synchronization Integration
 
-The application is synchronization-ready but synchronization execution is deferred.
+The Offline / Sync Integration phase (Task #15) has completed and is locked.
 
-The database includes the approved synchronization infrastructure.
+The database persists local business mutations and enqueues sync operations atomically.
 
-When local business data requires synchronization, the architecture must support:
+The architecture enforces:
 
 Business Transaction
 ↓
 Local Business Change
-↓
-Sync Operation Creation
++
+Sync Operation Creation (atomic, same transaction)
 ↓
 Commit
 
-The implementation must preserve this future capability without implementing advanced synchronization prematurely.
+Sync Engine processes outgoing operations and incoming pull batches while local operations remain fully functional offline.
+
+The system supports bidirectional 2-device synchronization using a sequence-based cursor and an ephemeral Realtime wake-up signal (proven in C4-C).
 
 Do not implement:
 
-- Real-time synchronization
-- Complex background synchronization
-- Advanced conflict resolution
-- CRDTs
+- Complex distributed merge algorithms & CRDTs
+- Raw WebSocket / full real-time collaborative editing
+- Full automatic CURSOR_TOO_OLD bootstrap resync
+- Flutter client OCC (server_version/base_version) propagation
+- Automatic background sync operations purge
+- Multi-tenant / SaaS / multi-branch administration
+- Complex platform background execution
 - Distributed locking
 
 unless explicitly approved later.
@@ -730,7 +749,7 @@ Includes:
 
 Order Number format:
 
-YY-XXX
+YY-<numeric sequence> (minimum width of 3 digits, no maximum length; e.g. 26-001, 26-999, 26-1000)
 
 ### Customers
 
@@ -1412,7 +1431,7 @@ The V1 implementation is considered ready for final review when:
 - Expenses are implemented as independent financial transactions.
 - Net Profit is derived correctly.
 - Tax is not exposed as an active V1 workflow.
-- Synchronization remains ready but deferred from execution.
+- Offline / Sync Integration connects local operations to Supabase while preserving local-first principles.
 - No known documentation/code contradiction remains.
 
 ---
@@ -1504,7 +1523,7 @@ The following are not V1 implementation targets unless explicitly approved:
 - Roles
 - Permissions
 - Branches
-- Refunds
+- Automated payment gateway refunds and line-item refunds
 - Loyalty
 - Storage capacity
 - Storage movement history
@@ -1514,7 +1533,7 @@ The following are not V1 implementation targets unless explicitly approved:
 - Advanced analytics
 - Predictive analytics
 - Advanced conflict resolution
-- Real-time synchronization
+- Raw WebSocket / full real-time collaborative editing (note: Realtime Broadcast wake-up adapter is implemented)
 
 Future possibilities must not create V1 complexity.
 

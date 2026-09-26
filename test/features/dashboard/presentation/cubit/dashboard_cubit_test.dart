@@ -24,6 +24,12 @@ class FakeDashboardRepository implements DashboardRepository {
     if (shouldThrow) throw Exception('Repository failure');
     return mockData;
   }
+
+  @override
+  Stream<DashboardData> watchDashboardData() async* {
+    if (shouldThrow) throw Exception('Repository failure');
+    yield mockData;
+  }
 }
 
 void main() {
@@ -46,16 +52,22 @@ void main() {
       expect(cubit.state.data, DashboardData.empty);
     });
 
-    test('loadDashboard emits loading and updates state with data on success', () async {
-      await cubit.loadDashboard();
+    test(
+      'loadDashboard emits loading and updates state with data on success',
+      () async {
+        await cubit.loadDashboard();
 
-      expect(cubit.state.isLoading, isFalse);
-      expect(cubit.state.errorMessage, isNull);
-      expect(cubit.state.data.todayOrdersCount, 5);
-      expect(cubit.state.data.processingOrdersCount, 2);
-      expect(cubit.state.data.readyOrdersCount, 3);
-      expect(cubit.state.data.totalRemainingAmount, const Money.fromPiastres(12000));
-    });
+        expect(cubit.state.isLoading, isFalse);
+        expect(cubit.state.errorMessage, isNull);
+        expect(cubit.state.data.todayOrdersCount, 5);
+        expect(cubit.state.data.processingOrdersCount, 2);
+        expect(cubit.state.data.readyOrdersCount, 3);
+        expect(
+          cubit.state.data.totalRemainingAmount,
+          const Money.fromPiastres(12000),
+        );
+      },
+    );
 
     test('loadDashboard sets errorMessage on failure', () async {
       repository.shouldThrow = true;

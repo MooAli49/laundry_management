@@ -75,9 +75,14 @@ class InvoiceSettingsSection extends StatelessWidget {
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(color: Color(0xFFE2E8F0)),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusMd,
+                            ),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
                         ),
                         child: Text(
                           'معاينة الفاتورة',
@@ -91,7 +96,8 @@ class InvoiceSettingsSection extends StatelessWidget {
                   ),
                   AppSpacing.gapMd,
                   const SettingsInfoBanner(
-                    message: 'تُبنى الفاتورة تلقائياً من «بيانات النشاط» (الاسم، الهاتف، العنوان، الشعار، نص التذييل) ومن بيانات الطلب. لتعديل هوية النشاط انتقل إلى قسم «بيانات النشاط».',
+                    message:
+                        'تُبنى الفاتورة تلقائياً من «بيانات النشاط» (الاسم، الهاتف، العنوان، الشعار، نص التذييل) ومن بيانات الطلب. لتعديل هوية النشاط انتقل إلى قسم «بيانات النشاط».',
                   ),
                   AppSpacing.gapMd,
                   Container(
@@ -163,7 +169,10 @@ class InvoiceSettingsSection extends StatelessWidget {
       builder: (ctx) {
         return Dialog(
           backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
           child: Center(
             child: SingleChildScrollView(
               child: Stack(
@@ -180,7 +189,10 @@ class InvoiceSettingsSection extends StatelessWidget {
                     start: 8,
                     child: IconButton(
                       onPressed: () => Navigator.of(ctx).pop(),
-                      icon: const Icon(Icons.close, color: AppColors.textSecondary),
+                      icon: const Icon(
+                        Icons.close,
+                        color: AppColors.textSecondary,
+                      ),
                       tooltip: 'إغلاق',
                     ),
                   ),
@@ -221,18 +233,24 @@ class InvoiceSettingsSection extends StatelessWidget {
           Text(
             businessName,
             textAlign: TextAlign.center,
-            style: AppTextStyles.titleLarge.copyWith(fontWeight: FontWeight.w800),
+            style: AppTextStyles.titleLarge.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             phone,
             textAlign: TextAlign.center,
-            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
           Text(
             address,
             textAlign: TextAlign.center,
-            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 12),
           _buildDashedLine(),
@@ -240,7 +258,9 @@ class InvoiceSettingsSection extends StatelessWidget {
           Text(
             'فاتورة استلام طلب (نموذج 80 مم)',
             textAlign: TextAlign.center,
-            style: AppTextStyles.labelMedium.copyWith(fontWeight: FontWeight.w700),
+            style: AppTextStyles.labelMedium.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 10),
           _buildReceiptRow('رقم الطلب', 'ORD-2026-001'),
@@ -284,13 +304,17 @@ class InvoiceSettingsSection extends StatelessWidget {
             label,
             style: isBold
                 ? AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)
-                : AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                : AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
           ),
           Text(
             value,
             style: isBold
                 ? AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)
-                : AppTextStyles.bodySmall.copyWith(color: AppColors.textPrimary),
+                : AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
           ),
         ],
       ),
@@ -323,4 +347,3 @@ class _ReceiptDashedLinePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-

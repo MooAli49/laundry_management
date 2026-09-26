@@ -15,8 +15,10 @@ class CustomerFormDialog extends StatefulWidget {
   final Future<void> Function({
     required String name,
     required String phone,
+    String? address,
     String? notes,
-  }) onSave;
+  })
+  onSave;
   final Future<Customer?> Function(String phone)? onFindDuplicate;
   final void Function(Customer existingCustomer)? onViewExisting;
 
@@ -35,6 +37,7 @@ class CustomerFormDialog extends StatefulWidget {
 class _CustomerFormDialogState extends State<CustomerFormDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
+  late final TextEditingController _addressController;
   late final TextEditingController _notesController;
 
   bool _isLoading = false;
@@ -47,14 +50,22 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.customer?.name ?? '');
-    _phoneController = TextEditingController(text: widget.customer?.phone ?? '');
-    _notesController = TextEditingController(text: widget.customer?.notes ?? '');
+    _phoneController = TextEditingController(
+      text: widget.customer?.phone ?? '',
+    );
+    _addressController = TextEditingController(
+      text: widget.customer?.address ?? '',
+    );
+    _notesController = TextEditingController(
+      text: widget.customer?.notes ?? '',
+    );
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _addressController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -92,10 +103,14 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
       _duplicateCustomer = null;
     });
 
+    final rawAddress = _addressController.text.trim();
+    final address = rawAddress.isNotEmpty ? rawAddress : null;
+
     try {
       await widget.onSave(
         name: name,
         phone: phone,
+        address: address,
         notes: _notesController.text.trim().isNotEmpty
             ? _notesController.text.trim()
             : null,
@@ -153,7 +168,9 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    _isEditing ? AppStrings.editCustomerTitle : AppStrings.addCustomerTitle,
+                    _isEditing
+                        ? AppStrings.editCustomerTitle
+                        : AppStrings.addCustomerTitle,
                     style: AppTextStyles.titleLarge,
                   ),
                   IconButton(
@@ -176,7 +193,10 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.error_outline, color: AppColors.error),
+                          const Icon(
+                            Icons.error_outline,
+                            color: AppColors.error,
+                          ),
                           AppSpacing.gapHorizontalSm,
                           Expanded(
                             child: Text(
@@ -188,7 +208,8 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
                           ),
                         ],
                       ),
-                      if (_duplicateCustomer != null && widget.onViewExisting != null) ...[
+                      if (_duplicateCustomer != null &&
+                          widget.onViewExisting != null) ...[
                         AppSpacing.gapSm,
                         Align(
                           alignment: AlignmentDirectional.centerEnd,
@@ -198,7 +219,10 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
                               Navigator.of(context).pop();
                               widget.onViewExisting!(existing);
                             },
-                            icon: const Icon(Icons.visibility_outlined, size: 16),
+                            icon: const Icon(
+                              Icons.visibility_outlined,
+                              size: 16,
+                            ),
                             label: const Text(AppStrings.viewCustomer),
                             style: TextButton.styleFrom(
                               foregroundColor: AppColors.primary,
@@ -228,6 +252,14 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
               AppSpacing.gapMd,
 
               AppTextField(
+                controller: _addressController,
+                label: AppStrings.customerAddressLabel,
+                hintText: AppStrings.customerAddressHint,
+                maxLines: 2,
+              ),
+              AppSpacing.gapMd,
+
+              AppTextField(
                 controller: _notesController,
                 label: AppStrings.notesLabel,
                 hintText: AppStrings.customerNotesHint,
@@ -241,11 +273,15 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
                   AppButton(
                     label: AppStrings.cancel,
                     variant: AppButtonVariant.secondary,
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isLoading
+                        ? null
+                        : () => Navigator.of(context).pop(),
                   ),
                   AppSpacing.gapHorizontalMd,
                   AppButton(
-                    label: _isEditing ? AppStrings.saveChanges : AppStrings.saveCustomer,
+                    label: _isEditing
+                        ? AppStrings.saveChanges
+                        : AppStrings.saveCustomer,
                     isLoading: _isLoading,
                     onPressed: _handleSave,
                   ),

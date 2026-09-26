@@ -67,12 +67,7 @@ class DeactivationConfirmDialog extends StatelessWidget {
                     ),
                   ),
                   AppSpacing.gapHorizontalMd,
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: AppTextStyles.titleLarge,
-                    ),
-                  ),
+                  Expanded(child: Text(title, style: AppTextStyles.titleLarge)),
                 ],
               ),
               AppSpacing.gapLg,

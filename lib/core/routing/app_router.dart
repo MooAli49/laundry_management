@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:laundry_management/core/routing/app_routes.dart';
-import 'package:laundry_management/core/widgets/app_shell.dart';
-import 'package:laundry_management/features/customers/presentation/screens/customer_detail_screen.dart';
-import 'package:laundry_management/features/customers/presentation/screens/customers_screen.dart';
-import 'package:laundry_management/features/dashboard/presentation/screens/dashboard_screen.dart';
-import 'package:laundry_management/features/orders/presentation/screens/create_order_screen.dart';
-import 'package:laundry_management/features/orders/presentation/screens/order_detail_screen.dart';
-import 'package:laundry_management/features/orders/presentation/screens/orders_screen.dart';
-import 'package:laundry_management/features/reports/presentation/screens/reports_screen.dart';
-import 'package:laundry_management/features/settings/presentation/screens/settings_screen.dart';
-import 'package:laundry_management/features/storage/presentation/screens/storage_screen.dart';
+
+import '../../features/customers/presentation/screens/customer_detail_screen.dart';
+import '../../features/customers/presentation/screens/customers_screen.dart';
+import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
+import '../../features/orders/presentation/screens/create_order_screen.dart';
+import '../../features/orders/presentation/screens/edit_order_screen.dart';
+import '../../features/orders/presentation/screens/order_detail_screen.dart';
+import '../../features/orders/presentation/screens/orders_screen.dart';
+import '../../features/reports/presentation/screens/reports_screen.dart';
+import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/storage/presentation/screens/storage_screen.dart';
+import '../widgets/app_shell.dart';
+import 'app_routes.dart';
 
 class AppRouter {
   AppRouter._();
@@ -45,6 +47,13 @@ class AppRouter {
             builder: (context, state) => CreateOrderScreen(
               initialCustomerId: state.uri.queryParameters['customerId'],
             ),
+          ),
+          GoRoute(
+            path: AppRoutes.ordersEdit,
+            builder: (context, state) {
+              final id = state.pathParameters['id'] ?? '';
+              return EditOrderScreen(orderId: id);
+            },
           ),
           GoRoute(
             path: AppRoutes.ordersDetail,

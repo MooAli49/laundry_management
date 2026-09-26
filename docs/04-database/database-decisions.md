@@ -1437,7 +1437,7 @@ Avoid creating tables for:
 - Employee management
 - Permissions
 - Loyalty
-- Refunds
+- Payment gateway refunds and item-level refunds
 - AI
 - Advanced inventory
 - Processing stages
@@ -1446,6 +1446,7 @@ Approved V1 additions are:
 
     Expenses
     Expense Categories
+    Refunds (order-level for cancelled orders)
     Net Profit as a derived financial metric
     Independent Delivery directions
     Item Type-aware Storage relationships
@@ -1463,7 +1464,7 @@ The following are explicitly outside the database scope:
     Roles
     Permissions
     Multiple Branches
-    Refund Workflow
+    Payment Gateway Refund Integration and Item-Level Refunds
     Loyalty Program
     AI Assistant
     Advanced Inventory

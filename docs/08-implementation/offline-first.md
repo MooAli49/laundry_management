@@ -4,13 +4,19 @@
 
 This document defines the mandatory Offline-First behavior for the V1 Laundry Management System.
 
-The purpose is to ensure that the application remains fully usable for its approved local workflows without requiring an Internet connection, while keeping the architecture ready for the future Backend and Synchronization phase.
+The purpose is to ensure that the application remains fully usable for its approved local workflows without requiring an Internet connection, both during normal operation and while the Offline / Sync Integration infrastructure is being implemented.
 
 V1 is Local-First.
 
-Backend integration and synchronization are intentionally deferred.
+Local-First is a permanent architectural principle.
 
-This document defines the current implementation boundary and prevents premature introduction of remote infrastructure.
+The project is now entering the **Offline / Sync Integration** implementation phase.
+
+Synchronization infrastructure may now be implemented according to the approved decisions documented in `synchronization-implementation.md` and `docs/03-architecture/technical-decisions.md`.
+
+The Local-First constraint remains fully in force.
+
+This document defines the boundary between Local-First requirements (which must not change) and the synchronization layer (which is now the active implementation target).
 
 ---
 
@@ -54,11 +60,11 @@ Offline-First means:
 - Local data is immediately available.
 - Local writes do not require network access.
 - The architecture does not depend on a remote server for normal operation.
-- Future synchronization can be added later.
+- Synchronization happens asynchronously after the local operation.
 
 It does not mean that the final product will permanently operate without a backend.
 
-Backend and synchronization are intentionally deferred to a later implementation phase.
+Synchronization is now being implemented in the **Offline / Sync Integration** phase.
 
 ---
 
@@ -182,6 +188,8 @@ Repository Implementation
 Local Data Source
 ↓
 Database Transaction
+├── Persist business entity
+└── Enqueue sync operation (atomic, same transaction)
 ↓
 Success / Failure
 ↓
@@ -191,7 +199,11 @@ UI
 
 The write is considered successful when the approved local persistence operation succeeds.
 
-A future remote synchronization step is not part of V1 completion.
+The UI must not wait for remote acknowledgment before reflecting a successful local write.
+
+For synchronizable mutations, the local business change and its corresponding sync operation must be created atomically in the same database transaction.
+
+Synchronization then occurs asynchronously outside the write path.
 
 ---
 
@@ -988,11 +1000,11 @@ without needing to know whether data is local or remote.
 
 ---
 
-## 50. Future Synchronization Boundary
+## 50. Synchronization Boundary
 
-Future synchronization should remain outside Feature Presentation.
+Synchronization must remain outside Feature Presentation.
 
-Future architecture may conceptually become:
+The approved architecture is:
 
 Cubit
 ↓
@@ -1000,11 +1012,17 @@ Repository
 ↓
 Local Data
 +
-Remote Data
+Sync Queue
 ↓
-Synchronization Infrastructure
+Sync Engine
+↓
+Remote Data Source
+↓
+Supabase / Backend
 
-The current implementation must not build this infrastructure prematurely.
+The Sync Engine and its supporting infrastructure belong to the Data / Infrastructure layer.
+
+Cubits and Widgets must remain unaware of synchronization mechanics.
 
 ---
 
@@ -1020,11 +1038,13 @@ uploadPendingOrders()
 
 downloadUpdates()
 
-to feature Cubits during V1.
+to feature Cubits.
 
 Synchronization is infrastructure.
 
 It is not a feature-level UI responsibility.
+
+This constraint applies both during and after the Offline / Sync Integration phase.
 
 ---
 
@@ -1036,10 +1056,11 @@ Do not add:
 
 - Connectivity listeners for business persistence.
 - Upload buttons for normal V1 operations.
-- Retry-sync UI.
+- Retry-sync queue management.
 - Remote refresh requirements.
+- Conflict resolution controls.
 
-unless explicitly introduced by the future synchronization phase.
+Optional user-facing sync status indicators (e.g., a small sync status badge) are permitted only if they are purely presentational and driven by data exposed through the approved repository/application boundary, not by direct Sync Engine calls inside widgets.
 
 ---
 
@@ -1065,35 +1086,35 @@ Synchronization state is separate from business lifecycle.
 
 ---
 
-## 54. No Premature Sync Queue
+## 54. Sync Queue Implementation
 
-Do not create:
+The Sync Queue is part of the Offline / Sync Integration phase and must be implemented according to the approved design in `synchronization-implementation.md`.
 
-SyncQueue
+The Sync Queue must:
 
-PendingUpload
+- Be durable (persisted to the local database).
+- Have stable operation IDs.
+- Be enqueued atomically with the corresponding local business mutation.
+- Survive application restart.
+- Support idempotent processing.
 
-SyncOperation
-
-SyncConflict
-
-or similar entities during the current V1 local implementation unless explicitly requested as part of the synchronization phase.
+Do not implement the Sync Queue in a way that contradicts these requirements.
 
 ---
 
-## 55. No Premature Conflict Resolution
+## 55. Conflict Resolution Constraint
 
 Do not implement:
 
-- Last-write-wins.
-- Server-wins.
-- Client-wins.
-- Merge rules.
-- Conflict UI.
+- Generic last-write-wins as a universal strategy.
+- Automatic conflict resolution without an approved entity-specific strategy.
+- Conflict UI without explicit design approval.
 
-during the local-only phase.
+Conflict resolution must be deterministic and entity-specific.
 
-Those decisions belong to the future synchronization architecture.
+Financial records (Payments, Expenses) require special protection and must never be silently overwritten, duplicated, or lost.
+
+Refer to `synchronization-implementation.md` section 53 for the approved conflict resolution constraints.
 
 ---
 
@@ -1491,17 +1512,31 @@ These are explicitly outside the current V1 implementation.
 
 The coding agent must treat this document as a hard boundary.
 
-During the current V1 implementation, the agent must not:
+During the Offline / Sync Integration phase, the agent:
 
-- Add API calls.
-- Add Dio usage.
-- Add Retrofit usage.
-- Add sync queues.
-- Add remote repositories.
-- Add connectivity requirements.
-- Add sync states to business entities.
+**Must:**
+
+- Keep all local workflows operational without requiring network access.
+- Enqueue sync operations atomically with their corresponding local mutations.
+- Implement the Sync Engine, Sync Queue, and Remote Data Sources in the Data / Infrastructure layer only.
+- Use the approved Supabase remote backend behind the Remote Data Source boundary.
+- Preserve stable UUIDs across local and remote storage.
+- Preserve stable operation IDs across retries.
+- Implement idempotent remote operations.
+- Distinguish retryable from permanent failures.
+- Respect dependency-aware synchronization ordering.
+- Protect financial records from silent loss, duplication, or overwrite.
+
+**Must not:**
+
+- Make local business operations wait for remote acknowledgment.
+- Add sync states to business entities (PendingSync, Syncing, SyncFailed, etc.).
+- Put sync engine logic inside Cubits or Widgets.
 - Add remote startup dependencies.
 - Disable local workflows when offline.
+- Create a new entity UUID during a retry.
+- Implement generic last-write-wins without entity-specific approval.
+- Introduce multi-tenant, branch, role, or permission functionality.
 
 ---
 
@@ -1605,24 +1640,25 @@ The same Domain rules apply regardless of connectivity.
 
 ---
 
-## 88. Offline Completion Criteria
+## 88. Offline-First Completion Criteria
 
-The Offline-First implementation is complete when:
+The Offline-First requirements remain complete and in force when:
 
-- Core V1 workflows work without network.
-- Local database is the operational source.
+- Core V1 workflows work without network access.
+- Local database is the operational source of truth.
 - Repository boundaries are preserved.
 - Cubits do not access database infrastructure directly.
-- Local writes are persisted.
+- Local writes are persisted and immediately reflected in the UI.
 - Critical multi-record operations are transactional.
-- Local business validation works.
+- Synchronizable local mutations atomically enqueue their corresponding sync operations.
+- Local business validation works without network.
 - Historical data remains protected.
 - Dashboard works from local data.
 - Reports work from local data.
 - Application startup does not depend on network.
-- No premature synchronization exists.
-- No feature contains direct network access.
-- Future backend integration can be added behind the Repository boundary.
+- No feature contains direct network access outside the approved Remote Data Source boundary.
+- Sync Engine logic does not appear in Cubits or Widgets.
+- Business entity statuses do not contain sync lifecycle states.
 
 ---
 
@@ -1671,25 +1707,27 @@ It must remain outside Presentation.
 
 ## 90. Final Principles
 
-The V1 Offline-First implementation follows these principles:
+The Offline-First implementation follows these permanent principles:
 
-1. Local data is the operational source of truth for V1.
+1. Local data is the operational source of truth for the Flutter client.
 2. Core business workflows must work without Internet access.
 3. The local database provides durable persistence.
 4. Cubit state is not persistent business storage.
 5. Repositories remain the boundary between Features and Data.
 6. Database transactions protect multi-record operations.
-7. Business validation works locally.
+7. Business validation works locally without network access.
 8. Historical transaction data remains stable.
 9. Offline mode does not create alternate business rules.
 10. Connectivity must not block normal local operations.
 11. Startup must not depend on a backend.
-12. Remote APIs are deferred.
-13. Synchronization is deferred.
+12. Synchronization happens asynchronously after local persistence succeeds.
+13. Synchronizable mutations must atomically persist the local change and enqueue the sync operation.
 14. Sync state must remain separate from business state.
 15. No fake synchronization is allowed.
 16. No speculative networking is allowed.
-17. Future backend integration must happen behind existing boundaries.
-18. The Feature layer should not need to know whether data is local or remote.
-19. V1 should remain simple, reliable, and locally consistent.
-20. Correct local behavior takes priority over premature distributed-system complexity. 
+17. Synchronization infrastructure must remain behind existing Data / Repository boundaries.
+18. The Feature layer must not know whether data is local or remote.
+19. The system must remain simple, reliable, and locally consistent.
+20. Correct local behavior takes priority over premature distributed-system complexity.
+21. Supabase is the approved remote backend platform; it must remain behind the Remote Data Source boundary.
+22. SaaS / multi-tenant readiness is an architectural goal only; tenant, branch, role, and permission features are not part of the current implementation.

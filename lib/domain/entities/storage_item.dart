@@ -75,17 +75,17 @@ class StorageItem {
 
   @override
   int get hashCode => Object.hash(
-        orderItem,
-        orderId,
-        orderNumber,
-        customerName,
-        customerPhone,
-        orderStatus,
-        expectedPickupDate,
-        orderCreatedAt,
-        activeRecord,
-        storageLocation,
-      );
+    orderItem,
+    orderId,
+    orderNumber,
+    customerName,
+    customerPhone,
+    orderStatus,
+    expectedPickupDate,
+    orderCreatedAt,
+    activeRecord,
+    storageLocation,
+  );
 
   @override
   String toString() =>

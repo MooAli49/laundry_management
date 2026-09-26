@@ -32,8 +32,9 @@ class SettingsState {
       settings: settings ?? this.settings,
       isLoading: isLoading ?? this.isLoading,
       isSaving: isSaving ?? this.isSaving,
-      errorMessage:
-          clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
       saveSuccessMessage: clearSuccessMessage
           ? null
           : (saveSuccessMessage ?? this.saveSuccessMessage),

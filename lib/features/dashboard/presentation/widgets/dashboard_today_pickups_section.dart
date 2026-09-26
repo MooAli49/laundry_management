@@ -39,10 +39,7 @@ class DashboardTodayPickupsSection extends StatelessWidget {
                   size: 22,
                 ),
                 AppSpacing.gapHorizontalSm,
-                Text(
-                  'استلام اليوم',
-                  style: AppTextStyles.titleLarge,
-                ),
+                Text('استلام اليوم', style: AppTextStyles.titleLarge),
               ],
             ),
             if (orders.isNotEmpty)
@@ -59,10 +56,15 @@ class DashboardTodayPickupsSection extends StatelessWidget {
                   if (hasMore) ...[
                     AppSpacing.gapHorizontalSm,
                     InkWell(
-                      onTap: () => context.push('${AppRoutes.orders}?filter=todayPickup'),
+                      onTap: () => context.push(
+                        '${AppRoutes.orders}?filter=todayPickup',
+                      ),
                       borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 2,
+                        ),
                         child: Text(
                           'عرض الكل',
                           style: AppTextStyles.bodySmall.copyWith(
@@ -112,7 +114,8 @@ class DashboardTodayPickupsSection extends StatelessWidget {
 
               return AppCard(
                 key: ValueKey('today_pickup_order_${item.order.id}'),
-                onTap: () => context.push(AppRoutes.orderDetailPath(item.order.id)),
+                onTap: () =>
+                    context.push(AppRoutes.orderDetailPath(item.order.id)),
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.md,
                   vertical: AppSpacing.md,
@@ -120,13 +123,19 @@ class DashboardTodayPickupsSection extends StatelessWidget {
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.backgroundSecondary,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusSm,
+                        ),
                       ),
                       child: Text(
                         displayNumber,
+                        textDirection: TextDirection.ltr,
                         style: AppTextStyles.labelMedium.copyWith(
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,

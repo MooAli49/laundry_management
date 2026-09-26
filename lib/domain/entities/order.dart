@@ -74,7 +74,8 @@ class Order {
       throw ArgumentError('total cannot be negative');
     }
 
-    final calculatedTotal = subtotal - discount + customerPickupFee + customerDeliveryFee + tax;
+    final calculatedTotal =
+        subtotal - discount + customerPickupFee + customerDeliveryFee + tax;
     if (total != calculatedTotal) {
       throw ArgumentError(
         'Order total ($total) does not equal subtotal ($subtotal) - discount ($discount) + '
@@ -91,7 +92,9 @@ class Order {
         throw ArgumentError('Cancelled order must have cancelledAt set');
       }
       if (cancellationReason == null || cancellationReason!.trim().isEmpty) {
-        throw ArgumentError('Cancelled order must have a non-empty cancellationReason');
+        throw ArgumentError(
+          'Cancelled order must have a non-empty cancellationReason',
+        );
       }
     }
   }
@@ -132,8 +135,7 @@ class Order {
       id: id ?? this.id,
       orderNumber: orderNumber ?? this.orderNumber,
       customerId: customerId ?? this.customerId,
-      customerNameSnapshot:
-          customerNameSnapshot ?? this.customerNameSnapshot,
+      customerNameSnapshot: customerNameSnapshot ?? this.customerNameSnapshot,
       customerPhoneSnapshot:
           customerPhoneSnapshot ?? this.customerPhoneSnapshot,
       status: status ?? this.status,
@@ -186,27 +188,27 @@ class Order {
 
   @override
   int get hashCode => Object.hashAll([
-        id,
-        orderNumber,
-        customerId,
-        customerNameSnapshot,
-        customerPhoneSnapshot,
-        status,
-        expectedPickupDate,
-        customerPickupRequested,
-        customerPickupFee,
-        customerDeliveryRequested,
-        customerDeliveryFee,
-        subtotal,
-        discount,
-        tax,
-        total,
-        completedAt,
-        cancelledAt,
-        cancellationReason,
-        createdAt,
-        updatedAt,
-      ]);
+    id,
+    orderNumber,
+    customerId,
+    customerNameSnapshot,
+    customerPhoneSnapshot,
+    status,
+    expectedPickupDate,
+    customerPickupRequested,
+    customerPickupFee,
+    customerDeliveryRequested,
+    customerDeliveryFee,
+    subtotal,
+    discount,
+    tax,
+    total,
+    completedAt,
+    cancelledAt,
+    cancellationReason,
+    createdAt,
+    updatedAt,
+  ]);
 
   @override
   String toString() =>

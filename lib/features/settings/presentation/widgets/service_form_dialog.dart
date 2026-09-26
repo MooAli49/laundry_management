@@ -74,15 +74,18 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
     super.initState();
     final svc = widget.service;
     _nameController = TextEditingController(text: svc?.name ?? '');
-    _descriptionController = TextEditingController(text: svc?.description ?? '');
-    _selectedPricingType = (svc != null && _v1PricingTypes.contains(svc.pricingType))
+    _descriptionController = TextEditingController(
+      text: svc?.description ?? '',
+    );
+    _selectedPricingType =
+        (svc != null && _v1PricingTypes.contains(svc.pricingType))
         ? svc.pricingType
         : PricingType.perPiece;
 
     final initialPriceText = svc != null
         ? (svc.price.toEgp == svc.price.toEgp.roundToDouble()
-            ? svc.price.toEgp.toInt().toString()
-            : svc.price.toEgp.toStringAsFixed(2))
+              ? svc.price.toEgp.toInt().toString()
+              : svc.price.toEgp.toStringAsFixed(2))
         : '';
     _priceController = TextEditingController(text: initialPriceText);
     _originalPrice = svc?.price;
@@ -104,7 +107,8 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
   void _onPriceChanged() {
     if (widget.service == null) return;
     final parsed = Money.tryParseEgp(_priceController.text);
-    final changed = parsed != null && _originalPrice != null && parsed != _originalPrice;
+    final changed =
+        parsed != null && _originalPrice != null && parsed != _originalPrice;
     if (changed != _priceChanged) {
       setState(() {
         _priceChanged = changed;
@@ -120,8 +124,6 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
         return AppStrings.priceLabelPerSquareMeter;
       case PricingType.fixedPrice:
         return AppStrings.priceLabelFixedPrice;
-      default:
-        return AppStrings.servicePriceLabel;
     }
   }
 
@@ -133,8 +135,6 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
         return AppStrings.pricingPerSquareMeter;
       case PricingType.fixedPrice:
         return AppStrings.pricingFixedPrice;
-      case PricingType.perKilogram:
-        return '';
     }
   }
 
@@ -196,7 +196,7 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
       backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480, maxHeight: 720),
+        constraints: const BoxConstraints(maxWidth: 400),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.xl),
           child: Form(
@@ -213,7 +213,7 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                   ),
                 ),
                 AppSpacing.gapLg,
-                Expanded(
+                Flexible(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
                     child: Column(
@@ -224,7 +224,9 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                             padding: const EdgeInsets.all(AppSpacing.md),
                             decoration: BoxDecoration(
                               color: AppColors.errorLight,
-                              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusMd,
+                              ),
                               border: Border.all(
                                 color: AppColors.error.withValues(alpha: 0.3),
                               ),
@@ -296,12 +298,14 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                                 color: isSelected
                                     ? AppColors.primaryDark
                                     : AppColors.textPrimary,
-                                fontWeight:
-                                    isSelected ? FontWeight.bold : FontWeight.normal,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
                               shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(AppSpacing.radiusMd),
+                                borderRadius: BorderRadius.circular(
+                                  AppSpacing.radiusMd,
+                                ),
                                 side: BorderSide(
                                   color: isSelected
                                       ? AppColors.primary
@@ -317,8 +321,9 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                           controller: _priceController,
                           label: '${_getPriceLabel()} (ج.م) *',
                           hintText: '0.00',
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
                               return AppStrings.servicePriceRequired;
@@ -358,7 +363,9 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                             spacing: AppSpacing.sm,
                             runSpacing: AppSpacing.sm,
                             children: widget.availableItemTypes.map((type) {
-                              final isSelected = _selectedTypeIds.contains(type.id);
+                              final isSelected = _selectedTypeIds.contains(
+                                type.id,
+                              );
                               return FilterChip(
                                 label: Text(type.name),
                                 selected: isSelected,
@@ -382,8 +389,9 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                                       : FontWeight.normal,
                                 ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppSpacing.radiusMd),
+                                  borderRadius: BorderRadius.circular(
+                                    AppSpacing.radiusMd,
+                                  ),
                                   side: BorderSide(
                                     color: isSelected
                                         ? AppColors.primary
@@ -403,10 +411,7 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    AppButton(
-                      label: AppStrings.save,
-                      onPressed: _handleSubmit,
-                    ),
+                    AppButton(label: AppStrings.save, onPressed: _handleSubmit),
                     AppSpacing.gapHorizontalMd,
                     AppButton(
                       label: AppStrings.cancel,

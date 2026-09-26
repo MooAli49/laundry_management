@@ -43,10 +43,12 @@ class SettingsScreen extends StatelessWidget {
           create: (_) => getIt<CarpetSizesManagementCubit>()..loadCarpetSizes(),
         ),
         BlocProvider<StorageLocationsManagementCubit>(
-          create: (_) => getIt<StorageLocationsManagementCubit>()..loadLocations(),
+          create: (_) =>
+              getIt<StorageLocationsManagementCubit>()..loadLocations(),
         ),
         BlocProvider<ExpenseCategoriesManagementCubit>(
-          create: (_) => getIt<ExpenseCategoriesManagementCubit>()..loadCategories(),
+          create: (_) =>
+              getIt<ExpenseCategoriesManagementCubit>()..loadCategories(),
         ),
       ],
       child: const _SettingsScreenContent(),
@@ -77,7 +79,8 @@ class _SettingsScreenContent extends StatelessWidget {
                 subtitle: AppStrings.settingsSubtitle,
               ),
               BlocBuilder<SettingsCubit, SettingsState>(
-                buildWhen: (prev, curr) => prev.selectedTabIndex != curr.selectedTabIndex,
+                buildWhen: (prev, curr) =>
+                    prev.selectedTabIndex != curr.selectedTabIndex,
                 builder: (context, state) {
                   return SettingsTabBar(
                     selectedIndex: state.selectedTabIndex,
@@ -90,7 +93,8 @@ class _SettingsScreenContent extends StatelessWidget {
               AppSpacing.gapLg,
               Expanded(
                 child: BlocBuilder<SettingsCubit, SettingsState>(
-                  buildWhen: (prev, curr) => prev.selectedTabIndex != curr.selectedTabIndex,
+                  buildWhen: (prev, curr) =>
+                      prev.selectedTabIndex != curr.selectedTabIndex,
                   builder: (context, state) {
                     return SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),

@@ -43,19 +43,25 @@ class _DashboardView extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => CustomerFormDialog(
-        onSave: ({required name, required phone, notes}) async {
+        onSave: ({required name, required phone, address, notes}) async {
           await cubit.createCustomer(
             name: name,
             phone: phone,
+            address: address,
             notes: notes,
           );
           if (context.mounted) {
+            context.read<DashboardCubit>().refresh();
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('تمت إضافة العميل بنجاح')),
             );
           }
         },
         onFindDuplicate: cubit.getCustomerByPhone,
+        onViewExisting: (existingCustomer) {
+          Navigator.of(ctx).pop();
+          context.push(AppRoutes.customerDetailPath(existingCustomer.id));
+        },
       ),
     );
   }
@@ -122,7 +128,12 @@ class _DashboardView extends StatelessWidget {
                   label: 'إضافة طلب',
                   icon: Icons.add,
                   variant: AppButtonVariant.primary,
-                  onPressed: () => context.push(AppRoutes.ordersNew),
+                  onPressed: () async {
+                    await context.push(AppRoutes.ordersNew);
+                    if (context.mounted) {
+                      context.read<DashboardCubit>().refresh();
+                    }
+                  },
                 ),
                 AppButton(
                   key: const ValueKey('dashboard_add_customer_button'),
@@ -151,22 +162,31 @@ class _DashboardView extends StatelessWidget {
 
             BlocBuilder<DashboardCubit, DashboardState>(
               builder: (context, state) {
-                if (state.isLoading && state.data.todayOrdersCount == 0 && state.data.recentOrders.isEmpty) {
+                if (state.isLoading &&
+                    state.data.todayOrdersCount == 0 &&
+                    state.data.recentOrders.isEmpty) {
                   return const Padding(
                     padding: EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
                     child: Center(
-                      child: LoadingIndicator(message: 'جاري تحميل بيانات الرئيسية...'),
+                      child: LoadingIndicator(
+                        message: 'جاري تحميل بيانات الرئيسية...',
+                      ),
                     ),
                   );
                 }
 
-                if (state.errorMessage != null && state.data.todayOrdersCount == 0 && state.data.recentOrders.isEmpty) {
+                if (state.errorMessage != null &&
+                    state.data.todayOrdersCount == 0 &&
+                    state.data.recentOrders.isEmpty) {
                   return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.xxxl,
+                    ),
                     child: AppErrorState(
                       title: 'تعذر تحميل بيانات الرئيسية',
                       message: state.errorMessage!,
-                      onRetry: () => context.read<DashboardCubit>().loadDashboard(),
+                      onRetry: () =>
+                          context.read<DashboardCubit>().loadDashboard(),
                     ),
                   );
                 }
@@ -188,8 +208,8 @@ class _DashboardView extends StatelessWidget {
                         final cardWidth = isSmall
                             ? constraints.maxWidth
                             : isMedium
-                                ? (constraints.maxWidth - AppSpacing.md) / 2
-                                : (constraints.maxWidth - (AppSpacing.md * 3)) / 4;
+                            ? (constraints.maxWidth - AppSpacing.md) / 2
+                            : (constraints.maxWidth - (AppSpacing.md * 3)) / 4;
 
                         return Wrap(
                           spacing: AppSpacing.md,
@@ -202,7 +222,9 @@ class _DashboardView extends StatelessWidget {
                                 value: '${data.todayOrdersCount}',
                                 icon: Icons.receipt_long_outlined,
                                 subtitle: 'إجمالي الطلبات المستلمة اليوم',
-                                onTap: () => context.push('${AppRoutes.orders}?filter=today'),
+                                onTap: () => context.push(
+                                  '${AppRoutes.orders}?filter=today',
+                                ),
                               ),
                             ),
                             SizedBox(
@@ -214,7 +236,9 @@ class _DashboardView extends StatelessWidget {
                                 iconColor: AppColors.info,
                                 iconBackground: AppColors.infoLight,
                                 subtitle: 'طلبات جاري العمل عليها',
-                                onTap: () => context.push('${AppRoutes.orders}?filter=processing'),
+                                onTap: () => context.push(
+                                  '${AppRoutes.orders}?filter=processing',
+                                ),
                               ),
                             ),
                             SizedBox(
@@ -226,26 +250,32 @@ class _DashboardView extends StatelessWidget {
                                 iconColor: AppColors.warning,
                                 iconBackground: AppColors.warningLight,
                                 subtitle: 'طلبات جاهزة لتسليم العملاء',
-                                onTap: () => context.push('${AppRoutes.orders}?filter=ready'),
+                                onTap: () => context.push(
+                                  '${AppRoutes.orders}?filter=ready',
+                                ),
                               ),
                             ),
                             SizedBox(
                               width: cardWidth,
                               child: DashboardMetricCard(
                                 title: 'مبالغ متبقية',
-                                value: '${data.totalRemainingAmount.toEgp.toStringAsFixed(2)} ج.م',
+                                value:
+                                    '${data.totalRemainingAmount.toEgp.toStringAsFixed(2)} ج.م',
                                 icon: Icons.payments_outlined,
                                 iconColor: data.totalRemainingAmount.isPositive
                                     ? AppColors.warning
                                     : AppColors.textSecondary,
-                                iconBackground: data.totalRemainingAmount.isPositive
+                                iconBackground:
+                                    data.totalRemainingAmount.isPositive
                                     ? AppColors.warningLight
                                     : AppColors.backgroundSecondary,
                                 valueColor: data.totalRemainingAmount.isPositive
                                     ? AppColors.warning
                                     : null,
                                 subtitle: 'متبقي على طلبات العملاء',
-                                onTap: () => context.push('${AppRoutes.orders}?filter=hasRemaining'),
+                                onTap: () => context.push(
+                                  '${AppRoutes.orders}?filter=hasRemaining',
+                                ),
                               ),
                             ),
                           ],

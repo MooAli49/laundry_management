@@ -10,7 +10,9 @@ class BusinessSettingsDao extends DatabaseAccessor<app_db.AppDatabase> {
   static const String defaultId = '00000000-0000-0000-0000-000000000001';
 
   Future<app_db.BusinessSetting> getSettings() async {
-    final existing = await (select(db.businessSettings)..limit(1)).getSingleOrNull();
+    final existing = await (select(
+      db.businessSettings,
+    )..limit(1)).getSingleOrNull();
     if (existing != null) {
       return existing;
     }
@@ -28,8 +30,12 @@ class BusinessSettingsDao extends DatabaseAccessor<app_db.AppDatabase> {
     return (await (select(db.businessSettings)..limit(1)).getSingle());
   }
 
-  Future<void> updateSettings(app_db.BusinessSettingsCompanion companion) async {
-    await (update(db.businessSettings)..where((t) => t.id.equals(companion.id.value))).write(companion);
+  Future<void> updateSettings(
+    app_db.BusinessSettingsCompanion companion,
+  ) async {
+    await (update(
+      db.businessSettings,
+    )..where((t) => t.id.equals(companion.id.value))).write(companion);
   }
 
   Stream<app_db.BusinessSetting> watchSettings() {

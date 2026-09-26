@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -6,10 +9,9 @@ plugins {
 }
 
 android {
-    namespace = "com.example.laundry_management"
-    compileSdk = 35
+    namespace = "com.mooali.laundry_management"
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
-    buildToolsVersion = "35.0.0"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -20,22 +22,51 @@ android {
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
+    val keystorePropertiesFile = rootProject.file("key.properties")
+    val keystoreProperties = Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    }
+
+    signingConfigs {
+        create("release") {
+            val keyStorePath = keystoreProperties.getProperty("storeFile")
+                ?: System.getenv("ANDROID_KEYSTORE_PATH")
+            if (!keyStorePath.isNullOrBlank()) {
+                val candidateInRoot = rootProject.file(keyStorePath)
+                val candidateInApp = file(keyStorePath)
+                val candidateInWorkspace = file("../../$keyStorePath")
+                storeFile = when {
+                    candidateInRoot.exists() -> candidateInRoot.absoluteFile
+                    candidateInApp.exists() -> candidateInApp.absoluteFile
+                    candidateInWorkspace.exists() -> candidateInWorkspace.absoluteFile
+                    file(keyStorePath).isAbsolute -> file(keyStorePath).absoluteFile
+                    else -> candidateInRoot.absoluteFile
+                }
+            }
+            storePassword = keystoreProperties.getProperty("storePassword")
+                ?: System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            keyAlias = keystoreProperties.getProperty("keyAlias")
+                ?: System.getenv("ANDROID_KEY_ALIAS")
+            keyPassword = keystoreProperties.getProperty("keyPassword")
+                ?: System.getenv("ANDROID_KEY_PASSWORD")
+        }
+    }
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.laundry_management"
+        applicationId = "com.mooali.laundry_management"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

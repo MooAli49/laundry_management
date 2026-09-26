@@ -6,55 +6,109 @@ This document defines the implementation contract for offline-first synchronizat
 
 The synchronization architecture exists to allow the application to remain operational while offline and synchronize local changes with the backend when connectivity is available.
 
-The approved architecture is:
+The approved architecture is **Bidirectional Push + Pull Synchronization**:
 
-User
-↓
-Presentation
-↓
-Cubit
-↓
-Repository
-↓
-Local Database
-↓
-Sync Queue
-↓
-Sync Engine
-↓
-Remote Data Source
-↓
-Retrofit
-↓
-Dio
-↓
-Supabase Edge Functions
-↓
-Backend
+### PUSH Flow:
 
-The most important principle is:
+    User
+    ↓
+    Presentation (Screens / Widgets)
+    ↓
+    Cubit
+    ↓
+    Repository
+    ↓
+    Local SQLite Database (Drift)
+    ├── Apply business mutation
+    └── Enqueue SyncOperation (atomic local transaction)
+    ↓
+    SyncEngine
+    ↓
+    RemoteApiDispatcher (Retrofit + Dio)
+    └── Header: X-Operation-ID (idempotency)
+    ↓
+    Supabase Edge Functions (/api/v1/...)
+    ↓
+    PostgreSQL Transactional RPCs (ACID)
+    ├── Check sync_idempotency_log
+    ├── Business rule validation
+    ├── Execute business mutation
+    ├── Increment server_version where applicable (backend OCC)
+    ├── Append to sync_changes (monotonically increasing sequence)
+    └── Commit
 
-Local operation must not depend on network availability.
+*Note: Backend RPCs support server_version optimistic concurrency checks, but Flutter client propagation of base_version is a known deferred V1 limitation.*
+
+### PULL Flow:
+
+    Realtime signal (sync_available) / Foreground pull / Resume / Connectivity
+    ↓
+    SyncEngine.pull() (Single-flight concurrency guard)
+    ↓
+    RemoteApiDispatcher (Retrofit + Dio)
+    ↓
+    Supabase Edge Function (GET /api/v1/sync/changes?after=<cursor>)
+    ↓
+    Remote changes retrieved from sync_changes in sequence order
+    ↓
+    RemoteChangeApplier
+    ↓
+    Local SQLite Database (Drift ACID Transaction)
+    ├── Upsert records directly via DAOs (zero SyncOperations created)
+    └── Advance sync_state.last_applied_sequence
+    ↓
+    Reactive Drift Streams (db.tableUpdates)
+    ↓
+    UI updates automatically
+
+The most important principles are:
+
+1. Local operation must not depend on network availability.
+2. Realtime is ONLY an ephemeral wake-up signal; the Pull API is the authoritative source.
+3. Ingestion must never generate outgoing SyncOperations (echo loop prevention).
+4. Applying changes and advancing the local cursor must be atomic in SQLite.
 
 ---
 
 ## 2. Current Implementation Status
 
-Synchronization is approved architecturally but deferred from the current local Flutter implementation phase.
+> **COMPLETED / LOCKED (Task #15)**
 
-The current phase focuses on completing the local application.
+Offline / Sync Integration (Task #15) has completed implementation and verification through:
+- C1 Remote Sync Foundation
+- C1.5 Forensic Audit
+- C1.6 Migration Hardening
+- C2 Local Pull Foundation
+- C3 Sync Orchestration
+- C3.1 Realtime Broadcast
+- C4-A Release Safety
+- C4-B Pull/Test Hardening
+- C4-C Two-Device Bidirectional Sync E2E
 
-Therefore, during the current implementation phase:
+The system has been verified end-to-end with two independent local SQLite devices operating bidirectionally against a live Supabase backend.
 
-- Local database must work independently.
-- Repositories must support local operations.
-- Cubits must work without networking.
-- The Sync Engine does not need to be implemented yet.
-- Remote API calls do not need to be implemented yet.
-- Background synchronization does not need to be implemented yet.
-- Conflict resolution does not need to be implemented yet.
+This phase was an **infrastructure / integration** phase. Existing V1 business rules, domain entities, and lifecycle states remained completely intact.
 
-The codebase must, however, avoid architectural decisions that would make future synchronization difficult to add.
+### Verified & Completed Capabilities:
+
+- Durable Sync Queue (`sync_operations` in local SQLite/Drift).
+- Atomic local mutation + sync operation enqueue within a single SQLite transaction.
+- Stable operation IDs preserved across retries (`X-Operation-ID`).
+- Sync Engine with exponential backoff, jitter, single-flight coalescing, error isolation, and crash recovery.
+- Remote Data Sources communicating with Supabase via Retrofit + Dio.
+- Idempotent remote processing with PostgreSQL transactional RPCs and `sync_idempotency_log`.
+- Remote append-oriented change log (`sync_changes`) with monotonically increasing `sequence` cursor.
+- Local pull cursor persisted in `sync_state` (`last_applied_sequence`).
+- `RemoteChangeApplier` applying remote changes directly via DAOs and updating `sync_state` in ONE atomic SQLite transaction (zero echo).
+- Supabase Realtime Broadcast wake-up signal adapter (`laundry:sync` / `sync_available`).
+- Two-Device Bidirectional E2E verification (Device A: Customer + Order → Supabase → Device B; Device B: Payment + Storage → Supabase → Device A).
+
+### What remains unchanged from the Local-First phase:
+
+- All local workflows must continue working without network access.
+- The local database remains the operational source of truth.
+- Cubits and Widgets must remain unaware of sync mechanics.
+- Business entity lifecycle statuses must not include sync states.
 
 ---
 
@@ -405,19 +459,31 @@ The exact error classification must follow the final backend error contract.
 
 ## 19. Retry Strategy
 
-The approved future retry direction is:
+The approved retry architecture is:
 
-Exponential Backoff
-+
-Maximum Retry Count
-+
-Permanent Failure State
+    Exponential Backoff
+    +
+    Maximum Retry Count
+    +
+    Permanent Failure State
 
-The exact constants are not finalized in this document.
+Retryable failures are retried with exponential backoff until the maximum retry count is reached.
 
-Do not invent arbitrary final retry values during the local implementation phase.
+Once the maximum retry count is exceeded, the operation transitions to a permanent failure state.
 
-A retry strategy should avoid:
+Operations in permanent failure state are not automatically retried.
+
+Retries are safe because all synchronization operations are idempotent: retrying the same operation with the same stable operation ID must not create duplicate business effects.
+
+The exact numeric constants (initial delay, backoff multiplier, maximum delay, maximum retry count) are implementation-level configuration.
+
+Those values must be chosen during synchronization implementation based on:
+
+- Observed platform behavior
+- Battery and network usage constraints
+- Backend rate-limiting requirements
+
+A retry strategy must avoid:
 
 - Continuous immediate retries
 - Excessive battery consumption
@@ -446,10 +512,9 @@ The exact scheduling mechanism may later use:
 
 - Application-triggered synchronization
 - Connectivity-triggered synchronization
-- Background execution
-- Periodic sync
+- Periodic sync while foregrounded
 
-The final mechanism depends on the platform/background requirements and is outside the current local-only phase.
+Foreground synchronization is part of the current implementation phase. Platform-specific background execution is deferred.
 
 ---
 
@@ -484,12 +549,11 @@ Possible triggers include:
 - Application resume
 - Connectivity restored
 - Manual refresh/sync
-- Background execution
-- Periodic execution
+- Periodic execution while running in foreground
 
-The exact trigger strategy will be finalized when background synchronization is implemented.
+Foreground synchronization triggers are part of the active sync implementation. Platform-specific background execution remains deferred.
 
-The local implementation must not require any of these triggers for normal operation.
+The local operational workflows must not require any of these triggers for normal offline operation.
 
 ---
 
@@ -891,17 +955,21 @@ It must not bypass the centralized networking infrastructure.
 
 ## 43. Authentication and Sync
 
-The current V1 application does not implement end-user authentication.
+V1 does not implement an end-user authentication system for the application UI.
 
-Therefore, synchronization must not introduce:
+The application does not include:
 
-- Login
-- Registration
+- Login screens
+- User registration
 - User sessions
 - Role management
 - Permission management
 
-Any backend-level protection required for API access must remain an infrastructure concern and follow the approved backend architecture.
+Therefore, synchronization must not introduce end-user authentication UI.
+
+Any backend-level protection required for API access (e.g., API keys, service-level authentication) must remain an infrastructure concern, implemented centrally, and must not appear inside feature code.
+
+Authentication infrastructure is handled at the centralized networking layer per `networking-implementation.md` §15.
 
 ---
 
@@ -922,16 +990,24 @@ Queue records should contain only the information required to reproduce the sync
 
 ## 45. Data Retention
 
-Successfully synchronized operations may eventually be:
+The approved data retention policy for successfully synchronized operations is:
 
-- Marked Synced
-- Retained for audit/debugging
-- Archived
-- Removed according to the final database strategy
+Successfully synchronized operations (status: Synced) are **retained** in the local Sync Queue for audit and diagnostics.
 
-The exact retention policy is not finalized here.
+They are not automatically deleted the moment synchronization succeeds.
 
-Do not automatically delete synchronization history merely because an operation succeeded unless the database design explicitly requires it.
+Retained Synced records may eventually be archived or purged according to a database maintenance policy, but that maintenance must not interfere with business data integrity.
+
+The specific cleanup/archival mechanism (e.g., periodic background cleanup, manual trigger, time-based expiry) is an implementation-level detail.
+
+Rationale:
+
+- Synced operation records provide an audit trail of what was synchronized.
+- Immediate deletion would make it impossible to diagnose synchronization issues after the fact.
+- Business entities themselves (Orders, Payments, etc.) remain present regardless of sync record retention.
+- Audit requirements for financial records (Payments, Expenses) make retention preferable to immediate deletion.
+
+Do not treat successfully synchronized records as disposable immediately after success.
 
 ---
 
@@ -1039,20 +1115,13 @@ Do not prematurely optimize with complex batching or concurrency without evidenc
 
 ## 52. Background Synchronization
 
-Background synchronization is a future concern.
+Platform-specific background synchronization is **deferred** from the current Offline / Sync Integration phase.
 
-It should be introduced only after:
+Foreground synchronization is the active requirement for this phase and must handle queue processing, retry, and crash recovery.
 
-- Local-first behavior is complete.
-- Networking is implemented.
-- Sync queue processing is stable.
-- Retry behavior is verified.
-- Crash recovery is verified.
-- Platform background limitations are understood.
+Do not make the application dependent on platform background execution for correctness.
 
-Do not make the application dependent on background execution for correctness.
-
-Foreground synchronization must remain capable of recovering pending operations.
+Foreground synchronization must remain capable of recovering pending operations whenever the application is active.
 
 ---
 
@@ -1077,15 +1146,22 @@ Financial records require particular caution.
 
 ---
 
-## 54. Multi-Device Considerations
+## 54. Multi-Device Considerations (Two-Terminal Operation)
 
-The system may eventually support multiple clients/devices synchronizing against the same backend.
+The system officially supports **two devices** synchronizing bidirectionally against the same remote Supabase backend.
 
-The local implementation must therefore preserve stable identifiers and synchronization metadata.
+Key architectural requirements for two-device synchronization:
 
-However, multi-device synchronization behavior is not required to be implemented during the current local phase.
-
-Do not introduce distributed synchronization complexity prematurely.
+1. **Bidirectional Ingestion**: Changes made on Device A are committed to remote `sync_changes` and pulled by Device B, and vice versa.
+2. **Deterministic Sequence Ordering**: All remote changes are ordered by `sync_changes.sequence ASC`.
+3. **Echo Loop Prevention**: `RemoteChangeApplier` directly writes pulled changes to Drift DAOs without enqueueing to `sync_operations`.
+4. **Domain-Aware Conflict Handling**:
+   - Generic Last-Write-Wins is strictly prohibited.
+   - Payments are append-only; balance validation is authoritative on the server.
+   - Storage moves enforce at most one active record per `OrderItem`. `sync_changes.sequence` provides committed ordering only; it is not a generic LWW conflict resolver. A stale concurrent move receives `CONCURRENCY_CONFLICT`, and the winning committed change is pulled by both terminals.
+   - Mutable entities: The backend supports entity `server_version` checked against `base_version` (Flutter client propagation of `base_version` is a known deferred V1 limitation).
+5. **Crash Safety**: Applying pulled changes and advancing `sync_state.last_applied_sequence` occur within the **same local transaction**.
+6. **Preservation of Local Pending Operations**: An initial bootstrap or full resync after `CURSOR_TOO_OLD` must NEVER delete locally pending unsynced records in `sync_operations`.
 
 ---
 
@@ -1210,21 +1286,74 @@ No orphan sync operation should remain.
 
 ---
 
-## 59. Current Phase Restrictions
+## 59. Approved Architectural Constraints for This Phase
 
-Until the local implementation phase is complete, the coding agent must not implement:
+The following architectural decisions are approved and must be followed during the Offline / Sync Integration phase.
 
-- Sync Engine
-- Background sync
-- Remote synchronization
-- Conflict resolution
-- Network-dependent UI
-- Retry scheduler
-- Connectivity-triggered sync
+These are the binding decisions documented in `technical-decisions.md`.
 
-unless explicitly requested as part of the networking/sync implementation phase.
+1. **Local-First write path.**
+   Local persistence is the primary client operation.
+   A network connection must never be required for normal approved V1 workflows.
+   Synchronization happens asynchronously after the local operation.
 
-The documentation exists now to establish the future architecture.
+2. **Stable entity identity.**
+   Business entities that participate in synchronization must use stable UUIDs.
+   The same entity UUID must remain stable between local and remote storage.
+   The Sync Engine must never replace a local entity UUID with a new remote ID.
+
+3. **Stable synchronization operation identity.**
+   Every synchronization operation must have a stable operation ID.
+   Retries must reuse the same operation ID.
+   Retrying an operation must not create duplicate logical records.
+
+4. **Atomic enqueue.**
+   A local business mutation and the corresponding synchronization operation must be persisted atomically in the same local transaction.
+   We must never end up with a business change without a sync operation, or a sync operation without its corresponding business change.
+
+5. **Idempotent remote processing.**
+   The remote / Supabase side must safely process retries.
+   Duplicate delivery of the same synchronization operation must not create duplicate business records.
+
+6. **Separation between business state and synchronization state.**
+   Sync state must NOT become part of business lifecycle state.
+   Do not introduce business statuses such as PendingSync, Syncing, or SyncFailed.
+   Order lifecycle remains exactly the approved lifecycle (Processing → Ready → Completed or Cancelled).
+
+7. **Conflict handling.**
+   Conflict resolution must be deterministic.
+   It must be defined at the entity / business-rule level.
+   It must NOT be delegated to UI behavior.
+   Do not assume generic last-write-wins is automatically correct for every entity.
+
+8. **Financial safety.**
+   Payments and other financial records require special protection.
+   Synchronization must never silently overwrite, duplicate, or lose financial history.
+
+9. **Dependency-aware synchronization.**
+   Synchronization order must respect entity relationships / dependencies.
+   Parent / reference data must be available before dependent records when required.
+   Example: Customer must exist remotely before dependent Orders are synchronized.
+
+10. **Architecture boundary.**
+    Feature Cubits and Widgets must NOT contain synchronization engine logic.
+    They must not manage queues, retries, conflict resolution, connectivity synchronization, etc.
+    Sync belongs to the Data / Infrastructure layer and communicates through approved repository / application boundaries.
+
+11. **Supabase.**
+    Supabase is the approved remote backend platform for this phase.
+    Supabase must remain behind the approved Remote Data Source boundary.
+    Feature-level code must not directly call Supabase.
+
+12. **Future SaaS readiness.**
+    The architecture should remain suitable for future multi-device / multi-tenant / SaaS evolution.
+    However, SaaS functionality itself is NOT part of the current implementation.
+    Do NOT introduce tenants, branches, roles, permissions, subscription management, or multi-tenant UI as part of this phase.
+
+13. **Current phase scope.**
+    Offline / Sync Integration is an infrastructure / integration phase.
+    It is not a new business feature.
+    It connects the existing Local-First application to the approved remote backend while preserving all existing business rules.
 
 ---
 
@@ -1335,3 +1464,690 @@ Synchronization second.
 Network failure must never erase or invalidate a successfully committed local business operation.
 
 The synchronization system exists to make local operations eventually consistent with the backend while preserving correctness, idempotency, data integrity, and offline usability.
+
+---
+
+## 63. Step 10 — Payment Synchronization Specification
+
+### 63.1 Overview
+The payment synchronization pipeline ensures offline-first payment capture with authoritative server-side validation and atomic order balance updates upon remote sync.
+
+```text
+RecordPaymentDialog / RecordPaymentCubit
+        ↓
+PaymentRepositoryImpl.recordPayment()
+        ↓
+Local Drift Transaction
+        ├── payments (inserted locally)
+        └── sync_operations (enqueued with self-contained payload)
+        ↓
+SyncEngine
+        ↓
+RemoteApiDispatcher
+        ↓
+PaymentRemoteApi (@POST('/api/v1/payments'))
+        ↓
+Supabase Edge Function (/api/v1/payments)
+        ↓
+PostgreSQL RPC sync_create_payment()
+        ↓
+Atomic ACID Transaction (FOR UPDATE lock, balance check, payment insert, paid_amount update, idempotency log)
+```
+
+### 63.2 Payment Entity & Payload Mapping
+- **Local Domain**: `Payment` (`id`, `orderId`, `amount`, `paymentMethod`, `paidAt`, `createdAt`, `updatedAt`).
+- **Monetary Units**: Integer minor units (piastres / `BIGINT`). No floating-point numbers.
+- **Payment Method Mapping**:
+  - `PaymentMethod.cash` → `"cash"`
+  - `PaymentMethod.instapay` → `"insta_pay"`
+  - `PaymentMethod.ewallet` → `"e_wallet"`
+- **Timestamps**: Serialized as UTC ISO-8601 strings (`2026-09-16T10:30:00.000Z`).
+- **Payload Schema**:
+  ```json
+  {
+    "id": "<UUID>",
+    "order_id": "<UUID>",
+    "amount": 8000,
+    "payment_method": "cash | insta_pay | e_wallet",
+    "paid_at": "<ISO-8601 UTC>",
+    "created_at": "<ISO-8601 UTC>",
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+
+### 63.3 Remote API & Edge Function Contracts
+- `POST /api/v1/payments`: Creates a new payment remotely via `sync_create_payment()`. Reads `X-Operation-ID` header. Returns `201 Created` with payment representation.
+- `GET /api/v1/payments/:id`: Retrieves a payment by ID. Returns `200 OK` or `404 Not Found`.
+- `GET /api/v1/payments?order_id=<UUID>`: Retrieves all payments for an order, ordered by `paid_at DESC`.
+- **Payment Immutability (V1)**: Payments are immutable once recorded. `PATCH`, `PUT`, and `DELETE` are disallowed and return `404 Not Found`.
+
+### 63.4 PostgreSQL RPC: `sync_create_payment`
+Executed under `SECURITY DEFINER` within a single PostgreSQL ACID transaction:
+1. **Idempotency Check**: Queries `sync_idempotency_log` by `operation_id`. If existing, immediately returns the previously recorded payload without re-inserting or incrementing `orders.paid_amount`.
+2. **Payload Validation**: Validates UUID formats, `amount > 0`, and allowed payment methods.
+3. **Concurrency Protection**: Locks the referenced order row using `SELECT total, paid_amount, status FROM orders WHERE id = v_order_id FOR UPDATE`.
+4. **Business Rule Enforcement**:
+   - Rejects payments for cancelled orders (`HTTP 409 CONFLICT`).
+   - Calculates remaining balance: `remaining = total - paid_amount`.
+   - Rejects overpayment if `amount > remaining` (`HTTP 409 CONFLICT`).
+5. **Atomic Payment & Balance Mutation**:
+   - `INSERT INTO payments (...) VALUES (...)`.
+   - `UPDATE orders SET paid_amount = paid_amount + v_amount, updated_at = now() WHERE id = v_order_id`.
+6. **Idempotency Logging**: Inserts record into `sync_idempotency_log` within the same transaction.
+7. **Return Payload**: Returns JSON representation of the persisted payment.
+
+---
+
+## 64. Step 11 — Expense & Expense Category Synchronization Specification
+
+### 64.1 Overview
+The expense and expense category synchronization pipeline provides offline-first expense management with remote persistence to Supabase. Local mutations occur atomically in SQLite/Drift and enqueue self-contained JSON payloads in `sync_operations`. When online, the `SyncEngine` dispatches these operations through `RemoteApiDispatcher`, calling Retrofit endpoints which proxy through Supabase Edge Functions to transactional `SECURITY DEFINER` PostgreSQL RPCs.
+
+```text
+AddExpenseDialog / ExpenseCategoryManagement
+        ↓
+ExpenseRepositoryImpl / ExpenseCategoryRepositoryImpl
+        ↓
+Local Drift Transaction
+        ├── expense_categories / expenses (inserted/updated locally)
+        └── sync_operations (enqueued with self-contained payload)
+        ↓
+SyncEngine
+        ↓
+RemoteApiDispatcher
+        ↓
+ExpenseRemoteApi / ExpenseCategoryRemoteApi
+        ├── @POST('/api/v1/expense-categories') / @PATCH('/api/v1/expense-categories/{id}')
+        └── @POST('/api/v1/expenses') / @PATCH('/api/v1/expenses/{id}')
+        ↓
+Supabase Edge Function (/api/v1/expense-categories, /api/v1/expenses)
+        ↓
+PostgreSQL RPCs (sync_create_expense_category, sync_update_expense_category, sync_create_expense, sync_update_expense)
+        ↓
+Atomic ACID Transaction (validation, mutation, sync_idempotency_log)
+```
+
+### 64.2 Entity & Payload Mapping
+
+#### Expense Categories
+- **Local Domain**: `ExpenseCategory` (`id`, `name`, `isActive`, `createdAt`, `updatedAt`).
+- **Normalized Uniqueness**: Category names are unique regardless of case and surrounding whitespace (`LOWER(TRIM(name))`). Duplicate attempts return `HTTP 409 CONFLICT`.
+- **Create Payload**:
+  ```json
+  {
+    "id": "<UUID>",
+    "name": "<string>",
+    "is_active": true,
+    "created_at": "<ISO-8601 UTC>",
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+- **Update Payload**:
+  ```json
+  {
+    "name": "<string>",
+    "is_active": true,
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+- **Status (Activate/Deactivate) Payload**:
+  ```json
+  {
+    "is_active": true,
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+
+#### Expenses
+- **Local Domain**: `Expense` (`id`, `categoryId`, `amount`, `expenseName`, `expenseDate`, `notes`, `categoryNameSnapshot`, `createdAt`, `updatedAt`).
+- **Monetary Units**: Integer minor units (piastres / `BIGINT`). Zero or negative amounts are invalid (`amount > 0`).
+- **Expense Date**: Stored as date-only `YYYY-MM-DD` (never shifted by timezone offsets).
+- **Category Name Snapshot**: Historical snapshot preserved at time of creation (`category_name_snapshot`).
+- **Custom Name Validation**: If category snapshot is `'أخرى'`, `expense_name` is mandatory and must be non-empty.
+- **Create Payload**:
+  ```json
+  {
+    "id": "<UUID>",
+    "expense_category_id": "<UUID>",
+    "amount": 15000,
+    "expense_name": "<nullable string>",
+    "expense_date": "2026-09-16",
+    "notes": "<nullable string>",
+    "category_name_snapshot": "<string>",
+    "created_at": "<ISO-8601 UTC>",
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+- **Update Payload**:
+  ```json
+  {
+    "amount": 15000,
+    "expense_name": "<nullable string>",
+    "expense_date": "2026-09-16",
+    "notes": "<nullable string>",
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+  *(Note: `expense_category_id` is immutable once created and cannot be modified via update).*
+
+### 64.3 Remote API & Edge Function Contracts
+
+#### `/api/v1/expense-categories`
+- `GET /api/v1/expense-categories`: Returns all categories ordered by `created_at ASC`. Supports optional `?is_active=true|false` query filter.
+- `GET /api/v1/expense-categories/:id`: Returns single category or `404 Not Found`.
+- `POST /api/v1/expense-categories`: Requires `X-Operation-ID`. Calls `sync_create_expense_category`. Returns `201 Created`.
+- `PATCH /api/v1/expense-categories/:id`: Requires `X-Operation-ID`. Calls `sync_update_expense_category`. Returns `200 OK`.
+- `DELETE /api/v1/expense-categories/:id`: Physical deletion is prohibited; returns `404 Not Found`.
+
+#### `/api/v1/expenses`
+- `GET /api/v1/expenses`: Returns expenses ordered by `expense_date DESC, created_at DESC`. Supports query filters:
+  - `category_id` / `categoryId` (UUID)
+  - `start_date` / `startDate` (`YYYY-MM-DD`)
+  - `end_date` / `endDate` (`YYYY-MM-DD`)
+  - `page`, `limit`, `offset` (pagination)
+- `GET /api/v1/expenses/:id`: Returns single expense or `404 Not Found`.
+- `POST /api/v1/expenses`: Requires `X-Operation-ID`. Calls `sync_create_expense`. Returns `201 Created`.
+- `PATCH /api/v1/expenses/:id`: Requires `X-Operation-ID`. Calls `sync_update_expense`. Returns `200 OK`.
+- `DELETE /api/v1/expenses/:id`: Physical deletion is prohibited; returns `404 Not Found`.
+
+### 64.4 PostgreSQL RPCs & Database Constraints
+
+All mutations run via `SECURITY DEFINER` RPCs within a single ACID transaction logging to `sync_idempotency_log`:
+
+1. **`sync_create_expense_category(p_op_id text, p_category jsonb)`**:
+   - Idempotency check on `p_op_id`: returns existing payload if duplicate.
+   - Validates non-empty `id` and non-empty trimmed `name`.
+   - Rejects duplicate normalized name via unique index `idx_expense_categories_name_lower` (`HTTP 409 CONFLICT`).
+   - Inserts row and logs operation. Returns entity JSON.
+
+2. **`sync_update_expense_category(p_op_id text, p_category_id text, p_category jsonb)`**:
+   - Idempotency check on `p_op_id`: returns existing payload if duplicate.
+   - Verifies category exists (`P0002` / `HTTP 404 NOT_FOUND` if missing).
+   - Updates `name`, `is_active`, and `updated_at`.
+   - Logs operation and returns updated entity JSON.
+
+3. **`sync_create_expense(p_op_id text, p_expense jsonb)`**:
+   - Idempotency check on `p_op_id`: returns existing payload if duplicate.
+   - Validates `amount > 0` and `expense_date`.
+   - Verifies referenced `expense_category_id` exists (`23503` / `HTTP 400 FOREIGN_KEY_VIOLATION`).
+   - Validates that if `category_name_snapshot == 'أخرى'`, `expense_name` must be non-empty (`HTTP 422 VALIDATION_ERROR`).
+   - Inserts expense row and logs operation. Returns entity JSON.
+
+4. **`sync_update_expense(p_op_id text, p_expense_id text, p_expense jsonb)`**:
+   - Idempotency check on `p_op_id`: returns existing payload if duplicate.
+   - Verifies expense exists (`P0002` / `HTTP 404 NOT_FOUND` if missing).
+   - Validates `amount > 0` if amount is being updated.
+   - Updates `amount`, `expense_name`, `expense_date`, `notes`, and `updated_at`. Protects `expense_category_id` from mutation.
+   - Logs operation and returns updated entity JSON.
+
+#### Security & Access Control
+- Remote tables `public.expense_categories` and `public.expenses` have Row Level Security (RLS) enabled.
+- Default-deny policies prevent direct access from `anon` and `authenticated` roles.
+- Flutter interacts exclusively via Edge Functions using `service_role` through transactional RPCs.
+
+---
+
+## 65. Step 12 — Master Data & Settings Synchronization Specification
+
+### 65.1 Overview
+Master Data and Business Settings synchronization completes remote persistence for all configuration entities in the Laundry Management System:
+1. `ItemType` (Clothing categories / types)
+2. `ItemDefinition` (Specific laundry service items belonging to an `ItemType`)
+3. `CarpetSize` (Configurable carpet dimensions `length x width` with calculated `area`)
+4. `StorageLocation` (Physical storage shelves/bins with many-to-many supported item types)
+5. `BusinessSettings` (Singleton shop configuration: name, phone, address, tax rate, receipt note, etc.)
+
+Local mutations occur atomically within Drift transactions in their respective repository implementations (`ItemTypeRepositoryImpl`, `ItemDefinitionRepositoryImpl`, `CarpetSizeRepositoryImpl`, `StorageLocationRepositoryImpl`, `SettingsRepositoryImpl`), simultaneously enqueuing self-contained JSON payloads into `sync_operations`. When online, mutations dispatch through the Supabase Edge Function `api` to transactional `SECURITY DEFINER` PostgreSQL RPCs with idempotency logging in `sync_idempotency_log`.
+
+### 65.2 Entity & Payload Schema Mapping
+
+#### 1. Item Types (`item_types`)
+- **Local Domain**: `ItemType` (`id`, `name`, `isActive`, `createdAt`, `updatedAt`).
+- **Normalized Uniqueness**: Case-insensitive and trimmed name uniqueness (`UNIQUE (name)`).
+- **Create Payload**:
+  ```json
+  {
+    "id": "<UUID>",
+    "name": "<string>",
+    "is_active": true,
+    "created_at": "<ISO-8601 UTC>",
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+- **Update Payload**:
+  ```json
+  {
+    "name": "<string>",
+    "is_active": true,
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+
+#### 2. Item Definitions (`item_definitions`)
+- **Local Domain**: `ItemDefinition` (`id`, `itemTypeId`, `name`, `pricingType`, `defaultPrice`, `isActive`, `createdAt`, `updatedAt`).
+- **Foreign Key**: References `item_types(id)` with `ON DELETE RESTRICT`.
+- **Pricing Type Mapping**: `perItem` → `"fixed"`, `perMeter` → `"per_meter"`, `custom` → `"custom"`.
+- **Monetary Unit**: Minor units (piastres / `BIGINT`).
+- **Composite Uniqueness**: `UNIQUE (item_type_id, name)`.
+- **Create Payload**:
+  ```json
+  {
+    "id": "<UUID>",
+    "item_type_id": "<UUID>",
+    "name": "<string>",
+    "pricing_type": "fixed | per_meter | custom",
+    "default_price": 2500,
+    "is_active": true,
+    "created_at": "<ISO-8601 UTC>",
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+- **Update Payload**:
+  ```json
+  {
+    "name": "<string>",
+    "pricing_type": "fixed | per_meter | custom",
+    "default_price": 2500,
+    "is_active": true,
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+
+#### 3. Carpet Sizes (`carpet_sizes`)
+- **Local Domain**: `CarpetSize` (`id`, `length`, `width`, `area`, `isActive`, `createdAt`, `updatedAt`).
+- **Dimensions**: Floating point numbers > 0. Unique index on `UNIQUE (length, width)`.
+- **Create Payload**:
+  ```json
+  {
+    "id": "<UUID>",
+    "length": 3.5,
+    "width": 2.5,
+    "area": 8.75,
+    "is_active": true,
+    "created_at": "<ISO-8601 UTC>",
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+- **Update Payload**:
+  ```json
+  {
+    "length": 4.0,
+    "width": 2.5,
+    "area": 10.0,
+    "is_active": true,
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+
+#### 4. Storage Locations (`storage_locations` & `storage_location_item_types`)
+- **Local Domain**: `StorageLocation` (`id`, `name`, `supportedItemTypeIds`, `isActive`, `createdAt`, `updatedAt`).
+- **Uniqueness**: `name` is unique.
+- **Many-to-Many Linking**: Link table `storage_location_item_types` links storage locations to multiple `item_types` with `ON DELETE CASCADE`.
+- **Create Payload**:
+  ```json
+  {
+    "id": "<UUID>",
+    "name": "<string>",
+    "is_active": true,
+    "supported_item_type_ids": ["<UUID>", "<UUID>"],
+    "created_at": "<ISO-8601 UTC>",
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+- **Update Payload**:
+  ```json
+  {
+    "name": "<string>",
+    "is_active": true,
+    "supported_item_type_ids": ["<UUID>"],
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+
+#### 5. Business Settings (`business_settings`)
+- **Local Domain**: `BusinessSettings` (`businessName`, `phoneNumber`, `address`, `taxRate`, `taxNumber`, `receiptFooterText`, `logoUrl`, `printerPaperSize`, `autoBackupEnabled`, `syncFrequencyMinutes`, `updatedAt`).
+- **Singleton Row**: Stored remotely with primary key `id = 'singleton'`. Always mutated via `PATCH /business-settings`.
+- **Tax Rate**: Must be between 0.0 and 1.0 inclusive (`CHECK (tax_rate >= 0 AND tax_rate <= 1)`).
+- **Update Payload**:
+  ```json
+  {
+    "business_name": "مغسلة النور",
+    "phone_number": "01012345678",
+    "address": "القاهرة",
+    "tax_rate": 0.14,
+    "tax_number": "123-456-789",
+    "receipt_footer_text": "شكراً لتعاملكم معنا",
+    "logo_url": null,
+    "printer_paper_size": "80mm",
+    "auto_backup_enabled": true,
+    "sync_frequency_minutes": 15,
+    "updated_at": "<ISO-8601 UTC>"
+  }
+  ```
+
+### 65.3 Remote API & Edge Function Contracts
+- **Endpoints**:
+  - `/api/v1/item-types`: `GET`, `GET /:id`, `POST`, `PATCH /:id`
+  - `/api/v1/item-definitions`: `GET`, `GET /:id`, `POST`, `PATCH /:id`
+  - `/api/v1/carpet-sizes`: `GET`, `GET /:id`, `POST`, `PATCH /:id`
+  - `/api/v1/storage-locations`: `GET`, `GET /:id`, `POST`, `PATCH /:id`
+  - `/api/v1/business-settings`: `GET`, `PATCH`
+- **Immutability / Deletion Policy**: Physical deletion is prohibited across all master data and settings in V1. `DELETE` on all endpoints returns `404 Not Found`. Deactivation is performed via `is_active: false` in `PATCH`.
+- **Idempotency**: All mutation endpoints require and validate the `X-Operation-ID` header.
+
+### 65.4 PostgreSQL RPCs
+9 transactional `SECURITY DEFINER` RPCs were deployed via migration `20260916000004_master_data_schema.sql`:
+1. `sync_create_item_type(p_op_id, p_item_type)`
+2. `sync_update_item_type(p_op_id, p_item_type_id, p_item_type)`
+3. `sync_create_item_definition(p_op_id, p_item_def)`
+4. `sync_update_item_definition(p_op_id, p_item_def_id, p_item_def)`
+5. `sync_create_carpet_size(p_op_id, p_carpet_size)`
+6. `sync_update_carpet_size(p_op_id, p_carpet_size_id, p_carpet_size)`
+7. `sync_create_storage_location(p_op_id, p_location)`
+8. `sync_update_storage_location(p_op_id, p_location_id, p_location)`
+9. `sync_update_business_settings(p_op_id, p_settings)`
+
+All RPCs log to `sync_idempotency_log` within the transaction and return cached results on replay. Default-deny RLS is enforced across all master data tables.
+
+---
+
+## 65A. Refund Synchronization Specification
+
+### 65A.1 Overview
+Refunds are synchronized as first-class, immutable financial transactions operating at the order level for cancelled orders:
+- **Entity Type**: `refund`
+- **Creation**: Generated locally via `CreateRefundUseCase` / `RefundRepositoryImpl`.
+- **Outbox Enqueueing**: Atomic with local SQLite write in `RefundsDao`. Stored in `sync_operations` with `entity_type: 'refund'`, `operation_type: 'create'`.
+- **Dispatch**: Dispatched through `POST /api/v1/refunds` proxying to `sync_create_refund` RPC with `X-Operation-ID`.
+- **Remote Change Log**: Represented in `sync_changes` with `entity_type: 'refund'`, `operation_type: 'create'`, `server_version: null` (append-only financial transaction).
+- **Remote Ingestion**: Pulled via cursor-based pull and applied directly to `RefundsDao` through `RemoteChangeApplier`.
+- **Zero Echo**: Ingestion does not enqueue an outgoing `SyncOperation` on the receiving terminal.
+
+### 65A.2 Payload Schema
+```json
+{
+  "id": "<UUID>",
+  "order_id": "<UUID>",
+  "amount": 3500,
+  "refund_method": "cash | insta_pay | e_wallet",
+  "reason": "optional string",
+  "refunded_at": "<ISO-8601 UTC>"
+}
+```
+
+---
+
+## 65B. Customer Address Synchronization Specification
+
+- **Address Field**: `Customer.address` (`TEXT NULL`) is included in Customer sync payloads.
+- **Create & Update**: Local mutations capture `address` in the outgoing `sync_operations` payload.
+- **Normalization**: Whitespace-only values normalize to `null`.
+- **Remote Change Applier**: `RemoteChangeApplier` maps `payload['address']` directly to `CustomersDao.updateCustomer` and `CustomersDao.insertCustomer`.
+- **Scope Guard**: Address is profile information only; no address search or delivery routing in V1.
+
+---
+
+## 65C. Order Aggregate Edit Synchronization Specification
+
+- **Endpoint**: `PATCH /api/v1/orders/{id}/edit-aggregate` backed by transactional PostgreSQL RPC `sync_update_order_aggregate`.
+- **Scope**: Full aggregate edit of an active `processing` order, replacing/updating items and carpet measurements.
+- **Server Version**: Managed and incremented on the Supabase backend.
+- **Client Concurrency**: Flutter Edit V3 does not send `base_version`; client-side OCC propagation remains deferred as documented.
+- **Sync Changes**: Emits discrete `sync_changes` events for affected entities (`order`, `order_items`, `order_item_carpets`).
+
+---
+
+## 66. Dashboard Operational Aggregation & Offline-First Reactivity
+
+The Dashboard operates in accordance with the system's Offline-First principles:
+
+### 66.1 Architecture & Local Source of Truth
+- **Zero Remote Dependencies**: The Dashboard does not issue remote HTTP queries or RPCs. It reads exclusively from the local Drift SQLite database.
+- **Database-Side Aggregation**: All operational overview metrics (`todayOrdersCount`, `readyOrdersCount`, `processingOrdersCount`, `totalRemaining`, `unpaidOrdersCount`, `overdueOrdersCount`, `todayPickupOrdersCount`) are evaluated within SQLite using conditional aggregations (`SUM(CASE ...)`). Dart memory is not used to scan or filter full table collections.
+- **Enrichment**: Recent orders and today's pickups are retrieved with minimal joins and enriched with `PaymentSummary` calculations directly from local records.
+
+### 66.2 Reactive Stream via Drift Table Updates
+- **Mechanism**: `DashboardRepository.watchDashboardData()` observes local table events via `db.tableUpdates()` for `orders`, `payments`, `storage_records`, and `order_items`.
+- **Automatic Sync Reflection**: When the background sync worker or local operations insert, update, or delete records in any of the 4 operational tables, `db.tableUpdates` triggers an immediate re-evaluation of `getDashboardData()`.
+- **No Polling**: No background polling loops or periodic timers are utilized.
+- **Clean Disposals**: Because `tableUpdates` operates via broadcast stream controllers rather than query stream listeners, subscription cancellations cleanly dispose without leaving unexecuted timer callbacks or lingering tasks.
+
+---
+
+## 67. Remote Change Application & Echo Loop Prevention (`RemoteChangeApplier`)
+
+### 67.1 Echo Loop Problem
+If remote changes pulled from the server were passed into standard repository methods (e.g. `orderRepository.createOrder()` or `paymentRepository.recordPayment()`), those methods would automatically call `syncOperationsDao.recordOperation()`, creating a circular ping-pong synchronization loop where pulled changes are uploaded back to the server.
+
+### 67.2 Architecture of `RemoteChangeApplier`
+The `RemoteChangeApplier` is a dedicated infrastructure service responsible for applying pulled changes directly to local storage:
+- Injected with Drift DAOs: `OrdersDao`, `CustomersDao`, `PaymentsDao`, `StorageRecordsDao`, `ExpensesDao`, `ExpenseCategoriesDao`, `MasterDataDao`, `SettingsDao`, `SyncStateDao`.
+- Bypasses repository mutation layers entirely.
+- Executes within an ACID Drift transaction:
+  ```dart
+  await db.transaction(() async {
+    for (final change in batch) {
+      await _applySingleChange(change);
+    }
+    await syncStateDao.updateLastAppliedSequence(lastSequenceInBatch);
+  });
+  ```
+- Guaranteed invariant: **Zero `SyncOperation` records are enqueued** during remote change application.
+- Triggering UI reactivity: Direct DAO writes emit SQLite table update notifications, automatically notifying reactive Drift stream queries (`db.tableUpdates()`) and refreshing Cubits/screens without manual UI re-fetch calls.
+
+---
+
+## 68. Cursor-Based Pull Contract & Change Tracking (`sync_changes`)
+
+### 68.1 Conceptual Schema of `sync_changes`
+The remote PostgreSQL database maintains a durable, append-only synchronization change log:
+
+| Column | Type | Nullable | Description |
+|---|---|---|---|
+| `sequence` | `BIGSERIAL` / `BIGINT` | No | Monotonically increasing primary key and pull cursor |
+| `operation_id` | `TEXT` | No | Stable ID of the client operation that triggered the change |
+| `entity_type` | `TEXT` | No | Entity type (`order`, `customer`, `payment`, `expense`, etc.) |
+| `entity_id` | `TEXT` | No | Stable UUID of the affected entity |
+| `operation_type` | `TEXT` | No | `create`, `update`, `deactivate` |
+| `payload` | `JSONB` | No | Canonical post-change snapshot required to reconstruct local state |
+| `server_version` | `INTEGER` | Yes | Entity version after mutation (null for unversioned entities) |
+| `created_at` | `TIMESTAMPTZ` | No | Server commit timestamp (`now()`) |
+
+### 68.2 Change Granularity: Hybrid Model
+- **Order Creation Aggregate**: For newly created orders, `sync_changes` records a single aggregate change (`entity_type = 'order'`, `operation_type = 'create'`) with a payload containing the complete canonical state (order header, all order items, carpet dimensions). This guarantees relational integrity on pull.
+- **Subsequent Mutations**: Status transitions, payments, storage moves, and cancellations are logged as independent, entity-specific change records.
+
+### 68.3 Pull Endpoint Contract
+- **Route**: `GET /api/v1/sync/changes`
+- **Query Parameters**:
+  - `after`: `BIGINT` (required, the client's `last_applied_sequence`)
+  - `limit`: `INTEGER` (optional, default 100, max 500)
+- **Response `200 OK`**:
+  ```json
+  {
+    "changes": [
+      {
+        "sequence": 1042,
+        "operation_id": "<UUID>",
+        "entity_type": "order",
+        "entity_id": "<UUID>",
+        "operation_type": "create",
+        "payload": { ... },
+        "server_version": 1,
+        "created_at": "2026-09-17T15:30:00.000Z"
+      }
+    ],
+    "has_more": false,
+    "latest_sequence": 1042
+  }
+  ```
+- **Error `410 Gone` (`CURSOR_TOO_OLD`)**:
+  If `after < oldest_retained_sequence` in `sync_changes`:
+  ```json
+  {
+    "error": "CURSOR_TOO_OLD",
+    "oldest_available_sequence": 500,
+    "message": "Client cursor has expired; full resync required."
+  }
+  ```
+
+### 68.4 Recovery & Bootstrap Invariant
+- If a client cursor falls behind retained history in `sync_changes`, the server returns HTTP 410 `CURSOR_TOO_OLD`, detected locally as `CursorTooOldException`.
+- *Known Deferred Limitation*: Full automated bootstrap resync is deferred in V1.
+- **CRITICAL INVARIANT**: Any resync or recovery must **NEVER delete or overwrite locally pending unsynced business data** stored in `sync_operations`. Pending local changes remain queued and are pushed after baseline synchronization.
+
+---
+
+## 69. Realtime Wake-Up Signal Adapter
+
+### 69.1 Purpose
+Supabase Realtime is utilized strictly as an **ephemeral wake-up notification adapter** to eliminate unnecessary polling when two devices are online simultaneously.
+
+### 69.2 Principles
+- **No Authoritative Data**: The Realtime payload contains only a lightweight notification (`{ "event": "sync_available", "latest_sequence": 1045 }`).
+- **No Direct Mutation**: The Realtime message does NOT modify the local database directly.
+- **Trigger Pull**: Upon receiving `sync_available`, the client adapter signals `SyncEngine.triggerPull()`.
+- **Single-Flight Concurrency Guard**: `SyncEngine` ensures that only one pull request is active at any time. Duplicate or overlapping Realtime signals are collapsed into the next single-flight pull.
+- **Resilience**: If the Realtime connection drops, the client continues normal operation and falls back to foreground pull triggers (app startup, app resume, connectivity restoration, periodic foreground timer).
+
+---
+
+## 70. Structured Semantic Error Classification & Queue Isolation
+
+### 70.1 Semantic Error Codes
+The remote API must return structured JSON error responses rather than monolithic `HTTP 409` strings:
+
+```json
+{
+  "error": "CONCURRENCY_CONFLICT",
+  "code": 409,
+  "message": "Base version 1 does not match current server version 2",
+  "entity_type": "order",
+  "entity_id": "<UUID>",
+  "current_server_version": 2
+}
+```
+
+Standard codes:
+- `DUPLICATE_ENTITY`: Entity identity already exists with conflicting non-idempotent payload.
+- `CONCURRENCY_CONFLICT`: Optimistic concurrency check failed (`server_version != base_version`).
+- `BUSINESS_RULE_VIOLATION`: Domain rule rejected mutation.
+- `INVALID_REFERENCE`: Referenced foreign entity is missing remotely.
+- `PAYMENT_BALANCE_EXCEEDED`: Payment amount exceeds order's remaining balance.
+- `INVALID_LIFECYCLE_TRANSITION`: Requested order status transition violates lifecycle rules.
+
+### 70.2 Queue Conflict Isolation in `SyncEngine`
+- When an operation receives a permanent semantic error or concurrency conflict:
+  - The operation's status in `sync_operations` is marked `failed` with the structured error details.
+  - The `SyncEngine` isolates the failed operation and **continues processing independent, unrelated operations** in the queue.
+  - Unrelated orders, payments, expenses, or master data are not blocked by a single isolated failure.
+
+---
+
+## 71. Actual Implemented Components Catalog
+
+### 71.1 Local Components (Flutter / Drift)
+- **`SyncOperation`**: Infrastructure model representing an outgoing synchronizable mutation in `sync_operations` with status (`pending`, `in_progress`, `synced`, `failed`), entity type, entity ID, retry count, and non-null JSON payload.
+- **`SyncOperationsDao`**: Drift DAO managing atomic enqueueing, next-operation querying, status transitions, and failed operation isolation.
+- **`SyncState`**: Infrastructure model and table (`sync_state`) storing singleton device synchronization state (`id = 'singleton'`) with `last_applied_sequence`.
+- **`SyncStateDao`**: Drift DAO managing reading and updating `last_applied_sequence`.
+- **`SyncEngine`**: Central orchestrator managing:
+  - Single-flight push and pull loops with trigger coalescing.
+  - Triggers: manual sync, startup sync, app resume, connectivity restoration, Realtime wake-up signal, 15-minute periodic foreground safety timer.
+  - Exponential backoff retry policy with jitter.
+  - Failure classification (retryable vs permanent).
+- **`RemoteChangeApplier`**: Direct DAO ingestion engine that:
+  - Applies pulled remote changes directly to Drift DAOs (`OrdersDao`, `CustomersDao`, `PaymentsDao`, `StorageRecordsDao`, `ExpensesDao`, `ExpenseCategoriesDao`, `MasterDataDao`, `SettingsDao`).
+  - Advances `sync_state.last_applied_sequence` in the **same local SQLite transaction**.
+  - Enforces strict ascending sequence validation (`change.sequence == expectedSequence`).
+  - Guarantees zero `SyncOperation` echo.
+
+### 71.2 Remote Components (Supabase / PostgreSQL)
+- **`sync_changes`**: Durable append-only change log storing committed changes with monotonically increasing `sequence` cursor (`BIGINT`), `operation_id`, `entity_type`, `entity_id`, `operation_type`, `payload`, `server_version`, and `created_at`.
+- **`sync_idempotency_log`**: Deduplication table recording processed `operation_id` values and cached responses.
+- **Edge Functions**: REST API endpoints proxying push mutations to PostgreSQL RPCs and serving paginated pull requests (`GET /api/v1/sync/changes?after=<seq>&limit=<limit>`).
+- **PostgreSQL Transactional RPCs**: Atomic functions executing business mutations, appending to `sync_changes`, and recording idempotency within a single ACID transaction.
+- **Realtime Broadcast**: Supabase Realtime channel on topic `laundry:sync` broadcasting `sync_available`. (CDC publication migration on `sync_changes` exists as dormant infrastructure).
+
+### 71.3 Adapter Layer
+- **`RealtimeSyncAdapter`**: Abstract interface decoupling `SyncEngine` from third-party Realtime mechanisms.
+- **`SupabaseRealtimeSyncAdapter`**: Concrete adapter implementing `RealtimeSyncAdapter` using Supabase Realtime Broadcast.
+
+---
+
+## 72. Execution Sequences
+
+### 72.1 Push Execution Sequence
+1. User action triggers a Repository mutation.
+2. Repository begins a local SQLite transaction via Drift.
+3. Repository persists local entity write via DAO.
+4. Repository enqueues corresponding `SyncOperation` via `SyncOperationsDao` within the same transaction.
+5. Transaction commits; UI reactive queries update immediately.
+6. `SyncEngine` is notified or triggers on its loop.
+7. `SyncEngine` takes the next pending operation and marks it `in_progress`.
+8. `RemoteApiDispatcher` dispatches request to Supabase Edge Function with `X-Operation-ID` header.
+9. Edge Function invokes PostgreSQL transactional RPC.
+10. RPC checks `sync_idempotency_log`, validates domain rules, mutates tables, appends to `sync_changes`, and commits.
+11. On `200 OK`, `SyncEngine` marks operation as `synced`.
+
+### 72.2 Pull Execution Sequence
+1. Pull trigger fires (Realtime Broadcast, 15-min periodic timer, app resume, startup, connectivity, or manual).
+2. `SyncEngine.pull()` is called; single-flight guard coalesces overlapping calls.
+3. `SyncEngine` reads `last_applied_sequence` from `SyncStateDao`.
+4. `SyncEngine` calls `GET /api/v1/sync/changes?after=<last_applied_sequence>&limit=100`.
+5. Edge Function queries `sync_changes WHERE sequence > after ORDER BY sequence ASC LIMIT limit`.
+6. `SyncEngine` passes change batch to `RemoteChangeApplier.applyBatch()`.
+7. `RemoteChangeApplier` opens a single local Drift transaction:
+   - Verifies strict ascending sequence order.
+   - Applies entity snapshot updates directly via DAOs (never creating `SyncOperation` rows).
+   - Calls `SyncStateDao.updateLastAppliedSequence(latestSequence)`.
+8. Transaction commits atomically; Drift reactive streams notify UI automatically.
+9. If more changes exist (`has_more == true`), `SyncEngine` continues pulling until caught up.
+
+---
+
+## 73. Approved Policies
+
+### 73.1 Retry Policy
+- **Initial delay**: 5 seconds
+- **Multiplier**: 2
+- **Maximum delay**: 300 seconds
+- **Maximum retries**: 5 retries after the initial attempt (6 total attempts maximum)
+- **Jitter**: Bounded additive jitter from 0 to 1 second
+
+### 73.2 Sync Operations Retention
+- Synced operations in `sync_operations` (`status = 'synced'`) are retained for **90 days**.
+- Automatic background deletion is NOT implemented in V1; retention maintenance is manual.
+
+---
+
+## 74. Known Deferred Limitations
+
+1. **Flutter Client Optimistic Concurrency Propagation**: While the backend RPCs support integer `server_version` checks, the Flutter client currently does NOT maintain local `server_version` columns and does NOT propagate `base_version` through `SyncOperation`.
+2. **Automated CURSOR_TOO_OLD Bootstrap / Resync Recovery**: When `CursorTooOldException` occurs, automatic snapshot reconstruction is deferred in V1. Local pending operations in `sync_operations` are strictly protected and never deleted.
+3. **Automatic Sync Operation Purge**: Automated deletion of expired `synced` operations is deferred.
+4. **OS-Level Platform Background Sync**: Platform-specific background execution (e.g. WorkManager) is deferred; foreground triggers provide reliable coverage.
+5. **Multi-Tenant / Multi-Branch SaaS Administration**: Deferred from V1.
+
+---
+
+## 75. Known Implementation Findings
+
+### 75.1 OrderItem PricingType Mapper Serialization Finding
+- **Location**: `OrderRepositoryImpl._mapOrderItemToDomain`, `ServiceRepositoryImpl._mapToDomain`, `StorageRepositoryImpl._mapOrderItemToDomain`
+- **Issue**: The mapper methods previously used `PricingType.values.byName(item.pricingType)` instead of `PricingType.fromValue(item.pricingType)`.
+- **Effect**: When remote `OrderItems` or services contained pricing types such as `per_square_meter` (serialized as `'per_square_meter'`), `byName` threw an `ArgumentError` because the Dart enum identifier is `perSquareMeter`.
+- **Resolution**: Resolved in C4-E. Updated `OrderRepositoryImpl`, `ServiceRepositoryImpl`, and `StorageRepositoryImpl` to use canonical `PricingType.fromValue(...)` (which safely maps both serialized snake_case values and camelCase enum identifiers). Added dedicated regression test suite `pricing_type_mapping_regression_test.dart` covering all supported values (`per_piece`, `per_square_meter`, `fixed_price`) across local SQLite, remote sync applier, and repository read paths.
+- **Status**: Resolved and verified in C4-E.
+
+### 75.2 Phase 3B Remote Foreign Key Integrity Hardening
+- **Location**: `supabase/migrations/20260919000000_enforce_master_foreign_keys.sql`
+- **Context**: During integration verification, remote PostgreSQL tables allowed untyped TEXT foreign key columns without database-level FK constraints.
+- **Resolution**: Added explicit PostgreSQL foreign keys (`order_items.item_type_id`, `order_items.item_definition_id`, `order_item_carpets.carpet_size_id`, `storage_records.storage_location_id`, `service_item_types.item_type_id`) with appropriate `ON DELETE RESTRICT` and `ON DELETE SET NULL` actions, converted columns to native `UUID`, added supporting performance indexes, and updated RPC write paths (`sync_create_order_aggregate`, `sync_store_order_items`, etc.) with explicit UUID casts.
+- **Status**: Completed, verified, and locked in Phase 3B.
+
+### 75.3 Canonical 35-Change Development Bootstrap Baseline & Safe Reset
+- **Location**: `scripts/dev_supabase_safe_reset.sql`, `scripts/dev_supabase_seed_canonical_baseline.sql`, `docs/09-operations/development-supabase-runbook.md`
+- **Context**: Repeated integration test runs contaminated development Supabase sequences with ephemeral test data.
+- **Resolution**: Created a guarded, single-transaction safe reset script to purge test records in reverse-dependency order, followed by a canonical seed script that generates sequences 1..35 representing the pristine baseline master data catalog. Fresh client bootstrap from cursor 0 was tested and verified to apply all 35 records cleanly without errors.
+- **Status**: Completed, verified, and locked in Phase 3C.

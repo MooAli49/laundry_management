@@ -513,6 +513,34 @@ The implementation should avoid duplicate indexing.
 
 ---
 
+## 24A. Refund Order Index
+
+Required:
+
+    INDEX refunds(order_id)
+
+This supports:
+
+    Load Order Refunds
+    Calculate Refundable Balance
+    Display Refund History in Order Details
+
+---
+
+## 24B. Refund Refunded At Index
+
+Required:
+
+    INDEX refunds(refunded_at)
+
+This supports:
+
+    Refunds by Date
+    Financial Report Total Refunds
+    Net Payments Calculation
+
+---
+
 ## 25. Storage Location Indexes
 
 Storage Locations are master data.
@@ -1384,6 +1412,40 @@ Retry count is normally evaluated together with:
     status
 
 Therefore, if a query requires it, the preferred index should be composite with status rather than indexing retry_count alone.
+
+---
+
+## 75.1. Local Sync State Index (sync_state)
+
+Required:
+
+    PRIMARY KEY sync_state(id)
+
+The local `sync_state` infrastructure table stores singleton device pull state (`id = 'singleton'`) with `last_applied_sequence`. The primary key index ensures fast point lookups and atomic updates during remote change ingestion.
+
+---
+
+## 75.2. Remote Change Tracking Indexes (sync_changes)
+
+On the remote Supabase PostgreSQL database, the `sync_changes` change log requires:
+
+1. **Pull Cursor Sequence Index (Primary Key)**:
+   ```sql
+   PRIMARY KEY (sequence)
+   ```
+   Supports high-throughput streaming queries: `WHERE sequence > p_after ORDER BY sequence ASC LIMIT p_limit`.
+
+2. **Entity Lookup Index**:
+   ```sql
+   INDEX idx_sync_changes_entity (entity_type, entity_id)
+   ```
+   Supports entity history lookups and conflict diagnostics.
+
+3. **Creation Timestamp Index**:
+   ```sql
+   INDEX idx_sync_changes_created_at (created_at)
+   ```
+   Supports audit, maintenance, and change retention window enforcement.
 
 ---
 
@@ -2408,7 +2470,7 @@ Do not add indexes for:
 
     delivery_routes
 
-    refunds
+    payment_gateway_refunds
 
     loyalty_accounts
 

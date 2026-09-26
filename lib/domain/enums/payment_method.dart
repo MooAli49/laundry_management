@@ -8,8 +8,11 @@ enum PaymentMethod {
   const PaymentMethod(this.value);
 
   static PaymentMethod fromValue(String value) {
+    final normalized = value.trim().toLowerCase().replaceAll('_', '');
     for (final method in PaymentMethod.values) {
-      if (method.value == value) {
+      if (method.value == value ||
+          method.name.toLowerCase() == normalized ||
+          method.value.replaceAll('_', '') == normalized) {
         return method;
       }
     }

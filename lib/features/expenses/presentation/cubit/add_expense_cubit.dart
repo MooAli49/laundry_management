@@ -19,10 +19,10 @@ class AddExpenseCubit extends Cubit<AddExpenseState> {
     required ExpenseCategoryRepository categoryRepository,
     required ExpenseRepository expenseRepository,
     Uuid uuid = const Uuid(),
-  })  : _categoryRepository = categoryRepository,
-        _expenseRepository = expenseRepository,
-        _uuid = uuid,
-        super(const AddExpenseState());
+  }) : _categoryRepository = categoryRepository,
+       _expenseRepository = expenseRepository,
+       _uuid = uuid,
+       super(const AddExpenseState());
 
   Future<void> loadCategories() async {
     emit(state.copyWith(isLoadingCategories: true, clearErrorMessage: true));
@@ -35,16 +35,20 @@ class AddExpenseCubit extends Cubit<AddExpenseState> {
           orElse: () => categories.first,
         );
       }
-      emit(state.copyWith(
-        isLoadingCategories: false,
-        categories: categories,
-        selectedCategory: defaultCategory,
-      ));
+      emit(
+        state.copyWith(
+          isLoadingCategories: false,
+          categories: categories,
+          selectedCategory: defaultCategory,
+        ),
+      );
     } catch (_) {
-      emit(state.copyWith(
-        isLoadingCategories: false,
-        errorMessage: 'تعذر تحميل تصنيفات المصروفات',
-      ));
+      emit(
+        state.copyWith(
+          isLoadingCategories: false,
+          errorMessage: 'تعذر تحميل تصنيفات المصروفات',
+        ),
+      );
     }
   }
 
@@ -64,7 +68,9 @@ class AddExpenseCubit extends Cubit<AddExpenseState> {
     if (amountText != null) {
       final trimmedText = amountText.trim();
       if (trimmedText.isEmpty) {
-        emit(state.copyWith(errorMessage: 'يرجى إدخال مبلغ صحيح أكبر من الصفر'));
+        emit(
+          state.copyWith(errorMessage: 'يرجى إدخال مبلغ صحيح أكبر من الصفر'),
+        );
         return null;
       }
       resolvedAmount = Money.tryParseEgp(trimmedText);
@@ -74,7 +80,9 @@ class AddExpenseCubit extends Cubit<AddExpenseState> {
       }
     }
 
-    if (resolvedAmount == null || resolvedAmount.isZero || resolvedAmount.isNegative) {
+    if (resolvedAmount == null ||
+        resolvedAmount.isZero ||
+        resolvedAmount.isNegative) {
       emit(state.copyWith(errorMessage: 'يرجى إدخال مبلغ صحيح أكبر من الصفر'));
       return null;
     }
@@ -92,7 +100,11 @@ class AddExpenseCubit extends Cubit<AddExpenseState> {
     final isOther = category.name == 'أخرى' || category.name.contains('أخرى');
     final trimmedName = expenseName?.trim();
     if (isOther && (trimmedName == null || trimmedName.isEmpty)) {
-      emit(state.copyWith(errorMessage: 'يرجى إدخال اسم المصروف عند اختيار تصنيف أخرى'));
+      emit(
+        state.copyWith(
+          errorMessage: 'يرجى إدخال اسم المصروف عند اختيار تصنيف أخرى',
+        ),
+      );
       return null;
     }
 
@@ -117,13 +129,24 @@ class AddExpenseCubit extends Cubit<AddExpenseState> {
       );
 
       await _expenseRepository.createExpense(expense);
-      emit(state.copyWith(isSaving: false, isSuccess: true, createdExpense: expense));
+      emit(
+        state.copyWith(
+          isSaving: false,
+          isSuccess: true,
+          createdExpense: expense,
+        ),
+      );
       return expense;
     } on Failure catch (e) {
       emit(state.copyWith(isSaving: false, errorMessage: e.message));
       return null;
     } catch (_) {
-      emit(state.copyWith(isSaving: false, errorMessage: 'حدث خطأ أثناء حفظ المصروف'));
+      emit(
+        state.copyWith(
+          isSaving: false,
+          errorMessage: 'حدث خطأ أثناء حفظ المصروف',
+        ),
+      );
       return null;
     }
   }

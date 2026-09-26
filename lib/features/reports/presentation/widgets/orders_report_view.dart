@@ -10,10 +10,7 @@ import 'report_metric_card.dart';
 class OrdersReportView extends StatelessWidget {
   final OrdersReportData data;
 
-  const OrdersReportView({
-    super.key,
-    required this.data,
-  });
+  const OrdersReportView({super.key, required this.data});
 
   @override
   Widget build(BuildContext context) {
@@ -22,17 +19,24 @@ class OrdersReportView extends StatelessWidget {
         padding: EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
         child: EmptyState(
           title: 'لا توجد طلبات خلال هذه الفترة',
-          message: 'لم يتم تسجيل أي طلبات في الفترة الزمنية المحددة. يمكنك تغيير الفترة من الأعلى.',
+          message:
+              'لم يتم تسجيل أي طلبات في الفترة الزمنية المحددة. يمكنك تغيير الفترة من الأعلى.',
           icon: Icons.receipt_long_outlined,
         ),
       );
     }
 
     final total = data.totalOrders;
-    final processingPercent = total > 0 ? (data.processingOrdersCount / total) : 0.0;
+    final processingPercent = total > 0
+        ? (data.processingOrdersCount / total)
+        : 0.0;
     final readyPercent = total > 0 ? (data.readyOrdersCount / total) : 0.0;
-    final completedPercent = total > 0 ? (data.completedOrdersCount / total) : 0.0;
-    final cancelledPercent = total > 0 ? (data.cancelledOrdersCount / total) : 0.0;
+    final completedPercent = total > 0
+        ? (data.completedOrdersCount / total)
+        : 0.0;
+    final cancelledPercent = total > 0
+        ? (data.cancelledOrdersCount / total)
+        : 0.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -43,7 +47,9 @@ class OrdersReportView extends StatelessWidget {
             final columns = constraints.maxWidth < 650
                 ? 1
                 : (constraints.maxWidth < 950 ? 2 : 3);
-            final cardWidth = (constraints.maxWidth - (AppSpacing.md * (columns - 1))) / columns;
+            final cardWidth =
+                (constraints.maxWidth - (AppSpacing.md * (columns - 1))) /
+                columns;
 
             return Wrap(
               spacing: AppSpacing.md,
@@ -62,7 +68,8 @@ class OrdersReportView extends StatelessWidget {
                   width: cardWidth,
                   child: ReportMetricCard(
                     title: 'إجمالي قيمة الطلبات',
-                    value: '${data.totalOrderValue.toEgp.toStringAsFixed(2)} ج.م',
+                    value:
+                        '${data.totalOrderValue.toEgp.toStringAsFixed(2)} ج.م',
                     icon: Icons.monetization_on_outlined,
                     iconColor: AppColors.info,
                     iconBackground: AppColors.infoLight,
@@ -75,9 +82,15 @@ class OrdersReportView extends StatelessWidget {
                     title: 'الطلبات المتأخرة',
                     value: '${data.overdueOrdersCount}',
                     icon: Icons.warning_amber_rounded,
-                    iconColor: data.overdueOrdersCount > 0 ? AppColors.warning : AppColors.textSecondary,
-                    iconBackground: data.overdueOrdersCount > 0 ? AppColors.warningLight : AppColors.backgroundSecondary,
-                    valueColor: data.overdueOrdersCount > 0 ? AppColors.warning : null,
+                    iconColor: data.overdueOrdersCount > 0
+                        ? AppColors.warning
+                        : AppColors.textSecondary,
+                    iconBackground: data.overdueOrdersCount > 0
+                        ? AppColors.warningLight
+                        : AppColors.backgroundSecondary,
+                    valueColor: data.overdueOrdersCount > 0
+                        ? AppColors.warning
+                        : null,
                     subtitle: 'تجاوزت تاريخ الاستلام المتوقع',
                   ),
                 ),
@@ -158,12 +171,16 @@ class OrdersReportView extends StatelessWidget {
             const Spacer(),
             Text(
               '$count طلب',
-              style: AppTextStyles.titleMedium.copyWith(fontWeight: FontWeight.bold),
+              style: AppTextStyles.titleMedium.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
             AppSpacing.gapHorizontalMd,
             Text(
               percentText,
-              style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),

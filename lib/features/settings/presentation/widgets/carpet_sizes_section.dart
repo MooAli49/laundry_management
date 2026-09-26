@@ -31,7 +31,10 @@ class CarpetSizesSection extends StatelessWidget {
     await CarpetSizeFormDialog.show(context, carpetSize: carpetSize);
   }
 
-  Future<void> _handleToggleStatus(BuildContext context, CarpetSize carpetSize) async {
+  Future<void> _handleToggleStatus(
+    BuildContext context,
+    CarpetSize carpetSize,
+  ) async {
     final cubit = context.read<CarpetSizesManagementCubit>();
     if (carpetSize.isActive) {
       final confirmed = await DeactivationConfirmDialog.show(
@@ -87,7 +90,8 @@ class CarpetSizesSection extends StatelessWidget {
                   for (final cs in state.carpetSizes)
                     SettingsCard(
                       icon: Icons.straighten_outlined,
-                      title: '${_formatNum(cs.length)} × ${_formatNum(cs.width)} م',
+                      title:
+                          '${_formatNum(cs.length)} × ${_formatNum(cs.width)} م',
                       subtitle: '${_formatNum(cs.area)} م²',
                       isActive: cs.isActive,
                       onEdit: () => _handleEdit(context, cs),

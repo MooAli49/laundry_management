@@ -18,36 +18,44 @@ class CustomerDetailCubit extends Cubit<CustomerDetailState> {
     required CustomerRepository customerRepository,
     required OrderRepository orderRepository,
     required PaymentRepository paymentRepository,
-  })  : _customerRepository = customerRepository,
-        _orderRepository = orderRepository,
-        _paymentRepository = paymentRepository,
-        super(const CustomerDetailState());
+  }) : _customerRepository = customerRepository,
+       _orderRepository = orderRepository,
+       _paymentRepository = paymentRepository,
+       super(const CustomerDetailState());
 
   Future<void> loadCustomerDetail(String customerId) async {
-    emit(state.copyWith(
-      isLoading: true,
-      clearErrorMessage: true,
-      clearActionSuccessMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        isLoading: true,
+        clearErrorMessage: true,
+        clearActionSuccessMessage: true,
+      ),
+    );
     try {
       final customer = await _customerRepository.getCustomerById(customerId);
       if (customer == null) {
         if (isClosed) return;
-        emit(state.copyWith(
-          isLoading: false,
-          errorMessage: AppStrings.customerNotFound,
-        ));
+        emit(
+          state.copyWith(
+            isLoading: false,
+            errorMessage: AppStrings.customerNotFound,
+          ),
+        );
         return;
       }
 
-      final aggregate = await _orderRepository.getCustomerOrderAggregate(customerId);
+      final aggregate = await _orderRepository.getCustomerOrderAggregate(
+        customerId,
+      );
       final orders = await _orderRepository.getOrders(
         customerId: customerId,
         limit: 20,
         offset: 0,
       );
       final orderIds = orders.map((o) => o.id).toList();
-      final summaries = await _paymentRepository.getPaymentSummariesForOrders(orderIds);
+      final summaries = await _paymentRepository.getPaymentSummariesForOrders(
+        orderIds,
+      );
       final hasMore = orders.length < aggregate.totalOrders;
 
       final detailModel = CustomerDetailViewModel(
@@ -58,28 +66,31 @@ class CustomerDetailCubit extends Cubit<CustomerDetailState> {
       );
 
       if (isClosed) return;
-      emit(state.copyWith(
-        isLoading: false,
-        data: detailModel,
-        hasMoreOrders: hasMore,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          data: detailModel,
+          hasMoreOrders: hasMore,
+        ),
+      );
     } on Failure catch (e) {
       if (isClosed) return;
-      emit(state.copyWith(
-        isLoading: false,
-        errorMessage: e.message,
-      ));
+      emit(state.copyWith(isLoading: false, errorMessage: e.message));
     } catch (_) {
       if (isClosed) return;
-      emit(state.copyWith(
-        isLoading: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 
   Future<void> loadMoreOrders() async {
-    if (state.isLoadingMore || !state.hasMoreOrders || state.data == null) return;
+    if (state.isLoadingMore || !state.hasMoreOrders || state.data == null) {
+      return;
+    }
     emit(state.copyWith(isLoadingMore: true, clearErrorMessage: true));
     try {
       final customerId = state.data!.customer.id;
@@ -90,78 +101,89 @@ class CustomerDetailCubit extends Cubit<CustomerDetailState> {
         offset: currentOrders.length,
       );
       final nextOrderIds = nextOrders.map((o) => o.id).toList();
-      final nextSummaries = await _paymentRepository.getPaymentSummariesForOrders(nextOrderIds);
+      final nextSummaries = await _paymentRepository
+          .getPaymentSummariesForOrders(nextOrderIds);
 
       final combinedOrders = [...currentOrders, ...nextOrders];
-      final combinedSummaries = {...state.data!.paymentSummaries, ...nextSummaries};
+      final combinedSummaries = {
+        ...state.data!.paymentSummaries,
+        ...nextSummaries,
+      };
       final hasMore = combinedOrders.length < state.data!.aggregate.totalOrders;
 
       if (isClosed) return;
-      emit(state.copyWith(
-        isLoadingMore: false,
-        hasMoreOrders: hasMore,
-        data: state.data!.copyWith(
-          orders: combinedOrders,
-          paymentSummaries: combinedSummaries,
+      emit(
+        state.copyWith(
+          isLoadingMore: false,
+          hasMoreOrders: hasMore,
+          data: state.data!.copyWith(
+            orders: combinedOrders,
+            paymentSummaries: combinedSummaries,
+          ),
         ),
-      ));
+      );
     } on Failure catch (e) {
       if (isClosed) return;
-      emit(state.copyWith(
-        isLoadingMore: false,
-        errorMessage: e.message,
-      ));
+      emit(state.copyWith(isLoadingMore: false, errorMessage: e.message));
     } catch (_) {
       if (isClosed) return;
-      emit(state.copyWith(
-        isLoadingMore: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isLoadingMore: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 
   Future<bool> updateCustomerInfo({
     required String name,
     required String phone,
+    String? address,
     String? notes,
   }) async {
     if (state.data == null) return false;
-    emit(state.copyWith(
-      isSaving: true,
-      clearErrorMessage: true,
-      clearActionSuccessMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        isSaving: true,
+        clearErrorMessage: true,
+        clearActionSuccessMessage: true,
+      ),
+    );
 
     try {
       final current = state.data!.customer;
       final updated = current.copyWith(
         name: name.trim(),
         phone: phone.trim(),
+        address: address?.trim().isNotEmpty == true ? address!.trim() : null,
+        clearAddress: address?.trim().isNotEmpty != true,
         notes: notes?.trim().isNotEmpty == true ? notes!.trim() : null,
         updatedAt: DateTime.now(),
       );
 
       final saved = await _customerRepository.updateCustomer(updated);
       if (isClosed) return false;
-      emit(state.copyWith(
-        isSaving: false,
-        data: state.data!.copyWith(customer: saved),
-        actionSuccessMessage: AppStrings.customerUpdatedSuccessfully,
-      ));
+      emit(
+        state.copyWith(
+          isSaving: false,
+          data: state.data!.copyWith(customer: saved),
+          actionSuccessMessage: AppStrings.customerUpdatedSuccessfully,
+        ),
+      );
       return true;
     } on Failure catch (e) {
       if (isClosed) return false;
-      emit(state.copyWith(
-        isSaving: false,
-        errorMessage: e.message,
-      ));
+      emit(state.copyWith(isSaving: false, errorMessage: e.message));
       return false;
     } catch (_) {
       if (isClosed) return false;
-      emit(state.copyWith(
-        isSaving: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isSaving: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
       return false;
     }
   }

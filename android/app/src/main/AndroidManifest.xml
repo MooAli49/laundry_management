@@ -1,8 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="laundry_management"
+        android:label="نظام إدارة المغسلة"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
         android:enableOnBackInvokedCallback="true">
         <activity
             android:name=".MainActivity"

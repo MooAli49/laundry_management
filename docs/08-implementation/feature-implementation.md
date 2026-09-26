@@ -511,9 +511,9 @@ This applies to:
 
 ---
 
-## 18. Future Synchronization Boundary
+## 18. Synchronization Boundary
 
-Synchronization is deferred from the current local implementation phase.
+Synchronization operates as an infrastructure concern behind the Repository/Data boundary.
 
 Feature code must not implement synchronization logic directly.
 
@@ -524,7 +524,7 @@ Do not add:
 - Retry logic inside Screens
 - Connectivity logic inside Widgets
 
-When synchronization is introduced, it remains behind the Repository/Data infrastructure.
+Synchronization remains strictly behind the Repository/Data infrastructure.
 
 ---
 
@@ -983,7 +983,7 @@ The feature must not allow normal editing of a cancelled Order.
 
 Existing Payment records remain historical.
 
-Cancellation does not automatically create a Refund because Refund is not a V1 Domain entity.
+Cancellation does not automatically create a Refund. Refund is an approved V1 Domain entity, but Cancellation and Refund remain separate operations; manual refunds may be created for eligible cancelled orders.
 
 ---
 
@@ -2893,7 +2893,7 @@ The coding agent must not create:
 - Roles
 - Permissions
 - Branches
-- Refunds
+- Automated payment gateway refunds and item-level refunds
 - Loyalty
 - Barcode scanning
 - Advanced laundry stages
@@ -3250,7 +3250,7 @@ The V1 feature implementation must follow these principles:
 5. Domain rules remain outside Widgets.
 6. V1 uses Cubit rather than requiring Bloc.
 7. Local-first behavior is the default.
-8. Networking and synchronization remain deferred.
+8. Features remain decoupled from networking and synchronization infrastructure.
 9. Physical OrderItems retain independent identity.
 10. Historical transaction values remain stable.
 11. Order lifecycle rules are enforced consistently.

@@ -37,7 +37,9 @@ class AddExpenseState {
       isSaving: isSaving ?? this.isSaving,
       isSuccess: isSuccess ?? this.isSuccess,
       createdExpense: createdExpense ?? this.createdExpense,
-      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
     );
   }
 }

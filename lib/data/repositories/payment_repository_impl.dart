@@ -8,8 +8,10 @@ import '../../domain/repositories/payment_repository.dart';
 import '../../domain/value_objects/money.dart';
 import '../local/daos/orders_dao.dart';
 import '../local/daos/payments_dao.dart';
+import '../local/daos/refunds_dao.dart';
 import '../local/daos/sync_operations_dao.dart';
 import '../local/database/app_database.dart' as app_db;
+import '../sync/sync_payload_builder.dart';
 
 class PaymentRepositoryImpl implements PaymentRepository {
   final PaymentsDao _paymentsDao;
@@ -22,16 +24,18 @@ class PaymentRepositoryImpl implements PaymentRepository {
     required OrdersDao ordersDao,
     required SyncOperationsDao syncOperationsDao,
     required app_db.AppDatabase db,
-  })  : _paymentsDao = paymentsDao,
-        _ordersDao = ordersDao,
-        _syncOperationsDao = syncOperationsDao,
-        _db = db;
+  }) : _paymentsDao = paymentsDao,
+       _ordersDao = ordersDao,
+       _syncOperationsDao = syncOperationsDao,
+       _db = db;
 
   @override
   Future<Payment> recordPayment(Payment payment) async {
     try {
       if (payment.amount.piastres <= 0) {
-        throw const ValidationFailure('Payment amount must be greater than zero');
+        throw const ValidationFailure(
+          'Payment amount must be greater than zero',
+        );
       }
 
       return await _db.transaction(() async {
@@ -41,16 +45,24 @@ class PaymentRepositoryImpl implements PaymentRepository {
         }
 
         if (order.status == 'completed') {
-          throw const BusinessRuleFailure('Cannot record payment for a completed order');
+          throw const BusinessRuleFailure(
+            'Cannot record payment for a completed order',
+          );
         }
         if (order.status == 'cancelled') {
-          throw const BusinessRuleFailure('Cannot record payment for a cancelled order');
+          throw const BusinessRuleFailure(
+            'Cannot record payment for a cancelled order',
+          );
         }
 
-        final paidPiastres = await _paymentsDao.getTotalPaidForOrder(payment.orderId);
+        final paidPiastres = await _paymentsDao.getTotalPaidForOrder(
+          payment.orderId,
+        );
         final remainingPiastres = order.total - paidPiastres;
         if (payment.amount.piastres > remainingPiastres) {
-          throw const BusinessRuleFailure('Payment amount exceeds remaining order balance');
+          throw const BusinessRuleFailure(
+            'Payment amount exceeds remaining order balance',
+          );
         }
 
         await _paymentsDao.insertPayment(
@@ -69,6 +81,7 @@ class PaymentRepositoryImpl implements PaymentRepository {
           entityType: 'payment',
           entityId: payment.id,
           operationType: 'create',
+          payload: SyncPayloadBuilder.buildPaymentPayload(payment),
         );
 
         return payment;
@@ -95,9 +108,9 @@ class PaymentRepositoryImpl implements PaymentRepository {
   @override
   Stream<List<Payment>> watchPaymentsForOrder(String orderId) {
     try {
-      return _paymentsDao.watchPaymentsForOrder(orderId).map(
-            (rows) => rows.map(_mapToDomain).toList(),
-          );
+      return _paymentsDao
+          .watchPaymentsForOrder(orderId)
+          .map((rows) => rows.map(_mapToDomain).toList());
     } catch (e) {
       if (e is Failure) rethrow;
       throw DatabaseFailure(e.toString());
@@ -122,9 +135,12 @@ class PaymentRepositoryImpl implements PaymentRepository {
       if (order == null) {
         throw ValidationFailure('Order with id $orderId not found');
       }
+      if (order.status == 'cancelled') {
+        return Money.zero;
+      }
       final paidPiastres = await _paymentsDao.getTotalPaidForOrder(orderId);
       final remaining = order.total - paidPiastres;
-      return Money.fromPiastres(remaining);
+      return Money.fromPiastres(remaining > 0 ? remaining : 0);
     } catch (e) {
       if (e is Failure) rethrow;
       throw DatabaseFailure(e.toString());
@@ -132,19 +148,29 @@ class PaymentRepositoryImpl implements PaymentRepository {
   }
 
   @override
-  Future<Map<String, OrderPaymentSummary>> getPaymentSummariesForOrders(List<String> orderIds) async {
+  Future<Map<String, OrderPaymentSummary>> getPaymentSummariesForOrders(
+    List<String> orderIds,
+  ) async {
     try {
       if (orderIds.isEmpty) return {};
       final paidMap = await _paymentsDao.getTotalPaidForOrders(orderIds);
+      final refundedMap = await RefundsDao(
+        _db,
+      ).getTotalRefundedForOrders(orderIds);
       final orders = await _ordersDao.getOrdersByIds(orderIds);
       final summaries = <String, OrderPaymentSummary>{};
 
       for (final order in orders) {
         final paidPiastres = paidMap[order.id] ?? 0;
-        final remainingPiastres = order.total - paidPiastres;
+        final refundedPiastres = refundedMap[order.id] ?? 0;
+        final isCancelled = order.status == 'cancelled';
+        final remainingPiastres = isCancelled ? 0 : (order.total - paidPiastres);
         summaries[order.id] = OrderPaymentSummary(
           totalPaid: Money.fromPiastres(paidPiastres),
-          remaining: Money.fromPiastres(remainingPiastres > 0 ? remainingPiastres : 0),
+          totalRefunded: Money.fromPiastres(refundedPiastres),
+          remaining: Money.fromPiastres(
+            remainingPiastres > 0 ? remainingPiastres : 0,
+          ),
         );
       }
       return summaries;
@@ -159,7 +185,7 @@ class PaymentRepositoryImpl implements PaymentRepository {
       id: row.id,
       orderId: row.orderId,
       amount: Money.fromPiastres(row.amount),
-      paymentMethod: PaymentMethod.values.byName(row.paymentMethod),
+      paymentMethod: PaymentMethod.fromValue(row.paymentMethod),
       paidAt: row.paidAt,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,

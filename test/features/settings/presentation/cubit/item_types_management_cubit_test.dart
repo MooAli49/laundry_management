@@ -105,7 +105,9 @@ class FakeItemDefinitionRepository implements ItemDefinitionRepository {
   @override
   Future<void> deactivateItemDefinition(String id) async {
     final idx = definitions.indexWhere((d) => d.id == id);
-    if (idx != -1) definitions[idx] = definitions[idx].copyWith(isActive: false);
+    if (idx != -1) {
+      definitions[idx] = definitions[idx].copyWith(isActive: false);
+    }
   }
 }
 
@@ -142,7 +144,9 @@ void main() {
 
       // Update
       final type = cubit.state.itemTypes.first;
-      final updateRes = await cubit.updateItemType(type.copyWith(name: 'ملابس وأقمشة'));
+      final updateRes = await cubit.updateItemType(
+        type.copyWith(name: 'ملابس وأقمشة'),
+      );
       expect(updateRes, isTrue);
       expect(cubit.state.itemTypes.first.name, 'ملابس وأقمشة');
     });
@@ -158,41 +162,44 @@ void main() {
       expect(cubit.state.itemTypes.first.isActive, isTrue);
     });
 
-    test('definitions handling: create, update, filter, activate, deactivate', () async {
-      await cubit.createItemType('ملابس');
-      final typeId = cubit.state.itemTypes.first.id;
+    test(
+      'definitions handling: create, update, filter, activate, deactivate',
+      () async {
+        await cubit.createItemType('ملابس');
+        final typeId = cubit.state.itemTypes.first.id;
 
-      // Create definition
-      final defRes = await cubit.createItemDefinition(
-        itemTypeId: typeId,
-        name: 'قميص',
-      );
-      expect(defRes, isTrue);
-      expect(cubit.state.definitions.length, 1);
-      expect(cubit.state.definitions.first.name, 'قميص');
+        // Create definition
+        final defRes = await cubit.createItemDefinition(
+          itemTypeId: typeId,
+          name: 'قميص',
+        );
+        expect(defRes, isTrue);
+        expect(cubit.state.definitions.length, 1);
+        expect(cubit.state.definitions.first.name, 'قميص');
 
-      // Filter
-      cubit.selectFilterItemType(typeId);
-      expect(cubit.state.filteredDefinitions.length, 1);
+        // Filter
+        cubit.selectFilterItemType(typeId);
+        expect(cubit.state.filteredDefinitions.length, 1);
 
-      cubit.selectFilterItemType('other-id');
-      expect(cubit.state.filteredDefinitions.length, 0);
+        cubit.selectFilterItemType('other-id');
+        expect(cubit.state.filteredDefinitions.length, 0);
 
-      cubit.selectFilterItemType(null);
-      expect(cubit.state.filteredDefinitions.length, 1);
+        cubit.selectFilterItemType(null);
+        expect(cubit.state.filteredDefinitions.length, 1);
 
-      // Update definition
-      final def = cubit.state.definitions.first;
-      await cubit.updateItemDefinition(def.copyWith(name: 'قميص رجالي'));
-      expect(cubit.state.definitions.first.name, 'قميص رجالي');
+        // Update definition
+        final def = cubit.state.definitions.first;
+        await cubit.updateItemDefinition(def.copyWith(name: 'قميص رجالي'));
+        expect(cubit.state.definitions.first.name, 'قميص رجالي');
 
-      // Deactivate & activate definition
-      final defId = cubit.state.definitions.first.id;
-      await cubit.deactivateItemDefinition(defId);
-      expect(cubit.state.definitions.first.isActive, isFalse);
+        // Deactivate & activate definition
+        final defId = cubit.state.definitions.first.id;
+        await cubit.deactivateItemDefinition(defId);
+        expect(cubit.state.definitions.first.isActive, isFalse);
 
-      await cubit.activateItemDefinition(defId);
-      expect(cubit.state.definitions.first.isActive, isTrue);
-    });
+        await cubit.activateItemDefinition(defId);
+        expect(cubit.state.definitions.first.isActive, isTrue);
+      },
+    );
   });
 }

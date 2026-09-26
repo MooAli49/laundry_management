@@ -12,11 +12,15 @@ class ExpensesDao extends DatabaseAccessor<app_db.AppDatabase> {
   }
 
   Future<void> updateExpense(app_db.ExpensesCompanion companion) async {
-    await (update(db.expenses)..where((t) => t.id.equals(companion.id.value))).write(companion);
+    await (update(
+      db.expenses,
+    )..where((t) => t.id.equals(companion.id.value))).write(companion);
   }
 
   Future<app_db.Expense?> getExpenseById(String id) async {
-    return (select(db.expenses)..where((t) => t.id.equals(id))).getSingleOrNull();
+    return (select(
+      db.expenses,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
   Future<List<app_db.Expense>> getExpenses({
@@ -47,7 +51,11 @@ class ExpensesDao extends DatabaseAccessor<app_db.AppDatabase> {
     final endOfDay = startOfDay.add(const Duration(days: 1));
 
     return (select(db.expenses)
-          ..where((t) => t.expenseDate.isBiggerOrEqualValue(startOfDay) & t.expenseDate.isSmallerThanValue(endOfDay))
+          ..where(
+            (t) =>
+                t.expenseDate.isBiggerOrEqualValue(startOfDay) &
+                t.expenseDate.isSmallerThanValue(endOfDay),
+          )
           ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
         .watch();
   }
@@ -91,7 +99,8 @@ class ExpensesDao extends DatabaseAccessor<app_db.AppDatabase> {
     return map;
   }
 
-  Future<Map<String, ({int total, int count})>> getExpensesGroupedByCategorySnapshot({
+  Future<Map<String, ({int total, int count})>>
+  getExpensesGroupedByCategorySnapshot({
     required DateTime startDate,
     required DateTime endDate,
   }) async {

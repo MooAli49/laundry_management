@@ -52,6 +52,14 @@ class SeedData {
       );
     }
 
+    // 4. Seed SyncState (exactly 1 record with sequence 0, idempotent)
+    await db.customStatement(
+      'INSERT OR IGNORE INTO sync_state '
+      '(id, last_applied_sequence, updated_at) '
+      'VALUES (?, ?, ?);',
+      ['singleton', 0, nowTimestamp],
+    );
+
     // Explicit Invariant:
     // customers, orders, order_items, payments, expenses, storage_records
     // are NEVER seeded. They remain strictly empty.

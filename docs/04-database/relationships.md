@@ -171,6 +171,46 @@ Remaining Amount
 
 ---
 
+## 5A. Order → Refund
+
+Relationship:
+
+Order 1 ──────── N Refund
+
+Database:
+
+refunds.order_id
+    ↓
+orders.id
+
+Rules:
+
+- Every Refund belongs to an Order.
+- An Order may have zero, one, or many Refunds.
+- Refunds are first-class immutable financial transactions.
+- Order-level in V1: no `payment_id` column.
+- Only `cancelled` orders can receive refunds.
+- Cumulative refunds for an order cannot exceed the order's total paid amount (`Total Paid - Total Refunded >= amount`).
+- Refund history is immutable: records are never edited or deleted.
+- Refunds do not modify or delete original `payments`.
+- Refunds are append-only financial records and do not use `server_version`.
+
+Example:
+
+Order (Cancelled)
+    ├── Refund 1 (partial)
+    └── Refund 2 (remaining balance)
+
+The refundable balance is derived from:
+
+Total Paid
+-
+Total Refunded
+=
+Refundable Balance
+
+---
+
 ## 6. OrderItem → ItemType
 
 Relationship:
@@ -1591,6 +1631,7 @@ Order:
 Order N → 1 Customer
 Order 1 → N OrderItems
 Order 1 → N Payments
+Order 1 → N Refunds
 
 OrderItem:
 
@@ -1604,6 +1645,10 @@ OrderItem 1 → N StorageRecords
 Payment:
 
 Payment N → 1 Order
+
+Refund:
+
+Refund N → 1 Order
 
 ItemDefinition:
 

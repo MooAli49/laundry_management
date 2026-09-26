@@ -1,4 +1,4 @@
-import 'package:laundry_management/core/constants/app_constants.dart';
+import '../constants/app_constants.dart';
 
 class CurrencyFormatter {
   CurrencyFormatter._();

@@ -13,6 +13,7 @@ class SyncOperations extends Table {
   IntColumn get retryCount => integer().withDefault(const Constant(0))();
   TextColumn get lastError => text().nullable()();
   DateTimeColumn get lastAttemptAt => dateTime().nullable()();
+  DateTimeColumn get nextRetryAt => dateTime().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
 

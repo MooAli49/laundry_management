@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/errors/failures.dart';
@@ -14,21 +17,40 @@ class OrdersListCubit extends Cubit<OrdersListState> {
   final OrderRepository _orderRepository;
   final CustomerRepository _customerRepository;
   final PaymentRepository _paymentRepository;
+  final DateTime Function() _clock;
 
   static const int _pageSize = 20;
+
+  StreamSubscription<void>? _dbSubscription;
+  int _loadRequestId = 0;
+  bool _hasPendingReload = false;
+
+  @visibleForTesting
+  bool get hasPendingReload => _hasPendingReload;
 
   OrdersListCubit({
     required OrderRepository orderRepository,
     required CustomerRepository customerRepository,
     required PaymentRepository paymentRepository,
-  })  : _orderRepository = orderRepository,
-        _customerRepository = customerRepository,
-        _paymentRepository = paymentRepository,
-        super(const OrdersListState());
+    DateTime Function()? clock,
+  }) : _orderRepository = orderRepository,
+       _customerRepository = customerRepository,
+       _paymentRepository = paymentRepository,
+       _clock = clock ?? DateTime.now,
+       super(const OrdersListState()) {
+    _dbSubscription = _orderRepository.watchOrderTableUpdates().listen((_) {
+      if (isClosed) return;
+      if (state.orders.length > _pageSize) return;
+      if (state.isLoading) {
+        _hasPendingReload = true;
+        return;
+      }
+      loadOrders(refresh: true);
+    });
+  }
 
   Future<void> loadOrders({bool refresh = false}) async {
-    if (state.isLoading && !refresh) return;
-
+    final requestId = ++_loadRequestId;
     emit(state.copyWith(isLoading: true, clearErrorMessage: true));
 
     try {
@@ -38,6 +60,7 @@ class OrdersListCubit extends Cubit<OrdersListState> {
         excludedStatuses: params.excludedStatuses,
         expectedPickupDate: params.expectedPickupDate,
         isOverdue: params.isOverdue,
+        referenceDate: _clock(),
         createdFrom: params.createdFrom,
         createdTo: params.createdTo,
         hasRemaining: params.hasRemaining,
@@ -48,21 +71,28 @@ class OrdersListCubit extends Cubit<OrdersListState> {
 
       final viewModels = await _enrichOrders(orders);
 
-      emit(state.copyWith(
-        orders: viewModels,
-        isLoading: false,
-        hasMore: orders.length == _pageSize,
-      ));
+      if (isClosed || requestId != _loadRequestId) return;
+
+      emit(
+        state.copyWith(
+          orders: viewModels,
+          isLoading: false,
+          hasMore: orders.length == _pageSize,
+        ),
+      );
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isLoading: false,
-        errorMessage: f.message,
-      ));
+      if (isClosed || requestId != _loadRequestId) return;
+      emit(state.copyWith(isLoading: false, errorMessage: f.message));
     } catch (e) {
-      emit(state.copyWith(
-        isLoading: false,
-        errorMessage: e.toString(),
-      ));
+      if (isClosed || requestId != _loadRequestId) return;
+      emit(state.copyWith(isLoading: false, errorMessage: e.toString()));
+    } finally {
+      if (!isClosed && requestId == _loadRequestId && _hasPendingReload) {
+        _hasPendingReload = false;
+        if (state.orders.length <= _pageSize) {
+          await loadOrders(refresh: true);
+        }
+      }
     }
   }
 
@@ -78,6 +108,7 @@ class OrdersListCubit extends Cubit<OrdersListState> {
         excludedStatuses: params.excludedStatuses,
         expectedPickupDate: params.expectedPickupDate,
         isOverdue: params.isOverdue,
+        referenceDate: _clock(),
         createdFrom: params.createdFrom,
         createdTo: params.createdTo,
         hasRemaining: params.hasRemaining,
@@ -88,21 +119,17 @@ class OrdersListCubit extends Cubit<OrdersListState> {
 
       final nextViewModels = await _enrichOrders(nextOrders);
 
-      emit(state.copyWith(
-        orders: [...state.orders, ...nextViewModels],
-        isLoadingMore: false,
-        hasMore: nextOrders.length == _pageSize,
-      ));
+      emit(
+        state.copyWith(
+          orders: [...state.orders, ...nextViewModels],
+          isLoadingMore: false,
+          hasMore: nextOrders.length == _pageSize,
+        ),
+      );
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isLoadingMore: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isLoadingMore: false, errorMessage: f.message));
     } catch (e) {
-      emit(state.copyWith(
-        isLoadingMore: false,
-        errorMessage: e.toString(),
-      ));
+      emit(state.copyWith(isLoadingMore: false, errorMessage: e.toString()));
     }
   }
 
@@ -124,12 +151,18 @@ class OrdersListCubit extends Cubit<OrdersListState> {
     loadOrders(refresh: true);
   }
 
-  Future<List<OrderListItemViewModel>> _enrichOrders(List<dynamic> orders) async {
+  Future<List<OrderListItemViewModel>> _enrichOrders(
+    List<dynamic> orders,
+  ) async {
     final viewModels = <OrderListItemViewModel>[];
     for (final order in orders) {
-      final customer = await _customerRepository.getCustomerById(order.customerId);
+      final customer = await _customerRepository.getCustomerById(
+        order.customerId,
+      );
       final totalPaid = await _paymentRepository.getTotalPaidForOrder(order.id);
-      final remaining = await _paymentRepository.getRemainingAmountForOrder(order.id);
+      final remaining = await _paymentRepository.getRemainingAmountForOrder(
+        order.id,
+      );
 
       viewModels.add(
         OrderListItemViewModel(
@@ -151,7 +184,8 @@ class OrdersListCubit extends Cubit<OrdersListState> {
     DateTime? createdFrom,
     DateTime? createdTo,
     bool? hasRemaining,
-  }) _resolveQueryParams() {
+  })
+  _resolveQueryParams() {
     final filter = state.activeFilter;
     OrderStatus? status = filter.status;
     List<OrderStatus>? excludedStatuses;
@@ -162,14 +196,17 @@ class OrdersListCubit extends Cubit<OrdersListState> {
     final hasRemaining = filter.requiresRemainingOnly ? true : null;
 
     if (filter.requiresTodayOnly) {
-      final now = DateTime.now();
+      final now = _clock();
       createdFrom = DateTime(now.year, now.month, now.day, 0, 0, 0);
       createdTo = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
     } else if (filter.requiresOverdueOnly) {
       isOverdue = true;
     } else if (filter.requiresTodayPickupOnly) {
-      expectedPickupDate = OrderDate.today();
+      final now = _clock();
+      expectedPickupDate = OrderDate(now.year, now.month, now.day);
       excludedStatuses = const [OrderStatus.completed, OrderStatus.cancelled];
+    } else if (filter.requiresRemainingOnly) {
+      excludedStatuses = const [OrderStatus.cancelled];
     }
 
     return (
@@ -181,5 +218,11 @@ class OrdersListCubit extends Cubit<OrdersListState> {
       createdTo: createdTo,
       hasRemaining: hasRemaining,
     );
+  }
+
+  @override
+  Future<void> close() {
+    _dbSubscription?.cancel();
+    return super.close();
   }
 }

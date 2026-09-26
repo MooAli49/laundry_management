@@ -69,7 +69,7 @@ Do not:
 - Change the database schema without requirement.
 - Introduce new architectural layers without approval.
 - Add speculative functionality.
-- Implement deferred backend/synchronization functionality.
+- Implement deferred functionality prematurely.
 - Improve unrelated UI screens while implementing another feature.
 
 A task should produce the smallest coherent change that satisfies the approved requirement.
@@ -89,7 +89,7 @@ Unless explicitly approved, do not add:
 - Driver management
 - Vehicle management
 - Delivery management
-- Refunds
+- Automated payment gateway refunds and line-item refunds
 - Loyalty programs
 - Barcode workflows
 - AI assistant
@@ -490,23 +490,18 @@ The local database is the operational source for the current implementation phas
 
 ---
 
-## 23. Backend and Synchronization
+## 23. Backend and Synchronization Phase Boundary
 
-Backend and synchronization are intentionally deferred.
+The project has entered the **Offline / Sync Integration** phase.
 
-Do not implement:
+In this phase, synchronization infrastructure (Sync Queue, Sync Engine, Remote Data Sources with Retrofit + Dio, Supabase integration) is implemented.
 
-- API calls.
-- Remote repositories.
-- Sync workers.
-- Sync queues.
-- Connectivity-dependent business flows.
-- Retry infrastructure.
-- Remote conflict resolution.
+However, the following boundaries continue to apply strictly:
 
-unless the task explicitly belongs to the later backend/synchronization phase.
-
-The current architecture must remain ready for future integration without implementing it prematurely.
+- Business flows must never depend on connectivity.
+- Local transactions remain the primary operational write path.
+- UI and Cubits must not perform direct API calls or manage sync.
+- Advanced distributed features (platform background sync, multi-device conflict resolution) remain deferred.
 
 ---
 
@@ -573,13 +568,21 @@ Do not introduce duplicate libraries for the same responsibility.
 
 ## 28. Approved Networking
 
-When networking is implemented in the later phase, the approved direction is:
+The approved remote networking stack is:
 
-Dio
-+
-Retrofit
+    Dio
+    +
+    Retrofit
 
-Do not implement networking during the current local-only phase.
+Networking infrastructure is active for the Offline / Sync Integration phase.
+
+Rules:
+
+- Centralized Dio client configuration
+- Retrofit typed API interfaces
+- Remote Data Sources used exclusively by Sync Engine
+- No direct network calls from UI or Cubits
+- Local operations must never block on remote requests
 
 ---
 

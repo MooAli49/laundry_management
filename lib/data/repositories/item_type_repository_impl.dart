@@ -6,6 +6,7 @@ import '../../domain/repositories/item_type_repository.dart';
 import '../local/daos/item_types_dao.dart';
 import '../local/daos/sync_operations_dao.dart';
 import '../local/database/app_database.dart' as app_db;
+import '../sync/sync_payload_builder.dart';
 
 class ItemTypeRepositoryImpl implements ItemTypeRepository {
   final ItemTypesDao _itemTypesDao;
@@ -16,9 +17,9 @@ class ItemTypeRepositoryImpl implements ItemTypeRepository {
     required ItemTypesDao itemTypesDao,
     required SyncOperationsDao syncOperationsDao,
     required app_db.AppDatabase db,
-  })  : _itemTypesDao = itemTypesDao,
-        _syncOperationsDao = syncOperationsDao,
-        _db = db;
+  }) : _itemTypesDao = itemTypesDao,
+       _syncOperationsDao = syncOperationsDao,
+       _db = db;
 
   @override
   Future<ItemType> createItemType(ItemType itemType) async {
@@ -38,6 +39,7 @@ class ItemTypeRepositoryImpl implements ItemTypeRepository {
           entityType: 'item_type',
           entityId: itemType.id,
           operationType: 'create',
+          payload: SyncPayloadBuilder.buildItemTypePayload(itemType),
         );
 
         return itemType;
@@ -73,6 +75,7 @@ class ItemTypeRepositoryImpl implements ItemTypeRepository {
           entityType: 'item_type',
           entityId: itemType.id,
           operationType: 'update',
+          payload: SyncPayloadBuilder.buildItemTypeUpdatePayload(itemType),
         );
 
         return itemType;
@@ -127,11 +130,17 @@ class ItemTypeRepositoryImpl implements ItemTypeRepository {
           throw ValidationFailure('ItemType not found');
         }
 
-        await _itemTypesDao.setActiveStatus(id, true, DateTime.now());
+        final now = DateTime.now();
+        await _itemTypesDao.setActiveStatus(id, true, now);
         await _syncOperationsDao.recordOperation(
           entityType: 'item_type',
           entityId: id,
           operationType: 'activate',
+          payload: SyncPayloadBuilder.buildItemTypeStatusPayload(
+            id,
+            true,
+            updatedAt: now,
+          ),
         );
       });
     } catch (e) {
@@ -149,11 +158,17 @@ class ItemTypeRepositoryImpl implements ItemTypeRepository {
           throw ValidationFailure('ItemType not found');
         }
 
-        await _itemTypesDao.setActiveStatus(id, false, DateTime.now());
+        final now = DateTime.now();
+        await _itemTypesDao.setActiveStatus(id, false, now);
         await _syncOperationsDao.recordOperation(
           entityType: 'item_type',
           entityId: id,
           operationType: 'deactivate',
+          payload: SyncPayloadBuilder.buildItemTypeStatusPayload(
+            id,
+            false,
+            updatedAt: now,
+          ),
         );
       });
     } catch (e) {
