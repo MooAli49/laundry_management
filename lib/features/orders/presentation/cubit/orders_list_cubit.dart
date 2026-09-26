@@ -17,6 +17,7 @@ class OrdersListCubit extends Cubit<OrdersListState> {
   final OrderRepository _orderRepository;
   final CustomerRepository _customerRepository;
   final PaymentRepository _paymentRepository;
+  final DateTime Function() _clock;
 
   static const int _pageSize = 20;
 
@@ -31,9 +32,11 @@ class OrdersListCubit extends Cubit<OrdersListState> {
     required OrderRepository orderRepository,
     required CustomerRepository customerRepository,
     required PaymentRepository paymentRepository,
+    DateTime Function()? clock,
   }) : _orderRepository = orderRepository,
        _customerRepository = customerRepository,
        _paymentRepository = paymentRepository,
+       _clock = clock ?? DateTime.now,
        super(const OrdersListState()) {
     _dbSubscription = _orderRepository.watchOrderTableUpdates().listen((_) {
       if (isClosed) return;
@@ -57,6 +60,7 @@ class OrdersListCubit extends Cubit<OrdersListState> {
         excludedStatuses: params.excludedStatuses,
         expectedPickupDate: params.expectedPickupDate,
         isOverdue: params.isOverdue,
+        referenceDate: _clock(),
         createdFrom: params.createdFrom,
         createdTo: params.createdTo,
         hasRemaining: params.hasRemaining,
@@ -104,6 +108,7 @@ class OrdersListCubit extends Cubit<OrdersListState> {
         excludedStatuses: params.excludedStatuses,
         expectedPickupDate: params.expectedPickupDate,
         isOverdue: params.isOverdue,
+        referenceDate: _clock(),
         createdFrom: params.createdFrom,
         createdTo: params.createdTo,
         hasRemaining: params.hasRemaining,
@@ -191,14 +196,17 @@ class OrdersListCubit extends Cubit<OrdersListState> {
     final hasRemaining = filter.requiresRemainingOnly ? true : null;
 
     if (filter.requiresTodayOnly) {
-      final now = DateTime.now();
+      final now = _clock();
       createdFrom = DateTime(now.year, now.month, now.day, 0, 0, 0);
       createdTo = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
     } else if (filter.requiresOverdueOnly) {
       isOverdue = true;
     } else if (filter.requiresTodayPickupOnly) {
-      expectedPickupDate = OrderDate.today();
+      final now = _clock();
+      expectedPickupDate = OrderDate(now.year, now.month, now.day);
       excludedStatuses = const [OrderStatus.completed, OrderStatus.cancelled];
+    } else if (filter.requiresRemainingOnly) {
+      excludedStatuses = const [OrderStatus.cancelled];
     }
 
     return (

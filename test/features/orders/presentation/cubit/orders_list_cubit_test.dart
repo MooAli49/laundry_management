@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/data/local/daos/customers_dao.dart';
@@ -92,6 +93,7 @@ void main() {
     required int totalPiastres,
     int paidPiastres = 0,
     OrderDate? expectedPickupDate,
+    DateTime? expectedPickupDateTime,
     DateTime? createdAt,
   }) async {
     final now = createdAt ?? DateTime.now();
@@ -124,7 +126,10 @@ void main() {
       customerNameSnapshot: 'عميل القائمة',
       customerPhoneSnapshot: '01012345678',
       status: status,
-      expectedPickupDate: expectedPickupDate ?? OrderDate(2026, 9, 20),
+      expectedPickupDate: expectedPickupDate ??
+          (expectedPickupDateTime != null
+              ? OrderDate.fromDate(expectedPickupDateTime)
+              : OrderDate(2026, 9, 20)),
       subtotal: Money.fromPiastres(totalPiastres),
       total: Money.fromPiastres(totalPiastres),
       completedAt: status == OrderStatus.completed ? now : null,
@@ -152,6 +157,14 @@ void main() {
     );
 
     await orderRepository.createOrder(order: order, items: [item]);
+
+    if (expectedPickupDateTime != null) {
+      await (db.update(db.orders)..where((t) => t.id.equals(orderId))).write(
+        db_pkg.OrdersCompanion(
+          expectedPickupDate: Value(expectedPickupDateTime),
+        ),
+      );
+    }
 
     if (paidPiastres > 0) {
       await paymentRepository.recordPayment(
@@ -229,6 +242,357 @@ void main() {
       expect(cubit.state.activeFilter, OrderListFilter.ready);
       expect(cubit.state.orders.length, 1);
       expect(cubit.state.orders.first.order.id, 'ord-2');
+    });
+
+    group('Completed and Cancelled Filters & Resilience', () {
+      test(
+        'completed filter returns only completed orders and excludes ready/processing/cancelled',
+        () async {
+          await seedOrder(
+            orderId: 'ord-proc',
+            orderNumber: '26-P01',
+            customerId: 'cust-1',
+            customerName: 'عميل 1',
+            phone: '01011111111',
+            status: OrderStatus.processing,
+            totalPiastres: 5000,
+          );
+          await seedOrder(
+            orderId: 'ord-ready',
+            orderNumber: '26-R01',
+            customerId: 'cust-2',
+            customerName: 'عميل 2',
+            phone: '01022222222',
+            status: OrderStatus.ready,
+            totalPiastres: 3000,
+          );
+          await seedOrder(
+            orderId: 'ord-comp',
+            orderNumber: '26-C01',
+            customerId: 'cust-3',
+            customerName: 'عميل 3',
+            phone: '01033333333',
+            status: OrderStatus.completed,
+            totalPiastres: 4000,
+          );
+          await seedOrder(
+            orderId: 'ord-canc',
+            orderNumber: '26-X01',
+            customerId: 'cust-4',
+            customerName: 'عميل 4',
+            phone: '01044444444',
+            status: OrderStatus.cancelled,
+            totalPiastres: 2000,
+          );
+
+          cubit.setFilter(OrderListFilter.completed);
+          await pumpEventQueue();
+
+          expect(cubit.state.activeFilter, OrderListFilter.completed);
+          expect(cubit.state.orders.length, 1);
+          expect(cubit.state.orders.first.order.id, 'ord-comp');
+          expect(cubit.state.orders.first.order.status, OrderStatus.completed);
+          expect(
+            cubit.state.orders.any((o) => o.order.status == OrderStatus.ready),
+            isFalse,
+          );
+          expect(
+            cubit.state.orders.any(
+              (o) => o.order.status == OrderStatus.processing,
+            ),
+            isFalse,
+          );
+          expect(
+            cubit.state.orders.any(
+              (o) => o.order.status == OrderStatus.cancelled,
+            ),
+            isFalse,
+          );
+        },
+      );
+
+      test(
+        'cancelled filter returns only cancelled orders and excludes ready/processing/completed',
+        () async {
+          await seedOrder(
+            orderId: 'ord-proc',
+            orderNumber: '26-P01',
+            customerId: 'cust-1',
+            customerName: 'عميل 1',
+            phone: '01011111111',
+            status: OrderStatus.processing,
+            totalPiastres: 5000,
+          );
+          await seedOrder(
+            orderId: 'ord-ready',
+            orderNumber: '26-R01',
+            customerId: 'cust-2',
+            customerName: 'عميل 2',
+            phone: '01022222222',
+            status: OrderStatus.ready,
+            totalPiastres: 3000,
+          );
+          await seedOrder(
+            orderId: 'ord-comp',
+            orderNumber: '26-C01',
+            customerId: 'cust-3',
+            customerName: 'عميل 3',
+            phone: '01033333333',
+            status: OrderStatus.completed,
+            totalPiastres: 4000,
+          );
+          await seedOrder(
+            orderId: 'ord-canc',
+            orderNumber: '26-X01',
+            customerId: 'cust-4',
+            customerName: 'عميل 4',
+            phone: '01044444444',
+            status: OrderStatus.cancelled,
+            totalPiastres: 2000,
+          );
+
+          cubit.setFilter(OrderListFilter.cancelled);
+          await pumpEventQueue();
+
+          expect(cubit.state.activeFilter, OrderListFilter.cancelled);
+          expect(cubit.state.orders.length, 1);
+          expect(cubit.state.orders.first.order.id, 'ord-canc');
+          expect(cubit.state.orders.first.order.status, OrderStatus.cancelled);
+          expect(
+            cubit.state.orders.any((o) => o.order.status == OrderStatus.ready),
+            isFalse,
+          );
+          expect(
+            cubit.state.orders.any(
+              (o) => o.order.status == OrderStatus.processing,
+            ),
+            isFalse,
+          );
+          expect(
+            cubit.state.orders.any(
+              (o) => o.order.status == OrderStatus.completed,
+            ),
+            isFalse,
+          );
+        },
+      );
+
+      test(
+        'changing from one filter to another actually refreshes the list',
+        () async {
+          await seedOrder(
+            orderId: 'ord-proc',
+            orderNumber: '26-P01',
+            customerId: 'cust-1',
+            customerName: 'عميل 1',
+            phone: '01011111111',
+            status: OrderStatus.processing,
+            totalPiastres: 5000,
+          );
+          await seedOrder(
+            orderId: 'ord-ready',
+            orderNumber: '26-R01',
+            customerId: 'cust-2',
+            customerName: 'عميل 2',
+            phone: '01022222222',
+            status: OrderStatus.ready,
+            totalPiastres: 3000,
+          );
+          await seedOrder(
+            orderId: 'ord-comp',
+            orderNumber: '26-C01',
+            customerId: 'cust-3',
+            customerName: 'عميل 3',
+            phone: '01033333333',
+            status: OrderStatus.completed,
+            totalPiastres: 4000,
+          );
+          await seedOrder(
+            orderId: 'ord-canc',
+            orderNumber: '26-X01',
+            customerId: 'cust-4',
+            customerName: 'عميل 4',
+            phone: '01044444444',
+            status: OrderStatus.cancelled,
+            totalPiastres: 2000,
+          );
+
+          // 1. Filter by Ready
+          cubit.setFilter(OrderListFilter.ready);
+          await pumpEventQueue();
+          expect(cubit.state.activeFilter, OrderListFilter.ready);
+          expect(cubit.state.orders.length, 1);
+          expect(cubit.state.orders.first.order.id, 'ord-ready');
+
+          // 2. Change to Completed -> Must refresh to completed order
+          cubit.setFilter(OrderListFilter.completed);
+          await pumpEventQueue();
+          expect(cubit.state.activeFilter, OrderListFilter.completed);
+          expect(cubit.state.orders.length, 1);
+          expect(cubit.state.orders.first.order.id, 'ord-comp');
+
+          // 3. Change to Cancelled -> Must refresh to cancelled order
+          cubit.setFilter(OrderListFilter.cancelled);
+          await pumpEventQueue();
+          expect(cubit.state.activeFilter, OrderListFilter.cancelled);
+          expect(cubit.state.orders.length, 1);
+          expect(cubit.state.orders.first.order.id, 'ord-canc');
+
+          // 4. Change to All -> Must refresh to all 4 orders
+          cubit.setFilter(OrderListFilter.all);
+          await pumpEventQueue();
+          expect(cubit.state.activeFilter, OrderListFilter.all);
+          expect(cubit.state.orders.length, 4);
+        },
+      );
+
+      test(
+        'search combined with completed and cancelled filters works correctly',
+        () async {
+          await seedOrder(
+            orderId: 'ord-comp-1',
+            orderNumber: '26-C01',
+            customerId: 'cust-hassan',
+            customerName: 'حسن كمال',
+            phone: '01011119999',
+            status: OrderStatus.completed,
+            totalPiastres: 4000,
+          );
+          await seedOrder(
+            orderId: 'ord-comp-2',
+            orderNumber: '26-C02',
+            customerId: 'cust-ali',
+            customerName: 'علي كمال',
+            phone: '01022229999',
+            status: OrderStatus.completed,
+            totalPiastres: 4000,
+          );
+          await seedOrder(
+            orderId: 'ord-canc-1',
+            orderNumber: '26-X01',
+            customerId: 'cust-hassan-canc',
+            customerName: 'حسن نصر',
+            phone: '01033339999',
+            status: OrderStatus.cancelled,
+            totalPiastres: 2000,
+          );
+
+          // Completed + search "حسن"
+          cubit.setFilter(OrderListFilter.completed);
+          await pumpEventQueue();
+          expect(cubit.state.orders.length, 2);
+
+          cubit.search('حسن');
+          await pumpEventQueue();
+          expect(cubit.state.orders.length, 1);
+          expect(cubit.state.orders.first.order.id, 'ord-comp-1');
+
+          // Cancelled + search "حسن"
+          cubit.setFilter(OrderListFilter.cancelled);
+          await pumpEventQueue();
+          expect(cubit.state.orders.length, 1);
+          expect(cubit.state.orders.first.order.id, 'ord-canc-1');
+
+          // Cancelled + search "علي" (Ali has completed ord-comp-2, no cancelled)
+          cubit.search('علي');
+          await pumpEventQueue();
+          expect(cubit.state.orders.isEmpty, true);
+        },
+      );
+
+      test(
+        'completed orders with null completed_at from database/sync are safely mapped and loaded',
+        () async {
+          final now = DateTime.now();
+          // Insert customer
+          await customerRepository.createCustomer(
+            Customer(
+              id: 'cust-sync-comp',
+              name: 'عميل مزامنة مكتمل',
+              phone: '01077777777',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+
+          // Insert raw SQLite row directly with status = 'completed' and completedAt = null
+          await db.into(db.orders).insert(
+            db_pkg.OrdersCompanion.insert(
+              id: 'ord-sync-comp',
+              orderNumber: '26-SC01',
+              customerId: 'cust-sync-comp',
+              customerNameSnapshot: const Value('عميل مزامنة مكتمل'),
+              customerPhoneSnapshot: const Value('01077777777'),
+              status: Value(OrderStatus.completed.value),
+              expectedPickupDate: DateTime(2026, 9, 20),
+              subtotal: 6000,
+              total: 6000,
+              completedAt: const Value(null),
+              createdAt: DateTime(2026, 9, 1, 10, 0),
+              updatedAt: DateTime(2026, 9, 1, 12, 0),
+            ),
+          );
+
+          cubit.setFilter(OrderListFilter.completed);
+          await pumpEventQueue();
+
+          expect(cubit.state.errorMessage, isNull);
+          expect(cubit.state.orders.length, 1);
+          final loaded = cubit.state.orders.first.order;
+          expect(loaded.id, 'ord-sync-comp');
+          expect(loaded.status, OrderStatus.completed);
+          expect(loaded.completedAt, isNotNull);
+          expect(loaded.completedAt, loaded.updatedAt);
+        },
+      );
+
+      test(
+        'cancelled orders with null cancelled_at and null/empty cancellation_reason from database/sync are safely mapped and loaded',
+        () async {
+          final now = DateTime.now();
+          await customerRepository.createCustomer(
+            Customer(
+              id: 'cust-sync-canc',
+              name: 'عميل مزامنة ملغي',
+              phone: '01088888888',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+
+          // Insert raw SQLite row directly with status = 'cancelled', cancelledAt = null, cancellationReason = null
+          await db.into(db.orders).insert(
+            db_pkg.OrdersCompanion.insert(
+              id: 'ord-sync-canc',
+              orderNumber: '26-SX01',
+              customerId: 'cust-sync-canc',
+              customerNameSnapshot: const Value('عميل مزامنة ملغي'),
+              customerPhoneSnapshot: const Value('01088888888'),
+              status: Value(OrderStatus.cancelled.value),
+              expectedPickupDate: DateTime(2026, 9, 20),
+              notes: const Value('ملاحظة سبب يدوي'),
+              subtotal: 4500,
+              total: 4500,
+              cancelledAt: const Value(null),
+              cancellationReason: const Value(null),
+              createdAt: DateTime(2026, 9, 2, 10, 0),
+              updatedAt: DateTime(2026, 9, 2, 11, 0),
+            ),
+          );
+
+          cubit.setFilter(OrderListFilter.cancelled);
+          await pumpEventQueue();
+
+          expect(cubit.state.errorMessage, isNull);
+          expect(cubit.state.orders.length, 1);
+          final loaded = cubit.state.orders.first.order;
+          expect(loaded.id, 'ord-sync-canc');
+          expect(loaded.status, OrderStatus.cancelled);
+          expect(loaded.cancelledAt, isNotNull);
+          expect(loaded.cancelledAt, loaded.updatedAt);
+          expect(loaded.cancellationReason, 'ملاحظة سبب يدوي');
+        },
+      );
     });
 
     test('search updates query and queries database', () async {
@@ -366,6 +730,190 @@ void main() {
       },
     );
 
+    group('Deterministic Date-based Filters (Today Pickup vs Overdue)', () {
+      late OrdersListCubit testCubit;
+      final fixedNow = DateTime(2026, 9, 26, 12, 0, 0); // Saturday 2026-09-26 12:00:00
+
+      setUp(() async {
+        testCubit = OrdersListCubit(
+          orderRepository: orderRepository,
+          customerRepository: customerRepository,
+          paymentRepository: paymentRepository,
+          clock: () => fixedNow,
+        );
+
+        // 1. Expected pickup = yesterday UTC midnight (2026-09-25 00:00:00 UTC)
+        await seedOrder(
+          orderId: 'ord-det-yesterday-utc',
+          orderNumber: '26-DET01',
+          customerId: 'cust-det-1',
+          customerName: 'عميل أمس UTC',
+          phone: '01090000001',
+          status: OrderStatus.processing,
+          expectedPickupDateTime: DateTime.utc(2026, 9, 25, 0, 0, 0),
+          totalPiastres: 5000,
+        );
+
+        // 2. Expected pickup = yesterday afternoon (2026-09-25 15:30:00)
+        await seedOrder(
+          orderId: 'ord-det-yesterday-afternoon',
+          orderNumber: '26-DET02',
+          customerId: 'cust-det-2',
+          customerName: 'عميل أمس بعد الظهر',
+          phone: '01090000002',
+          status: OrderStatus.processing,
+          expectedPickupDateTime: DateTime(2026, 9, 25, 15, 30, 0),
+          totalPiastres: 5000,
+        );
+
+        // 3. Expected pickup = today midnight (2026-09-26 00:00:00)
+        await seedOrder(
+          orderId: 'ord-det-today-midnight',
+          orderNumber: '26-DET03',
+          customerId: 'cust-det-3',
+          customerName: 'عميل اليوم منتصف الليل',
+          phone: '01090000003',
+          status: OrderStatus.processing,
+          expectedPickupDateTime: DateTime(2026, 9, 26, 0, 0, 0),
+          totalPiastres: 5000,
+        );
+
+        // 4. Expected pickup = today afternoon (2026-09-26 14:30:00)
+        await seedOrder(
+          orderId: 'ord-det-today-afternoon',
+          orderNumber: '26-DET04',
+          customerId: 'cust-det-4',
+          customerName: 'عميل اليوم بعد الظهر',
+          phone: '01090000004',
+          status: OrderStatus.ready,
+          expectedPickupDateTime: DateTime(2026, 9, 26, 14, 30, 0),
+          totalPiastres: 5000,
+        );
+
+        // 5. Expected pickup = today end-of-day (2026-09-26 23:59:59)
+        await seedOrder(
+          orderId: 'ord-det-today-end-of-day',
+          orderNumber: '26-DET05',
+          customerId: 'cust-det-5',
+          customerName: 'عميل اليوم نهاية اليوم',
+          phone: '01090000005',
+          status: OrderStatus.processing,
+          expectedPickupDateTime: DateTime(2026, 9, 26, 23, 59, 59),
+          totalPiastres: 5000,
+        );
+
+        // 6. Expected pickup = today but completed
+        await seedOrder(
+          orderId: 'ord-det-today-completed',
+          orderNumber: '26-DET06',
+          customerId: 'cust-det-6',
+          customerName: 'عميل اليوم مكتمل',
+          phone: '01090000006',
+          status: OrderStatus.completed,
+          expectedPickupDateTime: DateTime(2026, 9, 26, 11, 0, 0),
+          totalPiastres: 5000,
+        );
+
+        // 7. Expected pickup = tomorrow midnight (2026-09-27 00:00:00)
+        await seedOrder(
+          orderId: 'ord-det-tomorrow-midnight',
+          orderNumber: '26-DET07',
+          customerId: 'cust-det-7',
+          customerName: 'عميل الغد منتصف الليل',
+          phone: '01090000007',
+          status: OrderStatus.processing,
+          expectedPickupDateTime: DateTime(2026, 9, 27, 0, 0, 0),
+          totalPiastres: 5000,
+        );
+
+        // 8. Expected pickup = tomorrow afternoon (2026-09-27 16:00:00)
+        await seedOrder(
+          orderId: 'ord-det-tomorrow-afternoon',
+          orderNumber: '26-DET08',
+          customerId: 'cust-det-8',
+          customerName: 'عميل الغد بعد الظهر',
+          phone: '01090000008',
+          status: OrderStatus.processing,
+          expectedPickupDateTime: DateTime(2026, 9, 27, 16, 0, 0),
+          totalPiastres: 5000,
+        );
+      });
+
+      tearDown(() async {
+        await testCubit.close();
+      });
+
+      test(
+        'Case 1 & 2 & 4: Today Pickup filter includes all today active orders across different times, excludes yesterday/tomorrow/completed',
+        () async {
+          testCubit.setFilter(OrderListFilter.todayPickup);
+          await pumpEventQueue();
+
+          final ids = testCubit.state.orders.map((o) => o.order.id).toSet();
+
+          // Must include all active orders for today (midnight, afternoon, end-of-day)
+          expect(ids, contains('ord-det-today-midnight'));
+          expect(ids, contains('ord-det-today-afternoon'));
+          expect(ids, contains('ord-det-today-end-of-day'));
+          expect(ids.length, 3);
+
+          // Must NOT include yesterday
+          expect(ids.contains('ord-det-yesterday-utc'), isFalse);
+          expect(ids.contains('ord-det-yesterday-afternoon'), isFalse);
+
+          // Must NOT include tomorrow
+          expect(ids.contains('ord-det-tomorrow-midnight'), isFalse);
+          expect(ids.contains('ord-det-tomorrow-afternoon'), isFalse);
+
+          // Must NOT include completed
+          expect(ids.contains('ord-det-today-completed'), isFalse);
+        },
+      );
+
+      test(
+        'Case 1 & 2 & 3: Overdue filter includes strictly yesterday orders, never today or tomorrow',
+        () async {
+          testCubit.setFilter(OrderListFilter.overdue);
+          await pumpEventQueue();
+
+          final ids = testCubit.state.orders.map((o) => o.order.id).toSet();
+
+          // Must include yesterday's orders
+          expect(ids, contains('ord-det-yesterday-utc'));
+          expect(ids, contains('ord-det-yesterday-afternoon'));
+          expect(ids.length, 2);
+
+          // Must NOT include today's orders (neither midnight, afternoon, end-of-day, nor completed)
+          expect(ids.contains('ord-det-today-midnight'), isFalse);
+          expect(ids.contains('ord-det-today-afternoon'), isFalse);
+          expect(ids.contains('ord-det-today-end-of-day'), isFalse);
+          expect(ids.contains('ord-det-today-completed'), isFalse);
+
+          // Must NOT include tomorrow's orders
+          expect(ids.contains('ord-det-tomorrow-midnight'), isFalse);
+          expect(ids.contains('ord-det-tomorrow-afternoon'), isFalse);
+        },
+      );
+
+      test(
+        'Case 3: Tomorrow orders appear in neither todayPickup nor overdue filter',
+        () async {
+          testCubit.setFilter(OrderListFilter.todayPickup);
+          await pumpEventQueue();
+          final todayIds = testCubit.state.orders.map((o) => o.order.id).toSet();
+
+          testCubit.setFilter(OrderListFilter.overdue);
+          await pumpEventQueue();
+          final overdueIds = testCubit.state.orders.map((o) => o.order.id).toSet();
+
+          expect(todayIds.contains('ord-det-tomorrow-midnight'), isFalse);
+          expect(todayIds.contains('ord-det-tomorrow-afternoon'), isFalse);
+          expect(overdueIds.contains('ord-det-tomorrow-midnight'), isFalse);
+          expect(overdueIds.contains('ord-det-tomorrow-afternoon'), isFalse);
+        },
+      );
+    });
+
     test(
       'remaining filter returns only orders with unpaid balance at query level',
       () async {
@@ -400,6 +948,257 @@ void main() {
         expect(cubit.state.orders.first.order.id, 'ord-unpaid');
       },
     );
+
+    group('Outstanding Payment Filter (hasRemaining) Invariants & Precision', () {
+      test(
+        'returns only orders with remaining amount > 0; strictly excludes fully paid, overpaid, and cancelled orders',
+        () async {
+          // 1. Partially paid order: Total 240, Paid 100, Remaining 140 (SHOULD APPEAR)
+          await seedOrder(
+            orderId: 'ord-rem-partial',
+            orderNumber: '26-REM01',
+            customerId: 'cust-rem-1',
+            customerName: 'عميل جزئي',
+            phone: '01061111111',
+            status: OrderStatus.processing,
+            totalPiastres: 24000,
+            paidPiastres: 10000,
+          );
+
+          // 2. Completely unpaid order: Total 240, Paid 0, Remaining 240 (SHOULD APPEAR)
+          await seedOrder(
+            orderId: 'ord-rem-unpaid',
+            orderNumber: '26-REM02',
+            customerId: 'cust-rem-2',
+            customerName: 'عميل غير مسدد',
+            phone: '01062222222',
+            status: OrderStatus.processing,
+            totalPiastres: 24000,
+            paidPiastres: 0,
+          );
+
+          // 3. 1 piastre remaining: Total 240, Paid 239, Remaining 1 (SHOULD APPEAR)
+          await seedOrder(
+            orderId: 'ord-rem-almost',
+            orderNumber: '26-REM03',
+            customerId: 'cust-rem-3',
+            customerName: 'عميل شبه مسدد',
+            phone: '01063333333',
+            status: OrderStatus.ready,
+            totalPiastres: 24000,
+            paidPiastres: 23900,
+          );
+
+          // 4. Fully paid ready order: Total 240, Paid 240, Remaining 0 (SHOULD NOT APPEAR)
+          await seedOrder(
+            orderId: 'ord-rem-full-ready',
+            orderNumber: '26-REM04',
+            customerId: 'cust-rem-4',
+            customerName: 'عميل مسدد جاهز',
+            phone: '01064444444',
+            status: OrderStatus.ready,
+            totalPiastres: 24000,
+            paidPiastres: 24000,
+          );
+
+          // 5. Overpaid processing order: Total 240, Paid 250, Remaining -10 -> 0 (SHOULD NOT APPEAR)
+          await seedOrder(
+            orderId: 'ord-rem-overpaid',
+            orderNumber: '26-REM05',
+            customerId: 'cust-rem-5',
+            customerName: 'عميل مسدد بزيادة',
+            phone: '01065555555',
+            status: OrderStatus.processing,
+            totalPiastres: 24000,
+            paidPiastres: 0,
+          );
+          await paymentsDao.insertPayment(
+            db_pkg.PaymentsCompanion.insert(
+              id: 'pay-overpaid',
+              orderId: 'ord-rem-overpaid',
+              amount: 25000,
+              paymentMethod: 'cash',
+              paidAt: DateTime.now(),
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            ),
+          );
+
+          // 6. Completed fully-paid order: Total 200, Paid 200, Remaining 0 (SHOULD NOT APPEAR)
+          await seedOrder(
+            orderId: 'ord-rem-completed',
+            orderNumber: '26-REM06',
+            customerId: 'cust-rem-6',
+            customerName: 'عميل مكتمل مسدد',
+            phone: '01066666666',
+            status: OrderStatus.completed,
+            totalPiastres: 20000,
+            paidPiastres: 0,
+          );
+          await paymentsDao.insertPayment(
+            db_pkg.PaymentsCompanion.insert(
+              id: 'pay-completed',
+              orderId: 'ord-rem-completed',
+              amount: 20000,
+              paymentMethod: 'cash',
+              paidAt: DateTime.now(),
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            ),
+          );
+
+          // 7. Cancelled fully-paid order: Total 15, Paid 15, Remaining 0 (SHOULD NOT APPEAR)
+          await seedOrder(
+            orderId: 'ord-rem-canc-paid',
+            orderNumber: '26-REM07',
+            customerId: 'cust-rem-7',
+            customerName: 'عميل ملغي مسدد',
+            phone: '01067777777',
+            status: OrderStatus.cancelled,
+            totalPiastres: 1500,
+            paidPiastres: 0,
+          );
+          await paymentsDao.insertPayment(
+            db_pkg.PaymentsCompanion.insert(
+              id: 'pay-canc-paid',
+              orderId: 'ord-rem-canc-paid',
+              amount: 1500,
+              paymentMethod: 'cash',
+              paidAt: DateTime.now(),
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            ),
+          );
+
+          // 8. Cancelled unpaid order: Total 100, Paid 0, Remaining 0 in domain (SHOULD NOT APPEAR)
+          await seedOrder(
+            orderId: 'ord-rem-canc-unpaid',
+            orderNumber: '26-REM08',
+            customerId: 'cust-rem-8',
+            customerName: 'عميل ملغي غير مسدد',
+            phone: '01068888888',
+            status: OrderStatus.cancelled,
+            totalPiastres: 10000,
+            paidPiastres: 0,
+          );
+
+          cubit.setFilter(OrderListFilter.hasRemaining);
+          await pumpEventQueue();
+
+          final returnedIds = cubit.state.orders.map((o) => o.order.id).toSet();
+
+          // MUST contain orders with remaining > 0
+          expect(returnedIds, contains('ord-rem-partial'));
+          expect(returnedIds, contains('ord-rem-unpaid'));
+          expect(returnedIds, contains('ord-rem-almost'));
+          expect(cubit.state.orders.length, 3);
+
+          // MUST NOT contain fully paid, overpaid, or cancelled orders
+          expect(returnedIds.contains('ord-rem-full-ready'), isFalse);
+          expect(returnedIds.contains('ord-rem-overpaid'), isFalse);
+          expect(returnedIds.contains('ord-rem-completed'), isFalse);
+          expect(returnedIds.contains('ord-rem-canc-paid'), isFalse);
+          expect(returnedIds.contains('ord-rem-canc-unpaid'), isFalse);
+
+          // Verify all returned orders have remainingAmount > 0 and match domain calculation
+          for (final item in cubit.state.orders) {
+            expect(item.remainingAmount.isPositive, isTrue);
+            expect(item.isFullyPaid, isFalse);
+            expect(item.order.status, isNot(equals(OrderStatus.cancelled)));
+            final domainRemaining = await paymentRepository.getRemainingAmountForOrder(item.order.id);
+            expect(item.remainingAmount, domainRemaining);
+          }
+        },
+      );
+
+      test(
+        'search combined with outstanding filter filters accurately and excludes non-matching / cancelled',
+        () async {
+          await seedOrder(
+            orderId: 'ord-rem-s1',
+            orderNumber: '26-SRCH1',
+            customerId: 'cust-srch-1',
+            customerName: 'طارق عبد الله',
+            phone: '01091111111',
+            status: OrderStatus.processing,
+            totalPiastres: 15000,
+            paidPiastres: 5000,
+          );
+          await seedOrder(
+            orderId: 'ord-rem-s2',
+            orderNumber: '26-SRCH2',
+            customerId: 'cust-srch-2',
+            customerName: 'طارق مسدد',
+            phone: '01092222222',
+            status: OrderStatus.ready,
+            totalPiastres: 15000,
+            paidPiastres: 15000, // fully paid
+          );
+          await seedOrder(
+            orderId: 'ord-rem-s3',
+            orderNumber: '26-SRCH3',
+            customerId: 'cust-srch-3',
+            customerName: 'طارق ملغي',
+            phone: '01093333333',
+            status: OrderStatus.cancelled,
+            totalPiastres: 15000,
+            paidPiastres: 0, // cancelled
+          );
+
+          cubit.setFilter(OrderListFilter.hasRemaining);
+          await pumpEventQueue();
+
+          cubit.search('طارق');
+          await pumpEventQueue();
+
+          expect(cubit.state.orders.length, 1);
+          expect(cubit.state.orders.first.order.id, 'ord-rem-s1');
+          expect(cubit.state.orders.first.remainingAmount.toEgp, 100.0);
+        },
+      );
+
+      test(
+        'switching between other filters and outstanding filter refreshes the list dynamically',
+        () async {
+          await seedOrder(
+            orderId: 'ord-sw-proc-unpaid',
+            orderNumber: '26-SW01',
+            customerId: 'cust-sw-1',
+            customerName: 'عميل تبديل غير مسدد',
+            phone: '01081111111',
+            status: OrderStatus.processing,
+            totalPiastres: 5000,
+            paidPiastres: 0,
+          );
+          await seedOrder(
+            orderId: 'ord-sw-proc-paid',
+            orderNumber: '26-SW02',
+            customerId: 'cust-sw-2',
+            customerName: 'عميل تبديل مسدد',
+            phone: '01082222222',
+            status: OrderStatus.processing,
+            totalPiastres: 5000,
+            paidPiastres: 5000,
+          );
+
+          // 1. All -> 2 orders
+          cubit.setFilter(OrderListFilter.all);
+          await pumpEventQueue();
+          expect(cubit.state.orders.length, 2);
+
+          // 2. Switch to hasRemaining -> 1 order (unpaid only)
+          cubit.setFilter(OrderListFilter.hasRemaining);
+          await pumpEventQueue();
+          expect(cubit.state.orders.length, 1);
+          expect(cubit.state.orders.first.order.id, 'ord-sw-proc-unpaid');
+
+          // 3. Switch back to all -> 2 orders
+          cubit.setFilter(OrderListFilter.all);
+          await pumpEventQueue();
+          expect(cubit.state.orders.length, 2);
+        },
+      );
+    });
 
     test(
       'pagination loadMore loads subsequent pages and updates hasMore flag',
@@ -803,6 +1602,7 @@ class DelayedOrderRepository implements OrderRepository {
     List<OrderStatus>? excludedStatuses,
     OrderDate? expectedPickupDate,
     bool? isOverdue,
+    DateTime? referenceDate,
     DateTime? createdFrom,
     DateTime? createdTo,
     String? customerId,
@@ -820,6 +1620,7 @@ class DelayedOrderRepository implements OrderRepository {
       excludedStatuses: excludedStatuses,
       expectedPickupDate: expectedPickupDate,
       isOverdue: isOverdue,
+      referenceDate: referenceDate,
       createdFrom: createdFrom,
       createdTo: createdTo,
       customerId: customerId,

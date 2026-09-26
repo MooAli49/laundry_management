@@ -669,132 +669,238 @@ class FinancialReportView extends StatelessWidget {
                 ),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final availableWidth =
-                        constraints.maxWidth - (AppSpacing.md * 2);
-                    final dynamicSpacing =
-                        ((availableWidth - 420) / 4).clamp(AppSpacing.lg, 80.0);
-                    return SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minWidth: constraints.maxWidth,
-                        ),
-                        child: DataTable(
-                          dataRowMinHeight: 44,
-                          dataRowMaxHeight: 52,
-                          headingRowHeight: 42,
-                          headingRowColor: WidgetStateProperty.all(
-                            AppColors.backgroundSecondary,
+                    const double orderNumberWidth = 135.0;
+                    const double totalWidth = 115.0;
+                    const double paidWidth = 115.0;
+                    const double remainingWidth = 135.0;
+                    const double minTableWidth = 620.0;
+
+                    final tableWidth = constraints.maxWidth < minTableWidth
+                        ? minTableWidth
+                        : constraints.maxWidth;
+
+                    final tableContent = SizedBox(
+                      width: tableWidth,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Table Header
+                          Container(
+                            height: 42,
+                            color: AppColors.backgroundSecondary,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                            ),
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: orderNumberWidth,
+                                  child: Align(
+                                    alignment: AlignmentDirectional.centerStart,
+                                    child: Text(
+                                      'رقم الطلب',
+                                      style: AppTextStyles.labelMedium.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.sm,
+                                    ),
+                                    child: Align(
+                                      alignment: AlignmentDirectional.centerStart,
+                                      child: Text(
+                                        'العميل',
+                                        style: AppTextStyles.labelMedium.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: totalWidth,
+                                  child: Align(
+                                    alignment: AlignmentDirectional.centerEnd,
+                                    child: Text(
+                                      'الإجمالي',
+                                      textAlign: TextAlign.end,
+                                      style: AppTextStyles.labelMedium.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: paidWidth,
+                                  child: Align(
+                                    alignment: AlignmentDirectional.centerEnd,
+                                    child: Text(
+                                      'المدفوع',
+                                      textAlign: TextAlign.end,
+                                      style: AppTextStyles.labelMedium.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: remainingWidth,
+                                  child: Align(
+                                    alignment: AlignmentDirectional.centerEnd,
+                                    child: Text(
+                                      'المتبقي',
+                                      textAlign: TextAlign.end,
+                                      style: AppTextStyles.labelMedium.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.warning,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          horizontalMargin: AppSpacing.md,
-                          columnSpacing: dynamicSpacing,
-                    columns: [
-                      DataColumn(
-                        label: Text(
-                          'رقم الطلب',
-                          style: AppTextStyles.labelMedium.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'العميل',
-                          style: AppTextStyles.labelMedium.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                      DataColumn(
-                        numeric: true,
-                        label: Text(
-                          'الإجمالي',
-                          style: AppTextStyles.labelMedium.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                      DataColumn(
-                        numeric: true,
-                        label: Text(
-                          'المدفوع',
-                          style: AppTextStyles.labelMedium.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                      DataColumn(
-                        numeric: true,
-                        label: Text(
-                          'المتبقي',
-                          style: AppTextStyles.labelMedium.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.warning,
-                          ),
-                        ),
-                      ),
-                    ],
-                    rows: data.outstandingOrders.map((ord) {
-                      return DataRow(
-                        cells: [
-                          DataCell(
-                            Text(
-                              ord.orderNumber.startsWith('#')
-                                  ? ord.orderNumber
-                                  : '#${ord.orderNumber}',
-                              textDirection: TextDirection.ltr,
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary,
+                          // Table Rows
+                          ...data.outstandingOrders.map((ord) {
+                            final displayOrderNumber =
+                                ord.orderNumber.startsWith('#')
+                                    ? ord.orderNumber
+                                    : '#${ord.orderNumber}';
+
+                            return Container(
+                              height: 48,
+                              decoration: const BoxDecoration(
+                                border: Border(
+                                  top: BorderSide(
+                                    color: AppColors.border,
+                                    width: 0.5,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          DataCell(
-                            Text(
-                              ord.customerName.isNotEmpty
-                                  ? ord.customerName
-                                  : '—',
-                              style: AppTextStyles.bodyMedium,
-                            ),
-                          ),
-                          DataCell(
-                            Text(
-                              '${ord.totalAmount.toEgp.toStringAsFixed(2)} ج.م',
-                              style: AppTextStyles.bodyMedium,
-                            ),
-                          ),
-                          DataCell(
-                            Text(
-                              '${ord.paidAmount.toEgp.toStringAsFixed(2)} ج.م',
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                color: AppColors.success,
-                                fontWeight: FontWeight.w500,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.md,
                               ),
-                            ),
-                          ),
-                          DataCell(
-                            Text(
-                              '${ord.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                color: AppColors.warning,
-                                fontWeight: FontWeight.bold,
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    width: orderNumberWidth,
+                                    child: Align(
+                                      alignment:
+                                          AlignmentDirectional.centerStart,
+                                      child: Tooltip(
+                                        message: displayOrderNumber,
+                                        child: Text(
+                                          displayOrderNumber,
+                                          textDirection: TextDirection.ltr,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style:
+                                              AppTextStyles.bodyMedium.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.sm,
+                                      ),
+                                      child: Align(
+                                        alignment:
+                                            AlignmentDirectional.centerStart,
+                                        child: Tooltip(
+                                          message: ord.customerName.isNotEmpty
+                                              ? ord.customerName
+                                              : '—',
+                                          child: Text(
+                                            ord.customerName.isNotEmpty
+                                                ? ord.customerName
+                                                : '—',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: AppTextStyles.bodyMedium,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: totalWidth,
+                                    child: Align(
+                                      alignment: AlignmentDirectional.centerEnd,
+                                      child: Text(
+                                        '${ord.totalAmount.toEgp.toStringAsFixed(2)} ج.م',
+                                        textAlign: TextAlign.end,
+                                        maxLines: 1,
+                                        softWrap: false,
+                                        style: AppTextStyles.bodyMedium,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: paidWidth,
+                                    child: Align(
+                                      alignment: AlignmentDirectional.centerEnd,
+                                      child: Text(
+                                        '${ord.paidAmount.toEgp.toStringAsFixed(2)} ج.م',
+                                        textAlign: TextAlign.end,
+                                        maxLines: 1,
+                                        softWrap: false,
+                                        style:
+                                            AppTextStyles.bodyMedium.copyWith(
+                                          color: AppColors.success,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: remainingWidth,
+                                    child: Align(
+                                      alignment: AlignmentDirectional.centerEnd,
+                                      child: Text(
+                                        '${ord.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
+                                        textAlign: TextAlign.end,
+                                        maxLines: 1,
+                                        softWrap: false,
+                                        style:
+                                            AppTextStyles.bodyMedium.copyWith(
+                                          color: AppColors.warning,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ),
+                            );
+                          }),
                         ],
+                      ),
+                    );
+
+                    if (constraints.maxWidth < minTableWidth) {
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: tableContent,
                       );
-                    }).toList(),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                    }
+                    return tableContent;
+                  },
                 ),
               ),
+            ),
           ],
         ),
       );

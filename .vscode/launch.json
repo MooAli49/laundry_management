@@ -16,7 +16,10 @@
             "name": "laundry_management (release mode)",
             "request": "launch",
             "type": "dart",
-            "flutterMode": "release"
+            "flutterMode": "release",
+            "args": [
+                "--dart-define-from-file=scripts/release_env.json"
+            ]
         }
     ]
 }

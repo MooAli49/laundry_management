@@ -131,6 +131,7 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     List<String>? excludedStatuses,
     DateTime? expectedPickupDate,
     bool? isOverdue,
+    DateTime? referenceDate,
     DateTime? createdFrom,
     DateTime? createdTo,
     String? customerId,
@@ -167,15 +168,22 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
         selectQuery.where(db.orders.status.isNotIn(excludedStatuses));
       }
       if (expectedPickupDate != null) {
+        final targetDateStr =
+            '${expectedPickupDate.year.toString().padLeft(4, '0')}-${expectedPickupDate.month.toString().padLeft(2, '0')}-${expectedPickupDate.day.toString().padLeft(2, '0')}';
         selectQuery.where(
-          db.orders.expectedPickupDate.equals(expectedPickupDate),
+          CustomExpression<bool>(
+            "date(orders.expected_pickup_date, 'unixepoch', 'localtime') = '$targetDateStr'",
+          ),
         );
       }
       if (isOverdue == true) {
-        final now = DateTime.now();
-        final todayDate = DateTime.utc(now.year, now.month, now.day);
+        final ref = referenceDate ?? DateTime.now();
+        final todayStr =
+            '${ref.year.toString().padLeft(4, '0')}-${ref.month.toString().padLeft(2, '0')}-${ref.day.toString().padLeft(2, '0')}';
         selectQuery.where(
-          db.orders.expectedPickupDate.isSmallerThanValue(todayDate) &
+          CustomExpression<bool>(
+                "date(orders.expected_pickup_date, 'unixepoch', 'localtime') < '$todayStr'",
+              ) &
               db.orders.status.isNotIn(const ['completed', 'cancelled']),
         );
       }
@@ -193,13 +201,13 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
       if (hasRemaining == true) {
         selectQuery.where(
           const CustomExpression<bool>(
-            'orders.total > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)',
+            "orders.status != 'cancelled' AND orders.total > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)",
           ),
         );
       } else if (hasRemaining == false) {
         selectQuery.where(
           const CustomExpression<bool>(
-            'orders.total <= (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)',
+            "orders.status = 'cancelled' OR orders.total <= (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)",
           ),
         );
       }
@@ -220,16 +228,23 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
         selectQuery.where((t) => t.status.isNotIn(excludedStatuses));
       }
       if (expectedPickupDate != null) {
+        final targetDateStr =
+            '${expectedPickupDate.year.toString().padLeft(4, '0')}-${expectedPickupDate.month.toString().padLeft(2, '0')}-${expectedPickupDate.day.toString().padLeft(2, '0')}';
         selectQuery.where(
-          (t) => t.expectedPickupDate.equals(expectedPickupDate),
+          (t) => CustomExpression<bool>(
+            "date(orders.expected_pickup_date, 'unixepoch', 'localtime') = '$targetDateStr'",
+          ),
         );
       }
       if (isOverdue == true) {
-        final now = DateTime.now();
-        final todayDate = DateTime.utc(now.year, now.month, now.day);
+        final ref = referenceDate ?? DateTime.now();
+        final todayStr =
+            '${ref.year.toString().padLeft(4, '0')}-${ref.month.toString().padLeft(2, '0')}-${ref.day.toString().padLeft(2, '0')}';
         selectQuery.where(
           (t) =>
-              t.expectedPickupDate.isSmallerThanValue(todayDate) &
+              CustomExpression<bool>(
+                "date(orders.expected_pickup_date, 'unixepoch', 'localtime') < '$todayStr'",
+              ) &
               t.status.isNotIn(const ['completed', 'cancelled']),
         );
       }
@@ -245,13 +260,13 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
       if (hasRemaining == true) {
         selectQuery.where(
           (t) => const CustomExpression<bool>(
-            'orders.total > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)',
+            "orders.status != 'cancelled' AND orders.total > (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)",
           ),
         );
       } else if (hasRemaining == false) {
         selectQuery.where(
           (t) => const CustomExpression<bool>(
-            'orders.total <= (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)',
+            "orders.status = 'cancelled' OR orders.total <= (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payments.order_id = orders.id)",
           ),
         );
       }

@@ -244,5 +244,110 @@ void main() {
       final remainingWidget = tester.widget<Text>(remainingFinder);
       expect(remainingWidget.style?.color, AppColors.warning);
     });
+
+    testWidgets(
+      'Outstanding Orders table layout preserves readability of remaining amount with long customer names and large values',
+      (tester) async {
+        final now = DateTime.now();
+        final layoutTestData = FinancialReportData(
+          totalSales: const Money.fromPiastres(250000000),
+          totalPayments: const Money.fromPiastres(150000000),
+          totalRefunds: Money.zero,
+          netPayments: const Money.fromPiastres(150000000),
+          totalOperatingExpenses: Money.zero,
+          netProfit: const Money.fromPiastres(250000000),
+          outstandingAmount: const Money.fromPiastres(100000000),
+          totalDiscounts: Money.zero,
+          paymentMethodsBreakdown: const [],
+          expenseCategoriesBreakdown: const [],
+          outstandingOrders: [
+            OutstandingOrderSummary(
+              orderId: 'ord-long',
+              orderNumber: 'ORD-EXTENDED-LONG-NUMBER-2026-9993240',
+              createdAt: now,
+              customerName:
+                  'عبد الرحمن محمد عبد السلام الشناوي الدسوقي إبراهيم أحمد حسن',
+              customerPhone: '01011112222',
+              totalAmount: const Money.fromPiastres(150000000), // 1,500,000.00 EGP
+              paidAmount: const Money.fromPiastres(51235000), // 512,350.00 EGP
+              remainingAmount:
+                  const Money.fromPiastres(98765000), // 987,650.00 EGP
+            ),
+            OutstandingOrderSummary(
+              orderId: 'ord-short',
+              orderNumber: '26-101',
+              createdAt: now,
+              customerName: 'علي',
+              customerPhone: '01011112222',
+              totalAmount: const Money.fromPiastres(24000),
+              paidAmount: const Money.fromPiastres(10000),
+              remainingAmount: const Money.fromPiastres(14000),
+            ),
+          ],
+          expenseTransactions: const [],
+        );
+
+        // Tablet viewport (1000x800)
+        tester.view.physicalSize = const Size(1000, 800);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Scaffold(
+                body: SingleChildScrollView(
+                  child: FinancialReportView(
+                    data: layoutTestData,
+                    onRefresh: () {},
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // 1. Order numbers are rendered
+        expect(
+          find.text('#ORD-EXTENDED-LONG-NUMBER-2026-9993240'),
+          findsOneWidget,
+        );
+        expect(find.text('#26-101'), findsOneWidget);
+
+        // 2. Remaining amounts are rendered
+        final largeRemainingFinder = find.text('987650.00 ج.م');
+        final shortRemainingFinder = find.text('140.00 ج.م');
+        expect(largeRemainingFinder, findsOneWidget);
+        expect(shortRemainingFinder, findsOneWidget);
+
+        // 3. Verify horizontal positions: remaining column is at the left, order number at the right
+        final largeRemainingRect = tester.getRect(largeRemainingFinder);
+        final orderRect = tester.getRect(
+          find.text('#ORD-EXTENDED-LONG-NUMBER-2026-9993240'),
+        );
+        expect(largeRemainingRect.left, greaterThanOrEqualTo(0.0));
+        expect(orderRect.right, lessThanOrEqualTo(1000.0));
+        expect(orderRect.left, greaterThan(largeRemainingRect.right));
+
+        // 4. Verify customer name text has ellipsis overflow
+        final customerFinder = find.text(
+          'عبد الرحمن محمد عبد السلام الشناوي الدسوقي إبراهيم أحمد حسن',
+        );
+        expect(customerFinder, findsOneWidget);
+        final customerWidget = tester.widget<Text>(customerFinder);
+        expect(customerWidget.overflow, TextOverflow.ellipsis);
+        expect(customerWidget.maxLines, 1);
+
+        // 5. Verify remaining text styling
+        final largeRemainingWidget = tester.widget<Text>(largeRemainingFinder);
+        expect(largeRemainingWidget.style?.color, AppColors.warning);
+        expect(largeRemainingWidget.style?.fontWeight, FontWeight.bold);
+        expect(largeRemainingWidget.maxLines, 1);
+        expect(largeRemainingWidget.softWrap, false);
+      },
+    );
   });
 }

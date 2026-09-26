@@ -162,14 +162,74 @@ void main() {
       );
       expect(completedOrders.length, 1);
       expect(completedOrders.first.id, 'ord-3');
+
+      final cancelledOrders = await ordersDao.getOrders(
+        status: OrderStatus.cancelled.value,
+      );
+      expect(cancelledOrders.length, 1);
+      expect(cancelledOrders.first.id, 'ord-4');
     });
 
-    test('filters by hasRemaining at SQL level via subquery', () async {
+    test('completed and cancelled filters strictly exclude other statuses at SQL level', () async {
+      final completedOrders = await ordersDao.getOrders(
+        status: OrderStatus.completed.value,
+      );
+      for (final order in completedOrders) {
+        expect(order.status, equals(OrderStatus.completed.value));
+        expect(order.status, isNot(equals(OrderStatus.ready.value)));
+        expect(order.status, isNot(equals(OrderStatus.processing.value)));
+        expect(order.status, isNot(equals(OrderStatus.cancelled.value)));
+      }
+
+      final cancelledOrders = await ordersDao.getOrders(
+        status: OrderStatus.cancelled.value,
+      );
+      for (final order in cancelledOrders) {
+        expect(order.status, equals(OrderStatus.cancelled.value));
+        expect(order.status, isNot(equals(OrderStatus.ready.value)));
+        expect(order.status, isNot(equals(OrderStatus.processing.value)));
+        expect(order.status, isNot(equals(OrderStatus.completed.value)));
+      }
+    });
+
+    test('combines search query with completed and cancelled status filters', () async {
+      // Customer 'سارة' has ord-3 (completed) and ord-4 (cancelled)
+      final completedSearch = await ordersDao.getOrders(
+        query: 'سارة',
+        status: OrderStatus.completed.value,
+      );
+      expect(completedSearch.length, 1);
+      expect(completedSearch.first.id, 'ord-3');
+
+      final cancelledSearch = await ordersDao.getOrders(
+        query: 'سارة',
+        status: OrderStatus.cancelled.value,
+      );
+      expect(cancelledSearch.length, 1);
+      expect(cancelledSearch.first.id, 'ord-4');
+
+      // Search for 'أحمد' (has ord-1 processing, ord-2 ready) with completed status
+      final noResults = await ordersDao.getOrders(
+        query: 'أحمد',
+        status: OrderStatus.completed.value,
+      );
+      expect(noResults.isEmpty, true);
+    });
+
+    test('filters by hasRemaining at SQL level: only active orders with unpaid balance appear', () async {
       final remainingOrders = await ordersDao.getOrders(hasRemaining: true);
-      // ord-1 (5000 - 2000 = 3000) and ord-4 (4000 - 0 = 4000)
-      expect(remainingOrders.length, 2);
-      final ids = remainingOrders.map((o) => o.id).toSet();
-      expect(ids, containsAll(['ord-1', 'ord-4']));
+      // ord-1 (processing, 5000 - 2000 = 3000) appears.
+      // ord-2 (ready, fully paid 3000/3000 = 0) does NOT appear.
+      // ord-3 (completed, fully paid 8000/8000 = 0) does NOT appear.
+      // ord-4 (cancelled, remaining is 0) does NOT appear even though payments = 0.
+      expect(remainingOrders.length, 1);
+      expect(remainingOrders.first.id, 'ord-1');
+
+      // hasRemaining: false returns all orders with 0 remaining (fully paid ord-2, ord-3, and cancelled ord-4)
+      final zeroRemainingOrders = await ordersDao.getOrders(hasRemaining: false);
+      expect(zeroRemainingOrders.length, 3);
+      final zeroIds = zeroRemainingOrders.map((o) => o.id).toSet();
+      expect(zeroIds, containsAll(['ord-2', 'ord-3', 'ord-4']));
     });
 
     test('combines status and hasRemaining SQL filters', () async {
@@ -185,6 +245,13 @@ void main() {
         hasRemaining: true,
       );
       expect(readyWithRemaining.isEmpty, true);
+
+      // Cancelled orders never have remaining balance
+      final cancelledWithRemaining = await ordersDao.getOrders(
+        status: OrderStatus.cancelled.value,
+        hasRemaining: true,
+      );
+      expect(cancelledWithRemaining.isEmpty, true);
     });
 
     test('searches by order number', () async {
@@ -223,5 +290,220 @@ void main() {
         expect(page2[1].id, 'ord-1');
       },
     );
+
+    group('Date-based Filtering (Today Pickup and Overdue)', () {
+      final refDate = DateTime(2026, 9, 26, 12, 0, 0); // Reference "today"
+      final todayDate = DateTime(2026, 9, 26);
+
+      setUp(() async {
+        // 1. Yesterday pickup (UTC midnight)
+        await ordersDao.insertOrder(
+          db_pkg.OrdersCompanion.insert(
+            id: 'ord-yesterday-utc',
+            orderNumber: '26-D01',
+            customerId: 'cust-ahmed',
+            status: Value(OrderStatus.processing.value),
+            expectedPickupDate: DateTime.utc(2026, 9, 25, 0, 0, 0),
+            subtotal: 1000,
+            total: 1000,
+            createdAt: DateTime(2026, 9, 20),
+            updatedAt: DateTime(2026, 9, 20),
+          ),
+        );
+
+        // 2. Yesterday pickup (local afternoon 14:30)
+        await ordersDao.insertOrder(
+          db_pkg.OrdersCompanion.insert(
+            id: 'ord-yesterday-afternoon',
+            orderNumber: '26-D02',
+            customerId: 'cust-ahmed',
+            status: Value(OrderStatus.processing.value),
+            expectedPickupDate: DateTime(2026, 9, 25, 14, 30, 0),
+            subtotal: 1000,
+            total: 1000,
+            createdAt: DateTime(2026, 9, 20),
+            updatedAt: DateTime(2026, 9, 20),
+          ),
+        );
+
+        // 3. Today pickup (UTC midnight 00:00:00)
+        await ordersDao.insertOrder(
+          db_pkg.OrdersCompanion.insert(
+            id: 'ord-today-utc-midnight',
+            orderNumber: '26-D03',
+            customerId: 'cust-ahmed',
+            status: Value(OrderStatus.processing.value),
+            expectedPickupDate: DateTime.utc(2026, 9, 26, 0, 0, 0),
+            subtotal: 1000,
+            total: 1000,
+            createdAt: DateTime(2026, 9, 21),
+            updatedAt: DateTime(2026, 9, 21),
+          ),
+        );
+
+        // 4. Today pickup (local afternoon 14:30:00)
+        await ordersDao.insertOrder(
+          db_pkg.OrdersCompanion.insert(
+            id: 'ord-today-local-afternoon',
+            orderNumber: '26-D04',
+            customerId: 'cust-ahmed',
+            status: Value(OrderStatus.ready.value),
+            expectedPickupDate: DateTime(2026, 9, 26, 14, 30, 0),
+            subtotal: 1000,
+            total: 1000,
+            createdAt: DateTime(2026, 9, 21),
+            updatedAt: DateTime(2026, 9, 21),
+          ),
+        );
+
+        // 5. Today pickup (local end-of-day 23:59:59)
+        await ordersDao.insertOrder(
+          db_pkg.OrdersCompanion.insert(
+            id: 'ord-today-end-of-day',
+            orderNumber: '26-D05',
+            customerId: 'cust-sara',
+            status: Value(OrderStatus.processing.value),
+            expectedPickupDate: DateTime(2026, 9, 26, 23, 59, 59),
+            subtotal: 1000,
+            total: 1000,
+            createdAt: DateTime(2026, 9, 21),
+            updatedAt: DateTime(2026, 9, 21),
+          ),
+        );
+
+        // 6. Today pickup (completed status -> excluded from active filters)
+        await ordersDao.insertOrder(
+          db_pkg.OrdersCompanion.insert(
+            id: 'ord-today-completed',
+            orderNumber: '26-D06',
+            customerId: 'cust-ahmed',
+            status: Value(OrderStatus.completed.value),
+            expectedPickupDate: DateTime(2026, 9, 26, 10, 0, 0),
+            completedAt: Value(DateTime(2026, 9, 26, 11, 0, 0)),
+            subtotal: 1000,
+            total: 1000,
+            createdAt: DateTime(2026, 9, 21),
+            updatedAt: DateTime(2026, 9, 21),
+          ),
+        );
+
+        // 7. Tomorrow pickup (UTC midnight)
+        await ordersDao.insertOrder(
+          db_pkg.OrdersCompanion.insert(
+            id: 'ord-tomorrow-utc',
+            orderNumber: '26-D07',
+            customerId: 'cust-ahmed',
+            status: Value(OrderStatus.processing.value),
+            expectedPickupDate: DateTime.utc(2026, 9, 27, 0, 0, 0),
+            subtotal: 1000,
+            total: 1000,
+            createdAt: DateTime(2026, 9, 22),
+            updatedAt: DateTime(2026, 9, 22),
+          ),
+        );
+
+        // 8. Tomorrow pickup (local afternoon)
+        await ordersDao.insertOrder(
+          db_pkg.OrdersCompanion.insert(
+            id: 'ord-tomorrow-afternoon',
+            orderNumber: '26-D08',
+            customerId: 'cust-ahmed',
+            status: Value(OrderStatus.processing.value),
+            expectedPickupDate: DateTime(2026, 9, 27, 16, 0, 0),
+            subtotal: 1000,
+            total: 1000,
+            createdAt: DateTime(2026, 9, 22),
+            updatedAt: DateTime(2026, 9, 22),
+          ),
+        );
+      });
+
+      test(
+        'todayPickup: matches all orders with expectedPickupDate today regardless of time/UTC/local',
+        () async {
+          final results = await ordersDao.getOrders(
+            expectedPickupDate: todayDate,
+            excludedStatuses: const ['completed', 'cancelled'],
+          );
+          final ids = results.map((o) => o.id).toSet();
+
+          // Must include today's active orders:
+          expect(ids, contains('ord-today-utc-midnight'));
+          expect(ids, contains('ord-today-local-afternoon'));
+          expect(ids, contains('ord-today-end-of-day'));
+
+          // Must NOT include yesterday or tomorrow orders:
+          expect(ids.contains('ord-yesterday-utc'), isFalse);
+          expect(ids.contains('ord-yesterday-afternoon'), isFalse);
+          expect(ids.contains('ord-tomorrow-utc'), isFalse);
+          expect(ids.contains('ord-tomorrow-afternoon'), isFalse);
+
+          // Must NOT include completed orders:
+          expect(ids.contains('ord-today-completed'), isFalse);
+        },
+      );
+
+      test(
+        'overdue: matches orders with expectedPickupDate strictly before today and excludes today/tomorrow',
+        () async {
+          final results = await ordersDao.getOrders(
+            isOverdue: true,
+            referenceDate: refDate,
+          );
+          final ids = results.map((o) => o.id).toSet();
+
+          // Must include yesterday's orders:
+          expect(ids, contains('ord-yesterday-utc'));
+          expect(ids, contains('ord-yesterday-afternoon'));
+
+          // Must NOT include today's orders (neither midnight, afternoon, nor end-of-day):
+          expect(ids.contains('ord-today-utc-midnight'), isFalse);
+          expect(ids.contains('ord-today-local-afternoon'), isFalse);
+          expect(ids.contains('ord-today-end-of-day'), isFalse);
+          expect(ids.contains('ord-today-completed'), isFalse);
+
+          // Must NOT include tomorrow orders:
+          expect(ids.contains('ord-tomorrow-utc'), isFalse);
+          expect(ids.contains('ord-tomorrow-afternoon'), isFalse);
+        },
+      );
+
+      test(
+        'tomorrow: expectedPickupDate = tomorrow does not appear in today or overdue',
+        () async {
+          final todayPickups = await ordersDao.getOrders(
+            expectedPickupDate: todayDate,
+            excludedStatuses: const ['completed', 'cancelled'],
+          );
+          final overdue = await ordersDao.getOrders(
+            isOverdue: true,
+            referenceDate: refDate,
+          );
+
+          final todayIds = todayPickups.map((o) => o.id).toSet();
+          final overdueIds = overdue.map((o) => o.id).toSet();
+
+          expect(todayIds.contains('ord-tomorrow-utc'), isFalse);
+          expect(todayIds.contains('ord-tomorrow-afternoon'), isFalse);
+          expect(overdueIds.contains('ord-tomorrow-utc'), isFalse);
+          expect(overdueIds.contains('ord-tomorrow-afternoon'), isFalse);
+        },
+      );
+
+      test('date-based filtering works seamlessly with search query', () async {
+        final results = await ordersDao.getOrders(
+          query: 'أحمد',
+          expectedPickupDate: todayDate,
+          excludedStatuses: const ['completed', 'cancelled'],
+        );
+        final ids = results.map((o) => o.id).toSet();
+
+        // Includes Ahmed's active today orders, excludes Sara's order
+        expect(ids, contains('ord-today-utc-midnight'));
+        expect(ids, contains('ord-today-local-afternoon'));
+        expect(ids.contains('ord-today-end-of-day'), isFalse); // Sara
+        expect(ids.contains('ord-yesterday-utc'), isFalse);
+      });
+    });
   });
 }

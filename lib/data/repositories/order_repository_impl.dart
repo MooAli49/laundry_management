@@ -853,6 +853,7 @@ class OrderRepositoryImpl implements OrderRepository {
     List<OrderStatus>? excludedStatuses,
     OrderDate? expectedPickupDate,
     bool? isOverdue,
+    DateTime? referenceDate,
     DateTime? createdFrom,
     DateTime? createdTo,
     String? customerId,
@@ -867,6 +868,7 @@ class OrderRepositoryImpl implements OrderRepository {
         excludedStatuses: excludedStatuses?.map((s) => s.name).toList(),
         expectedPickupDate: expectedPickupDate?.toDateTime(),
         isOverdue: isOverdue,
+        referenceDate: referenceDate,
         createdFrom: createdFrom,
         createdTo: createdTo,
         customerId: customerId,
@@ -1223,13 +1225,30 @@ class OrderRepositoryImpl implements OrderRepository {
   }
 
   Order _mapOrderToDomain(app_db.Order row) {
+    final status = OrderStatus.fromValue(row.status);
+    DateTime? completedAt = row.completedAt;
+    DateTime? cancelledAt = row.cancelledAt;
+    String? cancellationReason = row.cancellationReason;
+
+    if (status == OrderStatus.completed && completedAt == null) {
+      completedAt = row.updatedAt;
+    } else if (status == OrderStatus.cancelled) {
+      cancelledAt ??= row.updatedAt;
+      if (cancellationReason == null || cancellationReason.trim().isEmpty) {
+        cancellationReason =
+            (row.notes != null && row.notes!.trim().isNotEmpty)
+                ? row.notes!
+                : 'تم الإلغاء';
+      }
+    }
+
     return Order(
       id: row.id,
       orderNumber: row.orderNumber,
       customerId: row.customerId,
       customerNameSnapshot: row.customerNameSnapshot,
       customerPhoneSnapshot: row.customerPhoneSnapshot,
-      status: OrderStatus.fromValue(row.status),
+      status: status,
       expectedPickupDate: OrderDate.fromDate(row.expectedPickupDate),
       notes: row.notes,
       customerPickupRequested: row.customerPickupRequested,
@@ -1240,9 +1259,9 @@ class OrderRepositoryImpl implements OrderRepository {
       discount: Money.fromPiastres(row.discount),
       tax: Money.fromPiastres(row.tax),
       total: Money.fromPiastres(row.total),
-      completedAt: row.completedAt,
-      cancelledAt: row.cancelledAt,
-      cancellationReason: row.cancellationReason,
+      completedAt: completedAt,
+      cancelledAt: cancelledAt,
+      cancellationReason: cancellationReason,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     );
