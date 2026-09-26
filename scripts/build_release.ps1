@@ -40,6 +40,15 @@ if ($DefineFile -ne "") {
         Write-Error "Define file not found: $DefineFile"
         exit 1
     }
+    $fileContent = Get-Content -Raw $DefineFile
+    if ($fileContent -match "dyhfgnbhijukbdptreto") {
+        Write-Error "Safety check failed: Define file '$DefineFile' targets the Development Supabase project ('dyhfgnbhijukbdptreto'). Release builds must target Production ('rvrskluqfbrkvvlxtxfp')."
+        exit 1
+    }
+    if ($fileContent -match "<.*>" -or $fileContent -match "REPLACE_WITH_PRODUCTION_ANON_KEY") {
+        Write-Error "Safety check failed: Define file '$DefineFile' contains unreplaced placeholders. Provide your actual Production Supabase anon key."
+        exit 1
+    }
     Write-Host "Building release APK using define file: $DefineFile" -ForegroundColor Cyan
     flutter build apk --release --dart-define-from-file="$DefineFile"
 } else {
@@ -49,14 +58,24 @@ Missing required Supabase configuration for release build.
 In release mode, SupabaseConfig strictly forbids falling back to development credentials.
 
 Please supply parameters or set environment variables:
-  .\scripts\build_release.ps1 -SupabaseUrlRoot "https://<your-project>.supabase.co" -SupabaseAnonKey "<your-anon-key>"
+  .\scripts\build_release.ps1 -SupabaseUrlRoot "https://rvrskluqfbrkvvlxtxfp.supabase.co" -SupabaseAnonKey "<your-production-anon-key>"
 Or:
-  `$env:SUPABASE_URL_ROOT = "https://<your-project>.supabase.co"
-  `$env:SUPABASE_ANON_KEY = "<your-anon-key>"
+  `$env:SUPABASE_URL_ROOT = "https://rvrskluqfbrkvvlxtxfp.supabase.co"
+  `$env:SUPABASE_ANON_KEY = "<your-production-anon-key>"
   .\scripts\build_release.ps1
 Or supply a define file:
   .\scripts\build_release.ps1 -DefineFile "scripts/release_env.json"
 "@
+        exit 1
+    }
+
+    if ($SupabaseUrlRoot -match "dyhfgnbhijukbdptreto") {
+        Write-Error "Safety check failed: SupabaseUrlRoot targets the Development Supabase project ('dyhfgnbhijukbdptreto'). Release builds must target Production ('rvrskluqfbrkvvlxtxfp')."
+        exit 1
+    }
+
+    if ($SupabaseAnonKey -match "<.*>" -or $SupabaseAnonKey -match "REPLACE_WITH_PRODUCTION_ANON_KEY") {
+        Write-Error "Safety check failed: SupabaseAnonKey contains placeholder text. Provide your actual Production Supabase anon key."
         exit 1
     }
 

@@ -216,6 +216,86 @@ void main() {
           );
         },
       );
+
+      test(
+        'resolve(isRelease: true) throws StateError when Development Supabase URL is supplied',
+        () {
+          expect(
+            () => SupabaseConfig.resolve(
+              customUrlRoot: SupabaseConfig.defaultDevUrlRoot,
+              customAnonKey: 'valid-prod-anon-key-12345',
+              isRelease: true,
+            ),
+            throwsA(
+              isA<StateError>().having(
+                (e) => e.message,
+                'message',
+                allOf(
+                  contains('Development Supabase project'),
+                  contains('cannot be targeted in release builds'),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+
+      test(
+        'resolve(isRelease: true) throws StateError when Development anon key is supplied',
+        () {
+          expect(
+            () => SupabaseConfig.resolve(
+              customUrlRoot: SupabaseConfig.prodUrlRoot,
+              customAnonKey: SupabaseConfig.defaultDevAnonKey,
+              isRelease: true,
+            ),
+            throwsA(
+              isA<StateError>().having(
+                (e) => e.message,
+                'message',
+                allOf(
+                  contains('Development Supabase anon key cannot be used in release builds'),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+
+      test(
+        'resolve(isRelease: true) throws StateError when placeholder anon key is supplied',
+        () {
+          expect(
+            () => SupabaseConfig.resolve(
+              customUrlRoot: SupabaseConfig.prodUrlRoot,
+              customAnonKey: '<your-production-anon-key>',
+              isRelease: true,
+            ),
+            throwsA(
+              isA<StateError>().having(
+                (e) => e.message,
+                'message',
+                contains('Placeholder anon key detected in release build'),
+              ),
+            ),
+          );
+        },
+      );
+
+      test(
+        'resolve(isRelease: true) succeeds with confirmed production URL and valid key',
+        () {
+          final config = SupabaseConfig.resolve(
+            customUrlRoot: SupabaseConfig.prodUrlRoot,
+            customAnonKey: 'valid-prod-anon-key-67890',
+            isRelease: true,
+          );
+
+          expect(config.urlRoot, equals('https://rvrskluqfbrkvvlxtxfp.supabase.co'));
+          expect(config.apiUrl, equals('https://rvrskluqfbrkvvlxtxfp.supabase.co/functions/v1/api'));
+          expect(config.anonKey, equals('valid-prod-anon-key-67890'));
+        },
+      );
     });
 
     group('URL Format Validation', () {

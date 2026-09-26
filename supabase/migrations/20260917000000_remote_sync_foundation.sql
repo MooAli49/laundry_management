@@ -2008,6 +2008,7 @@ DECLARE
     v_updated_at TIMESTAMPTZ;
     v_item_type_ids TEXT[];
     v_item_type_id TEXT;
+    v_supported_ids JSONB;
     v_version INTEGER;
     v_result JSONB;
 BEGIN

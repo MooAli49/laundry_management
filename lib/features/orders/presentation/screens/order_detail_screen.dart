@@ -474,6 +474,25 @@ class _OrderDetailView extends StatelessWidget {
                   ],
                 ),
               ),
+              if (customer?.address != null &&
+                  customer!.address!.trim().isNotEmpty) ...[
+                Row(
+                  children: [
+                    Text(
+                      customer.address!.trim(),
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    AppSpacing.gapHorizontalXs,
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
           if (customer?.notes != null && customer!.notes!.isNotEmpty) ...[

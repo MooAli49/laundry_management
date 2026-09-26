@@ -45,8 +45,7 @@ function mapPostgresError(error: { code?: string; message: string }, requestId: 
 
   // 2. Cursor Too Old (P0005 or CURSOR_TOO_OLD message)
   if (code === "P0005" || msg.includes("CURSOR_TOO_OLD")) {
-    return errorResponse("CURSOR_TOO_OLD", msg, requestId, 410); \
-    
+    return errorResponse("CURSOR_TOO_OLD", msg, requestId, 410);
   }
 
   // 3. Refund Balance Exceeded / Payment Balance Exceeded

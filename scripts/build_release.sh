@@ -19,6 +19,14 @@ if [ -n "${DEFINE_FILE}" ]; then
     echo "Error: Define file not found: ${DEFINE_FILE}" >&2
     exit 1
   fi
+  if grep -q "dyhfgnbhijukbdptreto" "${DEFINE_FILE}"; then
+    echo "Safety check failed: Define file '${DEFINE_FILE}' targets the Development Supabase project ('dyhfgnbhijukbdptreto'). Release builds must target Production ('rvrskluqfbrkvvlxtxfp')." >&2
+    exit 1
+  fi
+  if grep -E -q "<.*>|REPLACE_WITH_PRODUCTION_ANON_KEY" "${DEFINE_FILE}"; then
+    echo "Safety check failed: Define file '${DEFINE_FILE}' contains unreplaced placeholders. Provide your actual Production Supabase anon key." >&2
+    exit 1
+  fi
   echo "Building release APK using define file: ${DEFINE_FILE}..."
   flutter build apk --release --dart-define-from-file="${DEFINE_FILE}"
 else
@@ -29,11 +37,21 @@ else
     echo "Usage:" >&2
     echo "  ./scripts/build_release.sh <SUPABASE_URL_ROOT> <SUPABASE_ANON_KEY>" >&2
     echo "Or set environment variables:" >&2
-    echo "  export SUPABASE_URL_ROOT=\"https://<your-project>.supabase.co\"" >&2
-    echo "  export SUPABASE_ANON_KEY=\"<your-anon-key>\"" >&2
+    echo "  export SUPABASE_URL_ROOT=\"https://rvrskluqfbrkvvlxtxfp.supabase.co\"" >&2
+    echo "  export SUPABASE_ANON_KEY=\"<your-production-anon-key>\"" >&2
     echo "  ./scripts/build_release.sh" >&2
     echo "Or pass a define file:" >&2
     echo "  DEFINE_FILE=scripts/release_env.json ./scripts/build_release.sh" >&2
+    exit 1
+  fi
+
+  if [[ "${SUPABASE_URL_ROOT}" == *"dyhfgnbhijukbdptreto"* ]]; then
+    echo "Safety check failed: SUPABASE_URL_ROOT targets the Development Supabase project ('dyhfgnbhijukbdptreto'). Release builds must target Production ('rvrskluqfbrkvvlxtxfp')." >&2
+    exit 1
+  fi
+
+  if [[ "${SUPABASE_ANON_KEY}" =~ \<.*> ]] || [[ "${SUPABASE_ANON_KEY}" == *"REPLACE_WITH_PRODUCTION_ANON_KEY"* ]]; then
+    echo "Safety check failed: SUPABASE_ANON_KEY contains placeholder text. Provide your actual Production Supabase anon key." >&2
     exit 1
   fi
 

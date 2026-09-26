@@ -27,6 +27,20 @@ class SupabaseConfig {
     required this.anonKey,
   });
 
+  /// Production project reference.
+  static const String prodProjectRef = 'rvrskluqfbrkvvlxtxfp';
+
+  /// Expected production project root URL.
+  static const String prodUrlRoot =
+      'https://rvrskluqfbrkvvlxtxfp.supabase.co';
+
+  /// Expected production Edge Function REST API endpoint.
+  static const String prodApiUrl =
+      'https://rvrskluqfbrkvvlxtxfp.supabase.co/functions/v1/api';
+
+  /// Development project reference.
+  static const String devProjectRef = 'dyhfgnbhijukbdptreto';
+
   /// Default development project root URL.
   static const String defaultDevUrlRoot =
       'https://dyhfgnbhijukbdptreto.supabase.co';
@@ -51,7 +65,8 @@ class SupabaseConfig {
   /// 2. Compile-time `--dart-define` variables ([envUrlRoot], [envUrl], [envAnonKey]).
   /// 3. In debug/test mode ([isRelease] == false), development defaults.
   ///
-  /// Throws [StateError] in Release mode if required configuration is missing.
+  /// Throws [StateError] in Release mode if required configuration is missing or if
+  /// development credentials/URLs are accidentally provided.
   /// Throws [FormatException] if any configured URL is malformed.
   factory SupabaseConfig.resolve({
     String? customUrlRoot,
@@ -88,8 +103,33 @@ class SupabaseConfig {
           'Release build configuration error: missing required environment variables: ${missing.join(', ')}.\n'
           'Release builds must not silently fall back to development credentials.\n'
           'Provide them via --dart-define flags, for example:\n'
-          '  --dart-define=SUPABASE_URL_ROOT=https://<your-project>.supabase.co\n'
+          '  --dart-define=SUPABASE_URL_ROOT=$prodUrlRoot\n'
           '  --dart-define=SUPABASE_ANON_KEY=<your-production-anon-key>',
+        );
+      }
+
+      final targetUrl = suppliedUrlRoot ?? suppliedApiUrl ?? '';
+      if (targetUrl.contains(devProjectRef)) {
+        throw StateError(
+          'Release build configuration error: Development Supabase project ($devProjectRef) cannot be targeted in release builds.\n'
+          'Production release builds must target: $prodUrlRoot',
+        );
+      }
+
+      if (suppliedAnonKey == defaultDevAnonKey) {
+        throw StateError(
+          'Release build configuration error: Development Supabase anon key cannot be used in release builds.\n'
+          'Provide the Production anon key via --dart-define=SUPABASE_ANON_KEY=...',
+        );
+      }
+
+      if (suppliedAnonKey != null &&
+          (suppliedAnonKey.contains('<') ||
+              suppliedAnonKey.contains('REPLACE_WITH_PRODUCTION_ANON_KEY') ||
+              suppliedAnonKey.contains('your-production-anon-key'))) {
+        throw StateError(
+          'Release build configuration error: Placeholder anon key detected in release build.\n'
+          'Replace the placeholder with your actual Production Supabase anon key.',
         );
       }
     }

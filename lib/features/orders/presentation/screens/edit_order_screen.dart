@@ -55,7 +55,9 @@ class _EditOrderViewState extends State<EditOrderView> {
 
   // Item form controllers
   final TextEditingController _priceController = TextEditingController();
-  final TextEditingController _quantityController = TextEditingController(text: '1');
+  final TextEditingController _quantityController = TextEditingController(
+    text: '1',
+  );
   final TextEditingController _lengthController = TextEditingController();
   final TextEditingController _widthController = TextEditingController();
   final TextEditingController _itemNotesController = TextEditingController();
@@ -153,9 +155,7 @@ class _EditOrderViewState extends State<EditOrderView> {
       },
       builder: (context, state) {
         if (state.isLoading) {
-          return const Scaffold(
-            body: Center(child: LoadingIndicator()),
-          );
+          return const Scaffold(body: Center(child: LoadingIndicator()));
         }
 
         if (state.initialOrder == null) {
@@ -179,10 +179,7 @@ class _EditOrderViewState extends State<EditOrderView> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text('تعديل الطلب '),
-                Text(
-                  '#${order.orderNumber}',
-                  textDirection: TextDirection.ltr,
-                ),
+                Text('#${order.orderNumber}', textDirection: TextDirection.ltr),
               ],
             ),
             leading: BackButton(
@@ -252,7 +249,11 @@ class _EditOrderViewState extends State<EditOrderView> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.edit_note, color: AppColors.primary, size: 24),
+                  const Icon(
+                    Icons.edit_note,
+                    color: AppColors.primary,
+                    size: 24,
+                  ),
                   AppSpacing.gapHorizontalSm,
                   Text(
                     'تعديل تفاصيل الطلب قيد التجهيز',
@@ -263,7 +264,10 @@ class _EditOrderViewState extends State<EditOrderView> {
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.warningLight,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
@@ -283,7 +287,9 @@ class _EditOrderViewState extends State<EditOrderView> {
             'يمكنك تعديل بنود الطلب، نوع الخدمة، الأسعار، أو إضافة بنود جديدة. '
             'لا يمكن تغيير العميل إذا تم تسجيل مدفوعات مسبقة. '
             'كما لا يمكن حذف القطع المرتبطة بسجلات تخزين في المستودع.',
-            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),
@@ -310,7 +316,10 @@ class _EditOrderViewState extends State<EditOrderView> {
               ),
               if (!state.canChangeCustomer)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.errorLight,
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
@@ -318,7 +327,11 @@ class _EditOrderViewState extends State<EditOrderView> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.lock_outline, size: 14, color: AppColors.error),
+                      const Icon(
+                        Icons.lock_outline,
+                        size: 14,
+                        color: AppColors.error,
+                      ),
                       AppSpacing.gapHorizontalXs,
                       Text(
                         'العميل مقفل لوجود دفعات (${state.totalPaid.toEgp} ج.م)',
@@ -338,7 +351,9 @@ class _EditOrderViewState extends State<EditOrderView> {
             searchResults: state.customerSearchResults,
             isSearching: state.isSearchingCustomer,
             onSearch: cubit.searchCustomers,
-            onSelectCustomer: state.canChangeCustomer ? cubit.selectCustomer : (_) {},
+            onSelectCustomer: state.canChangeCustomer
+                ? cubit.selectCustomer
+                : (_) {},
             onAddNewCustomer: state.canChangeCustomer
                 ? cubit.addNewCustomer
                 : ({address, notes, required name, required phone}) async {},
@@ -354,7 +369,8 @@ class _EditOrderViewState extends State<EditOrderView> {
     EditProcessingOrderCubit cubit,
   ) {
     final isEditing = state.editingItemIndex != null;
-    final isExistingItem = isEditing && state.items[state.editingItemIndex!].isExisting;
+    final isExistingItem =
+        isEditing && state.items[state.editingItemIndex!].isExisting;
 
     _syncItemFormControllers(state);
 
@@ -385,36 +401,62 @@ class _EditOrderViewState extends State<EditOrderView> {
           // Deduplicated items and validated selected values to prevent dropdown assertion crashes
           Builder(
             builder: (context) {
-              final uniqueItemTypes = {for (final t in state.itemTypes) t.id: t}.values.toList();
-              if (state.draftItemType != null && !uniqueItemTypes.any((t) => t.id == state.draftItemType!.id)) {
+              final uniqueItemTypes = {
+                for (final t in state.itemTypes) t.id: t,
+              }.values.toList();
+              if (state.draftItemType != null &&
+                  !uniqueItemTypes.any(
+                    (t) => t.id == state.draftItemType!.id,
+                  )) {
                 uniqueItemTypes.insert(0, state.draftItemType!);
               }
               final selectedItemType = state.draftItemType != null
-                  ? uniqueItemTypes.where((t) => t.id == state.draftItemType!.id).firstOrNull
+                  ? uniqueItemTypes
+                        .where((t) => t.id == state.draftItemType!.id)
+                        .firstOrNull
                   : null;
 
-              final uniqueItemDefs = {for (final d in state.itemDefinitions) d.id: d}.values.toList();
-              if (state.draftItemDefinition != null && !uniqueItemDefs.any((d) => d.id == state.draftItemDefinition!.id)) {
+              final uniqueItemDefs = {
+                for (final d in state.itemDefinitions) d.id: d,
+              }.values.toList();
+              if (state.draftItemDefinition != null &&
+                  !uniqueItemDefs.any(
+                    (d) => d.id == state.draftItemDefinition!.id,
+                  )) {
                 uniqueItemDefs.insert(0, state.draftItemDefinition!);
               }
               final selectedItemDef = state.draftItemDefinition != null
-                  ? uniqueItemDefs.where((d) => d.id == state.draftItemDefinition!.id).firstOrNull
+                  ? uniqueItemDefs
+                        .where((d) => d.id == state.draftItemDefinition!.id)
+                        .firstOrNull
                   : null;
 
-              final uniqueServices = {for (final s in state.compatibleServices) s.id: s}.values.toList();
-              if (state.draftService != null && !uniqueServices.any((s) => s.id == state.draftService!.id)) {
+              final uniqueServices = {
+                for (final s in state.compatibleServices) s.id: s,
+              }.values.toList();
+              if (state.draftService != null &&
+                  !uniqueServices.any((s) => s.id == state.draftService!.id)) {
                 uniqueServices.insert(0, state.draftService!);
               }
               final selectedService = state.draftService != null
-                  ? uniqueServices.where((s) => s.id == state.draftService!.id).firstOrNull
+                  ? uniqueServices
+                        .where((s) => s.id == state.draftService!.id)
+                        .firstOrNull
                   : null;
 
-              final uniqueCarpetSizes = {for (final c in state.carpetSizes) c.id: c}.values.toList();
-              if (state.draftCarpetSize != null && !uniqueCarpetSizes.any((c) => c.id == state.draftCarpetSize!.id)) {
+              final uniqueCarpetSizes = {
+                for (final c in state.carpetSizes) c.id: c,
+              }.values.toList();
+              if (state.draftCarpetSize != null &&
+                  !uniqueCarpetSizes.any(
+                    (c) => c.id == state.draftCarpetSize!.id,
+                  )) {
                 uniqueCarpetSizes.insert(0, state.draftCarpetSize!);
               }
               final selectedCarpetSize = state.draftCarpetSize != null
-                  ? uniqueCarpetSizes.where((c) => c.id == state.draftCarpetSize!.id).firstOrNull
+                  ? uniqueCarpetSizes
+                        .where((c) => c.id == state.draftCarpetSize!.id)
+                        .firstOrNull
                   : null;
 
               return Column(
@@ -428,17 +470,26 @@ class _EditOrderViewState extends State<EditOrderView> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('نوع العنصر *', style: AppTextStyles.labelMedium),
+                            Text(
+                              'نوع العنصر *',
+                              style: AppTextStyles.labelMedium,
+                            ),
                             AppSpacing.gapXs,
                             DropdownButtonFormField<ItemType>(
-                              key: ValueKey('item_type_${selectedItemType?.id}'),
+                              key: ValueKey(
+                                'item_type_${selectedItemType?.id}',
+                              ),
                               initialValue: selectedItemType,
                               isExpanded: true,
                               decoration: InputDecoration(
                                 filled: true,
-                                fillColor: isExistingItem ? AppColors.surfaceDisabled : null,
+                                fillColor: isExistingItem
+                                    ? AppColors.surfaceDisabled
+                                    : null,
                                 hintText: 'اختر نوع العنصر',
-                                helperText: isExistingItem ? 'نوع العنصر غير قابل للتغيير للقطع الحالية' : null,
+                                helperText: isExistingItem
+                                    ? 'نوع العنصر غير قابل للتغيير للقطع الحالية'
+                                    : null,
                                 border: const OutlineInputBorder(),
                               ),
                               items: uniqueItemTypes.map((type) {
@@ -447,7 +498,9 @@ class _EditOrderViewState extends State<EditOrderView> {
                                   child: Text(type.name),
                                 );
                               }).toList(),
-                              onChanged: isExistingItem ? null : cubit.selectItemType,
+                              onChanged: isExistingItem
+                                  ? null
+                                  : cubit.selectItemType,
                             ),
                           ],
                         ),
@@ -457,7 +510,10 @@ class _EditOrderViewState extends State<EditOrderView> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('تعريف العنصر (اختياري)', style: AppTextStyles.labelMedium),
+                            Text(
+                              'تعريف العنصر (اختياري)',
+                              style: AppTextStyles.labelMedium,
+                            ),
                             AppSpacing.gapXs,
                             DropdownButtonFormField<ItemDefinition?>(
                               key: ValueKey('item_def_${selectedItemDef?.id}'),
@@ -528,16 +584,24 @@ class _EditOrderViewState extends State<EditOrderView> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('سعر الوحدة (ج.م) *', style: AppTextStyles.labelMedium),
+                            Text(
+                              'سعر الوحدة (ج.م) *',
+                              style: AppTextStyles.labelMedium,
+                            ),
                             AppSpacing.gapXs,
                             AppTextField(
                               controller: _priceController,
                               hintText: 'سعر الوحدة',
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
                               onChanged: (val) {
                                 final parsed = double.tryParse(val);
                                 if (parsed != null && parsed > 0) {
-                                  cubit.updateDraftUnitPrice(Money.fromEgp(parsed));
+                                  cubit.updateDraftUnitPrice(
+                                    Money.fromEgp(parsed),
+                                  );
                                 }
                               },
                             ),
@@ -556,10 +620,15 @@ class _EditOrderViewState extends State<EditOrderView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('الكمية (عدد القطع) *', style: AppTextStyles.labelMedium),
+                              Text(
+                                'الكمية (عدد القطع) *',
+                                style: AppTextStyles.labelMedium,
+                              ),
                               AppSpacing.gapXs,
                               AppTextField(
-                                key: const ValueKey('draft_item_quantity_field'),
+                                key: const ValueKey(
+                                  'draft_item_quantity_field',
+                                ),
                                 controller: _quantityController,
                                 hintText: '1',
                                 keyboardType: TextInputType.number,
@@ -584,13 +653,19 @@ class _EditOrderViewState extends State<EditOrderView> {
                           ),
                           decoration: BoxDecoration(
                             color: AppColors.backgroundSecondary,
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusSm,
+                            ),
                             border: Border.all(color: AppColors.border),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.info_outline, size: 14, color: AppColors.textSecondary),
+                              const Icon(
+                                Icons.info_outline,
+                                size: 14,
+                                color: AppColors.textSecondary,
+                              ),
                               AppSpacing.gapHorizontalXs,
                               Text(
                                 'العدد: 1 قطعة',
@@ -608,7 +683,8 @@ class _EditOrderViewState extends State<EditOrderView> {
                   ],
 
                   // Row 4: Carpet details if perSquareMeter (independent from quantity)
-                  if (state.draftService?.pricingType == PricingType.perSquareMeter) ...[
+                  if (state.draftService?.pricingType ==
+                      PricingType.perSquareMeter) ...[
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -616,10 +692,15 @@ class _EditOrderViewState extends State<EditOrderView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('مقاس السجاد المسبق', style: AppTextStyles.labelMedium),
+                              Text(
+                                'مقاس السجاد المسبق',
+                                style: AppTextStyles.labelMedium,
+                              ),
                               AppSpacing.gapXs,
                               DropdownButtonFormField<CarpetSize?>(
-                                key: ValueKey('carpet_size_${selectedCarpetSize?.id}'),
+                                key: ValueKey(
+                                  'carpet_size_${selectedCarpetSize?.id}',
+                                ),
                                 initialValue: selectedCarpetSize,
                                 isExpanded: true,
                                 decoration: const InputDecoration(
@@ -634,7 +715,9 @@ class _EditOrderViewState extends State<EditOrderView> {
                                   ...uniqueCarpetSizes.map((size) {
                                     return DropdownMenuItem<CarpetSize?>(
                                       value: size,
-                                      child: Text('${size.length} × ${size.width} م (${size.area} م²)'),
+                                      child: Text(
+                                        '${size.length} × ${size.width} م (${size.area} م²)',
+                                      ),
                                     );
                                   }),
                                 ],
@@ -648,15 +731,23 @@ class _EditOrderViewState extends State<EditOrderView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('الطول (متر) *', style: AppTextStyles.labelMedium),
+                              Text(
+                                'الطول (متر) *',
+                                style: AppTextStyles.labelMedium,
+                              ),
                               AppSpacing.gapXs,
                               AppTextField(
                                 controller: _lengthController,
                                 hintText: 'مثال: 3.0',
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
                                 onChanged: (val) {
                                   final l = double.tryParse(val) ?? 0.0;
-                                  final w = double.tryParse(_widthController.text) ?? 0.0;
+                                  final w =
+                                      double.tryParse(_widthController.text) ??
+                                      0.0;
                                   cubit.updateDraftCarpetDimensions(l, w);
                                 },
                               ),
@@ -668,14 +759,22 @@ class _EditOrderViewState extends State<EditOrderView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('العرض (متر) *', style: AppTextStyles.labelMedium),
+                              Text(
+                                'العرض (متر) *',
+                                style: AppTextStyles.labelMedium,
+                              ),
                               AppSpacing.gapXs,
                               AppTextField(
                                 controller: _widthController,
                                 hintText: 'مثال: 2.0',
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
                                 onChanged: (val) {
-                                  final l = double.tryParse(_lengthController.text) ?? 0.0;
+                                  final l =
+                                      double.tryParse(_lengthController.text) ??
+                                      0.0;
                                   final w = double.tryParse(val) ?? 0.0;
                                   cubit.updateDraftCarpetDimensions(l, w);
                                 },
@@ -737,7 +836,9 @@ class _EditOrderViewState extends State<EditOrderView> {
               if (items.isEmpty)
                 Text(
                   'يجب أن يحتوي الطلب على عنصر واحد على الأقل',
-                  style: AppTextStyles.labelSmall.copyWith(color: AppColors.error),
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.error,
+                  ),
                 ),
             ],
           ),
@@ -749,7 +850,9 @@ class _EditOrderViewState extends State<EditOrderView> {
               child: Center(
                 child: Text(
                   'لا توجد عناصر متبقية في الطلب',
-                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
             )
@@ -758,8 +861,10 @@ class _EditOrderViewState extends State<EditOrderView> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: items.length,
-              separatorBuilder: (_, __) =>
-                  const Divider(height: AppSpacing.lg, color: AppColors.divider),
+              separatorBuilder: (_, __) => const Divider(
+                height: AppSpacing.lg,
+                color: AppColors.divider,
+              ),
               itemBuilder: (context, index) {
                 final item = items[index];
                 return _buildItemRow(context, item, index, cubit);
@@ -818,12 +923,17 @@ class _EditOrderViewState extends State<EditOrderView> {
                   // Storage badge
                   if (item.hasStorageRecords)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: item.storageLocationName != null
                             ? AppColors.successLight
                             : AppColors.warningLight,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusSm,
+                        ),
                       ),
                       child: Text(
                         item.storageLocationName != null
@@ -840,10 +950,15 @@ class _EditOrderViewState extends State<EditOrderView> {
                     )
                   else
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.infoLight,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusSm,
+                        ),
                       ),
                       child: Text(
                         'غير مخزن',
@@ -913,7 +1028,9 @@ class _EditOrderViewState extends State<EditOrderView> {
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('لا يمكن حذف هذا البند لأنه مرتبط بسجل تخزين في المستودع'),
+                  content: Text(
+                    'لا يمكن حذف هذا البند لأنه مرتبط بسجل تخزين في المستودع',
+                  ),
                   backgroundColor: AppColors.warning,
                   behavior: SnackBarBehavior.floating,
                 ),
@@ -948,29 +1065,43 @@ class _EditOrderViewState extends State<EditOrderView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('تاريخ الاستلام المتوقع *', style: AppTextStyles.labelMedium),
+                    Text(
+                      'تاريخ الاستلام المتوقع *',
+                      style: AppTextStyles.labelMedium,
+                    ),
                     AppSpacing.gapXs,
                     InkWell(
                       onTap: () async {
                         final picked = await showDatePicker(
                           context: context,
                           initialDate: state.expectedPickupDate.toDateTime(),
-                          firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                          firstDate: DateTime.now().subtract(
+                            const Duration(days: 365),
+                          ),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 365),
+                          ),
                         );
                         if (picked != null) {
-                          cubit.updateExpectedPickupDate(OrderDate.fromDate(picked));
+                          cubit.updateExpectedPickupDate(
+                            OrderDate.fromDate(picked),
+                          );
                         }
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 14,
+                        ),
                         decoration: BoxDecoration(
                           border: Border.all(
                             color: !state.isPickupDateValid
                                 ? AppColors.error
                                 : AppColors.border,
                           ),
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusSm,
+                          ),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -991,7 +1122,9 @@ class _EditOrderViewState extends State<EditOrderView> {
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
                           'تاريخ الاستلام المتوقع لا يمكن أن يكون في الماضي',
-                          style: AppTextStyles.labelSmall.copyWith(color: AppColors.error),
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.error,
+                          ),
                         ),
                       ),
                   ],
@@ -1013,7 +1146,9 @@ class _EditOrderViewState extends State<EditOrderView> {
               child: AppTextField(
                 controller: _pickupFeeController,
                 hintText: 'رسوم الاستلام (ج.م)',
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 onChanged: (val) {
                   final parsed = double.tryParse(val) ?? 0.0;
                   cubit.updateCustomerPickupFee(Money.fromEgp(parsed));
@@ -1033,7 +1168,9 @@ class _EditOrderViewState extends State<EditOrderView> {
               child: AppTextField(
                 controller: _deliveryFeeController,
                 hintText: 'رسوم التوصيل (ج.م)',
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 onChanged: (val) {
                   final parsed = double.tryParse(val) ?? 0.0;
                   cubit.updateCustomerDeliveryFee(Money.fromEgp(parsed));
@@ -1102,7 +1239,9 @@ class _EditOrderViewState extends State<EditOrderView> {
                       child: AppTextField(
                         controller: _discountController,
                         hintText: '0.00',
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         onChanged: (val) {
                           final parsed = double.tryParse(val) ?? 0.0;
                           cubit.updateDiscount(Money.fromEgp(parsed));
@@ -1146,12 +1285,18 @@ class _EditOrderViewState extends State<EditOrderView> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline, color: AppColors.error, size: 18),
+                      const Icon(
+                        Icons.error_outline,
+                        color: AppColors.error,
+                        size: 18,
+                      ),
                       AppSpacing.gapHorizontalSm,
                       Expanded(
                         child: Text(
                           'تنبيه: إجمالي الطلب (${state.total.toEgp} ج.م) لا يمكن أن يكون أقل من المبلغ المدفوع (${state.totalPaid.toEgp} ج.م)',
-                          style: AppTextStyles.labelSmall.copyWith(color: AppColors.error),
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.error,
+                          ),
                         ),
                       ),
                     ],
@@ -1210,7 +1355,9 @@ class _EditOrderViewState extends State<EditOrderView> {
             label,
             style: isBold
                 ? AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold)
-                : AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                : AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
           ),
           Text(
             value,

@@ -51,3 +51,9 @@ scratch/
 *.sqlite3
 /*.png
 scripts/*.json
+release_env.json
+*.env.json
+key.properties
+*.keystore
+*.jks
+

@@ -35,13 +35,16 @@ void main() async {
 
   // Intercept known Flutter framework assertion mismatch on Android Emulator
   // when forwarding host physical keyboard shortcuts (e.g. Ctrl+V / modifier keys).
-  PlatformDispatcher.instance.onError = (error, stack) {
-    if (error is AssertionError &&
-        error.message?.toString().contains('hardware_keyboard.dart') == true) {
-      return true;
-    }
-    return false;
-  };
+  // Confined to debug mode so release builds maintain standard error dispatching.
+  if (kDebugMode) {
+    PlatformDispatcher.instance.onError = (error, stack) {
+      if (error is AssertionError &&
+          error.message?.toString().contains('hardware_keyboard.dart') == true) {
+        return true;
+      }
+      return false;
+    };
+  }
 
   await initDependencies(enableDevTestData: kDebugMode);
 
