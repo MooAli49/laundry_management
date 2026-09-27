@@ -13,6 +13,7 @@ import '../cubit/services_management_cubit.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
 import '../cubit/storage_locations_management_cubit.dart';
+import '../widgets/bluetooth_printer_section.dart';
 import '../widgets/business_info_section.dart';
 import '../widgets/carpet_sizes_section.dart';
 import '../widgets/expense_categories_section.dart';
@@ -128,6 +129,8 @@ class _SettingsScreenContent extends StatelessWidget {
         return const StorageLocationsSection();
       case 7:
         return const ExpenseCategoriesSection();
+      case 8:
+        return const BluetoothPrinterSection();
       default:
         return const BusinessInfoSection();
     }

@@ -306,4 +306,29 @@ class AppStrings {
   static const String tableHeaderDimensions = 'المقاس';
   static const String tableHeaderArea = 'المساحة';
   static const String tableHeaderItemType = 'نوع القطعة';
+
+  // Bluetooth Thermal Printer
+  static const String tabBluetoothPrinter = 'الطابعة';
+  static const String btPrinterTitle = 'الطابعة الحرارية';
+  static const String btPrinterSubtitle =
+      'إعداد طابعة البلوتوث الحرارية لطباعة الفواتير مباشرةً';
+  static const String btPrinterConnected = 'الطابعة متصلة';
+  static const String btPrinterScanning = 'جاري البحث عن الطابعات...';
+  static const String btPrinterNotFound = 'لم يتم العثور على طابعة';
+  static const String btPrinterPermissionRequired = 'صلاحية البلوتوث مطلوبة';
+  static const String btPrinterBluetoothOff = 'البلوتوث مغلق';
+  static const String btPrinterConnecting = 'جاري الاتصال بالطابعة...';
+  static const String btPrinterConnectionSuccess = 'تم الاتصال بالطابعة';
+  static const String btPrinterConnectionFailed = 'فشل الاتصال بالطابعة';
+  static const String btPrinterPrintFailed = 'فشلت عملية الطباعة';
+  static const String btPrinterDisconnected = 'تم قطع الاتصال بالطابعة';
+  static const String btPrinterPrinting = 'جاري الطباعة...';
+
+  // Invoice print selection
+  static const String printMethodTitle = 'اختر طريقة الطباعة';
+  static const String printViaBluetooth = 'طباعة عبر الطابعة الحرارية';
+  static const String printViaPdf = 'طباعة PDF / النظام';
+  static const String btPrinterNotConfigured =
+      'لم يتم إعداد طابعة بعد.\nيمكنك إعداد الطابعة من الإعدادات ← الطابعة.';
 }
+

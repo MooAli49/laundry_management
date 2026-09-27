@@ -24,6 +24,7 @@ class SettingsTabBar extends StatelessWidget {
     AppStrings.tabCarpetSizes,
     AppStrings.tabStorageLocations,
     AppStrings.tabExpenseCategories,
+    AppStrings.tabBluetoothPrinter,
   ];
 
   @override

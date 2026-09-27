@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  bluetooth_print_plus
   gtk
   printing
   sqlite3_flutter_libs
