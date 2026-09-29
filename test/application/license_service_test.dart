@@ -46,34 +46,65 @@ class _FakeRemoteDataSource implements LicenseRemoteDataSource {
   String status;
   DateTime? suspendedAt;
   bool shouldThrow;
+  Exception? customException;
 
   _FakeRemoteDataSource({
     this.status = 'active',
     this.suspendedAt,
     this.shouldThrow = false,
+    this.customException,
   });
 
   @override
   Future<LicenseRemoteData> fetchLicenseInfo() async {
+    if (customException != null) throw customException!;
     if (shouldThrow) throw Exception('Network error');
     return LicenseRemoteData(status: status, suspendedAt: suspendedAt);
   }
 }
 
+class _FakeTimer implements Timer {
+  final Duration duration;
+  final void Function() callback;
+  bool _isActive = true;
+
+  _FakeTimer(this.duration, this.callback);
+
+  @override
+  void cancel() {
+    _isActive = false;
+  }
+
+  @override
+  bool get isActive => _isActive;
+
+  @override
+  int get tick => 0;
+
+  void trigger() {
+    if (_isActive) {
+      _isActive = false;
+      callback();
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
-// Helper to build a LicenseService with injectable clock
+// Helper to build a LicenseService with injectable clock and timerFactory
 // ---------------------------------------------------------------------------
 LicenseService _buildService({
   required AppDatabase db,
   required LicenseRemoteDataSource remote,
   required _FakeNetworkInfo network,
   DateTime Function()? clock,
+  Timer Function(Duration, void Function())? timerFactory,
 }) {
   return LicenseService(
     remoteDataSource: remote,
     cacheDao: LicenseCacheDao(db),
     networkInfo: _NetworkInfoAdapter(network),
     clock: clock,
+    timerFactory: timerFactory,
   );
 }
 
@@ -495,6 +526,361 @@ void main() {
       service.dispose();
       network.dispose();
     });
+  });
+
+  // -------------------------------------------------------------------------
+  // I — Local grace period expiration timer
+  // -------------------------------------------------------------------------
+  group('I — Local grace period expiration timer', () {
+    test(
+      'schedules timer for remaining duration when entering gracePeriod',
+      () async {
+        final suspendedAt = DateTime(2026, 9, 20, 10, 0);
+        var currentTime = DateTime(2026, 9, 22, 10, 0); // 2 days elapsed
+        final scheduledTimers = <_FakeTimer>[];
+
+        final remote = _FakeRemoteDataSource(
+          status: 'suspended',
+          suspendedAt: suspendedAt,
+        );
+        final network = _FakeNetworkInfo(connected: true);
+        final service = _buildService(
+          db: db,
+          remote: remote,
+          network: network,
+          clock: () => currentTime,
+          timerFactory: (duration, callback) {
+            final timer = _FakeTimer(duration, callback);
+            scheduledTimers.add(timer);
+            return timer;
+          },
+        );
+
+        await service.initialize();
+
+        expect(service.currentStatus, LicenseStatus.gracePeriod);
+        expect(scheduledTimers.length, 1);
+        // 7 days - 2 days = exactly 5 days remaining
+        expect(scheduledTimers.first.duration, equals(const Duration(days: 5)));
+        expect(scheduledTimers.first.isActive, isTrue);
+
+        service.dispose();
+        network.dispose();
+      },
+    );
+
+    test(
+      'timer expiry transitions status to lockedOut and emits to statusStream',
+      () async {
+        final suspendedAt = DateTime(2026, 9, 20, 10, 0);
+        var currentTime = DateTime(2026, 9, 22, 10, 0); // 2 days elapsed
+        final scheduledTimers = <_FakeTimer>[];
+
+        final remote = _FakeRemoteDataSource(
+          status: 'suspended',
+          suspendedAt: suspendedAt,
+        );
+        final network = _FakeNetworkInfo(connected: true);
+        final service = _buildService(
+          db: db,
+          remote: remote,
+          network: network,
+          clock: () => currentTime,
+          timerFactory: (duration, callback) {
+            final timer = _FakeTimer(duration, callback);
+            scheduledTimers.add(timer);
+            return timer;
+          },
+        );
+
+        final emittedStatuses = <LicenseStatus>[];
+        final sub = service.statusStream.listen(emittedStatuses.add);
+
+        await service.initialize();
+        expect(service.currentStatus, LicenseStatus.gracePeriod);
+
+        // Advance clock to exactly expiration (7 days after suspendedAt)
+        currentTime = suspendedAt.add(const Duration(days: 7, seconds: 1));
+
+        // Trigger timer expiry
+        scheduledTimers.first.trigger();
+        await pumpEventQueue();
+
+        expect(service.currentStatus, equals(LicenseStatus.lockedOut));
+        expect(emittedStatuses, contains(LicenseStatus.lockedOut));
+
+        await sub.cancel();
+        service.dispose();
+        network.dispose();
+      },
+    );
+
+    test('reinstatement cancels timer and resets status to active', () async {
+      final suspendedAt = DateTime(2026, 9, 20, 10, 0);
+      var currentTime = DateTime(2026, 9, 22, 10, 0);
+      final scheduledTimers = <_FakeTimer>[];
+
+      final remote = _FakeRemoteDataSource(
+        status: 'suspended',
+        suspendedAt: suspendedAt,
+      );
+      final network = _FakeNetworkInfo(connected: true);
+      final service = _buildService(
+        db: db,
+        remote: remote,
+        network: network,
+        clock: () => currentTime,
+        timerFactory: (duration, callback) {
+          final timer = _FakeTimer(duration, callback);
+          scheduledTimers.add(timer);
+          return timer;
+        },
+      );
+
+      await service.initialize();
+      expect(scheduledTimers.length, 1);
+      final graceTimer = scheduledTimers.first;
+      expect(graceTimer.isActive, isTrue);
+
+      // Admin reinstates license to active
+      remote.status = 'active';
+      remote.suspendedAt = null;
+
+      // Force check / re-initialize
+      await service.initialize();
+
+      expect(service.currentStatus, LicenseStatus.active);
+      expect(
+        graceTimer.isActive,
+        isFalse,
+        reason: 'Reinstatement must cancel timer',
+      );
+
+      service.dispose();
+      network.dispose();
+    });
+
+    test('service dispose cancels scheduled timer', () async {
+      final suspendedAt = DateTime.now().subtract(const Duration(days: 1));
+      final scheduledTimers = <_FakeTimer>[];
+
+      final remote = _FakeRemoteDataSource(
+        status: 'suspended',
+        suspendedAt: suspendedAt,
+      );
+      final network = _FakeNetworkInfo(connected: true);
+      final service = _buildService(
+        db: db,
+        remote: remote,
+        network: network,
+        timerFactory: (duration, callback) {
+          final timer = _FakeTimer(duration, callback);
+          scheduledTimers.add(timer);
+          return timer;
+        },
+      );
+
+      await service.initialize();
+      expect(scheduledTimers.first.isActive, isTrue);
+
+      service.dispose();
+      expect(
+        scheduledTimers.first.isActive,
+        isFalse,
+        reason: 'dispose() must cancel any active grace period timer',
+      );
+      network.dispose();
+    });
+
+    test(
+      'restart while grace period is valid reschedules timer for remaining duration',
+      () async {
+        final suspendedAt = DateTime(2026, 9, 20, 10, 0);
+        var currentTime = DateTime(2026, 9, 23, 10, 0); // 3 days elapsed
+        final dao = LicenseCacheDao(db);
+        await dao.saveCache(
+          remoteStatus: 'suspended',
+          suspendedAt: suspendedAt,
+          lastCheckedAt: currentTime,
+        );
+
+        final scheduledTimers = <_FakeTimer>[];
+        final remote = _FakeRemoteDataSource(
+          shouldThrow: true,
+        ); // offline restart
+        final network = _FakeNetworkInfo(connected: false);
+
+        final service = _buildService(
+          db: db,
+          remote: remote,
+          network: network,
+          clock: () => currentTime,
+          timerFactory: (duration, callback) {
+            final timer = _FakeTimer(duration, callback);
+            scheduledTimers.add(timer);
+            return timer;
+          },
+        );
+
+        await service.initialize();
+
+        expect(service.currentStatus, LicenseStatus.gracePeriod);
+        expect(scheduledTimers.length, 1);
+        // 7 days - 3 days = 4 days remaining
+        expect(scheduledTimers.first.duration, equals(const Duration(days: 4)));
+        expect(scheduledTimers.first.isActive, isTrue);
+
+        service.dispose();
+        network.dispose();
+      },
+    );
+
+    test(
+      'restart after grace period expired transitions immediately to lockedOut without active timer',
+      () async {
+        final suspendedAt = DateTime(2026, 9, 20, 10, 0);
+        var currentTime = DateTime(2026, 9, 28, 10, 0); // 8 days elapsed (> 7)
+        final dao = LicenseCacheDao(db);
+        await dao.saveCache(
+          remoteStatus: 'suspended',
+          suspendedAt: suspendedAt,
+          lastCheckedAt: currentTime,
+        );
+
+        final scheduledTimers = <_FakeTimer>[];
+        final remote = _FakeRemoteDataSource(shouldThrow: true);
+        final network = _FakeNetworkInfo(connected: false);
+
+        final service = _buildService(
+          db: db,
+          remote: remote,
+          network: network,
+          clock: () => currentTime,
+          timerFactory: (duration, callback) {
+            final timer = _FakeTimer(duration, callback);
+            scheduledTimers.add(timer);
+            return timer;
+          },
+        );
+
+        await service.initialize();
+
+        expect(service.currentStatus, LicenseStatus.lockedOut);
+        // Any created timer must not remain active
+        expect(scheduledTimers.every((t) => !t.isActive), isTrue);
+
+        service.dispose();
+        network.dispose();
+      },
+    );
+
+    test(
+      'offline cached suspension transitions to lockedOut when timer expires',
+      () async {
+        final suspendedAt = DateTime(2026, 9, 20, 0, 0);
+        var currentTime = DateTime(
+          2026,
+          9,
+          26,
+          0,
+          0,
+        ); // 6 days elapsed, 1 day left
+        final dao = LicenseCacheDao(db);
+        await dao.saveCache(
+          remoteStatus: 'suspended',
+          suspendedAt: suspendedAt,
+          lastCheckedAt: currentTime,
+        );
+
+        final scheduledTimers = <_FakeTimer>[];
+        final remote = _FakeRemoteDataSource(shouldThrow: true); // offline
+        final network = _FakeNetworkInfo(connected: false);
+
+        final service = _buildService(
+          db: db,
+          remote: remote,
+          network: network,
+          clock: () => currentTime,
+          timerFactory: (duration, callback) {
+            final timer = _FakeTimer(duration, callback);
+            scheduledTimers.add(timer);
+            return timer;
+          },
+        );
+
+        await service.initialize();
+        expect(service.currentStatus, LicenseStatus.gracePeriod);
+        expect(scheduledTimers.length, 1);
+
+        // Advance clock past 7-day boundary
+        currentTime = suspendedAt.add(const Duration(days: 7, minutes: 1));
+
+        scheduledTimers.first.trigger();
+        await pumpEventQueue();
+
+        expect(service.currentStatus, LicenseStatus.lockedOut);
+
+        service.dispose();
+        network.dispose();
+      },
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // J — Malformed or unknown remote responses
+  // -------------------------------------------------------------------------
+  group('J — Malformed or unknown remote responses', () {
+    test('malformed remote response preserves cached suspended state', () async {
+      final suspendedAt = DateTime.now().subtract(const Duration(days: 2));
+      final dao = LicenseCacheDao(db);
+      await dao.saveCache(
+        remoteStatus: 'suspended',
+        suspendedAt: suspendedAt,
+        lastCheckedAt: DateTime.now().subtract(const Duration(hours: 2)),
+      );
+
+      // Remote returns an invalid/malformed response resulting in FormatException
+      final remote = _FakeRemoteDataSource(
+        customException: const FormatException(
+          'Unknown license status "revoked"',
+        ),
+      );
+      final network = _FakeNetworkInfo(connected: true);
+      final service = _buildService(db: db, remote: remote, network: network);
+
+      await service.initialize();
+
+      // Must preserve cached gracePeriod, not fail open to active
+      expect(service.currentStatus, LicenseStatus.gracePeriod);
+
+      service.dispose();
+      network.dispose();
+    });
+
+    test(
+      'malformed remote response with cached active state preserves active state',
+      () async {
+        final dao = LicenseCacheDao(db);
+        await dao.saveCache(
+          remoteStatus: 'active',
+          suspendedAt: null,
+          lastCheckedAt: DateTime.now().subtract(const Duration(hours: 2)),
+        );
+
+        final remote = _FakeRemoteDataSource(
+          customException: const FormatException('Missing status field'),
+        );
+        final network = _FakeNetworkInfo(connected: true);
+        final service = _buildService(db: db, remote: remote, network: network);
+
+        await service.initialize();
+
+        expect(service.currentStatus, LicenseStatus.active);
+
+        service.dispose();
+        network.dispose();
+      },
+    );
   });
 }
 

@@ -36,7 +36,20 @@ class LicenseRemoteDataSourceImpl implements LicenseRemoteDataSource {
               ? Map<String, dynamic>.from(response)
               : <String, dynamic>{});
 
-    final status = (json['status'] as String? ?? 'active').trim();
+    final rawStatus = json['status'];
+    if (rawStatus is! String) {
+      throw const FormatException(
+        'Missing or invalid "status" field in license response',
+      );
+    }
+
+    final status = rawStatus.trim().toLowerCase();
+    if (status != 'active' && status != 'suspended') {
+      throw FormatException(
+        'Unknown license status "$status" in license response',
+      );
+    }
+
     final suspendedAtRaw = json['suspended_at'] as String?;
     final suspendedAt = (suspendedAtRaw != null && suspendedAtRaw.isNotEmpty)
         ? DateTime.tryParse(suspendedAtRaw)?.toLocal()

@@ -330,4 +330,13 @@ class AppStrings {
   static const String printViaPdf = 'طباعة PDF / النظام';
   static const String btPrinterNotConfigured =
       'لم يتم إعداد طابعة بعد.\nيمكنك إعداد الطابعة من الإعدادات ← الطابعة.';
+
+  // License Control
+  static const String licenseSuspendedTitle = 'تم تعليق ترخيص النظام';
+  static const String licenseSuspendedDescription =
+      'يرجى التواصل مع مزود النظام لإعادة تفعيل التطبيق.';
+  static const String licenseWarningImmediate =
+      'تنبيه: الترخيص معلق. يرجى التواصل مع مزود النظام فوراً.';
+  static String licenseWarningGrace(int days) =>
+      'تنبيه: الترخيص معلق. متبقٍ $days ${days == 1 ? "يوم" : "أيام"} قبل إيقاف التطبيق. يرجى التواصل مع مزود النظام.';
 }

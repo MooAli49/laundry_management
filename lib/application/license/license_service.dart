@@ -7,7 +7,7 @@ import '../../data/local/daos/license_cache_dao.dart';
 import '../../domain/license/license_status.dart';
 
 /// Grace period duration — 7 days from the authoritative [suspendedAt] timestamp.
-const Duration _kGracePeriod = Duration(days: 7);
+const Duration kLicenseGracePeriod = Duration(days: 7);
 
 /// Maximum time between remote license checks while the app is running.
 const Duration _kCheckInterval = Duration(hours: 24);
@@ -42,9 +42,12 @@ class LicenseService {
   final LicenseCacheDao _cacheDao;
   final NetworkInfo _networkInfo;
   final DateTime Function() _clock;
+  final Timer Function(Duration duration, void Function() callback)
+  _timerFactory;
 
   LicenseStatus _currentStatus = LicenseStatus.active;
   DateTime? _suspendedAt;
+  Timer? _gracePeriodTimer;
 
   final StreamController<LicenseStatus> _statusController =
       StreamController<LicenseStatus>.broadcast();
@@ -57,10 +60,12 @@ class LicenseService {
     required LicenseCacheDao cacheDao,
     required NetworkInfo networkInfo,
     DateTime Function()? clock,
+    Timer Function(Duration duration, void Function() callback)? timerFactory,
   }) : _remoteDataSource = remoteDataSource,
        _cacheDao = cacheDao,
        _networkInfo = networkInfo,
-       _clock = clock ?? DateTime.now;
+       _clock = clock ?? DateTime.now,
+       _timerFactory = timerFactory ?? Timer.new;
 
   /// The latest evaluated license status. Synchronous after [initialize].
   LicenseStatus get currentStatus => _currentStatus;
@@ -211,15 +216,50 @@ class LicenseService {
     }
 
     final elapsed = _clock().difference(suspendedAt);
-    if (elapsed >= _kGracePeriod) {
+    if (elapsed >= kLicenseGracePeriod) {
       return LicenseStatus.lockedOut;
     }
     return LicenseStatus.gracePeriod;
   }
 
+  void _cancelGraceTimer() {
+    _gracePeriodTimer?.cancel();
+    _gracePeriodTimer = null;
+  }
+
+  void _onGracePeriodTimerExpired() {
+    if (_isDisposed) return;
+    _gracePeriodTimer = null;
+
+    final suspendedAtValue = _suspendedAt;
+    if (suspendedAtValue == null) return;
+
+    final elapsed = _clock().difference(suspendedAtValue);
+    if (elapsed >= kLicenseGracePeriod) {
+      _emitStatus(LicenseStatus.lockedOut, suspendedAtValue);
+    }
+  }
+
   void _emitStatus(LicenseStatus status, DateTime? suspendedAt) {
     _currentStatus = status;
     _suspendedAt = suspendedAt;
+
+    _cancelGraceTimer();
+
+    if (status == LicenseStatus.gracePeriod && suspendedAt != null) {
+      final expiry = suspendedAt.add(kLicenseGracePeriod);
+      final remaining = expiry.difference(_clock());
+      if (remaining.isNegative || remaining == Duration.zero) {
+        _currentStatus = LicenseStatus.lockedOut;
+        status = LicenseStatus.lockedOut;
+      } else {
+        _gracePeriodTimer = _timerFactory(
+          remaining,
+          _onGracePeriodTimerExpired,
+        );
+      }
+    }
+
     if (!_statusController.isClosed) {
       _statusController.add(status);
     }
@@ -237,6 +277,7 @@ class LicenseService {
   /// Releases resources. Called by GetIt dispose callback.
   void dispose() {
     _isDisposed = true;
+    _cancelGraceTimer();
     _connectivitySubscription?.cancel();
     _connectivitySubscription = null;
     if (!_statusController.isClosed) {

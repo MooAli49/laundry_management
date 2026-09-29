@@ -218,7 +218,11 @@ The bidirectional synchronization mechanism uses internal local infrastructure t
     sync_operations (local outgoing mutation queue)
     sync_state (local pull cursor: last_applied_sequence)
 
-Together, the local Drift database manages 19 tables at **schema version 6**.
+The system licensing mechanism uses an internal local infrastructure table:
+
+    license_cache (local singleton license state & 24h throttle cache)
+
+Together, the local Drift database manages 20 tables at **schema version 7**.
 
 Key entity attributes and rules:
 - `customers`: includes optional `address TEXT NULL` (nullable profile attribute; whitespace normalizes to NULL; no delivery routing in V1).
@@ -2677,6 +2681,20 @@ The approved V1 database direction is:
     Simple V1 Schema
 
 The database must remain simple, reliable, relational, and aligned with the approved Domain Model.
+
+---
+
+## 90A. Local Infrastructure Cache — license_cache
+
+The SQLite database includes a local singleton cache table dedicated to system license enforcement:
+
+- **Table**: `license_cache`
+- **Role**: Infrastructure cache for offline license gating and 24-hour check throttling.
+- **Nature**: Singleton row (`id = 'singleton'`).
+- **Isolation**:
+  - Excluded from synchronization (`SyncEngine` and `sync_operations` outbox).
+  - No foreign keys or relationships to business entities.
+  - Schema migration version 7 in Drift.
 
 ---
 

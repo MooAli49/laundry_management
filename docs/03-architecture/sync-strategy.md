@@ -2600,6 +2600,20 @@ Historical StorageRecord deletion
 
 \---
 
+**# 107A. Non-Synchronized Infrastructure Tables**
+
+The following tables reside exclusively in local SQLite and are strictly excluded from bidirectional synchronization:
+
+1. `sync_operations`: Local outbox persistent queue.
+2. `sync_state`: Local cursor tracking the highest applied pull sequence number.
+3. `license_cache`: Local singleton cache storing remote license status, authoritative suspension timestamp, and last check timestamp for the 24-hour throttle.
+   - It does NOT generate `SyncOperation` outbox records.
+   - It is NOT tracked or transmitted by `SyncEngine.push()`.
+   - It is NOT updated by `SyncEngine.pull()`.
+   - It communicates directly and read-only with the Supabase Edge Function `/api/v1/license` via `LicenseRemoteDataSource` and is persisted locally by `LicenseCacheDao`.
+
+\---
+
 **# 108. Final Synchronization Principles**
 
 The V1 synchronization architecture is based on:

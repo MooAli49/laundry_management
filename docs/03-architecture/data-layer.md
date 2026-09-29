@@ -1932,6 +1932,24 @@ The approved conceptual Data Layer is:
 
 ---
 
+# 99A. License Cache Infrastructure Persistence (`license_cache`)
+
+The Data Layer includes a local singleton cache table dedicated to system license enforcement:
+
+- **Purpose**: Persists operational license status locally so the application can enforce license gating and 7-day grace periods offline without network access.
+- **Table**: `license_cache` (introduced in Drift schema version 7).
+- **Structure**:
+  - `id`: TextColumn, primary key (constant `'singleton'`).
+  - `remote_status`: TextColumn (`'active'` or `'suspended'`).
+  - `suspended_at`: DateTimeColumn (nullable, remote authoritative UTC timestamp).
+  - `last_checked_at`: DateTimeColumn (nullable, local check timestamp for 24-hour throttling).
+- **Operational Rules**:
+  - **Isolation**: Completely excluded from SyncEngine and outbox queue (`sync_operations`). It is never synced.
+  - **Zero Coupling**: Has no foreign keys, relationships, or dependencies on business tables (`orders`, `customers`, etc.).
+  - **Access Boundary**: Read and written exclusively by `LicenseCacheDao` and orchestrated by `LicenseService`. Does not affect business queries.
+
+---
+
 # 100. Final Principle
 
 The Data Layer must make the approved business model persistent, queryable, offline-capable, and synchronization-ready.

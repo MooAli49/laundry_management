@@ -4652,6 +4652,42 @@ using:
 
 ---
 
+# 57A. License Cache Table — license_cache
+
+Location:
+
+    data/local/tables/license_cache_table.dart
+
+Purpose:
+
+Stores the locally cached license verification state for offline license enforcement and 24-hour check throttling.
+
+Table definition:
+
+    CREATE TABLE license_cache (
+        id TEXT NOT NULL PRIMARY KEY DEFAULT 'singleton',
+        remote_status TEXT NOT NULL,
+        suspended_at INTEGER,
+        last_checked_at INTEGER
+    );
+
+Column details:
+
+| Column | Type | Nullable | Default | Description |
+|---|---|---|---|---|
+| `id` | TEXT | No | `'singleton'` | Technical primary key; fixed constant singleton row. |
+| `remote_status` | TEXT | No | None | Last verified remote status (`'active'` or `'suspended'`). |
+| `suspended_at` | INTEGER | Yes | NULL | Authoritative suspension UTC timestamp from remote `license_info.suspended_at`. |
+| `last_checked_at` | INTEGER | Yes | NULL | Local timestamp when remote check was last performed (used for 24h throttling). |
+
+Operational rules:
+- **Singleton**: Only one row ever exists (`id = 'singleton'`).
+- **Isolation**: Excluded from synchronization (`sync_operations` / `SyncEngine`).
+- **No Foreign Keys**: Independent infrastructure cache with no business table relationships.
+- **Migration**: Added in Drift database schema version 7.
+
+---
+
 # 58. Final Approved Database Table Principles
 
 1. UUIDs are used as technical primary keys.

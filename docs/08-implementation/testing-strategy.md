@@ -65,10 +65,11 @@ The current implementation covers the full offline-first Flutter client and two-
 Testing validates:
 
 - Domain and business rules (Order numbers, status lifecycle, item snapshots, financial calculations, overdue boundary)
-- Database schema (Drift schema version 6, 19 tables, foreign keys, migrations)
+- Database schema (Drift schema version 7, 20 tables, foreign keys, migrations)
 - Data layer and repositories (offline persistence, aggregate writes)
 - Cubit state management (reactive flows, optimistic updates)
 - UI and Widget behavior (Arabic RTL, forms, validation, dialogs)
+- License Control System (remote status evaluation, 7-day grace period, timer-based local lockout, router gating)
 - Sync Engine & Outbox (two-way synchronization, conflict resolution, realtime pull, offline resilience)
 - Live cloud integration (Supabase Edge Functions, Postgres triggers, multi-device sync, row-level locking)
 

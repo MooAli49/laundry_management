@@ -337,11 +337,13 @@ Usage:
     Attention Required
     Pending Synchronization
     Important Operational Notice
+    License Grace Period Warning Banner (AppColors.warningLight / warningDark / warning)
 
 Examples:
 
     متبقي 200.00 ج.م
     في انتظار المزامنة
+    تنبيه: الترخيص معلق. متبقٍ X أيام قبل إيقاف التطبيق.
 
 Warning should not be used for ordinary neutral information.
 
@@ -349,7 +351,7 @@ Warning should not be used for ordinary neutral information.
 
 ## 14. Error Color
 
-Error communicates invalid input, failed actions, or destructive states.
+Error communicates invalid input, failed actions, destructive states, or blocking lockout.
 
 Token group:
 
@@ -364,10 +366,12 @@ Usage:
     Failed Operations
     Important Destructive Actions
     Sync Attention when appropriate
+    License Lockout Screen (AppColors.error / errorLight)
 
 Examples:
 
     المبلغ يجب أن يكون أكبر من صفر
+    تم تعليق ترخيص النظام
     تعذر تحميل البيانات
     فشل تنفيذ العملية
 

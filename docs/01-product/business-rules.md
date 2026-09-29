@@ -686,6 +686,29 @@ Subtotal is calculated from the OrderItems using their applicable pricing rules.
 
 ---
 
+## BR-063A — Manual Draft Item Total Override (customTotal) & Lossless Physical Piece Distribution
+
+When creating or editing an order item group, the user may manually override the calculated draft item total (`customTotal`):
+
+1. **Lossless Piastre Division**:
+   - The total amount is converted to integer minor units (piastres: `totalPiastres = customTotal.piastres`).
+   - For an item group with quantity `count > 1`, piastres are divided integer-wise across the `count` expanded physical `OrderItem` records:
+     - `basePiecePiastres = totalPiastres ~/ count`
+     - `remainder = totalPiastres % count`
+     - The first `remainder` items receive `basePiecePiastres + 1` piastre, and the remaining items receive `basePiecePiastres`.
+   - The sum of all individual piece totals is strictly and losslessly equal to `customTotal`:
+     `basePiecePiastres * count + remainder == totalPiastres`.
+
+2. **Effective Unit Price Snapshot**:
+   - For reporting and display purposes, `effectiveUnitPrice` is computed as:
+     - Carpets: `Money.fromPiastres((totalPiastres / (area * count)).round())`
+     - Non-carpets: `Money.fromPiastres((totalPiastres / count).round())`
+
+3. **Historical Value Immutability**:
+   - The stored transaction-time `OrderItem.calculatedTotal` and `OrderItem.unitPrice` are permanently saved in SQLite and are NEVER recalculated from updated `Service` prices.
+
+---
+
 ## BR-064 — Order Discount
 
 Discount is applied at the order level.
@@ -2083,6 +2106,66 @@ UI Success
 Pending Synchronization
 
 The Expense must remain available locally.
+
+---
+
+# 46A. License Control System Rules
+
+## BR-140A — Authoritative Remote Suspension Anchor
+
+The 7-day grace period clock is anchored strictly to the remote `license_info.suspended_at` timestamp.
+- Local device detection time is NEVER used as the suspension anchor.
+- On offline launches, the cached `suspended_at` timestamp remains the sole authoritative anchor.
+- If the remote backend updates `suspended_at` to a newer timestamp, the local cached anchor is updated accordingly.
+- Reinstatement to `'active'` clears the cached suspension timestamp.
+
+---
+
+## BR-140B — 7-Day Grace Period Duration
+
+The grace period duration is exactly 7 days (`kLicenseGracePeriod = Duration(days: 7)`).
+- When remote status is `'suspended'` and `now - suspended_at < 7 days`, the effective state is `LicenseStatus.gracePeriod`.
+- The application remains 100% operational; all workflows (creating orders, payments, storage, printing) continue normally.
+- A non-blocking warning banner (`LicenseWarningBanner`) is prominently displayed inside the main shell.
+
+---
+
+## BR-140C — Local Timer Expiration
+
+When entering `gracePeriod`, `LicenseService` schedules an in-memory Dart `Timer` for the exact remaining duration (`suspended_at + 7 days - now`).
+- Upon timer expiry, the status automatically transitions to `lockedOut` and broadcasts to `LicenseGuard`.
+- `LicenseGuard` triggers `GoRouter.refreshListenable`, immediately redirecting navigation to `/license-locked`.
+- The application does NOT remain indefinitely in `gracePeriod` simply because no network event or app resume occurred.
+- If the license is reinstated before expiration, the timer is cancelled immediately.
+
+---
+
+## BR-140D — Locked-Out State
+
+When `now - suspended_at >= 7 days`:
+- Effective license status becomes `LicenseStatus.lockedOut`.
+- All normal application navigation is blocked.
+- The user is redirected to the full-screen `LicenseLockScreen` outside the application shell.
+- No sidebar, bottom navigation, or back navigation is permitted.
+- Historical business data is preserved and never deleted or corrupted.
+
+---
+
+## BR-140E — 24-Hour Remote Check Policy (Policy A)
+
+- **Application Startup**: Evaluates local cache immediately for instantaneous offline launch, then checks remote status if online.
+- **Background / Resume**: Remote license checks are throttled to once every 24 hours based on `last_checked_at`.
+- **Offline Resilience**: Offline launches use the cached status. Fresh installations with no local cache fail open to `'active'`.
+
+---
+
+## BR-140F — Reinstatement
+
+When the backend changes status back to `'active'`:
+- The local cached status is updated to `'active'`.
+- The local suspension timestamp is cleared (`suspended_at = NULL`).
+- Any active grace period timer is cancelled.
+- The application automatically unlocks and redirects back to the dashboard.
 
 ---
 

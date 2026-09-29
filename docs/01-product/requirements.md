@@ -564,6 +564,19 @@ Currency selection is not required.
 
 ---
 
+## 7.6 Manual Draft Item Total Override (`customTotal`)
+
+The user may manually override the calculated draft total for an item group:
+
+- **Lossless Piastre Distribution**: When an item group with quantity > 1 has a custom total, the total integer piastres are distributed losslessly across the expanded physical `OrderItem` records:
+  - Base piece piastres = `totalPiastres ~/ quantity`
+  - Remainder = `totalPiastres % quantity`
+  - The first `remainder` items receive `basePiecePiastres + 1` piastre, and the remaining items receive `basePiecePiastres`.
+  - The sum of physical piece totals is strictly guaranteed to equal the custom total.
+- **Historical Price Stability**: The stored snapshot values (`unitPrice`, `calculatedTotal`) are saved permanently with each `OrderItem` in local SQLite and are never recalculated from updated service prices.
+
+---
+
 # 8. Tax
 
 Tax is disabled by default.
@@ -994,6 +1007,11 @@ The invoice or receipt should display, where applicable:
 
 The user must be able to print the Invoice / Receipt from the Order workflow.
 
+The system supports two complementary printing modes:
+
+1. **Direct Bluetooth Thermal Printing**: Direct ESC/POS printing to 80mm (standard) and 58mm companion thermal printers via Bluetooth from Android tablets, formatted with Arabic typography, item tables, and invoice metadata.
+2. **System / PDF Printing**: Standard document printing and PDF export using the operating system's native print framework.
+
 ---
 
 # 15. Expenses
@@ -1381,6 +1399,21 @@ The system should prioritize:
 - Reusable UI components
 - Reliable local data
 - Predictable behavior
+
+---
+
+# 24A. System Licensing & Operational Control
+
+The system includes a remote licensing mechanism to manage client deployments while preserving offline-first guarantees:
+
+1. **Remote Status**: The backend issues two operational states: `'active'` or `'suspended'`.
+2. **Authoritative Suspension Anchor**: The grace period clock is anchored strictly to the remote `suspended_at` timestamp. Device detection time is never used as the anchor.
+3. **7-Day Grace Period**: When a license is suspended, the application remains fully functional for exactly 7 days after `suspended_at`. A warning banner (`LicenseWarningBanner`) is displayed across all screens inside the shell.
+4. **Timer-Based Local Expiration**: `LicenseService` schedules a local timer for the exact remaining grace duration. When it expires, status transitions to `lockedOut` without requiring an app restart or network event.
+5. **Locked-Out State**: Exactly 7 days after `suspended_at`, the application blocks all navigation and displays the full-screen `LicenseLockScreen` outside the shell.
+6. **24-Hour Remote Check Policy (Policy A)**: Startup evaluates local cache immediately and checks remote status if online. Subsequent checks on resume are throttled to once every 24 hours.
+7. **Offline Safety**: Offline launches enforce the cached license status. Fresh installations with no cached state fail open to `'active'`.
+8. **Reinstatement**: Reinstating the license to `'active'` immediately unlocks the application and cancels all active timers.
 
 ---
 

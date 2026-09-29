@@ -49,8 +49,8 @@ class LicenseGuard extends ChangeNotifier {
   int get daysRemainingInGrace {
     if (_status != LicenseStatus.gracePeriod) return 0;
     final suspendedAtValue = _service.suspendedAt;
-    if (suspendedAtValue == null) return 7; // No timestamp → show max
-    const graceDays = 7;
+    final graceDays = kLicenseGracePeriod.inDays;
+    if (suspendedAtValue == null) return graceDays; // No timestamp → show max
     final elapsed = DateTime.now().difference(suspendedAtValue).inDays;
     return (graceDays - elapsed).clamp(0, graceDays);
   }

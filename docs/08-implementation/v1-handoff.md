@@ -38,13 +38,13 @@ The Laundry Management System V1 has successfully completed all development task
 ## 4. Database Architecture
 
 - **Local Database (Drift / SQLite)**:
-  - Schema version 6 containing 19 tables (17 business tables + 2 sync tables: `sync_operations`, `sync_states`).
+  - Schema version 7 containing 20 tables (17 business tables + 2 sync tables: `sync_operations`, `sync_states` + 1 license infrastructure table: `license_cache`).
   - Strict foreign key enforcement (`PRAGMA foreign_keys = ON;`), custom indexes, partial unique index on active storage records.
   - Customer profile support with optional address (`customers.address TEXT NULL`), normalized to null on whitespace.
   - Dedicated `refunds` table: append-only financial records linked to orders, omitting `server_version`.
   - Baseline singleton (`business_settings`) and default categories seeded on schema creation.
 - **Remote Database (Supabase PostgreSQL)**:
-  - 13 applied migrations from `supabase/migrations/` (through `20260925000000_customer_address.sql`).
+  - 15 migrations in `supabase/migrations/` (through `20260926000000_security_hardening.sql` and `20260930000000_license_info.sql`).
   - Relational tables protected by Row Level Security (`rowsecurity: true`). Direct PostgREST mutations disabled; all mutations route through `SECURITY DEFINER` RPCs.
   - Monotonically increasing `sequence BIGSERIAL` in `sync_changes` change log.
   - Dedicated `sync_idempotency_log` table storing client operation hashes.

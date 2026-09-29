@@ -1344,19 +1344,14 @@ Examples:
 
 Do not create redundant mapper classes when direct conversion is clearer and safe.
 
-## 75. Application Layer
+## 75. Application Layer Scope & Boundaries
 
-There is no mandatory separate Application layer in V1.
+The Application layer (`lib/application/`) exists exclusively for two approved purposes:
 
-Do not create:
+1. **Selective Domain Use Cases** (`lib/application/use_cases/`): Complex, multi-step business workflows (order creation, storage, relocation, status transitions, completion, cancellation) where cross-repository orchestration is required.
+2. **Cross-Cutting Orchestration Exception: License Control** (`lib/application/license/license_service.dart`): Orchestrating cross-cutting operational license enforcement across SQLite cache, remote API, connectivity, and router gating.
 
-application/
-services/
-use_cases/
-
-merely because they are common in other architectures.
-
-If future complexity requires such a layer, update the architecture documentation first.
+Do not introduce generic CRUD Use Cases, generic managers, or unnecessary services for simple entity operations. Simple entity operations interact directly with Repository contracts.
 
 ## 76. Testing Architecture
 

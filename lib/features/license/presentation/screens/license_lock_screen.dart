@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/localization/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 
@@ -35,11 +36,11 @@ class LicenseLockScreen extends StatelessWidget {
                   Container(
                     width: 88,
                     height: 88,
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withValues(alpha: 0.1),
+                    decoration: const BoxDecoration(
+                      color: AppColors.errorLight,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.lock_outline_rounded,
                       size: 44,
                       color: AppColors.error,
@@ -47,7 +48,7 @@ class LicenseLockScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 32),
                   Text(
-                    'تم تعليق ترخيص النظام',
+                    AppStrings.licenseSuspendedTitle,
                     style: AppTextStyles.headlineMedium.copyWith(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w700,
@@ -57,7 +58,7 @@ class LicenseLockScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'يرجى التواصل مع مزود النظام لإعادة تفعيل التطبيق.',
+                    AppStrings.licenseSuspendedDescription,
                     style: AppTextStyles.bodyMedium.copyWith(
                       color: AppColors.textSecondary,
                       height: 1.6,

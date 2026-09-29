@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/localization/app_strings.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 
 /// Non-dismissible warning banner shown during the license grace period.
@@ -17,22 +19,22 @@ class LicenseWarningBanner extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-      color: const Color(0xFFFFF3CD), // amber-100
+      color: AppColors.warningLight,
       child: Row(
         children: [
           const Icon(
             Icons.warning_amber_rounded,
-            color: Color(0xFF856404),
+            color: AppColors.warningDark,
             size: 18,
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               daysRemaining > 0
-                  ? 'تنبيه: الترخيص معلق. متبقٍ $daysRemaining ${daysRemaining == 1 ? "يوم" : "أيام"} قبل إيقاف التطبيق. يرجى التواصل مع مزود النظام.'
-                  : 'تنبيه: الترخيص معلق. يرجى التواصل مع مزود النظام فوراً.',
+                  ? AppStrings.licenseWarningGrace(daysRemaining)
+                  : AppStrings.licenseWarningImmediate,
               style: AppTextStyles.bodySmall.copyWith(
-                color: const Color(0xFF856404),
+                color: AppColors.warningDark,
                 fontWeight: FontWeight.w500,
               ),
               textDirection: TextDirection.rtl,

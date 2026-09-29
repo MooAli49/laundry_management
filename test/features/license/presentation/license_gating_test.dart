@@ -90,6 +90,7 @@ void main() {
   tearDown(() async {
     fakeNetworkInfo.dispose();
     fakeSyncEngine.dispose();
+    AppRouter.resetForTesting();
     if (getIt.isRegistered<AppDatabase>()) {
       await getIt<AppDatabase>().close();
     }
@@ -139,6 +140,9 @@ void main() {
       // AppShell and normal UI remain accessible
       expect(find.byType(AppShell), findsOneWidget);
       expect(find.byType(LicenseLockScreen), findsNothing);
+
+      // Clean up timer before widget tester verifies invariants
+      getIt<LicenseService>().dispose();
     });
 
     testWidgets(
