@@ -306,7 +306,8 @@ void main() {
         expect(
           stats.todayPickupOrdersCount,
           equals(3),
-          reason: 'Midnight (00:00), afternoon (14:30), and end-of-day (23:59) orders must be included in today pickups',
+          reason:
+              'Midnight (00:00), afternoon (14:30), and end-of-day (23:59) orders must be included in today pickups',
         );
 
         // Case E is overdue (< startOfToday) -> exactly 1

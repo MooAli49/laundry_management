@@ -1,10 +1,112 @@
-import 'dart:developer' as dev;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
+
+import 'package:flutter/foundation.dart';
 
 import 'printer_profile.dart';
 
-enum DiagnosticRasterFormat { gsV0, gsL }
+// ---------------------------------------------------------------------------
+// Isolate helpers — must be top-level for compute() to serialize them.
+// ---------------------------------------------------------------------------
+
+/// Arguments bundle passed across the isolate boundary to [_buildBlocksInIsolate].
+class _MonochromeArgs {
+  const _MonochromeArgs({
+    required this.pixels,
+    required this.width,
+    required this.height,
+    required this.protocol,
+    required this.blockHeight,
+    required this.paperWidthMm,
+    required this.threshold,
+  });
+
+  final Uint8List pixels;
+  final int width;
+  final int height;
+  final PrinterProtocol protocol;
+  final int blockHeight;
+  final int paperWidthMm;
+  final int threshold;
+}
+
+/// Top-level function executed in a background isolate by [compute].
+///
+/// Converts raw RGBA pixel data to a 1-bit monochrome representation and then
+/// builds the protocol-specific printer command blocks.
+List<List<int>> _buildBlocksInIsolate(_MonochromeArgs args) {
+  final lines = <List<bool>>[];
+  final width = args.width;
+  final height = args.height;
+  final pixels = args.pixels;
+  final threshold = args.threshold;
+
+  for (int y = 0; y < height; y++) {
+    final line = <bool>[];
+    for (int x = 0; x < width; x++) {
+      final idx = (y * width + x) * 4;
+      final r = pixels[idx];
+      final g = pixels[idx + 1];
+      final b = pixels[idx + 2];
+      // BT.601 luma approximation
+      final lum = (0.299 * r + 0.587 * g + 0.114 * b).round();
+      line.add(lum < threshold);
+    }
+    lines.add(line);
+  }
+
+  switch (args.protocol) {
+    case PrinterProtocol.tspl:
+      // Build a minimal TSPL BITMAP command entirely in the isolate.
+      return [
+        _buildTsplCommandInIsolate(lines, width, height, args.paperWidthMm),
+      ];
+    case PrinterProtocol.escPos:
+    case PrinterProtocol.auto:
+      return ThermalCommandBuilder.buildVerticallySplitEscPosRasterCommands(
+        rows: lines,
+        width: width,
+        blockHeight: args.blockHeight,
+      );
+  }
+}
+
+/// Minimal TSPL BITMAP command builder for use inside the background isolate.
+List<int> _buildTsplCommandInIsolate(
+  List<List<bool>> lines,
+  int width,
+  int height,
+  int paperWidthMm,
+) {
+  final cmd = <int>[];
+  void addStr(String s) => cmd.addAll(s.codeUnits);
+  void addCrlf() => cmd.addAll([0x0D, 0x0A]);
+  addStr('SIZE $paperWidthMm mm, 200 mm');
+  addCrlf();
+  addStr('GAP 0 mm, 0 mm');
+  addCrlf();
+  addStr('CLS');
+  addCrlf();
+  final bytesPerLine = (width + 7) ~/ 8;
+  addStr('BITMAP 0,0,$bytesPerLine,$height,1,');
+  for (int y = 0; y < lines.length; y++) {
+    final result = List<int>.filled(bytesPerLine, 0);
+    final row = lines[y];
+    for (int i = 0; i < row.length; i++) {
+      if (row[i]) {
+        final byteIdx = i ~/ 8;
+        final bitIdx = 7 - (i % 8);
+        result[byteIdx] |= (1 << bitIdx);
+      }
+    }
+    cmd.addAll(result);
+  }
+  addCrlf();
+  addStr('PRINT 1,1');
+  addCrlf();
+  return cmd;
+}
+
+// ---------------------------------------------------------------------------
 
 /// Builds the binary command sequences that wrap a raster image for
 /// transmission to a thermal printer.
@@ -28,22 +130,22 @@ enum DiagnosticRasterFormat { gsV0, gsL }
 class ThermalCommandBuilder {
   ThermalCommandBuilder._();
 
+  static const thermalThreshold = 220;
+
   // --------------------------------------------------------------------------
   // Public entry point
   // --------------------------------------------------------------------------
 
-  /// Build the full print command payload from PNG [imageBytes] for [profile].
+  /// Build the print command blocks from PNG [imageBytes] for [profile].
   ///
-  /// Returns a list of raw bytes ready to be sent via [BluetoothPrinterService.writeBytes].
-  static Future<List<int>> buildPrintCommand({
+  /// For ESC/POS receipts, splits the image vertically into fixed-height blocks
+  /// (default 64 rows, matching the physically validated Test 5/6 baseline).
+  /// This prevents the printer firmware's raster decoder buffer from overflowing.
+  static Future<List<List<int>>> buildPrintCommandBlocks({
     required Uint8List imageBytes,
     required PrinterProfile profile,
+    int blockHeight = 64,
   }) async {
-    final stopwatch = Stopwatch()..start();
-    dev.log(
-      'PRINT COMMAND BUILD START protocol=${profile.protocol.name}',
-      name: 'BluetoothPrinterService',
-    );
     final codec = await ui.instantiateImageCodec(imageBytes);
     final frame = await codec.getNextFrame();
     final image = frame.image;
@@ -51,7 +153,7 @@ class ThermalCommandBuilder {
     final width = image.width;
     final height = image.height;
 
-    // Get raw RGBA pixel data
+    // Get raw RGBA pixel data (main isolate — GPU readback only, fast).
     final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
     if (byteData == null) {
       throw StateError(
@@ -61,40 +163,42 @@ class ThermalCommandBuilder {
 
     final pixels = byteData.buffer.asUint8List();
 
-    // Convert RGBA to 1-bit monochrome bitmap (threshold: pixel luminance < 128 → black)
-    final monoBytes = _rgbaToMonochrome(pixels, width, height);
-
+    // Resolve protocol before entering the isolate so we don't need to
+    // pass a non-primitive type across the isolate boundary.
     final protocol = profile.protocol == PrinterProtocol.auto
         ? PrinterProtocol.escPos
         : profile.protocol;
-    dev.log(
-      'PRINT COMMAND BUILD imageWidth=$width imageHeight=$height '
-      'selectedProtocol=${protocol.name} autoResolvedTo=${profile.protocol == PrinterProtocol.auto ? 'escPos' : 'none'}',
-      name: 'BluetoothPrinterService',
-    );
 
-    final command = switch (protocol) {
-      PrinterProtocol.tspl => _buildTsplCommand(
-        monoBytes,
-        width,
-        height,
-        profile,
+    // Offload CPU-heavy RGBA→monochrome conversion + block packing to a
+    // background isolate so the UI thread stays responsive.
+    return compute(
+      _buildBlocksInIsolate,
+      _MonochromeArgs(
+        pixels: pixels,
+        width: width,
+        height: height,
+        protocol: protocol,
+        blockHeight: blockHeight,
+        paperWidthMm: profile.paperWidth.mm,
+        threshold: thermalThreshold,
       ),
-      PrinterProtocol.escPos ||
-      PrinterProtocol.auto => _buildEscPosCommand(monoBytes, width, height),
-    };
-    final widthBytes = (width + 7) ~/ 8;
-    final rasterPayloadLength = widthBytes * height;
-    dev.log(
-      'PRINT COMMAND BUILD SUCCESS commandType=${protocol == PrinterProtocol.tspl ? 'TSPL' : 'ESC/POS'} '
-      'imageWidth=$width imageHeight=$height widthBytes=$widthBytes '
-      'rasterPayloadLength=$rasterPayloadLength rows=$height '
-      'totalCommandLength=${command.length} first32Hex=${_hex(command.take(32).toList())} '
-      'firstRowHex=${_hex(command.skip(8).take(widthBytes).toList())} '
-      'durationMs=${stopwatch.elapsedMilliseconds}',
-      name: 'BluetoothPrinterService',
     );
-    return command;
+  }
+
+  /// Build the full print command payload from PNG [imageBytes] for [profile].
+  ///
+  /// Returns a concatenated list of raw bytes.
+  static Future<List<int>> buildPrintCommand({
+    required Uint8List imageBytes,
+    required PrinterProfile profile,
+    int blockHeight = 64,
+  }) async {
+    final blocks = await buildPrintCommandBlocks(
+      imageBytes: imageBytes,
+      profile: profile,
+      blockHeight: blockHeight,
+    );
+    return blocks.expand((b) => b).toList();
   }
 
   // --------------------------------------------------------------------------
@@ -141,20 +245,7 @@ class ThermalCommandBuilder {
     if (includeCut) {
       trailer.addAll([0x1D, 0x56, 0x41]); // GS V A
     }
-    final command = <int>[...header, ...rasterPayload, ...trailer];
-    dev.log(
-      'PRINT RASTER headerHex=${_hex(header)} '
-      'rasterFirst32Hex=${_hex(rasterPayload.take(32).toList())} '
-      'rasterFirstRowHex=${_hex(rasterPayload.take(widthBytes).toList())} '
-      'rasterLastRowHex=${_hex(rasterPayload.skip(expectedRasterLength - widthBytes).toList())} '
-      'widthPixels=$width heightPixels=$height widthBytes=$widthBytes '
-      'rasterPayloadLength=${rasterPayload.length} '
-      'expectedRasterLength=$expectedRasterLength '
-      'actualRasterLength=${rasterPayload.length} rows=$height '
-      'totalCommandLength=${command.length}',
-      name: 'BluetoothPrinterService',
-    );
-    return command;
+    return <int>[...header, ...rasterPayload, ...trailer];
   }
 
   /// Builds a raw ESC/POS raster from known monochrome rows for diagnostics/tests.
@@ -167,151 +258,71 @@ class ThermalCommandBuilder {
     return _buildEscPosCommand(rows, width, height, includeCut: includeCut);
   }
 
-  /// Builds a small deterministic ESC/POS raster for printer diagnostics.
-  /// The bitmap contains a border, crosshair, and ASCII-like block pattern.
-  static List<int> buildDiagnosticRasterCommand() {
-    const width = 128;
-    const height = 64;
-    final lines = _buildDiagnosticRows(width, height);
-    final command = _buildEscPosCommand(
-      lines,
-      width,
-      height,
-      includeCut: false,
-    );
-    dev.log(
-      'PRINT DIAGNOSTIC RASTER imageWidth=$width imageHeight=$height '
-      'widthBytes=${(width + 7) ~/ 8} rasterPayloadLength=${((width + 7) ~/ 8) * height} '
-      'headerHex=${_hex(command.take(16).toList())} '
-      'rasterFirstRowHex=${_hex(command.skip(16).take((width + 7) ~/ 8).toList())} '
-      'totalCommandLength=${command.length} rows=$height',
-      name: 'BluetoothPrinterService',
-    );
-    return command;
-  }
-
-  static List<int> buildDiagnosticGsLCommand() {
-    const width = 128;
-    const height = 64;
-    final rows = _buildDiagnosticRows(width, height);
+  /// Builds a sequence of individual GS v 0 commands split vertically into fixed-height blocks.
+  ///
+  /// Each block contains at most [blockHeight] rows (default 64 rows, matching
+  /// the physically verified 576x64 diagnostic).
+  ///
+  /// - The first block begins with ESC @ (init), ESC 3 0 (0-dot line spacing), and ESC a 1 (center).
+  /// - Each block contains its own GS v 0 header (`1D 76 30 00 [xL] [xH] [yL] [yH]`) and packed raster rows.
+  /// - The final block appends ESC d 5 (feed lines) without cutter.
+  static List<List<int>> buildVerticallySplitEscPosRasterCommands({
+    required List<List<bool>> rows,
+    required int width,
+    int blockHeight = 64,
+  }) {
+    final totalRows = rows.length;
+    if (totalRows == 0) return const [];
     final widthBytes = (width + 7) ~/ 8;
-    final rasterPayload = <int>[];
-    for (final row in rows) {
-      rasterPayload.addAll(_packBitsLine(row, widthBytes));
+    final blockCount = (totalRows + blockHeight - 1) ~/ blockHeight;
+    final commands = <List<int>>[];
+
+    for (var b = 0; b < blockCount; b++) {
+      final startY = b * blockHeight;
+      final endY = (startY + blockHeight).clamp(0, totalRows);
+      final currentBlockHeight = endY - startY;
+      final blockRows = rows.sublist(startY, endY);
+
+      final cmd = <int>[];
+      // Only the first block initializes printer & sets 0-dot line spacing
+      if (b == 0) {
+        cmd.addAll([
+          0x1B, 0x40, // ESC @
+          0x1B,
+          0x33,
+          0x00, // ESC 3 0 (0-dot line spacing ensures seamless stitching)
+          0x1B, 0x61, 0x01, // ESC a 1 (Center)
+        ]);
+      }
+
+      // GS v 0 header for this block
+      cmd.addAll([
+        0x1D, 0x76, 0x30, 0x00, // GS v 0, mode 0
+        widthBytes & 0xFF,
+        (widthBytes >> 8) & 0xFF,
+        currentBlockHeight & 0xFF,
+        (currentBlockHeight >> 8) & 0xFF,
+      ]);
+
+      // Raster payload for this block
+      for (final line in blockRows) {
+        cmd.addAll(_packBitsLine(line, widthBytes));
+      }
+
+      // Only the last block feeds paper (no cutter)
+      if (b == blockCount - 1) {
+        cmd.addAll([0x1B, 0x64, 0x05]); // ESC d 5
+      }
+
+      commands.add(cmd);
     }
 
-    final dataLength = 10 + rasterPayload.length;
-    final dataCommand = <int>[
-      0x1D,
-      0x28,
-      0x4C,
-      dataLength & 0xFF,
-      (dataLength >> 8) & 0xFF,
-      0x30,
-      0x00,
-      0x30,
-      0x00,
-      widthBytes & 0xFF,
-      (widthBytes >> 8) & 0xFF,
-      height & 0xFF,
-      (height >> 8) & 0xFF,
-      ...rasterPayload,
-    ];
-    final printCommand = <int>[0x1D, 0x28, 0x4C, 0x02, 0x00, 0x31, 0x45, 0x00];
-    final trailer = <int>[0x1B, 0x64, 0x05];
-    final command = [...dataCommand, ...printCommand, ...trailer];
-    dev.log(
-      'DIAGNOSTIC FORMAT=GS_L commandLength=${command.length} '
-      'headerHex=${_hex(dataCommand.take(13).toList())} '
-      'payloadLength=${rasterPayload.length}',
-      name: 'BluetoothPrinterService',
-    );
-    return command;
-  }
-
-  static List<List<bool>> _buildDiagnosticRows(int width, int height) {
-    return List<List<bool>>.generate(height, (y) {
-      return List<bool>.generate(width, (x) {
-        final border = x == 0 || x == width - 1 || y == 0 || y == height - 1;
-        final crosshair = x == width ~/ 2 || y == height ~/ 2;
-        final blocks =
-            (x >= 16 && x < 48 && y >= 16 && y < 32) ||
-            (x >= 80 && x < 112 && y >= 32 && y < 48);
-        return border || crosshair || blocks;
-      });
-    });
-  }
-
-  // --------------------------------------------------------------------------
-  // TSPL – BITMAP command
-  // --------------------------------------------------------------------------
-
-  static List<int> _buildTsplCommand(
-    List<List<bool>> monoLines,
-    int width,
-    int height,
-    PrinterProfile profile,
-  ) {
-    final cmd = <int>[];
-    final paperMm = profile.paperWidth.mm;
-
-    void addStr(String s) => cmd.addAll(s.codeUnits);
-    void addCrlf() => cmd.addAll([0x0D, 0x0A]);
-
-    // Set label size (width, max-height in mm)
-    addStr('SIZE $paperMm mm, 200 mm');
-    addCrlf();
-    addStr('GAP 0 mm, 0 mm');
-    addCrlf();
-    addStr('CLS');
-    addCrlf();
-
-    // BITMAP x,y,width_bytes,height,mode,data
-    // mode: 0=overwrite, 1=OR, 2=XOR, 3=AND
-    final bytesPerLine = (width + 7) ~/ 8;
-    addStr('BITMAP 0,0,$bytesPerLine,$height,1,');
-
-    // Pack bits
-    for (int y = 0; y < monoLines.length; y++) {
-      final lineBytes = _packBitsLine(monoLines[y], bytesPerLine);
-      cmd.addAll(lineBytes);
-    }
-    addCrlf();
-
-    // Print one label
-    addStr('PRINT 1,1');
-    addCrlf();
-
-    return cmd;
+    return commands;
   }
 
   // --------------------------------------------------------------------------
   // Pixel helpers
   // --------------------------------------------------------------------------
-
-  /// Convert RGBA flat array into a list-of-boolean-lines (black=true).
-  static List<List<bool>> _rgbaToMonochrome(
-    Uint8List pixels,
-    int width,
-    int height,
-  ) {
-    final lines = <List<bool>>[];
-    for (int y = 0; y < height; y++) {
-      final line = <bool>[];
-      for (int x = 0; x < width; x++) {
-        final idx = (y * width + x) * 4;
-        final r = pixels[idx];
-        final g = pixels[idx + 1];
-        final b = pixels[idx + 2];
-        // Luminance (BT.601 approximation)
-        final lum = (0.299 * r + 0.587 * g + 0.114 * b).round();
-        // Black pixel if luminance < 128
-        line.add(lum < 128);
-      }
-      lines.add(line);
-    }
-    return lines;
-  }
 
   /// Pack a boolean list into [bytesPerLine] bytes, MSB first.
   static List<int> _packBitsLine(List<bool> bits, int bytesPerLine) {
@@ -325,7 +336,4 @@ class ThermalCommandBuilder {
     }
     return result;
   }
-
-  static String _hex(List<int> bytes) =>
-      bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join(' ');
 }

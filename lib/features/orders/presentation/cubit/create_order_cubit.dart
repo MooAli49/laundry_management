@@ -125,8 +125,9 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
   }) async {
     final trimmedName = name.trim();
     final trimmedPhone = phone.trim();
-    final trimmedAddress =
-        address?.trim().isNotEmpty == true ? address!.trim() : null;
+    final trimmedAddress = address?.trim().isNotEmpty == true
+        ? address!.trim()
+        : null;
 
     if (trimmedName.isEmpty) {
       throw const ValidationFailure('اسم العميل مطلوب');

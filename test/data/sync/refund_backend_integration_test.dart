@@ -70,7 +70,10 @@ void main() {
 
       if (!isNetworkAvailable) return;
 
-      final syncRes = await dio.get('/sync/changes', queryParameters: {'limit': 1});
+      final syncRes = await dio.get(
+        '/sync/changes',
+        queryParameters: {'limit': 1},
+      );
       if (syncRes.statusCode == 200 && syncRes.data is Map) {
         baseSeq = syncRes.data['latest_sequence'] ?? 0;
       }
@@ -80,15 +83,11 @@ void main() {
           '012${(DateTime.now().microsecondsSinceEpoch % 100000000).toString().padLeft(8, '0')}';
 
       // 1. Seed dedicated customer for this test run
-      final custRes = await postSafe(
-        '/customers',
-        {
-          'id': customerId,
-          'name': 'عميل تجربة المرتجعات $runId',
-          'phone': customerPhone,
-        },
-        opId: 'op-refund-cust-$runId',
-      );
+      final custRes = await postSafe('/customers', {
+        'id': customerId,
+        'name': 'عميل تجربة المرتجعات $runId',
+        'phone': customerPhone,
+      }, opId: 'op-refund-cust-$runId');
       expect(custRes.statusCode, isIn([200, 201]));
     });
 
@@ -98,55 +97,51 @@ void main() {
       required String status,
       int total = 3000,
     }) async {
-      final orderId = 'd600${orderSuffix.padLeft(4, '0')}-0001-4001-8001-$runId';
+      final orderId =
+          'd600${orderSuffix.padLeft(4, '0')}-0001-4001-8001-$runId';
       final orderNum = 'ORD-TEST-REF-$orderSuffix-$runId';
       final itemId = 'e600${orderSuffix.padLeft(4, '0')}-0001-4001-8001-$runId';
 
-      final res = await postSafe(
-        '/orders',
-        {
-          'id': orderId,
-          'order_number': orderNum,
-          'customer_id': customerId,
-          'status': 'processing',
-          'expected_pickup_date': '2026-10-01T00:00:00.000Z',
-          'subtotal': total,
-          'discount': 0,
-          'tax': 0,
-          'total': total,
-          'items': [
-            {
-              'id': itemId,
-              'item_type_id': clothesType,
-              'item_definition_id': shirtDef,
-              'service_id': washService,
-              'item_type_name_snapshot': 'ملابس',
-              'service_name_snapshot': 'غسيل',
-              'pricing_type': 'per_piece',
-              'quantity': 1.0,
-              'unit_price': total,
-              'calculated_total': total,
-            },
-          ],
-        },
-        opId: 'op-seed-ord-$orderSuffix-$runId',
-      );
+      final res = await postSafe('/orders', {
+        'id': orderId,
+        'order_number': orderNum,
+        'customer_id': customerId,
+        'status': 'processing',
+        'expected_pickup_date': '2026-10-01T00:00:00.000Z',
+        'subtotal': total,
+        'discount': 0,
+        'tax': 0,
+        'total': total,
+        'items': [
+          {
+            'id': itemId,
+            'item_type_id': clothesType,
+            'item_definition_id': shirtDef,
+            'service_id': washService,
+            'item_type_name_snapshot': 'ملابس',
+            'service_name_snapshot': 'غسيل',
+            'pricing_type': 'per_piece',
+            'quantity': 1.0,
+            'unit_price': total,
+            'calculated_total': total,
+          },
+        ],
+      }, opId: 'op-seed-ord-$orderSuffix-$runId');
       expect(res.statusCode, equals(201));
 
       if (status == 'ready' || status == 'completed') {
-        await patchSafe(
-          '/orders/$orderId',
-          {'status': 'ready', 'updated_at': DateTime.now().toIso8601String()},
-          opId: 'op-ready-ord-$orderSuffix-$runId',
-        );
+        await patchSafe('/orders/$orderId', {
+          'status': 'ready',
+          'updated_at': DateTime.now().toIso8601String(),
+        }, opId: 'op-ready-ord-$orderSuffix-$runId');
       }
       if (status == 'completed') {
         final now = DateTime.now().toIso8601String();
-        await patchSafe(
-          '/orders/$orderId',
-          {'status': 'completed', 'completed_at': now, 'updated_at': now},
-          opId: 'op-comp-ord-$orderSuffix-$runId',
-        );
+        await patchSafe('/orders/$orderId', {
+          'status': 'completed',
+          'completed_at': now,
+          'updated_at': now,
+        }, opId: 'op-comp-ord-$orderSuffix-$runId');
       }
 
       return orderId;
@@ -159,17 +154,14 @@ void main() {
       String method = 'cash',
       String paymentSuffix = '0001',
     }) async {
-      final paymentId = 'b600${paymentSuffix.padLeft(4, '0')}-0001-4001-8001-$runId';
-      final res = await postSafe(
-        '/payments',
-        {
-          'id': paymentId,
-          'order_id': orderId,
-          'amount': amount,
-          'payment_method': method,
-        },
-        opId: 'op-seed-pay-$paymentSuffix-$runId',
-      );
+      final paymentId =
+          'b600${paymentSuffix.padLeft(4, '0')}-0001-4001-8001-$runId';
+      final res = await postSafe('/payments', {
+        'id': paymentId,
+        'order_id': orderId,
+        'amount': amount,
+        'payment_method': method,
+      }, opId: 'op-seed-pay-$paymentSuffix-$runId');
       expect(res.statusCode, equals(201));
       return paymentId;
     }
@@ -197,16 +189,12 @@ void main() {
       }
 
       final now = DateTime.now().toIso8601String();
-      final cancRes = await patchSafe(
-        '/orders/$orderId',
-        {
-          'status': 'cancelled',
-          'cancelled_at': now,
-          'cancellation_reason': 'إلغاء لاختبار الاسترداد',
-          'updated_at': now,
-        },
-        opId: 'op-canc-ord-$orderSuffix-$runId',
-      );
+      final cancRes = await patchSafe('/orders/$orderId', {
+        'status': 'cancelled',
+        'cancelled_at': now,
+        'cancellation_reason': 'إلغاء لاختبار الاسترداد',
+        'updated_at': now,
+      }, opId: 'op-canc-ord-$orderSuffix-$runId');
       expect(cancRes.statusCode, equals(200));
 
       return orderId;
@@ -248,7 +236,11 @@ void main() {
     test('2. Refund rejected for processing order', () async {
       if (!isNetworkAvailable) return;
 
-      final orderId = await seedOrder(orderSuffix: '0201', status: 'processing', total: 1500);
+      final orderId = await seedOrder(
+        orderSuffix: '0201',
+        status: 'processing',
+        total: 1500,
+      );
       await seedPayment(orderId: orderId, amount: 1500, paymentSuffix: '0201');
 
       final refundRes = await postSafe('/refunds', {
@@ -269,7 +261,11 @@ void main() {
     test('3. Refund rejected for ready order', () async {
       if (!isNetworkAvailable) return;
 
-      final orderId = await seedOrder(orderSuffix: '0301', status: 'ready', total: 1800);
+      final orderId = await seedOrder(
+        orderSuffix: '0301',
+        status: 'ready',
+        total: 1800,
+      );
       await seedPayment(orderId: orderId, amount: 1800, paymentSuffix: '0301');
 
       final refundRes = await postSafe('/refunds', {
@@ -290,7 +286,11 @@ void main() {
     test('4. Refund rejected for completed order', () async {
       if (!isNetworkAvailable) return;
 
-      final orderId = await seedOrder(orderSuffix: '0401', status: 'completed', total: 2200);
+      final orderId = await seedOrder(
+        orderSuffix: '0401',
+        status: 'completed',
+        total: 2200,
+      );
       await seedPayment(orderId: orderId, amount: 2200, paymentSuffix: '0401');
 
       final refundRes = await postSafe('/refunds', {
@@ -570,25 +570,35 @@ void main() {
     // =========================================================================
     // 16. Exactly one sync_changes row is created per successful refund
     // =========================================================================
-    test('16. Exactly one sync_changes row is created per successful refund', () async {
-      if (!isNetworkAvailable) return;
+    test(
+      '16. Exactly one sync_changes row is created per successful refund',
+      () async {
+        if (!isNetworkAvailable) return;
 
-      final syncRes = await dio.get(
-        '/sync/changes',
-        queryParameters: {'after': baseSeq, 'limit': 500},
-      );
-      expect(syncRes.statusCode, equals(200));
-      final List changes = syncRes.data['changes'] ?? [];
+        final syncRes = await dio.get(
+          '/sync/changes',
+          queryParameters: {'after': baseSeq, 'limit': 500},
+        );
+        expect(syncRes.statusCode, equals(200));
+        final List changes = syncRes.data['changes'] ?? [];
 
-      // Find changes for fullRefundId
-      final refundChanges = changes.where((c) =>
-          c['entity_type'] == 'refund' &&
-          c['entity_id'] == fullRefundId &&
-          c['operation_type'] == 'create').toList();
+        // Find changes for fullRefundId
+        final refundChanges = changes
+            .where(
+              (c) =>
+                  c['entity_type'] == 'refund' &&
+                  c['entity_id'] == fullRefundId &&
+                  c['operation_type'] == 'create',
+            )
+            .toList();
 
-      expect(refundChanges.length, equals(1));
-      expect(refundChanges.first['server_version'], isNull); // Immutable append-only
-    });
+        expect(refundChanges.length, equals(1));
+        expect(
+          refundChanges.first['server_version'],
+          isNull,
+        ); // Immutable append-only
+      },
+    );
 
     // =========================================================================
     // 17. No sync_changes row is created for rejected refund
@@ -605,9 +615,13 @@ void main() {
       expect(syncRes.statusCode, equals(200));
       final List changes = syncRes.data['changes'] ?? [];
 
-      final failedChanges = changes.where((c) =>
-          c['entity_type'] == 'refund' &&
-          c['entity_id'] == failedRefundId).toList();
+      final failedChanges = changes
+          .where(
+            (c) =>
+                c['entity_type'] == 'refund' &&
+                c['entity_id'] == failedRefundId,
+          )
+          .toList();
 
       expect(failedChanges, isEmpty);
     });
@@ -650,26 +664,29 @@ void main() {
     // =========================================================================
     // 19. Refund with no payment is rejected because refundable amount = 0
     // =========================================================================
-    test('19. Refund with no payment is rejected because refundable amount = 0', () async {
-      if (!isNetworkAvailable) return;
+    test(
+      '19. Refund with no payment is rejected because refundable amount = 0',
+      () async {
+        if (!isNetworkAvailable) return;
 
-      // Seed order directly cancelled with 0 payments
-      final orderId = await createCancelledOrder(
-        orderSuffix: '1901',
-        total: 1500,
-      );
+        // Seed order directly cancelled with 0 payments
+        final orderId = await createCancelledOrder(
+          orderSuffix: '1901',
+          total: 1500,
+        );
 
-      final refundRes = await postSafe('/refunds', {
-        'id': 'f6001901-0001-4001-8001-$runId',
-        'order_id': orderId,
-        'amount': 500,
-        'refund_method': 'cash',
-      }, opId: 'op-ref-1901-$runId');
+        final refundRes = await postSafe('/refunds', {
+          'id': 'f6001901-0001-4001-8001-$runId',
+          'order_id': orderId,
+          'amount': 500,
+          'refund_method': 'cash',
+        }, opId: 'op-ref-1901-$runId');
 
-      expect(refundRes.statusCode, equals(409));
-      final error = refundRes.data['error'] ?? refundRes.data['code'];
-      expect(error, equals('REFUND_BALANCE_EXCEEDED'));
-    });
+        expect(refundRes.statusCode, equals(409));
+        final error = refundRes.data['error'] ?? refundRes.data['code'];
+        expect(error, equals('REFUND_BALANCE_EXCEEDED'));
+      },
+    );
 
     // =========================================================================
     // 20. Refund history remains preserved
@@ -685,15 +702,21 @@ void main() {
       expect(syncRes.statusCode, equals(200));
       final List changes = syncRes.data['changes'] ?? [];
 
-      final test7Change = changes.any((c) =>
-          c['entity_type'] == 'refund' &&
-          c['entity_id'] == 'f6000701-0001-4001-8001-$runId');
-      final test8Change1 = changes.any((c) =>
-          c['entity_type'] == 'refund' &&
-          c['entity_id'] == 'f6000801-0001-4001-8001-$runId');
-      final test8Change2 = changes.any((c) =>
-          c['entity_type'] == 'refund' &&
-          c['entity_id'] == 'f6000802-0001-4001-8001-$runId');
+      final test7Change = changes.any(
+        (c) =>
+            c['entity_type'] == 'refund' &&
+            c['entity_id'] == 'f6000701-0001-4001-8001-$runId',
+      );
+      final test8Change1 = changes.any(
+        (c) =>
+            c['entity_type'] == 'refund' &&
+            c['entity_id'] == 'f6000801-0001-4001-8001-$runId',
+      );
+      final test8Change2 = changes.any(
+        (c) =>
+            c['entity_type'] == 'refund' &&
+            c['entity_id'] == 'f6000802-0001-4001-8001-$runId',
+      );
 
       expect(test7Change, isTrue);
       expect(test8Change1, isTrue);

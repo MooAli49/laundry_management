@@ -150,8 +150,14 @@ void main() {
         expect(find.text('300.00 ج.م'), findsWidgets); // Payments
         expect(find.text('إجمالي الاستردادات'), findsOneWidget);
         expect(find.text('0.00 ج.م'), findsWidgets); // Refunds
-        expect(find.text('صافي المدفوعات'), findsNWidgets(2)); // Primary metric card + Payment movement block
-        expect(find.text('300.00 ج.م'), findsWidgets); // Net Payments: 300 - 0 = 300
+        expect(
+          find.text('صافي المدفوعات'),
+          findsNWidgets(2),
+        ); // Primary metric card + Payment movement block
+        expect(
+          find.text('300.00 ج.م'),
+          findsWidgets,
+        ); // Net Payments: 300 - 0 = 300
         expect(find.text('المصروفات التشغيلية'), findsOneWidget);
         expect(find.text('100.00 ج.م'), findsWidgets); // Expenses
         expect(find.text('صافي الربح'), findsOneWidget);

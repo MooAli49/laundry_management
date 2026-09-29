@@ -5,7 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:laundry_management/application/use_cases/edit_processing_order_use_case.dart';
 import 'package:laundry_management/data/local/daos/payments_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
-import 'package:laundry_management/data/local/database/app_database.dart' as app_db;
+import 'package:laundry_management/data/local/database/app_database.dart'
+    as app_db;
 import 'package:laundry_management/domain/entities/business_settings.dart';
 import 'package:laundry_management/domain/entities/carpet_size.dart';
 import 'package:laundry_management/domain/entities/customer.dart';
@@ -59,8 +60,7 @@ class MockCustomerRepo implements CustomerRepository {
     String? query,
     int limit = 20,
     int offset = 0,
-  }) async =>
-      customers;
+  }) async => customers;
 
   @override
   Future<Customer?> getCustomerById(String id) async =>
@@ -77,7 +77,8 @@ class MockItemTypeRepo implements ItemTypeRepository {
   List<ItemType> types = [];
 
   @override
-  Future<List<ItemType>> getAllItemTypes({bool activeOnly = false}) async => types;
+  Future<List<ItemType>> getAllItemTypes({bool activeOnly = false}) async =>
+      types;
 
   @override
   Future<List<ItemType>> getActiveItemTypes() async => types;
@@ -93,8 +94,7 @@ class MockItemDefRepo implements ItemDefinitionRepository {
   Future<List<ItemDefinition>> getDefinitionsForItemType(
     String itemTypeId, {
     bool activeOnly = false,
-  }) async =>
-      defs;
+  }) async => defs;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -142,8 +142,7 @@ class MockStorageRecordsDao implements StorageRecordsDao {
   @override
   Future<app_db.StorageRecord?> getActiveRecordForOrderItem(
     String orderItemId,
-  ) async =>
-      null;
+  ) async => null;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -160,11 +159,11 @@ class MockStorageLocRepo implements StorageLocationRepository {
 class MockSettingsRepo implements SettingsRepository {
   @override
   Future<BusinessSettings> getSettings() async => BusinessSettings(
-        id: 'settings-1',
-        businessName: 'مغسلة تجريبية',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
+    id: 'settings-1',
+    businessName: 'مغسلة تجريبية',
+    createdAt: DateTime.now(),
+    updatedAt: DateTime.now(),
+  );
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -255,7 +254,8 @@ void main() {
     customerRepo = MockCustomerRepo()..customers = [initialCustomer];
     itemTypeRepo = MockItemTypeRepo()..types = [testType];
     itemDefRepo = MockItemDefRepo()..defs = [];
-    serviceRepo = MockServiceRepo()..services = [testPieceService, testCarpetService];
+    serviceRepo = MockServiceRepo()
+      ..services = [testPieceService, testCarpetService];
     carpetSizeRepo = MockCarpetSizeRepo()..sizes = [];
     paymentsDao = MockPaymentsDao()..totalPaidPiastres = 0;
     storageDao = MockStorageRecordsDao();
@@ -302,134 +302,146 @@ void main() {
       ],
     );
 
-    return MaterialApp.router(
-      routerConfig: router,
-    );
+    return MaterialApp.router(routerConfig: router);
   }
 
   group('UAT-D — Edit Order Quantity UI & Physical Piece Expansion Tests', () {
-    testWidgets('A. New non-carpet item: quantity = 2 expands into two separate pieces with physicalQuantity = 1', (tester) async {
-      tester.view.physicalSize = const Size(1280, 900);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() => tester.view.resetPhysicalSize());
+    testWidgets(
+      'A. New non-carpet item: quantity = 2 expands into two separate pieces with physicalQuantity = 1',
+      (tester) async {
+        tester.view.physicalSize = const Size(1280, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() => tester.view.resetPhysicalSize());
 
-      await tester.pumpWidget(buildTestWidget());
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(buildTestWidget());
+        await tester.pumpAndSettle();
 
-      // Ensure form is in new item mode
-      expect(find.text('إضافة بند جديد'), findsOneWidget);
-      expect(find.text('الكمية (عدد القطع) *'), findsOneWidget);
+        // Ensure form is in new item mode
+        expect(find.text('إضافة بند جديد'), findsOneWidget);
+        expect(find.text('الكمية (عدد القطع) *'), findsOneWidget);
 
-      // Select item type and service via cubit for reliable state setup
-      await cubit.selectItemType(testType);
-      cubit.selectService(testPieceService);
-      await tester.pumpAndSettle();
+        // Select item type and service via cubit for reliable state setup
+        await cubit.selectItemType(testType);
+        cubit.selectService(testPieceService);
+        await tester.pumpAndSettle();
 
-      // Enter quantity = 2
-      final quantityField = find.byKey(const ValueKey('draft_item_quantity_field'));
-      expect(quantityField, findsOneWidget);
-      await tester.enterText(quantityField, '2');
-      await tester.pumpAndSettle();
+        // Enter quantity = 2
+        final quantityField = find.byKey(
+          const ValueKey('draft_item_quantity_field'),
+        );
+        expect(quantityField, findsOneWidget);
+        await tester.enterText(quantityField, '2');
+        await tester.pumpAndSettle();
 
-      expect(cubit.state.draftQuantity, 2);
+        expect(cubit.state.draftQuantity, 2);
 
-      // Tap add item
-      await tester.tap(find.text('إضافة البند للطلب'));
-      await tester.pumpAndSettle();
+        // Tap add item
+        await tester.tap(find.text('إضافة البند للطلب'));
+        await tester.pumpAndSettle();
 
-      // Total items should now be 3 (1 existing + 2 newly added)
-      expect(cubit.state.items.length, 3);
-      expect(cubit.state.items[1].physicalQuantity, 1);
-      expect(cubit.state.items[2].physicalQuantity, 1);
+        // Total items should now be 3 (1 existing + 2 newly added)
+        expect(cubit.state.items.length, 3);
+        expect(cubit.state.items[1].physicalQuantity, 1);
+        expect(cubit.state.items[2].physicalQuantity, 1);
 
-      // Quantity input should reset back to 1
-      expect(cubit.state.draftQuantity, 1);
-    });
+        // Quantity input should reset back to 1
+        expect(cubit.state.draftQuantity, 1);
+      },
+    );
 
-    testWidgets('B. New carpet item: quantity control and carpet dimensions are both visible, creating two physical pieces with carpet data', (tester) async {
-      tester.view.physicalSize = const Size(1280, 900);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() => tester.view.resetPhysicalSize());
+    testWidgets(
+      'B. New carpet item: quantity control and carpet dimensions are both visible, creating two physical pieces with carpet data',
+      (tester) async {
+        tester.view.physicalSize = const Size(1280, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() => tester.view.resetPhysicalSize());
 
-      await tester.pumpWidget(buildTestWidget());
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(buildTestWidget());
+        await tester.pumpAndSettle();
 
-      await cubit.selectItemType(testType);
-      cubit.selectService(testCarpetService);
-      await tester.pumpAndSettle();
+        await cubit.selectItemType(testType);
+        cubit.selectService(testCarpetService);
+        await tester.pumpAndSettle();
 
-      // Both Quantity AND Carpet Dimensions must be visible simultaneously
-      expect(find.text('الكمية (عدد القطع) *'), findsOneWidget);
-      expect(find.text('الطول (متر) *'), findsOneWidget);
-      expect(find.text('العرض (متر) *'), findsOneWidget);
+        // Both Quantity AND Carpet Dimensions must be visible simultaneously
+        expect(find.text('الكمية (عدد القطع) *'), findsOneWidget);
+        expect(find.text('الطول (متر) *'), findsOneWidget);
+        expect(find.text('العرض (متر) *'), findsOneWidget);
 
-      // Set quantity = 2 and dimensions
-      cubit.updateDraftQuantity(2);
-      cubit.updateDraftCarpetDimensions(3.0, 2.0);
-      await tester.pumpAndSettle();
+        // Set quantity = 2 and dimensions
+        cubit.updateDraftQuantity(2);
+        cubit.updateDraftCarpetDimensions(3.0, 2.0);
+        await tester.pumpAndSettle();
 
-      // Add item
-      await tester.tap(find.text('إضافة البند للطلب'));
-      await tester.pumpAndSettle();
+        // Add item
+        await tester.tap(find.text('إضافة البند للطلب'));
+        await tester.pumpAndSettle();
 
-      // Verify two carpet items created each with physicalQuantity = 1 and correct dimensions
-      expect(cubit.state.items.length, 3);
-      final c1 = cubit.state.items[1];
-      final c2 = cubit.state.items[2];
+        // Verify two carpet items created each with physicalQuantity = 1 and correct dimensions
+        expect(cubit.state.items.length, 3);
+        final c1 = cubit.state.items[1];
+        final c2 = cubit.state.items[2];
 
-      expect(c1.physicalQuantity, 1);
-      expect(c2.physicalQuantity, 1);
-      expect(c1.length, 3.0);
-      expect(c1.width, 2.0);
-      expect(c1.carpetArea, 6.0);
-      expect(c2.length, 3.0);
-      expect(c2.width, 2.0);
-      expect(c2.carpetArea, 6.0);
-    });
+        expect(c1.physicalQuantity, 1);
+        expect(c2.physicalQuantity, 1);
+        expect(c1.length, 3.0);
+        expect(c1.width, 2.0);
+        expect(c1.carpetArea, 6.0);
+        expect(c2.length, 3.0);
+        expect(c2.width, 2.0);
+        expect(c2.carpetArea, 6.0);
+      },
+    );
 
-    testWidgets('C. Existing item edit: quantity is not editable, read-only label shown, and piece remains physicalQuantity = 1', (tester) async {
-      tester.view.physicalSize = const Size(1280, 900);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() => tester.view.resetPhysicalSize());
+    testWidgets(
+      'C. Existing item edit: quantity is not editable, read-only label shown, and piece remains physicalQuantity = 1',
+      (tester) async {
+        tester.view.physicalSize = const Size(1280, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() => tester.view.resetPhysicalSize());
 
-      await tester.pumpWidget(buildTestWidget());
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(buildTestWidget());
+        await tester.pumpAndSettle();
 
-      // Click edit on the existing item (index 0)
-      await cubit.startEditItem(0);
-      await tester.pumpAndSettle();
+        // Click edit on the existing item (index 0)
+        await cubit.startEditItem(0);
+        await tester.pumpAndSettle();
 
-      expect(find.text('تعديل بند من الطلب'), findsOneWidget);
+        expect(find.text('تعديل بند من الطلب'), findsOneWidget);
 
-      // Editable quantity field is NOT rendered
-      expect(find.text('الكمية (عدد القطع) *'), findsNothing);
+        // Editable quantity field is NOT rendered
+        expect(find.text('الكمية (عدد القطع) *'), findsNothing);
 
-      // Read-only informational label is rendered
-      expect(find.text('العدد: 1 قطعة'), findsOneWidget);
+        // Read-only informational label is rendered
+        expect(find.text('العدد: 1 قطعة'), findsOneWidget);
 
-      // Existing item still has physicalQuantity = 1
-      expect(cubit.state.items[0].physicalQuantity, 1);
-    });
+        // Existing item still has physicalQuantity = 1
+        expect(cubit.state.items[0].physicalQuantity, 1);
+      },
+    );
 
-    testWidgets('D. Quantity = 1: creates exactly one draft item with physicalQuantity = 1', (tester) async {
-      tester.view.physicalSize = const Size(1280, 900);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() => tester.view.resetPhysicalSize());
+    testWidgets(
+      'D. Quantity = 1: creates exactly one draft item with physicalQuantity = 1',
+      (tester) async {
+        tester.view.physicalSize = const Size(1280, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() => tester.view.resetPhysicalSize());
 
-      await tester.pumpWidget(buildTestWidget());
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(buildTestWidget());
+        await tester.pumpAndSettle();
 
-      await cubit.selectItemType(testType);
-      cubit.selectService(testPieceService);
-      cubit.updateDraftQuantity(1);
-      await tester.pumpAndSettle();
+        await cubit.selectItemType(testType);
+        cubit.selectService(testPieceService);
+        cubit.updateDraftQuantity(1);
+        await tester.pumpAndSettle();
 
-      await tester.tap(find.text('إضافة البند للطلب'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('إضافة البند للطلب'));
+        await tester.pumpAndSettle();
 
-      // 1 existing + 1 newly added = 2 items
-      expect(cubit.state.items.length, 2);
-      expect(cubit.state.items[1].physicalQuantity, 1);
-    });
+        // 1 existing + 1 newly added = 2 items
+        expect(cubit.state.items.length, 2);
+        expect(cubit.state.items[1].physicalQuantity, 1);
+      },
+    );
   });
 }

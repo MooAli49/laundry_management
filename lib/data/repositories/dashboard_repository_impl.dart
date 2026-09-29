@@ -95,8 +95,8 @@ class DashboardRepositoryImpl implements DashboardRepository {
   @override
   Stream<DashboardData> watchDashboardData() async* {
     yield await getDashboardData();
-    yield* _ordersDao
-        .watchDashboardUpdates()
-        .asyncMap((_) => getDashboardData());
+    yield* _ordersDao.watchDashboardUpdates().asyncMap(
+      (_) => getDashboardData(),
+    );
   }
 }

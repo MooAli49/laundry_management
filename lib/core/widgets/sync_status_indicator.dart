@@ -20,10 +20,7 @@ class SyncStatusIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (cubit != null) {
-      return BlocProvider.value(
-        value: cubit!,
-        child: const _SyncStatusView(),
-      );
+      return BlocProvider.value(value: cubit!, child: const _SyncStatusView());
     }
     return BlocProvider(
       create: (_) => getIt<SyncStatusCubit>(),
@@ -50,10 +47,7 @@ class _SyncStatusView extends StatelessWidget {
     return Container(
       width: 8,
       height: 8,
-      decoration: BoxDecoration(
-        color: dotColor,
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
     );
   }
 

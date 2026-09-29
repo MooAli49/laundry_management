@@ -48,7 +48,13 @@ void main() {
     // Seed customer
     await db.customStatement(
       'INSERT INTO customers (id, name, phone, created_at, updated_at) VALUES (?, ?, ?, ?, ?);',
-      [testCustomerId, 'عميل التدفق', '01099998888', nowTimestamp, nowTimestamp],
+      [
+        testCustomerId,
+        'عميل التدفق',
+        '01099998888',
+        nowTimestamp,
+        nowTimestamp,
+      ],
     );
 
     // Seed Cancelled Order (total = 10000 piastres = 100.00 EGP)
@@ -119,8 +125,9 @@ void main() {
 
         // 19b. Verify exactly one outbox operation in sync_operations
         final pendingOps = await syncOperationsDao.getPendingOperations();
-        final refundOps =
-            pendingOps.where((op) => op.entityType == 'refund').toList();
+        final refundOps = pendingOps
+            .where((op) => op.entityType == 'refund')
+            .toList();
         expect(refundOps.length, 1);
         expect(refundOps.first.operationType, 'create');
         expect(refundOps.first.entityId, createdRefund.id);
@@ -132,9 +139,12 @@ void main() {
       () async {
         // Initial state verification
         final orderBefore = await ordersDao.getOrderById(testOrderId);
-        final paymentsBefore = await paymentsDao.getPaymentsForOrder(testOrderId);
-        final totalPaidBefore =
-            await paymentsDao.getTotalPaidForOrder(testOrderId);
+        final paymentsBefore = await paymentsDao.getPaymentsForOrder(
+          testOrderId,
+        );
+        final totalPaidBefore = await paymentsDao.getTotalPaidForOrder(
+          testOrderId,
+        );
 
         expect(orderBefore?.total, 10000);
         expect(orderBefore?.status, 'cancelled');
@@ -151,11 +161,16 @@ void main() {
         expect(refundCubit.state.isSuccess, isTrue);
 
         // 21. Existing payments remain completely unchanged
-        final paymentsAfter = await paymentsDao.getPaymentsForOrder(testOrderId);
+        final paymentsAfter = await paymentsDao.getPaymentsForOrder(
+          testOrderId,
+        );
         expect(paymentsAfter.length, paymentsBefore.length);
         expect(paymentsAfter.first.id, paymentsBefore.first.id);
         expect(paymentsAfter.first.amount, paymentsBefore.first.amount);
-        expect(paymentsAfter.first.paymentMethod, paymentsBefore.first.paymentMethod);
+        expect(
+          paymentsAfter.first.paymentMethod,
+          paymentsBefore.first.paymentMethod,
+        );
         expect(paymentsAfter.first.paidAt, paymentsBefore.first.paidAt);
 
         // 22. Order total remains unchanged
@@ -164,8 +179,9 @@ void main() {
         expect(orderAfter?.total, orderBefore?.total);
 
         // 23. Order paid amount remains unchanged
-        final totalPaidAfter =
-            await paymentsDao.getTotalPaidForOrder(testOrderId);
+        final totalPaidAfter = await paymentsDao.getTotalPaidForOrder(
+          testOrderId,
+        );
         expect(totalPaidAfter, 10000);
         expect(totalPaidAfter, totalPaidBefore);
 
@@ -182,8 +198,9 @@ void main() {
       '26 & 27. Multiple refunds update balance correctly; full refund zeroes balance; further refunds rejected',
       () async {
         // Starting balance: Paid = 100.00 EGP, Refunded = 0, Refundable = 100.00 EGP
-        var balance =
-            await refundRepository.getRefundableBalanceSummary(testOrderId);
+        var balance = await refundRepository.getRefundableBalanceSummary(
+          testOrderId,
+        );
         expect(balance.totalPaid, Money.fromPiastres(10000));
         expect(balance.totalRefunded, Money.zero);
         expect(balance.remainingRefundable, Money.fromPiastres(10000));
@@ -196,7 +213,9 @@ void main() {
         );
         expect(refundCubit.state.isSuccess, isTrue);
 
-        balance = await refundRepository.getRefundableBalanceSummary(testOrderId);
+        balance = await refundRepository.getRefundableBalanceSummary(
+          testOrderId,
+        );
         expect(balance.totalRefunded, Money.fromPiastres(3000));
         expect(balance.remainingRefundable, Money.fromPiastres(7000));
 
@@ -209,7 +228,9 @@ void main() {
         );
         expect(refundCubit.state.isSuccess, isTrue);
 
-        balance = await refundRepository.getRefundableBalanceSummary(testOrderId);
+        balance = await refundRepository.getRefundableBalanceSummary(
+          testOrderId,
+        );
         expect(balance.totalRefunded, Money.fromPiastres(5000));
         expect(balance.remainingRefundable, Money.fromPiastres(5000));
 
@@ -222,7 +243,9 @@ void main() {
         );
         expect(refundCubit.state.isSuccess, isTrue);
 
-        balance = await refundRepository.getRefundableBalanceSummary(testOrderId);
+        balance = await refundRepository.getRefundableBalanceSummary(
+          testOrderId,
+        );
         expect(balance.totalRefunded, Money.fromPiastres(10000));
         expect(balance.remainingRefundable, Money.zero);
 
@@ -240,14 +263,17 @@ void main() {
         );
 
         // Balance remains unchanged at zero refundable
-        balance = await refundRepository.getRefundableBalanceSummary(testOrderId);
+        balance = await refundRepository.getRefundableBalanceSummary(
+          testOrderId,
+        );
         expect(balance.totalRefunded, Money.fromPiastres(10000));
         expect(balance.remainingRefundable, Money.zero);
 
         // Verify exactly 3 outbox operations exist for the 3 accepted refunds
         final pendingOps = await syncOperationsDao.getPendingOperations();
-        final refundOps =
-            pendingOps.where((op) => op.entityType == 'refund').toList();
+        final refundOps = pendingOps
+            .where((op) => op.entityType == 'refund')
+            .toList();
         expect(refundOps.length, 3);
       },
     );

@@ -530,7 +530,10 @@ void main() {
         await pumpEventQueue();
 
         expect(cubit.state.customers.length, equals(1));
-        expect(cubit.state.customers.first.customer.id, equals('cust-signal-1'));
+        expect(
+          cubit.state.customers.first.customer.id,
+          equals('cust-signal-1'),
+        );
       });
 
       test('7. Pagination guard is respected on DB change', () async {
@@ -591,123 +594,132 @@ void main() {
         expect(cubit.state.customers, isEmpty);
       });
 
-      test('9. Critical race: signal while loading triggers pending refresh after load', () async {
-        final controllableRepo = DelayedCustomerRepository(customerRepository)
-          ..useCustomWatch = true;
-        final testCubit = CustomersListCubit(
-          customerRepository: controllableRepo,
-          orderRepository: orderRepository,
-        );
-        addTearDown(() {
-          controllableRepo.dispose();
-          return testCubit.close();
-        });
+      test(
+        '9. Critical race: signal while loading triggers pending refresh after load',
+        () async {
+          final controllableRepo = DelayedCustomerRepository(customerRepository)
+            ..useCustomWatch = true;
+          final testCubit = CustomersListCubit(
+            customerRepository: controllableRepo,
+            orderRepository: orderRepository,
+          );
+          addTearDown(() {
+            controllableRepo.dispose();
+            return testCubit.close();
+          });
 
-        // 1. Start CustomersListCubit
-        expect(testCubit.state.isLoading, isFalse);
-        expect(testCubit.hasPendingReload, isFalse);
+          // 1. Start CustomersListCubit
+          expect(testCubit.state.isLoading, isFalse);
+          expect(testCubit.hasPendingReload, isFalse);
 
-        // 2 & 3. Call loadCustomers() and keep searchCustomers() pending
-        final completer1 = Completer<List<Customer>>();
-        controllableRepo.searchCompleter = completer1;
-        final loadFuture = testCubit.loadCustomers();
+          // 2 & 3. Call loadCustomers() and keep searchCustomers() pending
+          final completer1 = Completer<List<Customer>>();
+          controllableRepo.searchCompleter = completer1;
+          final loadFuture = testCubit.loadCustomers();
 
-        expect(testCubit.state.isLoading, isTrue);
-        expect(controllableRepo.searchCallCount, 1);
+          expect(testCubit.state.isLoading, isTrue);
+          expect(controllableRepo.searchCallCount, 1);
 
-        // 4. While it is pending, emit the repository DB update signal
-        controllableRepo.emitDbSignal();
-        await pumpEventQueue();
+          // 4. While it is pending, emit the repository DB update signal
+          controllableRepo.emitDbSignal();
+          await pumpEventQueue();
 
-        // 5. Verify the signal sets pending invalidation instead of being lost
-        expect(testCubit.hasPendingReload, isTrue);
-        expect(controllableRepo.searchCallCount, 1);
+          // 5. Verify the signal sets pending invalidation instead of being lost
+          expect(testCubit.hasPendingReload, isTrue);
+          expect(controllableRepo.searchCallCount, 1);
 
-        // 6. Complete the first request with stale/empty data
-        final completer2 = Completer<List<Customer>>();
-        controllableRepo.searchCompleter = completer2;
-        completer1.complete(<Customer>[]);
-        await pumpEventQueue();
+          // 6. Complete the first request with stale/empty data
+          final completer2 = Completer<List<Customer>>();
+          controllableRepo.searchCompleter = completer2;
+          completer1.complete(<Customer>[]);
+          await pumpEventQueue();
 
-        // 7. Verify exactly one fresh reload occurs automatically
-        expect(controllableRepo.searchCallCount, 2);
-        expect(testCubit.hasPendingReload, isFalse);
-        expect(testCubit.state.isLoading, isTrue);
+          // 7. Verify exactly one fresh reload occurs automatically
+          expect(controllableRepo.searchCallCount, 2);
+          expect(testCubit.hasPendingReload, isFalse);
+          expect(testCubit.state.isLoading, isTrue);
 
-        // 8. Complete the fresh reload with the new customer
-        final now = DateTime.now();
-        final newCustomer = Customer(
-          id: 'cust-race-new',
-          name: 'عميل السباق الجديد',
-          phone: '01099998888',
-          createdAt: now,
-          updatedAt: now,
-        );
-        completer2.complete([newCustomer]);
-        await loadFuture;
-        await pumpEventQueue();
+          // 8. Complete the fresh reload with the new customer
+          final now = DateTime.now();
+          final newCustomer = Customer(
+            id: 'cust-race-new',
+            name: 'عميل السباق الجديد',
+            phone: '01099998888',
+            createdAt: now,
+            updatedAt: now,
+          );
+          completer2.complete([newCustomer]);
+          await loadFuture;
+          await pumpEventQueue();
 
-        // 9. Verify final state contains the new customer
-        expect(testCubit.state.customers.length, 1);
-        expect(testCubit.state.customers.first.customer.id, 'cust-race-new');
-        expect(testCubit.state.isLoading, isFalse);
-      });
+          // 9. Verify final state contains the new customer
+          expect(testCubit.state.customers.length, 1);
+          expect(testCubit.state.customers.first.customer.id, 'cust-race-new');
+          expect(testCubit.state.isLoading, isFalse);
+        },
+      );
 
-      test('10. Multiple signals while loading coalesce into exactly one fresh reload', () async {
-        final controllableRepo = DelayedCustomerRepository(customerRepository)
-          ..useCustomWatch = true;
-        final testCubit = CustomersListCubit(
-          customerRepository: controllableRepo,
-          orderRepository: orderRepository,
-        );
-        addTearDown(() {
-          controllableRepo.dispose();
-          return testCubit.close();
-        });
+      test(
+        '10. Multiple signals while loading coalesce into exactly one fresh reload',
+        () async {
+          final controllableRepo = DelayedCustomerRepository(customerRepository)
+            ..useCustomWatch = true;
+          final testCubit = CustomersListCubit(
+            customerRepository: controllableRepo,
+            orderRepository: orderRepository,
+          );
+          addTearDown(() {
+            controllableRepo.dispose();
+            return testCubit.close();
+          });
 
-        final completer1 = Completer<List<Customer>>();
-        controllableRepo.searchCompleter = completer1;
-        final loadFuture = testCubit.loadCustomers();
+          final completer1 = Completer<List<Customer>>();
+          controllableRepo.searchCompleter = completer1;
+          final loadFuture = testCubit.loadCustomers();
 
-        expect(testCubit.state.isLoading, isTrue);
-        expect(controllableRepo.searchCallCount, 1);
+          expect(testCubit.state.isLoading, isTrue);
+          expect(controllableRepo.searchCallCount, 1);
 
-        // Emit multiple signals while load is in-flight
-        controllableRepo.emitDbSignal();
-        controllableRepo.emitDbSignal();
-        controllableRepo.emitDbSignal();
-        await pumpEventQueue();
+          // Emit multiple signals while load is in-flight
+          controllableRepo.emitDbSignal();
+          controllableRepo.emitDbSignal();
+          controllableRepo.emitDbSignal();
+          await pumpEventQueue();
 
-        expect(testCubit.hasPendingReload, isTrue);
-        expect(controllableRepo.searchCallCount, 1);
+          expect(testCubit.hasPendingReload, isTrue);
+          expect(controllableRepo.searchCallCount, 1);
 
-        final completer2 = Completer<List<Customer>>();
-        controllableRepo.searchCompleter = completer2;
-        completer1.complete(<Customer>[]);
-        await pumpEventQueue();
+          final completer2 = Completer<List<Customer>>();
+          controllableRepo.searchCompleter = completer2;
+          completer1.complete(<Customer>[]);
+          await pumpEventQueue();
 
-        // Exactly one reload triggered
-        expect(controllableRepo.searchCallCount, 2);
-        expect(testCubit.hasPendingReload, isFalse);
+          // Exactly one reload triggered
+          expect(controllableRepo.searchCallCount, 2);
+          expect(testCubit.hasPendingReload, isFalse);
 
-        final now = DateTime.now();
-        final newCustomer = Customer(
-          id: 'cust-multi-signal',
-          name: 'عميل إشارات متعددة',
-          phone: '01077776666',
-          createdAt: now,
-          updatedAt: now,
-        );
-        completer2.complete([newCustomer]);
-        await loadFuture;
-        await pumpEventQueue();
+          final now = DateTime.now();
+          final newCustomer = Customer(
+            id: 'cust-multi-signal',
+            name: 'عميل إشارات متعددة',
+            phone: '01077776666',
+            createdAt: now,
+            updatedAt: now,
+          );
+          completer2.complete([newCustomer]);
+          await loadFuture;
+          await pumpEventQueue();
 
-        // Ensure no third reload occurred
-        expect(controllableRepo.searchCallCount, 2);
-        expect(testCubit.state.customers.length, 1);
-        expect(testCubit.state.customers.first.customer.id, 'cust-multi-signal');
-        expect(testCubit.state.isLoading, isFalse);
-      });
+          // Ensure no third reload occurred
+          expect(controllableRepo.searchCallCount, 2);
+          expect(testCubit.state.customers.length, 1);
+          expect(
+            testCubit.state.customers.first.customer.id,
+            'cust-multi-signal',
+          );
+          expect(testCubit.state.isLoading, isFalse);
+        },
+      );
     });
   });
 }

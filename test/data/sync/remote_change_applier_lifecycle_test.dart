@@ -35,15 +35,14 @@ void main() {
       paymentsDao = PaymentsDao(db);
       storageRecordsDao = StorageRecordsDao(db);
 
-      applier = RemoteChangeApplier(
-        db: db,
-        syncStateDao: syncStateDao,
-      );
+      applier = RemoteChangeApplier(db: db, syncStateDao: syncStateDao);
 
       final now = DateTime.now();
 
       // Seed baseline master data
-      await db.into(db.customers).insert(
+      await db
+          .into(db.customers)
+          .insert(
             app_db.CustomersCompanion.insert(
               id: testCustomerId,
               name: 'عميل دورة الحياة',
@@ -53,7 +52,9 @@ void main() {
             ),
           );
 
-      await db.into(db.services).insert(
+      await db
+          .into(db.services)
+          .insert(
             app_db.ServicesCompanion.insert(
               id: testServiceId,
               name: 'تنظيف',
@@ -75,7 +76,9 @@ void main() {
         ],
       );
 
-      await db.into(db.storageLocations).insert(
+      await db
+          .into(db.storageLocations)
+          .insert(
             app_db.StorageLocationsCompanion.insert(
               id: testLocation1Id,
               name: 'رف 1',
@@ -85,7 +88,9 @@ void main() {
             ),
           );
 
-      await db.into(db.storageLocations).insert(
+      await db
+          .into(db.storageLocations)
+          .insert(
             app_db.StorageLocationsCompanion.insert(
               id: testLocation2Id,
               name: 'رف 2',
@@ -110,7 +115,9 @@ void main() {
     }) async {
       final now = DateTime.now();
 
-      await db.into(db.orders).insert(
+      await db
+          .into(db.orders)
+          .insert(
             app_db.OrdersCompanion.insert(
               id: orderId,
               orderNumber: 'ORD-$orderId',
@@ -127,7 +134,9 @@ void main() {
           );
 
       for (final itemId in itemIds) {
-        await db.into(db.orderItems).insert(
+        await db
+            .into(db.orderItems)
+            .insert(
               app_db.OrderItemsCompanion.insert(
                 id: itemId,
                 orderId: orderId,
@@ -145,7 +154,9 @@ void main() {
             );
 
         if (storeActive) {
-          await db.into(db.storageRecords).insert(
+          await db
+              .into(db.storageRecords)
+              .insert(
                 app_db.StorageRecordsCompanion.insert(
                   id: 'rec-$itemId',
                   orderItemId: itemId,
@@ -173,7 +184,9 @@ void main() {
 
         // Record a payment of 5000
         final now = DateTime.now();
-        await db.into(db.payments).insert(
+        await db
+            .into(db.payments)
+            .insert(
               app_db.PaymentsCompanion.insert(
                 id: 'pay-comp-A',
                 orderId: orderId,
@@ -186,8 +199,8 @@ void main() {
             );
 
         // Active storage exists before sync
-        final storageBefore =
-            await storageRecordsDao.getActiveRecordForOrderItem(itemId);
+        final storageBefore = await storageRecordsDao
+            .getActiveRecordForOrderItem(itemId);
         expect(storageBefore, isNotNull);
         expect(storageBefore!.isActive, isTrue);
 
@@ -216,13 +229,13 @@ void main() {
         expect(orderAfter.completedAt, isNotNull);
 
         // Active storage MUST be deactivated
-        final storageAfter =
-            await storageRecordsDao.getActiveRecordForOrderItem(itemId);
+        final storageAfter = await storageRecordsDao
+            .getActiveRecordForOrderItem(itemId);
         expect(storageAfter, isNull);
 
-        final allRecords = await (db.select(db.storageRecords)
-              ..where((t) => t.orderItemId.equals(itemId)))
-            .get();
+        final allRecords = await (db.select(
+          db.storageRecords,
+        )..where((t) => t.orderItemId.equals(itemId))).get();
         expect(allRecords.length, equals(1));
         expect(allRecords.first.isActive, isFalse);
 
@@ -251,7 +264,9 @@ void main() {
 
         // Partial payment
         final now = DateTime.now();
-        await db.into(db.payments).insert(
+        await db
+            .into(db.payments)
+            .insert(
               app_db.PaymentsCompanion.insert(
                 id: 'pay-canc-B',
                 orderId: orderId,
@@ -288,8 +303,8 @@ void main() {
         expect(orderAfter.cancellationReason, equals('العميل يرغب بالإلغاء'));
 
         // Storage deactivated
-        final storageAfter =
-            await storageRecordsDao.getActiveRecordForOrderItem(itemId);
+        final storageAfter = await storageRecordsDao
+            .getActiveRecordForOrderItem(itemId);
         expect(storageAfter, isNull);
 
         // Payment preserved
@@ -336,8 +351,8 @@ void main() {
         expect(orderAfter!.status, equals('processing'));
 
         // Active storage deactivated
-        final storageAfter =
-            await storageRecordsDao.getActiveRecordForOrderItem(itemId);
+        final storageAfter = await storageRecordsDao
+            .getActiveRecordForOrderItem(itemId);
         expect(storageAfter, isNull);
 
         // ZERO outbox
@@ -380,8 +395,8 @@ void main() {
         expect(orderAfter!.status, equals('ready'));
 
         // Active storage MUST REMAIN ACTIVE
-        final storageAfter =
-            await storageRecordsDao.getActiveRecordForOrderItem(itemId);
+        final storageAfter = await storageRecordsDao
+            .getActiveRecordForOrderItem(itemId);
         expect(storageAfter, isNotNull);
         expect(storageAfter!.isActive, isTrue);
 
@@ -432,13 +447,15 @@ void main() {
         await applier.applyBatch([changeA]);
 
         // Order A storage deactivated
-        final storageA =
-            await storageRecordsDao.getActiveRecordForOrderItem(itemA);
+        final storageA = await storageRecordsDao.getActiveRecordForOrderItem(
+          itemA,
+        );
         expect(storageA, isNull);
 
         // Order B storage MUST REMAIN ACTIVE
-        final storageB =
-            await storageRecordsDao.getActiveRecordForOrderItem(itemB);
+        final storageB = await storageRecordsDao.getActiveRecordForOrderItem(
+          itemB,
+        );
         expect(storageB, isNotNull);
         expect(storageB!.isActive, isTrue);
         expect(storageB.storageLocationId, equals(testLocation2Id));
@@ -464,8 +481,9 @@ void main() {
 
         // Verify all 3 are active
         for (final itemId in items) {
-          final rec =
-              await storageRecordsDao.getActiveRecordForOrderItem(itemId);
+          final rec = await storageRecordsDao.getActiveRecordForOrderItem(
+            itemId,
+          );
           expect(rec, isNotNull);
           expect(rec!.isActive, isTrue);
         }
@@ -492,9 +510,14 @@ void main() {
 
         // All 3 storage records must be deactivated
         for (final itemId in items) {
-          final rec =
-              await storageRecordsDao.getActiveRecordForOrderItem(itemId);
-          expect(rec, isNull, reason: 'Item $itemId storage should be deactivated');
+          final rec = await storageRecordsDao.getActiveRecordForOrderItem(
+            itemId,
+          );
+          expect(
+            rec,
+            isNull,
+            reason: 'Item $itemId storage should be deactivated',
+          );
         }
 
         // ZERO outbox
@@ -538,7 +561,9 @@ void main() {
 
         var order = await ordersDao.getOrderById(orderId);
         expect(order!.status, equals('completed'));
-        var storage = await storageRecordsDao.getActiveRecordForOrderItem(itemId);
+        var storage = await storageRecordsDao.getActiveRecordForOrderItem(
+          itemId,
+        );
         expect(storage, isNull);
 
         // Apply second time (same or higher sequence)

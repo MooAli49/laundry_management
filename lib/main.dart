@@ -39,7 +39,8 @@ void main() async {
   if (kDebugMode) {
     PlatformDispatcher.instance.onError = (error, stack) {
       if (error is AssertionError &&
-          error.message?.toString().contains('hardware_keyboard.dart') == true) {
+          error.message?.toString().contains('hardware_keyboard.dart') ==
+              true) {
         return true;
       }
       return false;

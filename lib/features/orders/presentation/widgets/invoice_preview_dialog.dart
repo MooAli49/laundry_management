@@ -82,27 +82,18 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
   // Bluetooth thermal printing (new path)
   // ---------------------------------------------------------------------------
 
-  Future<void> _handleBluetoothPrint(BuildContext context) async {
+  Future<void> _handleBluetoothPrint() async {
     if (_isPrinting) return;
 
-    dev.log(
-      'PRINT START order=${widget.order.orderNumber} selectedMethod=bluetooth',
-      name: 'BluetoothPrinterService',
-    );
+    final messenger = ScaffoldMessenger.of(context);
     final cubit = getIt<BluetoothPrinterCubit>();
     await cubit.ensurePrinterReady();
     if (!mounted) return;
     final printerState = cubit.state;
-    dev.log(
-      'PRINT READINESS isConfigured=${printerState.isConfigured} '
-      'isConnected=${printerState.isConnected} '
-      'isReadyToPrint=${printerState.isReadyToPrint}',
-      name: 'BluetoothPrinterService',
-    );
 
     if (!printerState.isConfigured) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(
             content: Text(AppStrings.btPrinterNotConfigured),
             backgroundColor: AppColors.warning,
@@ -115,7 +106,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
 
     if (!printerState.isConnected || printerState.connectedProfile == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(
             content: Text(AppStrings.btPrinterDisconnected),
             backgroundColor: AppColors.warning,
@@ -130,12 +121,6 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
 
     try {
       final profile = printerState.connectedProfile!;
-      dev.log(
-        'PRINT RENDER START order=${widget.order.orderNumber} '
-        'paper=${profile.paperWidth.mm}mm protocol=${profile.protocol.name}',
-        name: 'BluetoothPrinterService',
-      );
-
       // 1. Render invoice to PNG raster (Arabic-safe via Flutter text engine)
       final imageBytes = await ThermalInvoiceRenderer.renderToImage(
         context: context,
@@ -147,29 +132,25 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
         customer: widget.customer,
         settings: widget.settings,
         pixelRatio: 1.0,
-      );
-      dev.log(
-        'PRINT RENDER SUCCESS bytes=${imageBytes.length} format=PNG',
-        name: 'BluetoothPrinterService',
+        targetWidthPx: 576.0,
+        solidBlackText: true,
       );
 
-      // 2. Build printer command bytes
-      final printBytes = await ThermalCommandBuilder.buildPrintCommand(
+      // 2. Build printer command blocks (64-row vertically split GS v 0 commands)
+      final blocks = await ThermalCommandBuilder.buildPrintCommandBlocks(
         imageBytes: imageBytes,
         profile: profile,
-      );
-      dev.log(
-        'PRINT COMMAND BUILD SUCCESS bytes=${printBytes.length} '
-        'protocol=${profile.protocol.name}',
-        name: 'BluetoothPrinterService',
+        blockHeight: 64,
       );
 
-      // 3. Send to printer
-      await cubit.writeBytes(printBytes);
-      dev.log('PRINT SUCCESS', name: 'BluetoothPrinterService');
+      // 3. Send blocks sequentially to printer
+      await cubit.writeBlockSequence(
+        blocks,
+        delay: const Duration(milliseconds: 50),
+      );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           const SnackBar(
             content: Text('تم إرسال الفاتورة إلى الطابعة بنجاح'),
             backgroundColor: AppColors.success,
@@ -184,7 +165,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
         stackTrace: stackTrace,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text('فشلت عملية الطباعة: $e'),
             backgroundColor: AppColors.error,
@@ -248,7 +229,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           : AppColors.textTertiary,
                       onTap: () {
                         Navigator.of(sheetCtx).pop();
-                        _handleBluetoothPrint(context);
+                        _handleBluetoothPrint();
                       },
                     ),
                     const Divider(height: AppSpacing.xxl),

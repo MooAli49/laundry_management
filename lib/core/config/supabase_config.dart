@@ -31,8 +31,7 @@ class SupabaseConfig {
   static const String prodProjectRef = 'rvrskluqfbrkvvlxtxfp';
 
   /// Expected production project root URL.
-  static const String prodUrlRoot =
-      'https://rvrskluqfbrkvvlxtxfp.supabase.co';
+  static const String prodUrlRoot = 'https://rvrskluqfbrkvvlxtxfp.supabase.co';
 
   /// Expected production Edge Function REST API endpoint.
   static const String prodApiUrl =

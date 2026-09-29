@@ -29,7 +29,8 @@ class SyncChangeDto {
       entityType: json['entity_type'] as String? ?? '',
       entityId: json['entity_id'] as String? ?? '',
       operationType: json['operation_type'] as String? ?? '',
-      payload: (json['payload'] as Map<String, dynamic>?) ?? <String, dynamic>{},
+      payload:
+          (json['payload'] as Map<String, dynamic>?) ?? <String, dynamic>{},
       serverVersion: (json['server_version'] as num?)?.toInt(),
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)

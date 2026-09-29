@@ -296,15 +296,11 @@ void main() {
           '011${(DateTime.now().microsecondsSinceEpoch % 100000000).toString().padLeft(8, '0')}';
 
       // Seed customer on Supabase
-      final custRes = await postSafe(
-        '/customers',
-        {
-          'id': testCustomerId,
-          'name': 'عميل استرجاع الجهازين $runId',
-          'phone': testCustomerPhone,
-        },
-        opId: 'op-refund-c2d-cust-$runId',
-      );
+      final custRes = await postSafe('/customers', {
+        'id': testCustomerId,
+        'name': 'عميل استرجاع الجهازين $runId',
+        'phone': testCustomerPhone,
+      }, opId: 'op-refund-c2d-cust-$runId');
       expect(custRes.statusCode, isIn([200, 201]));
     });
 
@@ -313,7 +309,10 @@ void main() {
     setUp(() async {
       if (!isLiveBackendAvailable) return;
 
-      final probe = await dio.get('/sync/changes', queryParameters: {'limit': 1});
+      final probe = await dio.get(
+        '/sync/changes',
+        queryParameters: {'limit': 1},
+      );
       if (probe.statusCode == 200 && probe.data is Map) {
         testBaseSeq = probe.data['latest_sequence'] as int? ?? 0;
       }
@@ -336,15 +335,17 @@ void main() {
       // Seed local customer and master data so foreign keys are satisfied
       final now = DateTime.now();
       for (final device in [deviceA, deviceB]) {
-        await device.db.into(device.db.customers).insertOnConflictUpdate(
-          app_db.CustomersCompanion.insert(
-            id: testCustomerId,
-            name: 'عميل استرجاع الجهازين $runId',
-            phone: testCustomerPhone,
-            createdAt: now,
-            updatedAt: now,
-          ),
-        );
+        await device.db
+            .into(device.db.customers)
+            .insertOnConflictUpdate(
+              app_db.CustomersCompanion.insert(
+                id: testCustomerId,
+                name: 'عميل استرجاع الجهازين $runId',
+                phone: testCustomerPhone,
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
         await device.db.customStatement(
           'INSERT OR REPLACE INTO item_types (id, name, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
           [
@@ -355,17 +356,19 @@ void main() {
             now.millisecondsSinceEpoch ~/ 1000,
           ],
         );
-        await device.db.into(device.db.services).insertOnConflictUpdate(
-          app_db.ServicesCompanion.insert(
-            id: '00000000-0000-0000-0002-000000000001',
-            name: 'غسيل',
-            pricingType: 'per_piece',
-            price: 1000,
-            isActive: const drift.Value(true),
-            createdAt: now,
-            updatedAt: now,
-          ),
-        );
+        await device.db
+            .into(device.db.services)
+            .insertOnConflictUpdate(
+              app_db.ServicesCompanion.insert(
+                id: '00000000-0000-0000-0002-000000000001',
+                name: 'غسيل',
+                pricingType: 'per_piece',
+                price: 1000,
+                isActive: const drift.Value(true),
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
       }
     });
 
@@ -385,63 +388,51 @@ void main() {
       final orderId = 'd300$orderSuffix-0001-4001-8001-$runId';
       final orderNumber = '26-$orderSuffix-$runId';
 
-      final createRes = await postSafe(
-        '/orders',
-        {
-          'id': orderId,
-          'order_number': orderNumber,
-          'customer_id': testCustomerId,
-          'status': 'processing',
-          'expected_pickup_date': DateTime.now()
-              .add(const Duration(days: 2))
-              .toUtc()
-              .toIso8601String(),
-          'subtotal': total,
-          'discount': 0,
-          'tax': 0,
-          'total': total,
-          'notes': 'Order for refund sync test',
-          'items': [
-            {
-              'id': 'e300$orderSuffix-0001-4001-8001-$runId',
-              'item_type_id': '00000000-0000-0000-0001-000000000001',
-              'service_id': '00000000-0000-0000-0002-000000000001',
-              'item_type_name_snapshot': 'ملابس',
-              'service_name_snapshot': 'غسيل',
-              'pricing_type': 'per_piece',
-              'quantity': 1.0,
-              'unit_price': total,
-              'calculated_total': total,
-            }
-          ],
-        },
-        opId: 'op-seed-ord-$orderSuffix-$runId',
-      );
+      final createRes = await postSafe('/orders', {
+        'id': orderId,
+        'order_number': orderNumber,
+        'customer_id': testCustomerId,
+        'status': 'processing',
+        'expected_pickup_date': DateTime.now()
+            .add(const Duration(days: 2))
+            .toUtc()
+            .toIso8601String(),
+        'subtotal': total,
+        'discount': 0,
+        'tax': 0,
+        'total': total,
+        'notes': 'Order for refund sync test',
+        'items': [
+          {
+            'id': 'e300$orderSuffix-0001-4001-8001-$runId',
+            'item_type_id': '00000000-0000-0000-0001-000000000001',
+            'service_id': '00000000-0000-0000-0002-000000000001',
+            'item_type_name_snapshot': 'ملابس',
+            'service_name_snapshot': 'غسيل',
+            'pricing_type': 'per_piece',
+            'quantity': 1.0,
+            'unit_price': total,
+            'calculated_total': total,
+          },
+        ],
+      }, opId: 'op-seed-ord-$orderSuffix-$runId');
       expect(createRes.statusCode, isIn([200, 201]));
 
       final payId = 'a300$orderSuffix-0001-4001-8001-$runId';
-      final payRes = await postSafe(
-        '/payments',
-        {
-          'id': payId,
-          'order_id': orderId,
-          'amount': effectivePayment,
-          'payment_method': 'cash',
-          'paid_at': DateTime.now().toUtc().toIso8601String(),
-        },
-        opId: 'op-seed-pay-$orderSuffix-$runId',
-      );
+      final payRes = await postSafe('/payments', {
+        'id': payId,
+        'order_id': orderId,
+        'amount': effectivePayment,
+        'payment_method': 'cash',
+        'paid_at': DateTime.now().toUtc().toIso8601String(),
+      }, opId: 'op-seed-pay-$orderSuffix-$runId');
       expect(payRes.statusCode, isIn([200, 201]));
 
-      final cancelRes = await patchSafe(
-        '/orders/$orderId',
-        {
-          'status': 'cancelled',
-          'cancelled_at': DateTime.now().toUtc().toIso8601String(),
-          'cancellation_reason': 'العميل يرغب في الإلغاء',
-        },
-        opId: 'op-canc-ord-$orderSuffix-$runId',
-      );
+      final cancelRes = await patchSafe('/orders/$orderId', {
+        'status': 'cancelled',
+        'cancelled_at': DateTime.now().toUtc().toIso8601String(),
+        'cancellation_reason': 'العميل يرغب في الإلغاء',
+      }, opId: 'op-canc-ord-$orderSuffix-$runId');
       expect(cancelRes.statusCode, isIn([200, 204]));
 
       return orderId;
@@ -452,7 +443,9 @@ void main() {
       () async {
         if (!isLiveBackendAvailable) return;
 
-        final orderId = await seedCancelledOrderWithPayment(orderSuffix: '0101');
+        final orderId = await seedCancelledOrderWithPayment(
+          orderSuffix: '0101',
+        );
 
         // Step 1: Both devices pull from Supabase to get the cancelled order and payment
         await deviceA.syncEngine.pull();
@@ -480,7 +473,9 @@ void main() {
           updatedAt: now,
         );
 
-        final createdRefund = await deviceA.refundRepository.createRefund(localRefund);
+        final createdRefund = await deviceA.refundRepository.createRefund(
+          localRefund,
+        );
         expect(createdRefund.id, equals(refundId));
 
         // Step 3: Verify local refund exists on Device A
@@ -490,7 +485,8 @@ void main() {
         expect(refundA.refundMethod, equals('cash'));
 
         // Step 4: Verify exactly ONE refund/create outbox operation exists on Device A
-        final pendingOpsA = await deviceA.syncOperationsDao.getEligibleOperations(asOf: DateTime.now());
+        final pendingOpsA = await deviceA.syncOperationsDao
+            .getEligibleOperations(asOf: DateTime.now());
         expect(pendingOpsA.length, equals(1));
         expect(pendingOpsA.first.entityType, equals('refund'));
         expect(pendingOpsA.first.operationType, equals('create'));
@@ -500,11 +496,15 @@ void main() {
         await deviceA.syncEngine.sync();
 
         // Verify outbox operation is synced
-        final remainingOpsA = await deviceA.syncOperationsDao.getEligibleOperations(asOf: DateTime.now());
+        final remainingOpsA = await deviceA.syncOperationsDao
+            .getEligibleOperations(asOf: DateTime.now());
         expect(remainingOpsA, isEmpty);
 
         // Step 6: Verify Backend state via PostgREST / GET sync/changes
-        final changesRes = await dio.get('/sync/changes', queryParameters: {'after': testBaseSeq, 'limit': 100});
+        final changesRes = await dio.get(
+          '/sync/changes',
+          queryParameters: {'after': testBaseSeq, 'limit': 100},
+        );
         expect(changesRes.statusCode, equals(200));
         final changesList = changesRes.data['changes'] as List;
         final refundChanges = changesList.where(
@@ -517,15 +517,24 @@ void main() {
         expect(refundChange['payload']['refund_method'], equals('cash'));
 
         // Step 7: Verify backend Payment and Order invariants
-        final paymentRes = await dio.get('/payments', queryParameters: {'order_id': orderId});
+        final paymentRes = await dio.get(
+          '/payments',
+          queryParameters: {'order_id': orderId},
+        );
         expect(paymentRes.statusCode, equals(200));
         final paymentsList = paymentRes.data as List;
         expect(paymentsList.length, equals(1));
-        expect(paymentsList.first['amount'], equals(10000)); // Payment row is untouched!
+        expect(
+          paymentsList.first['amount'],
+          equals(10000),
+        ); // Payment row is untouched!
 
         final orderRes = await dio.get('/orders/$orderId');
         expect(orderRes.statusCode, equals(200));
-        expect(orderRes.data['total'], equals(10000)); // Order total is untouched!
+        expect(
+          orderRes.data['total'],
+          equals(10000),
+        ); // Order total is untouched!
         expect(orderRes.data['status'], equals('cancelled'));
 
         // Step 8: Device B pulls sync changes
@@ -539,11 +548,14 @@ void main() {
         expect(refundB.reason, equals('استرجاع جزئي للعميل'));
 
         // Step 10: Invariant — Device B created ZERO outbox operations from remote apply
-        final pendingOpsB = await deviceB.syncOperationsDao.getEligibleOperations(asOf: DateTime.now());
+        final pendingOpsB = await deviceB.syncOperationsDao
+            .getEligibleOperations(asOf: DateTime.now());
         expect(pendingOpsB, isEmpty);
 
         // Step 11: Invariant — Device B payments and orders remain unchanged
-        final paymentsB = await deviceB.paymentsDao.getPaymentsForOrder(orderId);
+        final paymentsB = await deviceB.paymentsDao.getPaymentsForOrder(
+          orderId,
+        );
         expect(paymentsB.length, equals(1));
         expect(paymentsB.first.amount, equals(10000));
 
@@ -553,7 +565,9 @@ void main() {
 
         // Step 12: Repeat sync on Device B to prove idempotent pull
         await deviceB.syncEngine.pull();
-        final refundsBAfter = await deviceB.refundsDao.getRefundsForOrder(orderId);
+        final refundsBAfter = await deviceB.refundsDao.getRefundsForOrder(
+          orderId,
+        );
         expect(refundsBAfter.length, equals(1));
         expect(refundsBAfter.first.id, equals(refundId));
       },
@@ -565,7 +579,10 @@ void main() {
         if (!isLiveBackendAvailable) return;
 
         // Paid: 10000 piastres (100 EGP)
-        final orderId = await seedCancelledOrderWithPayment(orderSuffix: '0201', total: 10000);
+        final orderId = await seedCancelledOrderWithPayment(
+          orderSuffix: '0201',
+          total: 10000,
+        );
 
         // Pull initial order/payment into Device A
         await deviceA.syncEngine.pull();
@@ -586,7 +603,8 @@ void main() {
         );
         await deviceA.syncEngine.sync();
 
-        var remaining = await deviceA.refundRepository.getRemainingRefundableForOrder(orderId);
+        var remaining = await deviceA.refundRepository
+            .getRemainingRefundableForOrder(orderId);
         expect(remaining.piastres, equals(7000)); // 10000 - 3000 = 7000
 
         // 2. Second partial refund: 2000 piastres (20 EGP)
@@ -605,7 +623,8 @@ void main() {
         );
         await deviceA.syncEngine.sync();
 
-        remaining = await deviceA.refundRepository.getRemainingRefundableForOrder(orderId);
+        remaining = await deviceA.refundRepository
+            .getRemainingRefundableForOrder(orderId);
         expect(remaining.piastres, equals(5000)); // 7000 - 2000 = 5000
 
         // 3. Final refund: remaining 5000 piastres (50 EGP)
@@ -624,10 +643,12 @@ void main() {
         );
         await deviceA.syncEngine.sync();
 
-        remaining = await deviceA.refundRepository.getRemainingRefundableForOrder(orderId);
+        remaining = await deviceA.refundRepository
+            .getRemainingRefundableForOrder(orderId);
         expect(remaining.piastres, equals(0)); // 5000 - 5000 = 0
 
-        final totalRefunded = await deviceA.refundRepository.getTotalRefundedForOrder(orderId);
+        final totalRefunded = await deviceA.refundRepository
+            .getTotalRefundedForOrder(orderId);
         expect(totalRefunded.piastres, equals(10000));
 
         // 4. Attempt another refund locally: should fail validation
@@ -653,11 +674,15 @@ void main() {
 
         final refundsOnB = await deviceB.refundsDao.getRefundsForOrder(orderId);
         expect(refundsOnB.length, equals(3));
-        final totalB = await deviceB.refundsDao.getTotalRefundedForOrder(orderId);
+        final totalB = await deviceB.refundsDao.getTotalRefundedForOrder(
+          orderId,
+        );
         expect(totalB, equals(10000));
 
         // Invariant: zero outbox ops generated on Device B
-        final outboxB = await deviceB.syncOperationsDao.getEligibleOperations(asOf: DateTime.now());
+        final outboxB = await deviceB.syncOperationsDao.getEligibleOperations(
+          asOf: DateTime.now(),
+        );
         expect(outboxB, isEmpty);
       },
     );
@@ -667,7 +692,10 @@ void main() {
       () async {
         if (!isLiveBackendAvailable) return;
 
-        final orderId = await seedCancelledOrderWithPayment(orderSuffix: '0301', total: 6000);
+        final orderId = await seedCancelledOrderWithPayment(
+          orderSuffix: '0301',
+          total: 6000,
+        );
 
         final refundId = 'b3000301-0001-4001-8001-$runId';
         final opId = 'op-ref-idem-test-$runId';
@@ -717,9 +745,14 @@ void main() {
         expect(res2, isNotNull);
 
         // Verify sync_changes on backend contains exactly ONE change for this opId
-        final changesRes = await dio.get('/sync/changes', queryParameters: {'after': testBaseSeq, 'limit': 100});
+        final changesRes = await dio.get(
+          '/sync/changes',
+          queryParameters: {'after': testBaseSeq, 'limit': 100},
+        );
         final changesList = changesRes.data['changes'] as List;
-        final matchingChanges = changesList.where((c) => c['operation_id'] == opId).toList();
+        final matchingChanges = changesList
+            .where((c) => c['operation_id'] == opId)
+            .toList();
         expect(matchingChanges.length, equals(1));
       },
     );

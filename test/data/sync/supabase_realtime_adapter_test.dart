@@ -4,12 +4,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class FakeRealtimeChannel extends RealtimeChannel {
   void Function(Map<String, dynamic> payload)? broadcastCallback;
-  void Function(RealtimeSubscribeStatus status, Object? error)? subscribeCallback;
+  void Function(RealtimeSubscribeStatus status, Object? error)?
+  subscribeCallback;
   int subscribeCount = 0;
   int unsubscribeCount = 0;
 
   FakeRealtimeChannel()
-      : super('laundry:sync', RealtimeClient('ws://localhost'));
+    : super('laundry:sync', RealtimeClient('ws://localhost'));
 
   @override
   RealtimeChannel onBroadcast({
@@ -38,7 +39,9 @@ class FakeRealtimeChannel extends RealtimeChannel {
     return 'ok';
   }
 
-  void simulateBroadcast([Map<String, dynamic> payload = const {'type': 'sync_available'}]) {
+  void simulateBroadcast([
+    Map<String, dynamic> payload = const {'type': 'sync_available'},
+  ]) {
     broadcastCallback?.call(payload);
   }
 
@@ -52,7 +55,7 @@ class FakeSupabaseClient extends SupabaseClient {
   int removeChannelCount = 0;
 
   FakeSupabaseClient(this.fakeChannel)
-      : super('https://dummy.supabase.co', 'dummy-anon-key');
+    : super('https://dummy.supabase.co', 'dummy-anon-key');
 
   @override
   RealtimeChannel channel(
@@ -146,22 +149,19 @@ void main() {
     // -------------------------------------------------------------------------
     // Unsubscribe and Disposal
     // -------------------------------------------------------------------------
-    test(
-      'Unsubscribe cleans up channel; dispose closes stream',
-      () async {
-        await adapter.subscribe();
-        expect(adapter.isSubscribed, isTrue);
+    test('Unsubscribe cleans up channel; dispose closes stream', () async {
+      await adapter.subscribe();
+      expect(adapter.isSubscribed, isTrue);
 
-        await adapter.unsubscribe();
-        expect(adapter.isSubscribed, isFalse);
-        expect(fakeChannel.unsubscribeCount, equals(1));
-        expect(fakeClient.removeChannelCount, equals(1));
+      await adapter.unsubscribe();
+      expect(adapter.isSubscribed, isFalse);
+      expect(fakeChannel.unsubscribeCount, equals(1));
+      expect(fakeClient.removeChannelCount, equals(1));
 
-        await adapter.dispose();
-        // Calling subscribe after dispose is rejected
-        await adapter.subscribe();
-        expect(adapter.isSubscribed, isFalse);
-      },
-    );
+      await adapter.dispose();
+      // Calling subscribe after dispose is rejected
+      await adapter.subscribe();
+      expect(adapter.isSubscribed, isFalse);
+    });
   });
 }

@@ -7,10 +7,7 @@ import 'sync_remote_api.dart';
 /// High-level remote data source interface for pull synchronization.
 abstract class SyncRemoteDataSource {
   /// Fetches a batch of remote changes occurring strictly after [after].
-  Future<PullChangesResponseDto> getChanges({
-    required int after,
-    int? limit,
-  });
+  Future<PullChangesResponseDto> getChanges({required int after, int? limit});
 }
 
 /// Production implementation of [SyncRemoteDataSource] using [SyncRemoteApi].
@@ -42,7 +39,8 @@ class SyncRemoteDataSourceImpl implements SyncRemoteDataSource {
           message = data['message'] as String?;
         }
         throw CursorTooOldException(
-          message: message ?? 'Client cursor has expired; full resync required.',
+          message:
+              message ?? 'Client cursor has expired; full resync required.',
           oldestAvailableSequence: oldestSeq,
           cause: e,
         );

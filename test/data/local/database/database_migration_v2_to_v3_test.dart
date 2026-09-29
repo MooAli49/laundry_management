@@ -216,8 +216,9 @@ void main() {
           final customerCols = await migratedDb
               .customSelect("PRAGMA table_info('customers');")
               .get();
-          final customerColNames =
-              customerCols.map((r) => r.read<String>('name')).toSet();
+          final customerColNames = customerCols
+              .map((r) => r.read<String>('name'))
+              .toSet();
           expect(customerColNames, contains('address'));
 
           // 8. Verify inserting a record with nextRetryAt works on migrated schema

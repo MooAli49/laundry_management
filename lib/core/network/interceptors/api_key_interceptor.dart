@@ -11,9 +11,10 @@ class ApiKeyInterceptor extends Interceptor {
   final String _apiKey;
 
   ApiKeyInterceptor({String? apiKey, SupabaseConfig? config})
-      : _apiKey = apiKey ??
-            (config?.anonKey ??
-                SupabaseConfig.resolve(customAnonKey: apiKey).anonKey);
+    : _apiKey =
+          apiKey ??
+          (config?.anonKey ??
+              SupabaseConfig.resolve(customAnonKey: apiKey).anonKey);
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {

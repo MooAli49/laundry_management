@@ -37,22 +37,46 @@ void main() {
 
         // Verify strictly 0 transactional entities exist
         final customers = await db.select(db.customers).get();
-        expect(customers, isEmpty, reason: 'Must not seed customers in release/profile mode');
+        expect(
+          customers,
+          isEmpty,
+          reason: 'Must not seed customers in release/profile mode',
+        );
 
         final orders = await db.select(db.orders).get();
-        expect(orders, isEmpty, reason: 'Must not seed orders in release/profile mode');
+        expect(
+          orders,
+          isEmpty,
+          reason: 'Must not seed orders in release/profile mode',
+        );
 
         final orderItems = await db.select(db.orderItems).get();
-        expect(orderItems, isEmpty, reason: 'Must not seed order items in release/profile mode');
+        expect(
+          orderItems,
+          isEmpty,
+          reason: 'Must not seed order items in release/profile mode',
+        );
 
         final payments = await db.select(db.payments).get();
-        expect(payments, isEmpty, reason: 'Must not seed payments in release/profile mode');
+        expect(
+          payments,
+          isEmpty,
+          reason: 'Must not seed payments in release/profile mode',
+        );
 
         final storageRecords = await db.select(db.storageRecords).get();
-        expect(storageRecords, isEmpty, reason: 'Must not seed storage records in release/profile mode');
+        expect(
+          storageRecords,
+          isEmpty,
+          reason: 'Must not seed storage records in release/profile mode',
+        );
 
         final expenses = await db.select(db.expenses).get();
-        expect(expenses, isEmpty, reason: 'Must not seed expenses in release/profile mode');
+        expect(
+          expenses,
+          isEmpty,
+          reason: 'Must not seed expenses in release/profile mode',
+        );
       },
     );
 
@@ -66,16 +90,32 @@ void main() {
 
         // Verify development test data is populated
         final customers = await db.select(db.customers).get();
-        expect(customers, isNotEmpty, reason: 'Debug configuration should seed customers');
+        expect(
+          customers,
+          isNotEmpty,
+          reason: 'Debug configuration should seed customers',
+        );
 
         final orders = await db.select(db.orders).get();
-        expect(orders, isNotEmpty, reason: 'Debug configuration should seed orders');
+        expect(
+          orders,
+          isNotEmpty,
+          reason: 'Debug configuration should seed orders',
+        );
 
         final orderItems = await db.select(db.orderItems).get();
-        expect(orderItems, isNotEmpty, reason: 'Debug configuration should seed order items');
+        expect(
+          orderItems,
+          isNotEmpty,
+          reason: 'Debug configuration should seed order items',
+        );
 
         final payments = await db.select(db.payments).get();
-        expect(payments, isNotEmpty, reason: 'Debug configuration should seed payments');
+        expect(
+          payments,
+          isNotEmpty,
+          reason: 'Debug configuration should seed payments',
+        );
       },
     );
 
@@ -88,10 +128,18 @@ void main() {
         await initDependencies();
 
         final customers = await db.select(db.customers).get();
-        expect(customers, isEmpty, reason: 'Default without argument should not seed dev data');
+        expect(
+          customers,
+          isEmpty,
+          reason: 'Default without argument should not seed dev data',
+        );
 
         final orders = await db.select(db.orders).get();
-        expect(orders, isEmpty, reason: 'Default without argument should not seed dev data');
+        expect(
+          orders,
+          isEmpty,
+          reason: 'Default without argument should not seed dev data',
+        );
       },
     );
   });

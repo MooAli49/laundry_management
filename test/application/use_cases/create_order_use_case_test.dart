@@ -684,47 +684,53 @@ void main() {
     });
 
     group('Advance Payment (Initial Payment)', () {
-      test('passes null initialPayment to repository when not provided', () async {
-        final result = await useCase.execute(
-          CreateOrderInput(
-            customerId: 'cust-1',
-            expectedPickupDate: OrderDate.today(),
-            items: [
-              const CreateOrderItemInput(
-                itemTypeId: 'type-clothes',
-                serviceId: 'srv-wash-iron',
-                physicalQuantity: 1,
-              ),
-            ],
-          ),
-        );
-
-        expect(result, isNotNull);
-        expect(orderRepo.lastCreatedInitialPayment, isNull);
-      });
-
-      test('passes null initialPayment to repository when amount is zero', () async {
-        final result = await useCase.execute(
-          CreateOrderInput(
-            customerId: 'cust-1',
-            expectedPickupDate: OrderDate.today(),
-            initialPayment: const InitialPaymentInput(
-              amount: Money.zero,
-              paymentMethod: PaymentMethod.cash,
+      test(
+        'passes null initialPayment to repository when not provided',
+        () async {
+          final result = await useCase.execute(
+            CreateOrderInput(
+              customerId: 'cust-1',
+              expectedPickupDate: OrderDate.today(),
+              items: [
+                const CreateOrderItemInput(
+                  itemTypeId: 'type-clothes',
+                  serviceId: 'srv-wash-iron',
+                  physicalQuantity: 1,
+                ),
+              ],
             ),
-            items: [
-              const CreateOrderItemInput(
-                itemTypeId: 'type-clothes',
-                serviceId: 'srv-wash-iron',
-                physicalQuantity: 1,
-              ),
-            ],
-          ),
-        );
+          );
 
-        expect(result, isNotNull);
-        expect(orderRepo.lastCreatedInitialPayment, isNull);
-      });
+          expect(result, isNotNull);
+          expect(orderRepo.lastCreatedInitialPayment, isNull);
+        },
+      );
+
+      test(
+        'passes null initialPayment to repository when amount is zero',
+        () async {
+          final result = await useCase.execute(
+            CreateOrderInput(
+              customerId: 'cust-1',
+              expectedPickupDate: OrderDate.today(),
+              initialPayment: const InitialPaymentInput(
+                amount: Money.zero,
+                paymentMethod: PaymentMethod.cash,
+              ),
+              items: [
+                const CreateOrderItemInput(
+                  itemTypeId: 'type-clothes',
+                  serviceId: 'srv-wash-iron',
+                  physicalQuantity: 1,
+                ),
+              ],
+            ),
+          );
+
+          expect(result, isNotNull);
+          expect(orderRepo.lastCreatedInitialPayment, isNull);
+        },
+      );
 
       test('rejects negative initial payment with ValidationFailure', () async {
         expect(
@@ -755,16 +761,50 @@ void main() {
         );
       });
 
-      test('rejects initial payment exceeding order total with BusinessRuleFailure', () async {
-        // Total = 1500 piastres
-        expect(
-          () => useCase.execute(
+      test(
+        'rejects initial payment exceeding order total with BusinessRuleFailure',
+        () async {
+          // Total = 1500 piastres
+          expect(
+            () => useCase.execute(
+              CreateOrderInput(
+                customerId: 'cust-1',
+                expectedPickupDate: OrderDate.today(),
+                initialPayment: const InitialPaymentInput(
+                  amount: Money.fromPiastres(2000), // > 1500
+                  paymentMethod: PaymentMethod.cash,
+                ),
+                items: [
+                  const CreateOrderItemInput(
+                    itemTypeId: 'type-clothes',
+                    serviceId: 'srv-wash-iron',
+                    physicalQuantity: 1,
+                  ),
+                ],
+              ),
+            ),
+            throwsA(
+              isA<BusinessRuleFailure>().having(
+                (f) => f.message,
+                'message',
+                'Initial payment cannot exceed order total',
+              ),
+            ),
+          );
+        },
+      );
+
+      test(
+        'creates and passes Payment entity to repository for valid partial initial payment',
+        () async {
+          // Total = 1500 piastres (15 EGP)
+          final result = await useCase.execute(
             CreateOrderInput(
               customerId: 'cust-1',
               expectedPickupDate: OrderDate.today(),
               initialPayment: const InitialPaymentInput(
-                amount: Money.fromPiastres(2000), // > 1500
-                paymentMethod: PaymentMethod.cash,
+                amount: Money.fromPiastres(500),
+                paymentMethod: PaymentMethod.instapay,
               ),
               items: [
                 const CreateOrderItemInput(
@@ -774,103 +814,81 @@ void main() {
                 ),
               ],
             ),
-          ),
-          throwsA(
-            isA<BusinessRuleFailure>().having(
-              (f) => f.message,
-              'message',
-              'Initial payment cannot exceed order total',
-            ),
-          ),
-        );
-      });
+          );
 
-      test('creates and passes Payment entity to repository for valid partial initial payment', () async {
-        // Total = 1500 piastres (15 EGP)
-        final result = await useCase.execute(
-          CreateOrderInput(
-            customerId: 'cust-1',
-            expectedPickupDate: OrderDate.today(),
-            initialPayment: const InitialPaymentInput(
-              amount: Money.fromPiastres(500),
-              paymentMethod: PaymentMethod.instapay,
-            ),
-            items: [
-              const CreateOrderItemInput(
-                itemTypeId: 'type-clothes',
-                serviceId: 'srv-wash-iron',
-                physicalQuantity: 1,
+          expect(result, isNotNull);
+          final payment = orderRepo.lastCreatedInitialPayment;
+          expect(payment, isNotNull);
+          expect(payment!.amount, const Money.fromPiastres(500));
+          expect(payment.paymentMethod, PaymentMethod.instapay);
+          expect(payment.orderId, result.id);
+        },
+      );
+
+      test(
+        'creates and passes Payment entity for full initial payment (100% total)',
+        () async {
+          // Total = 1500 piastres
+          final result = await useCase.execute(
+            CreateOrderInput(
+              customerId: 'cust-1',
+              expectedPickupDate: OrderDate.today(),
+              initialPayment: const InitialPaymentInput(
+                amount: Money.fromPiastres(1500),
+                paymentMethod: PaymentMethod.ewallet,
               ),
-            ],
-          ),
-        );
-
-        expect(result, isNotNull);
-        final payment = orderRepo.lastCreatedInitialPayment;
-        expect(payment, isNotNull);
-        expect(payment!.amount, const Money.fromPiastres(500));
-        expect(payment.paymentMethod, PaymentMethod.instapay);
-        expect(payment.orderId, result.id);
-      });
-
-      test('creates and passes Payment entity for full initial payment (100% total)', () async {
-        // Total = 1500 piastres
-        final result = await useCase.execute(
-          CreateOrderInput(
-            customerId: 'cust-1',
-            expectedPickupDate: OrderDate.today(),
-            initialPayment: const InitialPaymentInput(
-              amount: Money.fromPiastres(1500),
-              paymentMethod: PaymentMethod.ewallet,
+              items: [
+                const CreateOrderItemInput(
+                  itemTypeId: 'type-clothes',
+                  serviceId: 'srv-wash-iron',
+                  physicalQuantity: 1,
+                ),
+              ],
             ),
-            items: [
-              const CreateOrderItemInput(
-                itemTypeId: 'type-clothes',
-                serviceId: 'srv-wash-iron',
-                physicalQuantity: 1,
+          );
+
+          expect(result, isNotNull);
+          final payment = orderRepo.lastCreatedInitialPayment;
+          expect(payment, isNotNull);
+          expect(payment!.amount, const Money.fromPiastres(1500));
+          expect(payment.paymentMethod, PaymentMethod.ewallet);
+          expect(payment.orderId, result.id);
+        },
+      );
+
+      test(
+        'creates and passes Payment entity for full initial payment including tax',
+        () async {
+          // Subtotal = 1500, Tax = 210, Total = 1710 piastres
+          final result = await useCase.execute(
+            CreateOrderInput(
+              customerId: 'cust-1',
+              expectedPickupDate: OrderDate.today(),
+              tax: const Money.fromPiastres(210),
+              initialPayment: const InitialPaymentInput(
+                amount: Money.fromPiastres(1710),
+                paymentMethod: PaymentMethod.instapay,
               ),
-            ],
-          ),
-        );
-
-        expect(result, isNotNull);
-        final payment = orderRepo.lastCreatedInitialPayment;
-        expect(payment, isNotNull);
-        expect(payment!.amount, const Money.fromPiastres(1500));
-        expect(payment.paymentMethod, PaymentMethod.ewallet);
-        expect(payment.orderId, result.id);
-      });
-
-      test('creates and passes Payment entity for full initial payment including tax', () async {
-        // Subtotal = 1500, Tax = 210, Total = 1710 piastres
-        final result = await useCase.execute(
-          CreateOrderInput(
-            customerId: 'cust-1',
-            expectedPickupDate: OrderDate.today(),
-            tax: const Money.fromPiastres(210),
-            initialPayment: const InitialPaymentInput(
-              amount: Money.fromPiastres(1710),
-              paymentMethod: PaymentMethod.instapay,
+              items: [
+                const CreateOrderItemInput(
+                  itemTypeId: 'type-clothes',
+                  serviceId: 'srv-wash-iron',
+                  physicalQuantity: 1,
+                ),
+              ],
             ),
-            items: [
-              const CreateOrderItemInput(
-                itemTypeId: 'type-clothes',
-                serviceId: 'srv-wash-iron',
-                physicalQuantity: 1,
-              ),
-            ],
-          ),
-        );
+          );
 
-        expect(result, isNotNull);
-        expect(result.tax, const Money.fromPiastres(210));
-        expect(result.total, const Money.fromPiastres(1710));
-        final payment = orderRepo.lastCreatedInitialPayment;
-        expect(payment, isNotNull);
-        expect(payment!.amount, const Money.fromPiastres(1710));
-        expect(payment.paymentMethod, PaymentMethod.instapay);
-        expect(payment.orderId, result.id);
-      });
+          expect(result, isNotNull);
+          expect(result.tax, const Money.fromPiastres(210));
+          expect(result.total, const Money.fromPiastres(1710));
+          final payment = orderRepo.lastCreatedInitialPayment;
+          expect(payment, isNotNull);
+          expect(payment!.amount, const Money.fromPiastres(1710));
+          expect(payment.paymentMethod, PaymentMethod.instapay);
+          expect(payment.orderId, result.id);
+        },
+      );
 
       test('rejects negative tax with ValidationFailure', () async {
         expect(
@@ -894,4 +912,3 @@ void main() {
     });
   });
 }
-

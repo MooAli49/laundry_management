@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'printer_profile.dart';
-import 'thermal_command_builder.dart';
 
 /// All states a thermal-printer connection can be in.
 ///
@@ -141,18 +140,15 @@ abstract class BluetoothPrinterService {
   // ---------------------------------------------------------------------------
 
   /// Send raw bytes to the connected printer.
-  ///
   /// Throws [BluetoothPrinterException] if not connected or on failure.
   Future<void> writeBytes(List<int> bytes);
 
-  /// Sends a minimal ESC/POS ASCII diagnostic command, independent of invoice rendering.
-  Future<void> diagnosticPrint();
-
-  /// Sends a small deterministic ESC/POS bitmap for raster diagnostics.
-  Future<void> diagnosticRasterPrint();
-
-  /// Sends one deterministic raster variant for printer compatibility testing.
-  Future<void> diagnosticRasterPrintVariant(DiagnosticRasterFormat format);
+  /// Send a sequence of complete command blocks to the connected printer with an optional delay between blocks.
+  /// Each block must be an independent, complete valid printer command.
+  Future<void> writeBlockSequence(
+    List<List<int>> blocks, {
+    Duration delay = const Duration(milliseconds: 50),
+  });
 
   // ---------------------------------------------------------------------------
   // Lifecycle

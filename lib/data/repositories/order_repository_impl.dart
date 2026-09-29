@@ -241,8 +241,9 @@ class OrderRepositoryImpl implements OrderRepository {
         }
 
         // 3. Read total paid for financial validation
-        final totalPaidPiastres =
-            await _paymentsDao.getTotalPaidForOrder(input.orderId);
+        final totalPaidPiastres = await _paymentsDao.getTotalPaidForOrder(
+          input.orderId,
+        );
         final totalPaid = Money.fromPiastres(totalPaidPiastres);
 
         // 4. Customer change validation
@@ -256,9 +257,9 @@ class OrderRepositoryImpl implements OrderRepository {
               'Cannot change customer on an order with recorded payments',
             );
           }
-          final newCustomerRow = await (_db.select(_db.customers)
-                ..where((t) => t.id.equals(input.customerId)))
-              .getSingleOrNull();
+          final newCustomerRow = await (_db.select(
+            _db.customers,
+          )..where((t) => t.id.equals(input.customerId))).getSingleOrNull();
           if (newCustomerRow == null) {
             throw const ValidationFailure('Customer not found');
           }
@@ -268,8 +269,8 @@ class OrderRepositoryImpl implements OrderRepository {
         }
 
         // 5. Existing items and carpets
-        final existingItemAndCarpetRows =
-            await _ordersDao.getOrderItemsWithCarpets(input.orderId);
+        final existingItemAndCarpetRows = await _ordersDao
+            .getOrderItemsWithCarpets(input.orderId);
         final existingItemsMap = {
           for (final r in existingItemAndCarpetRows) r.item.id: r,
         };
@@ -279,8 +280,8 @@ class OrderRepositoryImpl implements OrderRepository {
           if (!existingItemsMap.containsKey(deletedId)) {
             throw ValidationFailure('Item to delete not found: $deletedId');
           }
-          final storageCount =
-              await _storageRecordsDao.countAllRecordsForOrderItem(deletedId);
+          final storageCount = await _storageRecordsDao
+              .countAllRecordsForOrderItem(deletedId);
           if (storageCount > 0) {
             throw BusinessRuleFailure(
               'Cannot delete item with storage records: $deletedId',
@@ -290,15 +291,19 @@ class OrderRepositoryImpl implements OrderRepository {
 
         // 7. Validate and prepare modified items
         final now = DateTime.now();
-        final survivingExistingIds = existingItemsMap.keys
-            .toSet()
-            .difference(input.deletedItemIds.toSet());
+        final survivingExistingIds = existingItemsMap.keys.toSet().difference(
+          input.deletedItemIds.toSet(),
+        );
 
-        final updatedItemsMap = <String, ({
-          app_db.OrderItemsCompanion item,
-          app_db.OrderItemCarpetsCompanion? carpet,
-          Money total,
-        })>{};
+        final updatedItemsMap =
+            <
+              String,
+              ({
+                app_db.OrderItemsCompanion item,
+                app_db.OrderItemCarpetsCompanion? carpet,
+                Money total,
+              })
+            >{};
 
         for (final mod in input.modifiedItems) {
           if (!survivingExistingIds.contains(mod.id)) {
@@ -314,9 +319,9 @@ class OrderRepositoryImpl implements OrderRepository {
           final itemTypeNameSnapshot = existingItem.itemTypeNameSnapshot;
 
           // Validate service
-          final serviceRow = await (_db.select(_db.services)
-                ..where((t) => t.id.equals(mod.serviceId)))
-              .getSingleOrNull();
+          final serviceRow = await (_db.select(
+            _db.services,
+          )..where((t) => t.id.equals(mod.serviceId))).getSingleOrNull();
           if (serviceRow == null) {
             throw const ValidationFailure('Service not found');
           }
@@ -325,13 +330,13 @@ class OrderRepositoryImpl implements OrderRepository {
           }
 
           // Verify service compatibility with itemTypeId via service_item_types
-          final isServiceCompatible = await (_db.select(_db.serviceItemTypes)
-                ..where(
-                  (t) =>
-                      t.serviceId.equals(mod.serviceId) &
-                      t.itemTypeId.equals(itemTypeId),
-                ))
-              .getSingleOrNull();
+          final isServiceCompatible =
+              await (_db.select(_db.serviceItemTypes)..where(
+                    (t) =>
+                        t.serviceId.equals(mod.serviceId) &
+                        t.itemTypeId.equals(itemTypeId),
+                  ))
+                  .getSingleOrNull();
           if (isServiceCompatible == null) {
             throw IncompatibleServiceFailure(
               serviceId: mod.serviceId,
@@ -340,12 +345,12 @@ class OrderRepositoryImpl implements OrderRepository {
           }
 
           // Validate item definition if provided
-          String? itemDefNameSnapshot =
-              existingItem.itemDefinitionNameSnapshot;
+          String? itemDefNameSnapshot = existingItem.itemDefinitionNameSnapshot;
           if (mod.itemDefinitionId != null) {
-            final defRow = await (_db.select(_db.itemDefinitions)
-                  ..where((t) => t.id.equals(mod.itemDefinitionId!)))
-                .getSingleOrNull();
+            final defRow =
+                await (_db.select(_db.itemDefinitions)
+                      ..where((t) => t.id.equals(mod.itemDefinitionId!)))
+                    .getSingleOrNull();
             if (defRow == null) {
               throw const ValidationFailure('Item definition not found');
             }
@@ -435,11 +440,14 @@ class OrderRepositoryImpl implements OrderRepository {
         }
 
         // 8. Validate and prepare brand new items
-        final newItemsList = <({
-          app_db.OrderItemsCompanion item,
-          app_db.OrderItemCarpetsCompanion? carpet,
-          Money total,
-        })>[];
+        final newItemsList =
+            <
+              ({
+                app_db.OrderItemsCompanion item,
+                app_db.OrderItemCarpetsCompanion? carpet,
+                Money total,
+              })
+            >[];
 
         for (final newItemInput in input.newItems) {
           if (newItemInput.physicalQuantity <= 0) {
@@ -448,9 +456,10 @@ class OrderRepositoryImpl implements OrderRepository {
             );
           }
 
-          final itemType = await (_db.select(_db.itemTypes)
-                ..where((t) => t.id.equals(newItemInput.itemTypeId)))
-              .getSingleOrNull();
+          final itemType =
+              await (_db.select(_db.itemTypes)
+                    ..where((t) => t.id.equals(newItemInput.itemTypeId)))
+                  .getSingleOrNull();
           if (itemType == null) {
             throw const ValidationFailure('Item type not found');
           }
@@ -460,9 +469,11 @@ class OrderRepositoryImpl implements OrderRepository {
 
           String? itemDefName;
           if (newItemInput.itemDefinitionId != null) {
-            final def = await (_db.select(_db.itemDefinitions)
-                  ..where((t) => t.id.equals(newItemInput.itemDefinitionId!)))
-                .getSingleOrNull();
+            final def =
+                await (_db.select(_db.itemDefinitions)..where(
+                      (t) => t.id.equals(newItemInput.itemDefinitionId!),
+                    ))
+                    .getSingleOrNull();
             if (def == null) {
               throw const ValidationFailure('Item definition not found');
             }
@@ -474,9 +485,10 @@ class OrderRepositoryImpl implements OrderRepository {
             itemDefName = def.name;
           }
 
-          final service = await (_db.select(_db.services)
-                ..where((t) => t.id.equals(newItemInput.serviceId)))
-              .getSingleOrNull();
+          final service =
+              await (_db.select(_db.services)
+                    ..where((t) => t.id.equals(newItemInput.serviceId)))
+                  .getSingleOrNull();
           if (service == null) {
             throw const ValidationFailure('Service not found');
           }
@@ -484,13 +496,13 @@ class OrderRepositoryImpl implements OrderRepository {
             throw const BusinessRuleFailure('Service is inactive');
           }
 
-          final isComp = await (_db.select(_db.serviceItemTypes)
-                ..where(
-                  (t) =>
-                      t.serviceId.equals(service.id) &
-                      t.itemTypeId.equals(itemType.id),
-                ))
-              .getSingleOrNull();
+          final isComp =
+              await (_db.select(_db.serviceItemTypes)..where(
+                    (t) =>
+                        t.serviceId.equals(service.id) &
+                        t.itemTypeId.equals(itemType.id),
+                  ))
+                  .getSingleOrNull();
           if (isComp == null) {
             throw IncompatibleServiceFailure(
               serviceId: service.id,
@@ -499,8 +511,7 @@ class OrderRepositoryImpl implements OrderRepository {
           }
 
           final unitPrice =
-              newItemInput.customUnitPrice ??
-              Money.fromPiastres(service.price);
+              newItemInput.customUnitPrice ?? Money.fromPiastres(service.price);
           if (unitPrice <= Money.zero) {
             throw const ValidationFailure(
               'Unit price must be strictly greater than zero',
@@ -522,7 +533,8 @@ class OrderRepositoryImpl implements OrderRepository {
               );
             }
             final area =
-                newItemInput.carpetData!.length * newItemInput.carpetData!.width;
+                newItemInput.carpetData!.length *
+                newItemInput.carpetData!.width;
             final calcTotal = Money.fromPiastres(
               (unitPrice.piastres * area).round(),
             );
@@ -642,12 +654,12 @@ class OrderRepositoryImpl implements OrderRepository {
         // 11. Execute DB mutations
         // 11a. Delete removed items and their carpets
         for (final deletedId in input.deletedItemIds) {
-          await (_db.delete(_db.orderItemCarpets)
-                ..where((t) => t.orderItemId.equals(deletedId)))
-              .go();
-          await (_db.delete(_db.orderItems)
-                ..where((t) => t.id.equals(deletedId)))
-              .go();
+          await (_db.delete(
+            _db.orderItemCarpets,
+          )..where((t) => t.orderItemId.equals(deletedId))).go();
+          await (_db.delete(
+            _db.orderItems,
+          )..where((t) => t.id.equals(deletedId))).go();
         }
 
         // 11b. Update modified items
@@ -661,9 +673,9 @@ class OrderRepositoryImpl implements OrderRepository {
                 .into(_db.orderItemCarpets)
                 .insertOnConflictUpdate(modEntry.carpet!);
           } else {
-            await (_db.delete(_db.orderItemCarpets)
-                  ..where((t) => t.orderItemId.equals(modEntry.item.id.value)))
-                .go();
+            await (_db.delete(
+              _db.orderItemCarpets,
+            )..where((t) => t.orderItemId.equals(modEntry.item.id.value))).go();
           }
         }
 
@@ -690,38 +702,33 @@ class OrderRepositoryImpl implements OrderRepository {
 
         final newStatus =
             (totalItemCount > 0 && activeStoredCount == totalItemCount)
-                ? OrderStatus.ready
-                : OrderStatus.processing;
+            ? OrderStatus.ready
+            : OrderStatus.processing;
 
         // 13. Update orders header
-        await (_db.update(_db.orders)
-              ..where((t) => t.id.equals(input.orderId)))
-            .write(
-              app_db.OrdersCompanion(
-                customerId: Value(customerId),
-                customerNameSnapshot: Value(customerNameSnapshot),
-                customerPhoneSnapshot: Value(customerPhoneSnapshot),
-                status: Value(newStatus.name),
-                expectedPickupDate: Value(
-                  input.expectedPickupDate.toDateTime(),
-                ),
-                notes: Value(input.notes),
-                customerPickupRequested: Value(input.customerPickupRequested),
-                customerPickupFee: Value(pickupFee.piastres),
-                customerDeliveryRequested: Value(
-                  input.customerDeliveryRequested,
-                ),
-                customerDeliveryFee: Value(deliveryFee.piastres),
-                subtotal: Value(subtotal.piastres),
-                discount: Value(input.discount.piastres),
-                total: Value(total.piastres),
-                updatedAt: Value(now),
-              ),
-            );
+        await (_db.update(
+          _db.orders,
+        )..where((t) => t.id.equals(input.orderId))).write(
+          app_db.OrdersCompanion(
+            customerId: Value(customerId),
+            customerNameSnapshot: Value(customerNameSnapshot),
+            customerPhoneSnapshot: Value(customerPhoneSnapshot),
+            status: Value(newStatus.name),
+            expectedPickupDate: Value(input.expectedPickupDate.toDateTime()),
+            notes: Value(input.notes),
+            customerPickupRequested: Value(input.customerPickupRequested),
+            customerPickupFee: Value(pickupFee.piastres),
+            customerDeliveryRequested: Value(input.customerDeliveryRequested),
+            customerDeliveryFee: Value(deliveryFee.piastres),
+            subtotal: Value(subtotal.piastres),
+            discount: Value(input.discount.piastres),
+            total: Value(total.piastres),
+            updatedAt: Value(now),
+          ),
+        );
 
         // 14. Outbox Enqueueing
-        final updatedOrderRow =
-            (await _ordersDao.getOrderById(input.orderId))!;
+        final updatedOrderRow = (await _ordersDao.getOrderById(input.orderId))!;
         final committedOrder = _mapOrderToDomain(updatedOrderRow);
         final currentOrderItems = await getOrderItems(input.orderId);
 
@@ -1235,10 +1242,9 @@ class OrderRepositoryImpl implements OrderRepository {
     } else if (status == OrderStatus.cancelled) {
       cancelledAt ??= row.updatedAt;
       if (cancellationReason == null || cancellationReason.trim().isEmpty) {
-        cancellationReason =
-            (row.notes != null && row.notes!.trim().isNotEmpty)
-                ? row.notes!
-                : 'تم الإلغاء';
+        cancellationReason = (row.notes != null && row.notes!.trim().isNotEmpty)
+            ? row.notes!
+            : 'تم الإلغاء';
       }
     }
 

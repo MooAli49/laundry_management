@@ -29,7 +29,10 @@ void main() {
       );
 
       try {
-        final res = await edgeFunctionDio.get('/customers', queryParameters: {'limit': 1});
+        final res = await edgeFunctionDio.get(
+          '/customers',
+          queryParameters: {'limit': 1},
+        );
         if (res.statusCode != 200) {
           isNetworkAvailable = false;
         }

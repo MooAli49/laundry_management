@@ -236,7 +236,11 @@ class FinancialReportView extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Row(
               children: [
-                const Icon(Icons.remove, size: 16, color: AppColors.textTertiary),
+                const Icon(
+                  Icons.remove,
+                  size: 16,
+                  color: AppColors.textTertiary,
+                ),
                 AppSpacing.gapHorizontalXs,
                 Text(
                   'طرح الاستردادات',
@@ -349,13 +353,16 @@ class FinancialReportView extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: (isBold
-                        ? AppTextStyles.titleSmall
-                        : AppTextStyles.bodyMedium)
-                    .copyWith(
-                  fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
+                style:
+                    (isBold
+                            ? AppTextStyles.titleSmall
+                            : AppTextStyles.bodyMedium)
+                        .copyWith(
+                          fontWeight: isBold
+                              ? FontWeight.bold
+                              : FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
               ),
               const SizedBox(height: 2),
               Text(
@@ -373,9 +380,9 @@ class FinancialReportView extends StatelessWidget {
           value,
           style: (isBold ? AppTextStyles.titleMedium : AppTextStyles.bodyLarge)
               .copyWith(
-            fontWeight: FontWeight.bold,
-            color: color ?? AppColors.textPrimary,
-          ),
+                fontWeight: FontWeight.bold,
+                color: color ?? AppColors.textPrimary,
+              ),
         ),
       ],
     );
@@ -712,13 +719,15 @@ class FinancialReportView extends StatelessWidget {
                                       horizontal: AppSpacing.sm,
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional.centerStart,
+                                      alignment:
+                                          AlignmentDirectional.centerStart,
                                       child: Text(
                                         'العميل',
-                                        style: AppTextStyles.labelMedium.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.textPrimary,
-                                        ),
+                                        style: AppTextStyles.labelMedium
+                                            .copyWith(
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.textPrimary,
+                                            ),
                                       ),
                                     ),
                                   ),
@@ -772,8 +781,8 @@ class FinancialReportView extends StatelessWidget {
                           ...data.outstandingOrders.map((ord) {
                             final displayOrderNumber =
                                 ord.orderNumber.startsWith('#')
-                                    ? ord.orderNumber
-                                    : '#${ord.orderNumber}';
+                                ? ord.orderNumber
+                                : '#${ord.orderNumber}';
 
                             return Container(
                               height: 48,
@@ -802,11 +811,11 @@ class FinancialReportView extends StatelessWidget {
                                           textDirection: TextDirection.ltr,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style:
-                                              AppTextStyles.bodyMedium.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.primary,
-                                          ),
+                                          style: AppTextStyles.bodyMedium
+                                              .copyWith(
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.primary,
+                                              ),
                                         ),
                                       ),
                                     ),
@@ -857,11 +866,11 @@ class FinancialReportView extends StatelessWidget {
                                         textAlign: TextAlign.end,
                                         maxLines: 1,
                                         softWrap: false,
-                                        style:
-                                            AppTextStyles.bodyMedium.copyWith(
-                                          color: AppColors.success,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                        style: AppTextStyles.bodyMedium
+                                            .copyWith(
+                                              color: AppColors.success,
+                                              fontWeight: FontWeight.w500,
+                                            ),
                                       ),
                                     ),
                                   ),
@@ -874,11 +883,11 @@ class FinancialReportView extends StatelessWidget {
                                         textAlign: TextAlign.end,
                                         maxLines: 1,
                                         softWrap: false,
-                                        style:
-                                            AppTextStyles.bodyMedium.copyWith(
-                                          color: AppColors.warning,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                        style: AppTextStyles.bodyMedium
+                                            .copyWith(
+                                              color: AppColors.warning,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                       ),
                                     ),
                                   ),
@@ -901,10 +910,10 @@ class FinancialReportView extends StatelessWidget {
                 ),
               ),
             ),
-          ],
-        ),
-      );
-    }
+        ],
+      ),
+    );
+  }
 
   Widget _buildExpenseTransactionsSection() {
     return Container(
@@ -980,8 +989,10 @@ class FinancialReportView extends StatelessWidget {
                   builder: (context, constraints) {
                     final availableWidth =
                         constraints.maxWidth - (AppSpacing.md * 2);
-                    final dynamicSpacing =
-                        ((availableWidth - 460) / 3).clamp(AppSpacing.lg, 100.0);
+                    final dynamicSpacing = ((availableWidth - 460) / 3).clamp(
+                      AppSpacing.lg,
+                      100.0,
+                    );
                     return SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: ConstrainedBox(
@@ -997,138 +1008,147 @@ class FinancialReportView extends StatelessWidget {
                           ),
                           horizontalMargin: AppSpacing.md,
                           columnSpacing: dynamicSpacing,
-                    columns: [
-                      DataColumn(
-                        label: Text(
-                          'التاريخ',
-                          style: AppTextStyles.labelMedium.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'التصنيف',
-                          style: AppTextStyles.labelMedium.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Text(
-                          'المصروف والملاحظات',
-                          style: AppTextStyles.labelMedium.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                      DataColumn(
-                        numeric: true,
-                        label: Text(
-                          'المبلغ',
-                          style: AppTextStyles.labelMedium.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                    ],
-                    rows: data.expenseTransactions.map((exp) {
-                      final hasName =
-                          exp.expenseName != null &&
-                          exp.expenseName!.trim().isNotEmpty;
-                      final hasNotes =
-                          exp.notes != null && exp.notes!.trim().isNotEmpty;
-                      final title = hasName
-                          ? exp.expenseName!
-                          : (hasNotes ? exp.notes! : '—');
-
-                      return DataRow(
-                        cells: [
-                          DataCell(
-                            Text(
-                              DateFormatter.formatArabicDate(
-                                exp.expenseDate.toDateTime(),
-                              ),
-                              style: AppTextStyles.bodySmall.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ),
-                          DataCell(
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.backgroundSecondary,
-                                borderRadius: BorderRadius.circular(
-                                  AppSpacing.radiusSm,
-                                ),
-                                border: Border.all(color: AppColors.border),
-                              ),
-                              child: Text(
-                                exp.categoryNameSnapshot,
-                                style: AppTextStyles.labelSmall.copyWith(
+                          columns: [
+                            DataColumn(
+                              label: Text(
+                                'التاريخ',
+                                style: AppTextStyles.labelMedium.copyWith(
+                                  fontWeight: FontWeight.bold,
                                   color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
-                          ),
-                          DataCell(
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
+                            DataColumn(
+                              label: Text(
+                                'التصنيف',
+                                style: AppTextStyles.labelMedium.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            DataColumn(
+                              label: Text(
+                                'المصروف والملاحظات',
+                                style: AppTextStyles.labelMedium.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            DataColumn(
+                              numeric: true,
+                              label: Text(
+                                'المبلغ',
+                                style: AppTextStyles.labelMedium.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                          rows: data.expenseTransactions.map((exp) {
+                            final hasName =
+                                exp.expenseName != null &&
+                                exp.expenseName!.trim().isNotEmpty;
+                            final hasNotes =
+                                exp.notes != null &&
+                                exp.notes!.trim().isNotEmpty;
+                            final title = hasName
+                                ? exp.expenseName!
+                                : (hasNotes ? exp.notes! : '—');
+
+                            return DataRow(
+                              cells: [
+                                DataCell(
                                   Text(
-                                    title,
+                                    DateFormatter.formatArabicDate(
+                                      exp.expenseDate.toDateTime(),
+                                    ),
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.backgroundSecondary,
+                                      borderRadius: BorderRadius.circular(
+                                        AppSpacing.radiusSm,
+                                      ),
+                                      border: Border.all(
+                                        color: AppColors.border,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      exp.categoryNameSnapshot,
+                                      style: AppTextStyles.labelSmall.copyWith(
+                                        color: AppColors.textPrimary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 4,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          title,
+                                          style: AppTextStyles.bodyMedium
+                                              .copyWith(
+                                                fontWeight: FontWeight.w500,
+                                                color: AppColors.textPrimary,
+                                              ),
+                                        ),
+                                        if (hasName && hasNotes) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            exp.notes!,
+                                            style: AppTextStyles.caption
+                                                .copyWith(
+                                                  color: AppColors.textTertiary,
+                                                  fontSize: 11,
+                                                ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    '${exp.amount.toEgp.toStringAsFixed(2)} ج.م',
                                     style: AppTextStyles.bodyMedium.copyWith(
-                                      fontWeight: FontWeight.w500,
+                                      fontWeight: FontWeight.bold,
                                       color: AppColors.textPrimary,
                                     ),
                                   ),
-                                  if (hasName && hasNotes) ...[
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      exp.notes!,
-                                      style: AppTextStyles.caption.copyWith(
-                                        color: AppColors.textTertiary,
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ),
-                          DataCell(
-                            Text(
-                              '${exp.amount.toEgp.toStringAsFixed(2)} ج.م',
-                              style: AppTextStyles.bodyMedium.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-                          ),
+                                ),
+                              ],
+                            );
+                          }).toList(),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
-          ],
-        ),
-      );
-    }
+            ),
+        ],
+      ),
+    );
   }
+}

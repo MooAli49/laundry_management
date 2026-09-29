@@ -331,4 +331,3 @@ class AppStrings {
   static const String btPrinterNotConfigured =
       'لم يتم إعداد طابعة بعد.\nيمكنك إعداد الطابعة من الإعدادات ← الطابعة.';
 }
-

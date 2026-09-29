@@ -32,10 +32,7 @@ class DioClient {
   }) : _dio = dio ?? Dio() {
     final effectiveConfig =
         config ??
-        SupabaseConfig.resolve(
-          customApiUrl: baseUrl,
-          customAnonKey: apiKey,
-        );
+        SupabaseConfig.resolve(customApiUrl: baseUrl, customAnonKey: apiKey);
 
     final effectiveBaseUrl = baseUrl ?? effectiveConfig.apiUrl;
     final effectiveApiKey = apiKey ?? effectiveConfig.anonKey;

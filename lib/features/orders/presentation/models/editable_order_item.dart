@@ -2,7 +2,8 @@ import '../../../../domain/enums/pricing_type.dart';
 import '../../../../domain/value_objects/money.dart';
 
 class EditableOrderItem {
-  final String? id; // null for newly added items, non-null for existing order items
+  final String?
+  id; // null for newly added items, non-null for existing order items
   final String itemTypeId;
   final String itemTypeName;
   final String? itemDefinitionId;
@@ -11,12 +12,14 @@ class EditableOrderItem {
   final String serviceName;
   final PricingType pricingType;
   final Money unitPrice;
-  final int physicalQuantity; // 1 for existing physical piece; for new can be >= 1
+  final int
+  physicalQuantity; // 1 for existing physical piece; for new can be >= 1
   final String? carpetSizeId;
   final double length;
   final double width;
   final String? notes;
-  final bool hasStorageRecords; // true if COUNT(storage_records) > 0 (blocks deletion)
+  final bool
+  hasStorageRecords; // true if COUNT(storage_records) > 0 (blocks deletion)
   final String? storageLocationName; // Displayed in badge if actively stored
 
   const EditableOrderItem({

@@ -150,30 +150,33 @@ void main() {
       expect(find.text(AppStrings.servicePriceMustBePositive), findsWidgets);
     });
 
-    testWidgets('UAT-B — dialog renders without fixed 720px height and submits valid service', (tester) async {
-      await tester.pumpWidget(buildDialog());
-      await tester.pumpAndSettle();
+    testWidgets(
+      'UAT-B — dialog renders without fixed 720px height and submits valid service',
+      (tester) async {
+        await tester.pumpWidget(buildDialog());
+        await tester.pumpAndSettle();
 
-      // Enter valid name
-      final nameField = find.widgetWithText(TextFormField, '');
-      await tester.enterText(nameField.first, 'خدمة غسيل خاصة');
+        // Enter valid name
+        final nameField = find.widgetWithText(TextFormField, '');
+        await tester.enterText(nameField.first, 'خدمة غسيل خاصة');
 
-      // Enter valid price
-      final priceField = find.widgetWithText(TextFormField, '0.00');
-      await tester.enterText(priceField, '45.00');
+        // Enter valid price
+        final priceField = find.widgetWithText(TextFormField, '0.00');
+        await tester.enterText(priceField, '45.00');
 
-      // Select item type
-      await tester.ensureVisible(find.text('ملابس'));
-      await tester.tap(find.text('ملابس'));
-      await tester.pumpAndSettle();
+        // Select item type
+        await tester.ensureVisible(find.text('ملابس'));
+        await tester.tap(find.text('ملابس'));
+        await tester.pumpAndSettle();
 
-      // Submit
-      await tester.tap(find.text(AppStrings.save));
-      await tester.pumpAndSettle();
+        // Submit
+        await tester.tap(find.text(AppStrings.save));
+        await tester.pumpAndSettle();
 
-      expect(serviceRepo.services.length, 1);
-      expect(serviceRepo.services.first.name, 'خدمة غسيل خاصة');
-      expect(serviceRepo.services.first.price, Money.fromEgp(45));
-    });
+        expect(serviceRepo.services.length, 1);
+        expect(serviceRepo.services.first.name, 'خدمة غسيل خاصة');
+        expect(serviceRepo.services.first.price, Money.fromEgp(45));
+      },
+    );
   });
 }

@@ -40,7 +40,8 @@ class EditProcessingOrderState {
   final BusinessSettings? settings;
 
   // Draft for adding or editing an item
-  final int? editingItemIndex; // null when adding new item; index when editing item
+  final int?
+  editingItemIndex; // null when adding new item; index when editing item
   final ItemType? draftItemType;
   final ItemDefinition? draftItemDefinition;
   final Service? draftService;
@@ -104,7 +105,8 @@ class EditProcessingOrderState {
       customerDeliveryRequested ? customerDeliveryFee : Money.zero;
 
   Money get total {
-    final computed = subtotal - discount + effectivePickupFee + effectiveDeliveryFee;
+    final computed =
+        subtotal - discount + effectivePickupFee + effectiveDeliveryFee;
     return computed.isNegative ? Money.zero : computed;
   }
 
@@ -116,7 +118,8 @@ class EditProcessingOrderState {
   bool get isTotalValid => total >= totalPaid;
 
   bool get isPickupDateValid {
-    if (initialOrder != null && expectedPickupDate == initialOrder!.expectedPickupDate) {
+    if (initialOrder != null &&
+        expectedPickupDate == initialOrder!.expectedPickupDate) {
       return true;
     }
     return !expectedPickupDate.isBeforeToday;
@@ -178,21 +181,26 @@ class EditProcessingOrderState {
     return EditProcessingOrderState(
       isLoading: isLoading ?? this.isLoading,
       isSubmitting: isSubmitting ?? this.isSubmitting,
-      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
       initialOrder: initialOrder ?? this.initialOrder,
       totalPaid: totalPaid ?? this.totalPaid,
       selectedCustomer: clearSelectedCustomer
           ? null
           : (selectedCustomer ?? this.selectedCustomer),
-      customerSearchResults: customerSearchResults ?? this.customerSearchResults,
+      customerSearchResults:
+          customerSearchResults ?? this.customerSearchResults,
       isSearchingCustomer: isSearchingCustomer ?? this.isSearchingCustomer,
       items: items ?? this.items,
       deletedItemIds: deletedItemIds ?? this.deletedItemIds,
       expectedPickupDate: expectedPickupDate ?? this.expectedPickupDate,
       notes: notes ?? this.notes,
-      customerPickupRequested: customerPickupRequested ?? this.customerPickupRequested,
+      customerPickupRequested:
+          customerPickupRequested ?? this.customerPickupRequested,
       customerPickupFee: customerPickupFee ?? this.customerPickupFee,
-      customerDeliveryRequested: customerDeliveryRequested ?? this.customerDeliveryRequested,
+      customerDeliveryRequested:
+          customerDeliveryRequested ?? this.customerDeliveryRequested,
       customerDeliveryFee: customerDeliveryFee ?? this.customerDeliveryFee,
       discount: discount ?? this.discount,
       savedOrder: savedOrder ?? this.savedOrder,
@@ -204,14 +212,22 @@ class EditProcessingOrderState {
       editingItemIndex: clearEditingItemIndex
           ? null
           : (editingItemIndex ?? this.editingItemIndex),
-      draftItemType: clearDraftItemType ? null : (draftItemType ?? this.draftItemType),
+      draftItemType: clearDraftItemType
+          ? null
+          : (draftItemType ?? this.draftItemType),
       draftItemDefinition: clearDraftItemDefinition
           ? null
           : (draftItemDefinition ?? this.draftItemDefinition),
-      draftService: clearDraftService ? null : (draftService ?? this.draftService),
-      draftUnitPrice: clearDraftUnitPrice ? null : (draftUnitPrice ?? this.draftUnitPrice),
+      draftService: clearDraftService
+          ? null
+          : (draftService ?? this.draftService),
+      draftUnitPrice: clearDraftUnitPrice
+          ? null
+          : (draftUnitPrice ?? this.draftUnitPrice),
       draftQuantity: draftQuantity ?? this.draftQuantity,
-      draftCarpetSize: clearDraftCarpetSize ? null : (draftCarpetSize ?? this.draftCarpetSize),
+      draftCarpetSize: clearDraftCarpetSize
+          ? null
+          : (draftCarpetSize ?? this.draftCarpetSize),
       draftCarpetLength: draftCarpetLength ?? this.draftCarpetLength,
       draftCarpetWidth: draftCarpetWidth ?? this.draftCarpetWidth,
       draftNotes: clearDraftNotes ? null : (draftNotes ?? this.draftNotes),

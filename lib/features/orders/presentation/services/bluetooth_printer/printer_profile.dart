@@ -31,8 +31,17 @@ enum ThermalPaperWidth {
   /// Paper width in millimetres.
   final int mm;
 
-  /// Printable width pixels assuming 8 dots/mm (203 dpi).
-  int get printablePixels => (mm - 6) * 8; // ~6 mm margin total
+  /// Printable width pixels assuming standard 203 DPI (8 dots/mm) printheads:
+  /// - 58mm: 48mm printable / 384 dots (48 bytes/row)
+  /// - 76mm: 70mm printable / 560 dots (70 bytes/row)
+  /// - 80mm: 72mm printable / 576 dots (72 bytes/row) [Industry standard receipt width]
+  /// - 104mm: 100mm printable / 800 dots (100 bytes/row)
+  int get printablePixels => switch (this) {
+    ThermalPaperWidth.w58 => 384,
+    ThermalPaperWidth.w76 => 560,
+    ThermalPaperWidth.w80 => 576,
+    ThermalPaperWidth.w104 => 800,
+  };
 
   String get label => '$mm مم';
 }
@@ -85,6 +94,7 @@ class PrinterProfile {
   int get hashCode => address.hashCode;
 
   @override
-  String toString() => 'PrinterProfile(name: $name, address: $address, '
+  String toString() =>
+      'PrinterProfile(name: $name, address: $address, '
       'paper: ${paperWidth.mm}mm, protocol: $protocol)';
 }

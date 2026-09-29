@@ -297,7 +297,9 @@ void main() {
 
       final now = DateTime.now();
       for (final device in [deviceA, deviceB]) {
-        await device.db.into(device.db.services).insertOnConflictUpdate(
+        await device.db
+            .into(device.db.services)
+            .insertOnConflictUpdate(
               app_db.ServicesCompanion.insert(
                 id: pieceServiceId,
                 name: 'غسيل وكوي',
@@ -320,7 +322,9 @@ void main() {
           ],
         );
 
-        await device.db.into(device.db.storageLocations).insertOnConflictUpdate(
+        await device.db
+            .into(device.db.storageLocations)
+            .insertOnConflictUpdate(
               app_db.StorageLocationsCompanion.insert(
                 id: rack1LocationId,
                 name: 'Rack 1',
@@ -384,11 +388,17 @@ void main() {
         final custDeadline = DateTime.now().add(const Duration(seconds: 15));
         while (DateTime.now().isBefore(custDeadline)) {
           await deviceB.syncEngine.sync();
-          custOnB = await deviceB.customerRepository.getCustomerById(testCustomerId);
+          custOnB = await deviceB.customerRepository.getCustomerById(
+            testCustomerId,
+          );
           if (custOnB != null) break;
           await Future<void>.delayed(const Duration(milliseconds: 300));
         }
-        expect(custOnB, isNotNull, reason: 'Customer must replicate to Device B');
+        expect(
+          custOnB,
+          isNotNull,
+          reason: 'Customer must replicate to Device B',
+        );
 
         // =====================================================================
         // SCENARIO 1: Device A stores item -> Ready -> Sync -> Device B receives Ready & active storage preserved
@@ -401,7 +411,9 @@ void main() {
           customerNameSnapshot: 'عميل Phase 4 $runId',
           customerPhoneSnapshot: testCustomerPhone,
           status: OrderStatus.processing,
-          expectedPickupDate: OrderDate.fromDate(now.add(const Duration(days: 2))),
+          expectedPickupDate: OrderDate.fromDate(
+            now.add(const Duration(days: 2)),
+          ),
           subtotal: const Money.fromPiastres(1500),
           total: const Money.fromPiastres(1500),
           createdAt: now,
@@ -423,7 +435,10 @@ void main() {
           updatedAt: now,
         );
 
-        await deviceA.orderRepository.createOrder(order: order1, items: [item1]);
+        await deviceA.orderRepository.createOrder(
+          order: order1,
+          items: [item1],
+        );
 
         // Device A stores item and marks order Ready
         await deviceA.storageRepository.storeItem(
@@ -437,15 +452,23 @@ void main() {
         while (DateTime.now().isBefore(pollDeadlineA1)) {
           await deviceA.syncEngine.sync();
           final ordA = await deviceA.orderRepository.getOrderById(testOrder1Id);
-          final pendingA = await deviceA.syncOperationsDao.getPendingOperations();
-          if (ordA != null && ordA.status == OrderStatus.ready && pendingA.isEmpty) break;
+          final pendingA = await deviceA.syncOperationsDao
+              .getPendingOperations();
+          if (ordA != null &&
+              ordA.status == OrderStatus.ready &&
+              pendingA.isEmpty) {
+            break;
+          }
           await Future<void>.delayed(const Duration(milliseconds: 300));
         }
 
         // Verify Device A is Ready with active storage
-        final order1A = await deviceA.orderRepository.getOrderById(testOrder1Id);
+        final order1A = await deviceA.orderRepository.getOrderById(
+          testOrder1Id,
+        );
         expect(order1A!.status, equals(OrderStatus.ready));
-        final storage1A = await deviceA.storageRecordsDao.getActiveRecordForOrderItem(testItem1Id);
+        final storage1A = await deviceA.storageRecordsDao
+            .getActiveRecordForOrderItem(testItem1Id);
         expect(storage1A, isNotNull);
         expect(storage1A!.isActive, isTrue);
 
@@ -460,18 +483,29 @@ void main() {
         }
 
         expect(order1B, isNotNull);
-        expect(order1B!.status, equals(OrderStatus.ready),
-            reason: 'Device B must receive Ready state');
+        expect(
+          order1B!.status,
+          equals(OrderStatus.ready),
+          reason: 'Device B must receive Ready state',
+        );
 
         // Storage on Device B must be active
-        final storage1B = await deviceB.storageRecordsDao.getActiveRecordForOrderItem(testItem1Id);
-        expect(storage1B, isNotNull,
-            reason: 'Device B must have an active storage record for stored item');
+        final storage1B = await deviceB.storageRecordsDao
+            .getActiveRecordForOrderItem(testItem1Id);
+        expect(
+          storage1B,
+          isNotNull,
+          reason: 'Device B must have an active storage record for stored item',
+        );
         expect(storage1B!.isActive, isTrue);
 
         // Zero outbox on Device B
         final outboxB1 = await deviceB.syncOperationsDao.getPendingOperations();
-        expect(outboxB1, isEmpty, reason: 'Device B must have 0 outbox operations');
+        expect(
+          outboxB1,
+          isEmpty,
+          reason: 'Device B must have 0 outbox operations',
+        );
 
         // =====================================================================
         // SCENARIO 2: Device A Ready -> Processing with reason -> Sync -> Device B receives Processing & active storage deactivated
@@ -483,8 +517,8 @@ void main() {
         );
 
         // Device A storage must be deactivated locally
-        final storage1AfterR2PA =
-            await deviceA.storageRecordsDao.getActiveRecordForOrderItem(testItem1Id);
+        final storage1AfterR2PA = await deviceA.storageRecordsDao
+            .getActiveRecordForOrderItem(testItem1Id);
         expect(storage1AfterR2PA, isNull);
 
         // Push from Device A
@@ -495,17 +529,23 @@ void main() {
         while (DateTime.now().isBefore(pollDeadline2)) {
           await deviceB.syncEngine.sync();
           order1B = await deviceB.orderRepository.getOrderById(testOrder1Id);
-          if (order1B != null && order1B.status == OrderStatus.processing) break;
+          if (order1B != null && order1B.status == OrderStatus.processing) {
+            break;
+          }
           await Future<void>.delayed(const Duration(milliseconds: 300));
         }
 
         expect(order1B!.status, equals(OrderStatus.processing));
 
         // Active storage on Device B MUST BE DEACTIVATED!
-        final storage1BAfterR2P =
-            await deviceB.storageRecordsDao.getActiveRecordForOrderItem(testItem1Id);
-        expect(storage1BAfterR2P, isNull,
-            reason: 'Device B active storage MUST be deactivated on remote Ready -> Processing');
+        final storage1BAfterR2P = await deviceB.storageRecordsDao
+            .getActiveRecordForOrderItem(testItem1Id);
+        expect(
+          storage1BAfterR2P,
+          isNull,
+          reason:
+              'Device B active storage MUST be deactivated on remote Ready -> Processing',
+        );
 
         // Zero outbox on Device B
         final outboxB2 = await deviceB.syncOperationsDao.getPendingOperations();
@@ -540,8 +580,13 @@ void main() {
         while (DateTime.now().isBefore(pollDeadlineA3)) {
           await deviceA.syncEngine.sync();
           final ordA = await deviceA.orderRepository.getOrderById(testOrder1Id);
-          final pendingA = await deviceA.syncOperationsDao.getPendingOperations();
-          if (ordA != null && ordA.status == OrderStatus.ready && pendingA.isEmpty) break;
+          final pendingA = await deviceA.syncOperationsDao
+              .getPendingOperations();
+          if (ordA != null &&
+              ordA.status == OrderStatus.ready &&
+              pendingA.isEmpty) {
+            break;
+          }
           await Future<void>.delayed(const Duration(milliseconds: 300));
         }
 
@@ -553,12 +598,19 @@ void main() {
         expect(completedOrderA.status, equals(OrderStatus.completed));
 
         // Push completion from Device A and wait until settled
-        final pollDeadlineAComplete = DateTime.now().add(const Duration(seconds: 15));
+        final pollDeadlineAComplete = DateTime.now().add(
+          const Duration(seconds: 15),
+        );
         while (DateTime.now().isBefore(pollDeadlineAComplete)) {
           await deviceA.syncEngine.sync();
           final ordA = await deviceA.orderRepository.getOrderById(testOrder1Id);
-          final pendingA = await deviceA.syncOperationsDao.getPendingOperations();
-          if (ordA != null && ordA.status == OrderStatus.completed && pendingA.isEmpty) break;
+          final pendingA = await deviceA.syncOperationsDao
+              .getPendingOperations();
+          if (ordA != null &&
+              ordA.status == OrderStatus.completed &&
+              pendingA.isEmpty) {
+            break;
+          }
           await Future<void>.delayed(const Duration(milliseconds: 300));
         }
 
@@ -575,12 +627,14 @@ void main() {
         expect(order1B.completedAt, isNotNull);
 
         // Device B storage must be deactivated
-        final storage1BAfterComplete =
-            await deviceB.storageRecordsDao.getActiveRecordForOrderItem(testItem1Id);
+        final storage1BAfterComplete = await deviceB.storageRecordsDao
+            .getActiveRecordForOrderItem(testItem1Id);
         expect(storage1BAfterComplete, isNull);
 
         // Device B payments must remain intact
-        final paymentsOnB = await deviceB.paymentRepository.getPaymentsForOrder(testOrder1Id);
+        final paymentsOnB = await deviceB.paymentRepository.getPaymentsForOrder(
+          testOrder1Id,
+        );
         expect(paymentsOnB, isNotEmpty);
         expect(paymentsOnB.first.amount.piastres, equals(1500));
 
@@ -591,17 +645,18 @@ void main() {
         // =====================================================================
         // SCENARIO 3B: Completed -> Processing correction on Device A -> Sync -> Device B receives Processing, completed_at=null, storage inactive, payments intact, zero outbox
         // =====================================================================
-        final correctedOrderA = await deviceA.orderRepository.correctOrderStatus(
-          orderId: testOrder1Id,
-          newStatus: OrderStatus.processing,
-          reason: 'تصحيح إداري تشغيلي لإعادة فتح الطلب',
-        );
+        final correctedOrderA = await deviceA.orderRepository
+            .correctOrderStatus(
+              orderId: testOrder1Id,
+              newStatus: OrderStatus.processing,
+              reason: 'تصحيح إداري تشغيلي لإعادة فتح الطلب',
+            );
         expect(correctedOrderA.status, equals(OrderStatus.processing));
         expect(correctedOrderA.completedAt, isNull);
 
         // Device A storage records must remain inactive
-        final storage1AAfterCorrection =
-            await deviceA.storageRecordsDao.getActiveRecordForOrderItem(testItem1Id);
+        final storage1AAfterCorrection = await deviceA.storageRecordsDao
+            .getActiveRecordForOrderItem(testItem1Id);
         expect(storage1AAfterCorrection, isNull);
 
         // Push correction from Device A and wait until settled
@@ -609,8 +664,13 @@ void main() {
         while (DateTime.now().isBefore(pollDeadlineA3B)) {
           await deviceA.syncEngine.sync();
           final ordA = await deviceA.orderRepository.getOrderById(testOrder1Id);
-          final pendingA = await deviceA.syncOperationsDao.getPendingOperations();
-          if (ordA != null && ordA.status == OrderStatus.processing && pendingA.isEmpty) break;
+          final pendingA = await deviceA.syncOperationsDao
+              .getPendingOperations();
+          if (ordA != null &&
+              ordA.status == OrderStatus.processing &&
+              pendingA.isEmpty) {
+            break;
+          }
           await Future<void>.delayed(const Duration(milliseconds: 300));
         }
 
@@ -619,8 +679,9 @@ void main() {
         final pollDeadline3B = DateTime.now().add(const Duration(seconds: 15));
         while (DateTime.now().isBefore(pollDeadline3B)) {
           await deviceB.syncEngine.sync();
-          order1BAfterCorrection =
-              await deviceB.orderRepository.getOrderById(testOrder1Id);
+          order1BAfterCorrection = await deviceB.orderRepository.getOrderById(
+            testOrder1Id,
+          );
           if (order1BAfterCorrection != null &&
               order1BAfterCorrection.status == OrderStatus.processing) {
             break;
@@ -633,18 +694,19 @@ void main() {
         expect(order1BAfterCorrection.completedAt, isNull);
 
         // Device B storage records must NOT be reactivated
-        final storage1BAfterCorrection =
-            await deviceB.storageRecordsDao.getActiveRecordForOrderItem(testItem1Id);
+        final storage1BAfterCorrection = await deviceB.storageRecordsDao
+            .getActiveRecordForOrderItem(testItem1Id);
         expect(storage1BAfterCorrection, isNull);
 
         // Device B payments must remain intact
-        final paymentsOnBAfterCorrection =
-            await deviceB.paymentRepository.getPaymentsForOrder(testOrder1Id);
+        final paymentsOnBAfterCorrection = await deviceB.paymentRepository
+            .getPaymentsForOrder(testOrder1Id);
         expect(paymentsOnBAfterCorrection, isNotEmpty);
         expect(paymentsOnBAfterCorrection.first.amount.piastres, equals(1500));
 
         // Zero outbox on Device B (no sync echo)
-        final outboxB3B = await deviceB.syncOperationsDao.getPendingOperations();
+        final outboxB3B = await deviceB.syncOperationsDao
+            .getPendingOperations();
         expect(outboxB3B, isEmpty);
 
         // =====================================================================
@@ -654,21 +716,23 @@ void main() {
           orderItemId: testItem1Id,
           storageLocationId: rack1LocationId,
         );
-        final reStoredRecordA =
-            await deviceA.storageRecordsDao.getActiveRecordForOrderItem(testItem1Id);
+        final reStoredRecordA = await deviceA.storageRecordsDao
+            .getActiveRecordForOrderItem(testItem1Id);
         expect(reStoredRecordA, isNotNull);
         expect(reStoredRecordA!.isActive, isTrue);
 
         await deviceA.orderRepository.markOrderReady(testOrder1Id);
-        final reReadiedOrderA =
-            await deviceA.orderRepository.getOrderById(testOrder1Id);
+        final reReadiedOrderA = await deviceA.orderRepository.getOrderById(
+          testOrder1Id,
+        );
         expect(reReadiedOrderA!.status, equals(OrderStatus.ready));
 
         // Device A syncs to push storage and mark_ready
         final pollDeadlineA3C = DateTime.now().add(const Duration(seconds: 15));
         while (DateTime.now().isBefore(pollDeadlineA3C)) {
           await deviceA.syncEngine.sync();
-          final pendingA = await deviceA.syncOperationsDao.getPendingOperations();
+          final pendingA = await deviceA.syncOperationsDao
+              .getPendingOperations();
           if (pendingA.isEmpty) break;
           await Future<void>.delayed(const Duration(milliseconds: 300));
         }
@@ -678,8 +742,8 @@ void main() {
         while (DateTime.now().isBefore(pollDeadline3C)) {
           await deviceB.syncEngine.sync();
           final ordB = await deviceB.orderRepository.getOrderById(testOrder1Id);
-          final storB =
-              await deviceB.storageRecordsDao.getActiveRecordForOrderItem(testItem1Id);
+          final storB = await deviceB.storageRecordsDao
+              .getActiveRecordForOrderItem(testItem1Id);
           if (ordB != null &&
               ordB.status == OrderStatus.ready &&
               storB != null &&
@@ -689,11 +753,12 @@ void main() {
           await Future<void>.delayed(const Duration(milliseconds: 300));
         }
 
-        final order1BReReadied =
-            await deviceB.orderRepository.getOrderById(testOrder1Id);
+        final order1BReReadied = await deviceB.orderRepository.getOrderById(
+          testOrder1Id,
+        );
         expect(order1BReReadied!.status, equals(OrderStatus.ready));
-        final storage1BReStored =
-            await deviceB.storageRecordsDao.getActiveRecordForOrderItem(testItem1Id);
+        final storage1BReStored = await deviceB.storageRecordsDao
+            .getActiveRecordForOrderItem(testItem1Id);
         expect(storage1BReStored, isNotNull);
         expect(storage1BReStored!.isActive, isTrue);
 
@@ -707,7 +772,9 @@ void main() {
           customerNameSnapshot: 'عميل Phase 4 $runId',
           customerPhoneSnapshot: testCustomerPhone,
           status: OrderStatus.processing,
-          expectedPickupDate: OrderDate.fromDate(now.add(const Duration(days: 3))),
+          expectedPickupDate: OrderDate.fromDate(
+            now.add(const Duration(days: 3)),
+          ),
           subtotal: const Money.fromPiastres(1500),
           total: const Money.fromPiastres(1500),
           createdAt: now,
@@ -729,7 +796,10 @@ void main() {
           updatedAt: now,
         );
 
-        await deviceA.orderRepository.createOrder(order: order2, items: [item2]);
+        await deviceA.orderRepository.createOrder(
+          order: order2,
+          items: [item2],
+        );
 
         // Store item 2 on Device A
         await deviceA.storageRepository.storeItem(
@@ -755,8 +825,11 @@ void main() {
         final pollDeadlineA4 = DateTime.now().add(const Duration(seconds: 15));
         while (DateTime.now().isBefore(pollDeadlineA4)) {
           await deviceA.syncEngine.sync();
-          final ordA2 = await deviceA.orderRepository.getOrderById(testOrder2Id);
-          final pendingA2 = await deviceA.syncOperationsDao.getPendingOperations();
+          final ordA2 = await deviceA.orderRepository.getOrderById(
+            testOrder2Id,
+          );
+          final pendingA2 = await deviceA.syncOperationsDao
+              .getPendingOperations();
           if (ordA2 != null && pendingA2.isEmpty) break;
           await Future<void>.delayed(const Duration(milliseconds: 300));
         }
@@ -786,12 +859,13 @@ void main() {
         expect(order2B.cancelledAt, isNotNull);
 
         // Device B storage must be deactivated
-        final storage2B =
-            await deviceB.storageRecordsDao.getActiveRecordForOrderItem(testItem2Id);
+        final storage2B = await deviceB.storageRecordsDao
+            .getActiveRecordForOrderItem(testItem2Id);
         expect(storage2B, isNull);
 
         // Device B partial payment preserved intact
-        final payments2OnB = await deviceB.paymentRepository.getPaymentsForOrder(testOrder2Id);
+        final payments2OnB = await deviceB.paymentRepository
+            .getPaymentsForOrder(testOrder2Id);
         expect(payments2OnB, isNotEmpty);
         expect(payments2OnB.first.amount.piastres, equals(500));
 

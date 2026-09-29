@@ -346,10 +346,7 @@ void main() {
           report.expenseCategoriesBreakdown[0].totalAmount,
           const Money.fromPiastres(10000),
         );
-        expect(
-          report.expenseCategoriesBreakdown[1].categoryName,
-          elecCat.name,
-        );
+        expect(report.expenseCategoriesBreakdown[1].categoryName, elecCat.name);
         expect(
           report.expenseCategoriesBreakdown[1].totalAmount,
           const Money.fromPiastres(5000),
@@ -833,29 +830,26 @@ void main() {
       },
     );
 
-    test(
-      'Part N: Empty period returns zero values for all metrics',
-      () async {
-        final periodStart = DateTime(2026, 1, 1, 0, 0, 0);
-        final periodEnd = DateTime(2026, 1, 31, 23, 59, 59);
+    test('Part N: Empty period returns zero values for all metrics', () async {
+      final periodStart = DateTime(2026, 1, 1, 0, 0, 0);
+      final periodEnd = DateTime(2026, 1, 31, 23, 59, 59);
 
-        final report = await reportsRepository.getFinancialReport(
-          startDate: periodStart,
-          endDate: periodEnd,
-        );
+      final report = await reportsRepository.getFinancialReport(
+        startDate: periodStart,
+        endDate: periodEnd,
+      );
 
-        expect(report.totalSales, Money.zero);
-        expect(report.totalPayments, Money.zero);
-        expect(report.totalRefunds, Money.zero);
-        expect(report.netPayments, Money.zero);
-        expect(report.totalOperatingExpenses, Money.zero);
-        expect(report.netProfit, Money.zero);
-        expect(report.outstandingAmount, Money.zero);
-        expect(report.totalDiscounts, Money.zero);
-        expect(report.outstandingOrders, isEmpty);
-        expect(report.expenseTransactions, isEmpty);
-      },
-    );
+      expect(report.totalSales, Money.zero);
+      expect(report.totalPayments, Money.zero);
+      expect(report.totalRefunds, Money.zero);
+      expect(report.netPayments, Money.zero);
+      expect(report.totalOperatingExpenses, Money.zero);
+      expect(report.netProfit, Money.zero);
+      expect(report.outstandingAmount, Money.zero);
+      expect(report.totalDiscounts, Money.zero);
+      expect(report.outstandingOrders, isEmpty);
+      expect(report.expenseTransactions, isEmpty);
+    });
 
     test(
       'expense report strictly adheres to expense_date, not created_at',
@@ -920,10 +914,7 @@ void main() {
         );
 
         // 1. Total expenses must equal 200 EGP
-        expect(
-          report.totalOperatingExpenses,
-          const Money.fromPiastres(20000),
-        );
+        expect(report.totalOperatingExpenses, const Money.fromPiastres(20000));
 
         // 2. Categories breakdown must contain منظفات with 200 EGP
         expect(report.expenseCategoriesBreakdown.length, 1);

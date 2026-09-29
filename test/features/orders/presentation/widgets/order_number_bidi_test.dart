@@ -30,105 +30,105 @@ void main() {
       updatedAt: now,
     );
 
-    testWidgets('OrderCard renders #26-9993240 with explicit LTR direction in Arabic RTL context', (
-      tester,
-    ) async {
-      final viewModel = OrderListItemViewModel(
-        order: testOrder,
-        totalPaid: Money.zero,
-        remainingAmount: testOrder.total,
-      );
+    testWidgets(
+      'OrderCard renders #26-9993240 with explicit LTR direction in Arabic RTL context',
+      (tester) async {
+        final viewModel = OrderListItemViewModel(
+          order: testOrder,
+          totalPaid: Money.zero,
+          remainingAmount: testOrder.total,
+        );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Directionality(
-            textDirection: TextDirection.rtl, // Arabic RTL Context
-            child: Scaffold(
-              body: OrderCard(
-                item: viewModel,
-                onTap: () {},
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Directionality(
+              textDirection: TextDirection.rtl, // Arabic RTL Context
+              child: Scaffold(
+                body: OrderCard(item: viewModel, onTap: () {}),
               ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      // Verify the Text widget with the formatted order number exists
-      final textFinder = find.text('#26-9993240');
-      expect(textFinder, findsOneWidget);
+        // Verify the Text widget with the formatted order number exists
+        final textFinder = find.text('#26-9993240');
+        expect(textFinder, findsOneWidget);
 
-      // Verify explicit TextDirection.ltr is configured on the Text widget
-      final textWidget = tester.widget<Text>(textFinder);
-      expect(textWidget.textDirection, TextDirection.ltr);
+        // Verify explicit TextDirection.ltr is configured on the Text widget
+        final textWidget = tester.widget<Text>(textFinder);
+        expect(textWidget.textDirection, TextDirection.ltr);
 
-      // Verify the stored value itself was NOT altered
-      expect(testOrder.orderNumber, '26-9993240');
-    });
+        // Verify the stored value itself was NOT altered
+        expect(testOrder.orderNumber, '26-9993240');
+      },
+    );
 
-    testWidgets('Order Details Header title pattern renders طلب #26-9993240 cleanly with LTR', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Directionality(
-            textDirection: TextDirection.rtl, // Arabic RTL Context
-            child: Scaffold(
-              appBar: AppBar(
-                title: Row(
+    testWidgets(
+      'Order Details Header title pattern renders طلب #26-9993240 cleanly with LTR',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Directionality(
+              textDirection: TextDirection.rtl, // Arabic RTL Context
+              child: Scaffold(
+                appBar: AppBar(
+                  title: Row(
+                    children: [
+                      const Text('طلب '),
+                      Text(
+                        '#${testOrder.orderNumber}',
+                        textDirection: TextDirection.ltr,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('طلب '), findsOneWidget);
+        final numberFinder = find.text('#26-9993240');
+        expect(numberFinder, findsOneWidget);
+
+        final textWidget = tester.widget<Text>(numberFinder);
+        expect(textWidget.textDirection, TextDirection.ltr);
+      },
+    );
+
+    testWidgets(
+      'Customer detail order row renders #26-9993240 with LTR textDirection',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Scaffold(
+                body: Row(
                   children: [
-                    const Text('طلب '),
                     Text(
-                      '#${testOrder.orderNumber}',
+                      testOrder.orderNumber.startsWith('#')
+                          ? testOrder.orderNumber
+                          : '#${testOrder.orderNumber}',
                       textDirection: TextDirection.ltr,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
               ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.text('طلب '), findsOneWidget);
-      final numberFinder = find.text('#26-9993240');
-      expect(numberFinder, findsOneWidget);
+        final numberFinder = find.text('#26-9993240');
+        expect(numberFinder, findsOneWidget);
 
-      final textWidget = tester.widget<Text>(numberFinder);
-      expect(textWidget.textDirection, TextDirection.ltr);
-    });
-
-    testWidgets('Customer detail order row renders #26-9993240 with LTR textDirection', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Directionality(
-            textDirection: TextDirection.rtl,
-            child: Scaffold(
-              body: Row(
-                children: [
-                  Text(
-                    testOrder.orderNumber.startsWith('#')
-                        ? testOrder.orderNumber
-                        : '#${testOrder.orderNumber}',
-                    textDirection: TextDirection.ltr,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final numberFinder = find.text('#26-9993240');
-      expect(numberFinder, findsOneWidget);
-
-      final textWidget = tester.widget<Text>(numberFinder);
-      expect(textWidget.textDirection, TextDirection.ltr);
-    });
+        final textWidget = tester.widget<Text>(numberFinder);
+        expect(textWidget.textDirection, TextDirection.ltr);
+      },
+    );
   });
 }

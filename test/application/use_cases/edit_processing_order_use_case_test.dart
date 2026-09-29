@@ -82,9 +82,7 @@ void main() {
     mockOrderRepository.orderToReturn = testOrder;
     mockOrderRepository.itemsToReturn = [testExistingItem];
 
-    useCase = EditProcessingOrderUseCase(
-      orderRepository: mockOrderRepository,
-    );
+    useCase = EditProcessingOrderUseCase(orderRepository: mockOrderRepository);
   });
 
   group('EditProcessingOrderUseCase', () {
@@ -177,7 +175,9 @@ void main() {
         EditProcessingOrderInput(
           orderId: 'order-1',
           customerId: 'cust-1',
-          expectedPickupDate: OrderDate.fromDate(now.add(const Duration(days: 3))),
+          expectedPickupDate: OrderDate.fromDate(
+            now.add(const Duration(days: 3)),
+          ),
           notes: 'ملاحظة محدثة',
           customerDeliveryRequested: true,
           customerDeliveryFee: Money.fromEgp(15),

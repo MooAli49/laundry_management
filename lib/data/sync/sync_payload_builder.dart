@@ -122,8 +122,9 @@ class SyncPayloadBuilder {
       'id': order.id,
       'order_number': order.orderNumber,
       'customer_id': order.customerId,
-      'expected_pickup_date':
-          order.expectedPickupDate.toDateTime().toIso8601String(),
+      'expected_pickup_date': order.expectedPickupDate
+          .toDateTime()
+          .toIso8601String(),
       'notes': order.notes,
       'customer_pickup_requested': order.customerPickupRequested,
       'customer_pickup_fee': order.customerPickupFee.piastres,
@@ -456,7 +457,9 @@ class SyncPayloadBuilder {
   }
 
   /// Builds a payload for item definition update (PATCH contract).
-  static String buildItemDefinitionUpdatePayload(ItemDefinition itemDefinition) {
+  static String buildItemDefinitionUpdatePayload(
+    ItemDefinition itemDefinition,
+  ) {
     return jsonEncode(<String, dynamic>{
       'item_type_id': itemDefinition.itemTypeId,
       'name': itemDefinition.name,

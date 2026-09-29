@@ -78,9 +78,7 @@ class ReportsRepositoryImpl implements ReportsRepository {
         endDate: endDate,
         overdueCutoff: todayDate,
       );
-      final totalSales = Money.fromPiastres(
-        orderAggregate.totalSalesPiastres,
-      );
+      final totalSales = Money.fromPiastres(orderAggregate.totalSalesPiastres);
       final totalDiscounts = Money.fromPiastres(
         orderAggregate.totalDiscountsPiastres,
       );

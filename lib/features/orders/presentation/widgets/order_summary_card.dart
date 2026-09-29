@@ -75,10 +75,7 @@ class OrderSummaryCard extends StatelessWidget {
 
           if (state.tax.isPositive) ...[
             AppSpacing.gapSm,
-            _buildRow(
-              'الضريبة',
-              '+ ${state.tax.toEgp.toStringAsFixed(2)} ج.م',
-            ),
+            _buildRow('الضريبة', '+ ${state.tax.toEgp.toStringAsFixed(2)} ج.م'),
           ],
 
           if (state.isInitialPaymentEnabled &&

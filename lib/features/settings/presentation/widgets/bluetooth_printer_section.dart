@@ -12,6 +12,7 @@ import '../../../orders/presentation/cubit/bluetooth_printer_state.dart';
 import '../../../orders/presentation/services/bluetooth_printer/bluetooth_printer_service.dart';
 import '../../../orders/presentation/services/bluetooth_printer/printer_profile.dart';
 import '../../../orders/presentation/services/bluetooth_printer/thermal_command_builder.dart';
+import '../../../orders/presentation/services/bluetooth_printer/thermal_invoice_renderer.dart';
 
 /// Settings section for configuring the Bluetooth thermal printer.
 ///
@@ -39,10 +40,7 @@ class _BluetoothPrinterSectionContent extends StatefulWidget {
 
 class _BluetoothPrinterSectionContentState
     extends State<_BluetoothPrinterSectionContent> {
-  ThermalPaperWidth _selectedWidth = ThermalPaperWidth.w80;
-  PrinterProtocol _selectedProtocol = PrinterProtocol.auto;
-  bool _isDiagnosticPrinting = false;
-  DiagnosticRasterFormat? _diagnosticFormat;
+  bool _isTestPrinting = false;
 
   @override
   Widget build(BuildContext context) {
@@ -61,9 +59,6 @@ class _BluetoothPrinterSectionContentState
                   _buildConnectedCard(context, state)
                 else if (state.savedProfile != null && !state.isConnected)
                   _buildSavedProfileCard(context, state),
-                AppSpacing.gapLg,
-                // Paper/Protocol config
-                _buildConfigCard(context, state),
                 AppSpacing.gapLg,
                 // Scanner
                 _buildScannerCard(context, state),
@@ -145,6 +140,16 @@ class _BluetoothPrinterSectionContentState
                   ],
                 ),
               ),
+              AppSpacing.gapHorizontalMd,
+              AppButton(
+                label: 'طباعة تجريبية',
+                icon: Icons.print_outlined,
+                isLoading: _isTestPrinting,
+                onPressed: _isTestPrinting
+                    ? null
+                    : () => _handleTestPrint(profile),
+              ),
+              AppSpacing.gapHorizontalSm,
               AppButton(
                 label: 'قطع الاتصال',
                 variant: AppButtonVariant.outline,
@@ -153,81 +158,55 @@ class _BluetoothPrinterSectionContentState
               ),
             ],
           ),
-          AppSpacing.gapMd,
-          AppButton(
-            label: 'Test GS v 0 raster',
-            icon: Icons.print_outlined,
-            isLoading: _diagnosticFormat == DiagnosticRasterFormat.gsV0,
-            onPressed: _isDiagnosticPrinting
-                ? null
-                : () => _runDiagnosticPrint(
-                    context,
-                    state,
-                    DiagnosticRasterFormat.gsV0,
-                  ),
-          ),
-          AppSpacing.gapSm,
-          AppButton(
-            label: 'Test GS ( L graphics raster',
-            icon: Icons.image_outlined,
-            isLoading: _diagnosticFormat == DiagnosticRasterFormat.gsL,
-            onPressed: _isDiagnosticPrinting
-                ? null
-                : () => _runDiagnosticPrint(
-                    context,
-                    state,
-                    DiagnosticRasterFormat.gsL,
-                  ),
-          ),
         ],
       ),
     );
   }
 
-  Future<void> _runDiagnosticPrint(
-    BuildContext context,
-    BluetoothPrinterState state,
-    DiagnosticRasterFormat format,
-  ) async {
-    if (!state.isConfigured || !state.isConnected || !state.isReadyToPrint) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(state.connectionError ?? 'الطابعة غير متصلة'),
-          backgroundColor: AppColors.warning,
-        ),
-      );
-      return;
-    }
+  Future<void> _handleTestPrint(PrinterProfile profile) async {
+    if (_isTestPrinting) return;
+    setState(() => _isTestPrinting = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final cubit = context.read<BluetoothPrinterCubit>();
 
-    setState(() {
-      _isDiagnosticPrinting = true;
-      _diagnosticFormat = format;
-    });
     try {
-      await context.read<BluetoothPrinterCubit>().diagnosticRasterPrintVariant(
-        format,
+      final imageBytes = await ThermalInvoiceRenderer.renderTestReceiptToImage(
+        context: context,
+        profile: profile,
       );
+
+      final blocks = await ThermalCommandBuilder.buildPrintCommandBlocks(
+        imageBytes: imageBytes,
+        profile: profile,
+        blockHeight: 64,
+      );
+
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Diagnostic ${format.name} print sent successfully'),
-          backgroundColor: AppColors.success,
-        ),
+      await cubit.writeBlockSequence(
+        blocks,
+        delay: const Duration(milliseconds: 50),
       );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Diagnostic print failed: $error'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('تم إرسال الفاتورة التجريبية إلى الطابعة بنجاح'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('فشلت الطباعة التجريبية: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } finally {
       if (mounted) {
-        setState(() {
-          _isDiagnosticPrinting = false;
-          _diagnosticFormat = null;
-        });
+        setState(() => _isTestPrinting = false);
       }
     }
   }
@@ -307,82 +286,6 @@ class _BluetoothPrinterSectionContentState
   }
 
   // ---------------------------------------------------------------------------
-  // Config card (paper width + protocol)
-  // ---------------------------------------------------------------------------
-
-  Widget _buildConfigCard(BuildContext context, BluetoothPrinterState state) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'إعدادات الطابعة',
-            style: AppTextStyles.titleMedium.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          AppSpacing.gapMd,
-          // Paper width
-          Text(
-            'عرض الورق',
-            style: AppTextStyles.labelMedium.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-          AppSpacing.gapSm,
-          Wrap(
-            spacing: AppSpacing.sm,
-            children: ThermalPaperWidth.values.map((w) {
-              final selected = _selectedWidth == w;
-              return ChoiceChip(
-                label: Text(w.label),
-                selected: selected,
-                onSelected: (_) => setState(() => _selectedWidth = w),
-                selectedColor: AppColors.primaryLighter,
-                labelStyle: AppTextStyles.labelMedium.copyWith(
-                  color: selected ? AppColors.primary : AppColors.textPrimary,
-                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                ),
-              );
-            }).toList(),
-          ),
-          AppSpacing.gapLg,
-          // Protocol
-          Text(
-            'نوع الأمر (Protocol)',
-            style: AppTextStyles.labelMedium.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-          AppSpacing.gapSm,
-          Wrap(
-            spacing: AppSpacing.sm,
-            children: [
-              _protocolChip(PrinterProtocol.auto, 'تلقائي (مُوصى به)'),
-              _protocolChip(PrinterProtocol.escPos, 'ESC/POS'),
-              _protocolChip(PrinterProtocol.tspl, 'TSPL/TSC'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _protocolChip(PrinterProtocol protocol, String label) {
-    final selected = _selectedProtocol == protocol;
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => setState(() => _selectedProtocol = protocol),
-      selectedColor: AppColors.primaryLighter,
-      labelStyle: AppTextStyles.labelMedium.copyWith(
-        color: selected ? AppColors.primary : AppColors.textPrimary,
-        fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
   // Scanner card
   // ---------------------------------------------------------------------------
 
@@ -406,7 +309,7 @@ class _BluetoothPrinterSectionContentState
                 isLoading: state.isScanning,
                 onPressed: state.isScanning
                     ? () => context.read<BluetoothPrinterCubit>().stopScan()
-                    : () => _startScan(context),
+                    : () => _startScan(),
               ),
             ],
           ),
@@ -438,9 +341,12 @@ class _BluetoothPrinterSectionContentState
     );
   }
 
-  void _startScan(BuildContext context) {
-    context.read<BluetoothPrinterCubit>().requestPermissions().then((_) {
-      context.read<BluetoothPrinterCubit>().startScan();
+  void _startScan() {
+    final cubit = context.read<BluetoothPrinterCubit>();
+    cubit.requestPermissions().then((_) {
+      if (mounted) {
+        cubit.startScan();
+      }
     });
   }
 
@@ -470,8 +376,8 @@ class _BluetoothPrinterSectionContentState
               label: 'اتصال',
               onPressed: () => context.read<BluetoothPrinterCubit>().connect(
                 printer,
-                paperWidth: _selectedWidth,
-                protocol: _selectedProtocol,
+                paperWidth: ThermalPaperWidth.w80,
+                protocol: PrinterProtocol.auto,
               ),
             ),
       contentPadding: EdgeInsets.zero,

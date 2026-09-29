@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:developer' as dev;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -7,12 +6,14 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
-import '../../../../../core/theme/app_colors.dart';
 import '../../../../../domain/entities/business_settings.dart';
 import '../../../../../domain/entities/customer.dart';
 import '../../../../../domain/entities/order.dart';
 import '../../../../../domain/entities/order_item.dart';
+import '../../../../../domain/enums/order_status.dart';
+import '../../../../../domain/enums/pricing_type.dart';
 import '../../../../../domain/value_objects/money.dart';
+import '../../../../../domain/value_objects/order_date.dart';
 import '../invoice_printer.dart';
 import 'printer_profile.dart';
 
@@ -21,7 +22,7 @@ import 'printer_profile.dart';
 ///
 /// ## Arabic Support Strategy
 ///
-/// Thermal printers like TSC printers do NOT have built-in Arabic glyphs.
+/// Thermal printers like TSC or ESC/POS printers do NOT have built-in Arabic glyphs.
 /// Attempting to send raw UTF-8/Arabic text commands results in garbled output.
 ///
 /// **Solution**: Render the invoice using Flutter's text engine (which
@@ -29,16 +30,25 @@ import 'printer_profile.dart';
 /// [RenderRepaintBoundary], capture it as a [ui.Image], then convert to raw
 /// PNG bytes.
 ///
-/// The PNG bytes are then wrapped in ESC/POS or TSPL raster commands and sent
-/// to the printer.  This guarantees pixel-perfect Arabic regardless of the
-/// printer's internal font set.
+/// The PNG bytes are then converted to monochrome 1-bit raster and wrapped in
+/// ESC/POS or TSPL raster commands and sent to the printer. This guarantees
+/// sharp, readable Arabic regardless of the printer's internal font set.
 ///
-/// ## Paper Width
+/// ## Visual Hierarchy & 80mm Layout
 ///
-/// The rendered widget width is [ThermalPaperWidth.printablePixels] dots, which
-/// respects the selected paper width configuration.
+/// The visual layout mirrors the Invoice Preview Dialog (the visual source of truth):
+/// - Prominent Header (Business Name, Address, Phone)
+/// - Order Metadata (Invoice #, Date, Status Badge)
+/// - Bordered Customer & Expected Pickup Card
+/// - Itemized Table with quantity, unit price, totals, and notes
+/// - Clear Financial Summary with boxed Total and Remaining amounts
+/// - Centered Footer
 class ThermalInvoiceRenderer {
   ThermalInvoiceRenderer._();
+
+  /// Standard printable width in pixels for 80mm thermal receipt printers
+  /// (72mm printable line @ 203 DPI / 8 dots/mm = 576 dots / 72 bytes).
+  static const double defaultTargetWidthPx = 576.0;
 
   // ---------------------------------------------------------------------------
   // Public API
@@ -47,8 +57,7 @@ class ThermalInvoiceRenderer {
   /// Render the invoice to a PNG byte buffer sized for the given [profile].
   ///
   /// [pixelRatio] is the device-pixel ratio used when capturing the image.
-  /// Higher values produce sharper output but larger data payloads.
-  /// A value of 2.0 gives good results on 203-dpi thermal printers.
+  /// Default is 1.0 so rendered pixel width matches printableDots exactly (576 px for 80mm).
   static Future<Uint8List> renderToImage({
     required BuildContext context,
     required Order order,
@@ -58,15 +67,11 @@ class ThermalInvoiceRenderer {
     required PrinterProfile profile,
     Customer? customer,
     BusinessSettings? settings,
-    double pixelRatio = 2.0,
+    double pixelRatio = 1.0,
+    double? targetWidthPx,
+    double typographyScale = 1.0,
+    bool solidBlackText = true,
   }) async {
-    final stopwatch = Stopwatch()..start();
-    final hasOverlay = context.findAncestorStateOfType<OverlayState>() != null;
-    dev.log(
-      'PRINT RENDER CONTEXT valid=$hasOverlay',
-      name: 'BluetoothPrinterService',
-    );
-    dev.log('PRINT RENDER START', name: 'BluetoothPrinterService');
     // Load Arabic fonts
     final regularFontData = await rootBundle.load(
       'assets/fonts/IBMPlexSansArabic-Regular.ttf',
@@ -75,10 +80,14 @@ class ThermalInvoiceRenderer {
       'assets/fonts/IBMPlexSansArabic-Bold.ttf',
     );
 
-    final paperWidthPx = profile.paperWidth.printablePixels.toDouble();
+    final paperWidthPx =
+        targetWidthPx ??
+        (profile.paperWidth == ThermalPaperWidth.w80
+            ? defaultTargetWidthPx
+            : profile.paperWidth.printablePixels.toDouble());
 
     // Build the invoice widget tree (off-screen)
-    final invoiceWidget = _buildInvoiceWidget(
+    final invoiceWidget = buildInvoiceWidget(
       order: order,
       items: items,
       totalPaid: totalPaid,
@@ -88,7 +97,15 @@ class ThermalInvoiceRenderer {
       paperWidthPx: paperWidthPx,
       regularFontData: regularFontData,
       boldFontData: boldFontData,
+      typographyScale: typographyScale,
+      solidBlackText: solidBlackText,
     );
+
+    if (!context.mounted) {
+      throw StateError(
+        'BuildContext is no longer mounted for thermal rendering',
+      );
+    }
 
     // Rasterise to image
     final imageBytes = await _rasterise(
@@ -96,28 +113,100 @@ class ThermalInvoiceRenderer {
       invoiceWidget,
       pixelRatio: pixelRatio,
     );
-    dev.log(
-      'PRINT RENDER SUCCESS bytes=${imageBytes.length} format=PNG '
-      'durationMs=${stopwatch.elapsedMilliseconds}',
-      name: 'BluetoothPrinterService',
-    );
     return imageBytes;
   }
 
+  /// Render a sample test receipt to PNG image bytes for verifying physical printer output.
+  static Future<Uint8List> renderTestReceiptToImage({
+    required BuildContext context,
+    required PrinterProfile profile,
+    double pixelRatio = 1.0,
+    double? targetWidthPx,
+    double typographyScale = 1.0,
+    bool solidBlackText = true,
+  }) async {
+    final now = DateTime.now();
+    final sampleOrder = Order(
+      id: 'test-order-sample',
+      orderNumber: '001',
+      customerId: 'sample-customer',
+      customerNameSnapshot: 'عميل تجريبي',
+      customerPhoneSnapshot: '01000000000',
+      status: OrderStatus.ready,
+      subtotal: Money.fromEgp(100),
+      discount: Money.zero,
+      customerPickupFee: Money.zero,
+      customerDeliveryFee: Money.zero,
+      tax: Money.zero,
+      total: Money.fromEgp(100),
+      createdAt: now,
+      updatedAt: now,
+      expectedPickupDate: OrderDate.fromDate(now.add(const Duration(days: 2))),
+    );
+
+    final sampleItems = [
+      OrderItem(
+        id: 'item-1',
+        orderId: 'test-order-sample',
+        serviceId: 'srv-1',
+        itemTypeId: 'type-1',
+        quantity: 2,
+        unitPrice: Money.fromEgp(20),
+        calculatedTotal: Money.fromEgp(40),
+        serviceNameSnapshot: 'غسيل وكوي',
+        itemTypeNameSnapshot: 'قميص رجالي',
+        pricingType: PricingType.perPiece,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      OrderItem(
+        id: 'item-2',
+        orderId: 'test-order-sample',
+        serviceId: 'srv-2',
+        itemTypeId: 'type-2',
+        quantity: 1,
+        unitPrice: Money.fromEgp(60),
+        calculatedTotal: Money.fromEgp(60),
+        notes: 'تسليم سريع',
+        serviceNameSnapshot: 'تنظيف جاف',
+        itemTypeNameSnapshot: 'بدلة كاملة',
+        pricingType: PricingType.perPiece,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    ];
+
+    return renderToImage(
+      context: context,
+      order: sampleOrder,
+      items: sampleItems,
+      totalPaid: Money.fromEgp(100),
+      remainingAmount: Money.zero,
+      profile: profile,
+      pixelRatio: pixelRatio,
+      targetWidthPx: targetWidthPx ?? defaultTargetWidthPx,
+      typographyScale: typographyScale,
+      solidBlackText: solidBlackText,
+    );
+  }
+
   // ---------------------------------------------------------------------------
-  // Internal widget builder
+  // Widget builder (available for testing and diagnostic rendering)
   // ---------------------------------------------------------------------------
 
-  static Widget _buildInvoiceWidget({
+  @visibleForTesting
+  static Widget buildInvoiceWidget({
     required Order order,
     required List<OrderItem> items,
     required Money totalPaid,
     required Money remainingAmount,
     required double paperWidthPx,
-    required ByteData regularFontData,
-    required ByteData boldFontData,
+    ByteData? regularFontData,
+    ByteData? boldFontData,
     Customer? customer,
     BusinessSettings? settings,
+    double typographyScale = 1.0,
+    bool solidBlackText = true,
   }) {
     final businessName =
         (settings?.businessName != null &&
@@ -139,12 +228,43 @@ class ThermalInvoiceRenderer {
         : (customer?.phone ?? '');
 
     final lines = InvoicePrinter.groupItems(items);
-    const baseFs =
-        11.0; // base font-size (points) — scaled to pixels by Flutter
-    const smallFs = 9.5;
-    const tinyFs = 8.5;
+
+    // ── Typography scale ─────────────────────────────────────────────────────
+    //
+    // Physics: pixelRatio=1.0, printer DPI=203 (8 dots/mm).
+    // 1 Flutter logical px = 1 thermal dot = 1/8 mm = 0.125 mm.
+    // Physical em height = fontSize / 8 mm.
+    // Capital letter ≈ 70% of em = fontSize / 8 * 0.7 mm.
+    //
+    // Target physical sizes:
+    //   Headline (business name): ~6.5 mm em  → 52 px
+    //   Invoice number:           ~5.0 mm em  → 40 px
+    //   Customer name:            ~4.5 mm em  → 36 px
+    //   Pickup date:              ~4.0 mm em  → 32 px
+    //   Table headers:            ~3.75 mm em → 30 px
+    //   Table body / financial:   ~3.5 mm em  → 28 px
+    //   Secondary meta / labels:  ~3.0 mm em  → 24 px
+    //   Total / remaining box:    ~5.5 mm em  → 44 px
+    //   Footer:                   ~3.0 mm em  → 24 px
+    //   Notes / subtext:          ~2.75 mm em → 22 px
+    final businessNameFs = 52.0 * typographyScale;
+    final headerMetaFs = 24.0 * typographyScale;
+    final invoiceNumberFs = 40.0 * typographyScale;
+    final orderDateFs = 24.0 * typographyScale;
+    final statusBadgeFs = 22.0 * typographyScale;
+    final cardLabelFs = 22.0 * typographyScale;
+    final customerNameFs = 36.0 * typographyScale;
+    final customerPhoneFs = 24.0 * typographyScale;
+    final pickupDateFs = 32.0 * typographyScale;
+    final financialFs = 28.0 * typographyScale;
+    final totalHighlightFs = 44.0 * typographyScale;
+    final footerFs = 24.0 * typographyScale;
 
     const regularFamily = 'IBM Plex Sans Arabic';
+
+    final textColorPrimary = solidBlackText ? Colors.black : Colors.black87;
+    final textColorSecondary = solidBlackText ? Colors.black : Colors.black54;
+    final dividerColor = solidBlackText ? Colors.black : Colors.black54;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -153,187 +273,351 @@ class ThermalInvoiceRenderer {
         child: SizedBox(
           width: paperWidthPx,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ── Header ──────────────────────────────────────────────────
+                // ── 1. Laundry Info Header ───────────────────────────────────
                 Center(
-                  child: Text(
-                    businessName,
-                    style: TextStyle(
-                      fontFamily: regularFamily,
-                      fontSize: baseFs + 1,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                    textAlign: TextAlign.center,
+                  child: Column(
+                    children: [
+                      Text(
+                        businessName,
+                        style: TextStyle(
+                          fontFamily: regularFamily,
+                          fontSize: businessNameFs,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (address != null && address.trim().isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          address.trim(),
+                          style: TextStyle(
+                            fontFamily: regularFamily,
+                            fontSize: headerMetaFs,
+                            fontWeight: FontWeight.w600,
+                            color: textColorPrimary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                      if (phone != null && phone.trim().isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'هاتف: ${phone.trim()}',
+                          style: TextStyle(
+                            fontFamily: regularFamily,
+                            fontSize: headerMetaFs,
+                            fontWeight: FontWeight.w600,
+                            color: textColorPrimary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                if (address != null && address.trim().isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Center(
-                    child: Text(
-                      address.trim(),
-                      style: TextStyle(
-                        fontFamily: regularFamily,
-                        fontSize: tinyFs,
-                        color: Colors.black87,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
-                if (phone != null && phone.trim().isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Center(
-                    child: Text(
-                      'هاتف: ${phone.trim()}',
-                      style: TextStyle(
-                        fontFamily: regularFamily,
-                        fontSize: tinyFs,
-                        color: Colors.black87,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 6),
-                _divider(),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
+                _divider(dividerColor, 1.5),
+                const SizedBox(height: 8),
 
-                // ── Order metadata ───────────────────────────────────────────
+                // ── 2. Order & Customer Meta Row ─────────────────────────────
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
-                      'فاتورة رقم: ${order.orderNumber}',
-                      style: TextStyle(
-                        fontFamily: regularFamily,
-                        fontSize: smallFs,
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'فاتورة #${order.orderNumber}',
+                            style: TextStyle(
+                              fontFamily: regularFamily,
+                              fontSize: invoiceNumberFs,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'التاريخ: ${InvoicePrinter.formatDateTime(order.createdAt)}',
+                            style: TextStyle(
+                              fontFamily: regularFamily,
+                              fontSize: orderDateFs,
+                              fontWeight: FontWeight.w600,
+                              color: textColorPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.black, width: 1.5),
+                      ),
+                      child: Text(
+                        _statusLabel(order.status),
+                        style: TextStyle(
+                          fontFamily: regularFamily,
+                          fontSize: statusBadgeFs,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  'التاريخ: ${InvoicePrinter.formatDateTime(order.createdAt)}',
-                  style: TextStyle(
-                    fontFamily: regularFamily,
-                    fontSize: tinyFs,
-                    color: Colors.black87,
+                const SizedBox(height: 10),
+
+                // ── 3. Customer Data & Expected Pickup Date Card ─────────────
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: dividerColor, width: 1.2),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'بيانات العميل',
+                              style: TextStyle(
+                                fontFamily: regularFamily,
+                                fontSize: cardLabelFs,
+                                fontWeight: FontWeight.bold,
+                                color: textColorPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              customerName,
+                              style: TextStyle(
+                                fontFamily: regularFamily,
+                                fontSize: customerNameFs,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                            if (customerPhone.isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                customerPhone,
+                                style: TextStyle(
+                                  fontFamily: regularFamily,
+                                  fontSize: customerPhoneFs,
+                                  fontWeight: FontWeight.w600,
+                                  color: textColorPrimary,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            'موعد الاستلام',
+                            style: TextStyle(
+                              fontFamily: regularFamily,
+                              fontSize: cardLabelFs,
+                              fontWeight: FontWeight.bold,
+                              color: textColorPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            InvoicePrinter.formatDate(
+                              order.expectedPickupDate.toDateTime(),
+                            ),
+                            style: TextStyle(
+                              fontFamily: regularFamily,
+                              fontSize: pickupDateFs,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  'موعد الاستلام: ${InvoicePrinter.formatDate(order.expectedPickupDate.toDateTime())}',
-                  style: TextStyle(
-                    fontFamily: regularFamily,
-                    fontSize: tinyFs,
-                    color: Colors.black87,
-                  ),
+                const SizedBox(height: 10),
+
+                // ── 4. Itemized Table ────────────────────────────────────────
+                _ItemsTable(
+                  lines: lines,
+                  fontFamily: regularFamily,
+                  typographyScale: typographyScale,
+                  solidBlackText: solidBlackText,
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  'العميل: $customerName',
-                  style: TextStyle(
-                    fontFamily: regularFamily,
-                    fontSize: tinyFs,
-                    color: Colors.black87,
-                  ),
-                ),
-                if (customerPhone.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    'الهاتف: $customerPhone',
-                    style: TextStyle(
+                const SizedBox(height: 8),
+                _divider(dividerColor, 1.5),
+                const SizedBox(height: 8),
+
+                // ── 5. Financial Summary ─────────────────────────────────────
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _summaryRow(
+                      'المجموع الفرعي:',
+                      '${order.subtotal.toEgp.toStringAsFixed(2)} ج.م',
                       fontFamily: regularFamily,
-                      fontSize: tinyFs,
-                      color: Colors.black87,
+                      fontSize: financialFs,
+                      bold: true,
                     ),
-                  ),
-                ],
+                    if (order.discount.isPositive)
+                      _summaryRow(
+                        'الخصم:',
+                        '- ${order.discount.toEgp.toStringAsFixed(2)} ج.م',
+                        fontFamily: regularFamily,
+                        fontSize: financialFs,
+                      ),
+                    if (order.customerPickupRequested &&
+                        order.customerPickupFee.isPositive)
+                      _summaryRow(
+                        'استلام من العميل:',
+                        '+ ${order.customerPickupFee.toEgp.toStringAsFixed(2)} ج.م',
+                        fontFamily: regularFamily,
+                        fontSize: financialFs,
+                      ),
+                    if (order.customerDeliveryRequested &&
+                        order.customerDeliveryFee.isPositive)
+                      _summaryRow(
+                        'توصيل للعميل:',
+                        '+ ${order.customerDeliveryFee.toEgp.toStringAsFixed(2)} ج.م',
+                        fontFamily: regularFamily,
+                        fontSize: financialFs,
+                      ),
+                    if (order.tax.isPositive)
+                      _summaryRow(
+                        'الضريبة:',
+                        '+ ${order.tax.toEgp.toStringAsFixed(2)} ج.م',
+                        fontFamily: regularFamily,
+                        fontSize: financialFs,
+                      ),
+                    const SizedBox(height: 3),
+                    _divider(dividerColor, 1.0),
+                    const SizedBox(height: 3),
+                    // Prominent Total Highlight Box
+                    Container(
+                      margin: const EdgeInsets.symmetric(vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.black, width: 1.5),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'الإجمالي:',
+                              style: TextStyle(
+                                fontFamily: regularFamily,
+                                fontSize: totalHighlightFs,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${order.total.toEgp.toStringAsFixed(2)} ج.م',
+                            style: TextStyle(
+                              fontFamily: regularFamily,
+                              fontSize: totalHighlightFs,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _summaryRow(
+                      'المدفوع:',
+                      '${totalPaid.toEgp.toStringAsFixed(2)} ج.م',
+                      fontFamily: regularFamily,
+                      fontSize: financialFs,
+                    ),
+                    // Prominent Remaining Highlight Box
+                    Container(
+                      margin: const EdgeInsets.symmetric(vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.black, width: 1.5),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              remainingAmount.isZero
+                                  ? 'المتبقي (خالص):'
+                                  : 'المتبقي:',
+                              style: TextStyle(
+                                fontFamily: regularFamily,
+                                fontSize: totalHighlightFs,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
+                            style: TextStyle(
+                              fontFamily: regularFamily,
+                              fontSize: totalHighlightFs,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _divider(dividerColor, 1.0),
                 const SizedBox(height: 6),
-                _divider(),
-                const SizedBox(height: 4),
 
-                // ── Items table ──────────────────────────────────────────────
-                _ItemsTable(lines: lines, fontFamily: regularFamily),
-                const SizedBox(height: 4),
-                _divider(),
-                const SizedBox(height: 4),
-
-                // ── Financial summary ────────────────────────────────────────
-                _summaryRow(
-                  'المجموع الفرعي:',
-                  '${order.subtotal.toEgp.toStringAsFixed(2)} ج.م',
-                  fontFamily: regularFamily,
-                ),
-                if (order.discount.isPositive)
-                  _summaryRow(
-                    'الخصم:',
-                    '- ${order.discount.toEgp.toStringAsFixed(2)} ج.م',
-                    fontFamily: regularFamily,
-                  ),
-                if (order.customerPickupRequested &&
-                    order.customerPickupFee.isPositive)
-                  _summaryRow(
-                    'استلام من العميل:',
-                    '+ ${order.customerPickupFee.toEgp.toStringAsFixed(2)} ج.م',
-                    fontFamily: regularFamily,
-                  ),
-                if (order.customerDeliveryRequested &&
-                    order.customerDeliveryFee.isPositive)
-                  _summaryRow(
-                    'توصيل للعميل:',
-                    '+ ${order.customerDeliveryFee.toEgp.toStringAsFixed(2)} ج.م',
-                    fontFamily: regularFamily,
-                  ),
-                if (order.tax.isPositive)
-                  _summaryRow(
-                    'الضريبة:',
-                    '+ ${order.tax.toEgp.toStringAsFixed(2)} ج.م',
-                    fontFamily: regularFamily,
-                  ),
-                const SizedBox(height: 3),
-                _dashedDivider(),
-                const SizedBox(height: 3),
-                _summaryRow(
-                  'الإجمالي:',
-                  '${order.total.toEgp.toStringAsFixed(2)} ج.م',
-                  fontFamily: regularFamily,
-                  bold: true,
-                  fontSize: baseFs,
-                ),
-                _summaryRow(
-                  'المدفوع:',
-                  '${totalPaid.toEgp.toStringAsFixed(2)} ج.م',
-                  fontFamily: regularFamily,
-                ),
-                _summaryRow(
-                  'المتبقي:',
-                  '${remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
-                  fontFamily: regularFamily,
-                  bold: true,
-                  fontSize: baseFs,
-                  valueColor: remainingAmount.isZero
-                      ? AppColors.success
-                      : AppColors.warning,
-                ),
-                const SizedBox(height: 8),
-                _dashedDivider(),
-                const SizedBox(height: 8),
-
-                // ── Footer ───────────────────────────────────────────────────
+                // ── 6. Footer ────────────────────────────────────────────────
                 Center(
                   child: Text(
                     footer,
                     style: TextStyle(
                       fontFamily: regularFamily,
-                      fontSize: tinyFs,
-                      color: Colors.black54,
+                      fontSize: footerFs,
+                      fontWeight: FontWeight.w600,
+                      color: textColorSecondary,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -358,32 +642,13 @@ class ThermalInvoiceRenderer {
   /// 3. Wait one frame so the layout pass has run.
   /// 4. Call [toImage] on the boundary.
   /// 5. Remove the Overlay entry and return PNG bytes.
-  ///
-  /// This is the canonical modern Flutter approach for off-screen rendering
-  /// without any deprecated APIs.
   static Future<Uint8List> _rasterise(
     BuildContext context,
     Widget widget, {
-    double pixelRatio = 2.0,
+    double pixelRatio = 1.0,
   }) async {
-    // Use a Completer to return from a callback-based lifecycle
     final completer = Completer<Uint8List>();
     final repaintKey = GlobalKey();
-
-    // We need an entry point into the widget tree.  We use a Navigator overlay
-    // trick: push an Offstage widget onto the root overlay, wait for a frame
-    // to complete layout, then capture.
-    //
-    // However, since we may not have access to a navigator here, we use a
-    // simpler approach: build the widget standalone using a PipelineOwner +
-    // RendererBinding-aware technique via Directionality + constraints.
-    //
-    // Modern clean approach: use a dummy WidgetsApp / runApp alternative.
-    // The simplest method that avoids all deprecated APIs is:
-    // - Create a WidgetsFlutterBinding-dependent overlay capture.
-    //
-    // We use the WidgetsBinding instance and inject a temporary
-    // OverlayEntry into the root overlay.
 
     OverlayEntry? entry;
 
@@ -407,10 +672,6 @@ class ThermalInvoiceRenderer {
 
         var paintReady = false;
         for (var frame = 0; frame < 2; frame++) {
-          dev.log(
-            'PRINT RENDER WAIT FRAME index=${frame + 1}',
-            name: 'BluetoothPrinterService',
-          );
           await SchedulerBinding.instance.endOfFrame;
 
           var needsPaint = false;
@@ -419,48 +680,23 @@ class ThermalInvoiceRenderer {
             return true;
           }());
           paintReady = boundary.attached && boundary.hasSize && !needsPaint;
-          dev.log(
-            'PRINT RENDER PAINT READY=$paintReady attached=${boundary.attached} '
-            'hasSize=${boundary.hasSize} needsPaint=$needsPaint',
-            name: 'BluetoothPrinterService',
-          );
           if (paintReady) break;
         }
 
         if (!paintReady) {
-          var needsPaint = false;
-          assert(() {
-            needsPaint = boundary.debugNeedsPaint;
-            return true;
-          }());
-          dev.log(
-            'PRINT RENDER CAPTURE FAILED needsPaint=$needsPaint '
-            'attached=${boundary.attached} hasSize=${boundary.hasSize}',
-            name: 'BluetoothPrinterService',
-          );
           completer.completeError(
             StateError('RenderRepaintBoundary was not paint-ready'),
           );
           return;
         }
 
-        dev.log('PRINT RENDER CAPTURE START', name: 'BluetoothPrinterService');
         final image = await boundary.toImage(pixelRatio: pixelRatio);
-        dev.log(
-          'PRINT RENDER IMAGE width=${image.width} height=${image.height}',
-          name: 'BluetoothPrinterService',
-        );
         final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
         if (byteData == null) {
           completer.completeError(StateError('toByteData returned null'));
           return;
         }
         final pngBytes = byteData.buffer.asUint8List();
-        dev.log(
-          'PRINT RENDER COMPLETE imageWidth=${image.width} '
-          'imageHeight=${image.height} pngBytes=${pngBytes.length}',
-          name: 'BluetoothPrinterService',
-        );
         completer.complete(pngBytes);
       } catch (e, s) {
         completer.completeError(e, s);
@@ -480,16 +716,12 @@ class ThermalInvoiceRenderer {
       ),
     );
 
-    // Insert into the root overlay
     final overlayState = context.findAncestorStateOfType<OverlayState>();
 
     if (overlayState != null) {
       overlayState.insert(entry!);
-      // Schedule capture after layout
       WidgetsBinding.instance.addPostFrameCallback((_) => capture());
     } else {
-      // Fallback: if no overlay is available (e.g., unit test context),
-      // use the naive PipelineOwner approach.  We call dispose in finally.
       entry = null;
       completer.completeError(
         StateError(
@@ -506,45 +738,61 @@ class ThermalInvoiceRenderer {
   // Helpers
   // ---------------------------------------------------------------------------
 
-  static Widget _divider() => Container(height: 0.5, color: Colors.black54);
-
-  static Widget _dashedDivider() =>
-      Container(height: 0.5, color: Colors.black38);
+  static Widget _divider([
+    Color color = Colors.black,
+    double thickness = 1.0,
+  ]) => Container(height: thickness, color: color);
 
   static Widget _summaryRow(
     String label,
     String value, {
     required String fontFamily,
     bool bold = false,
-    double fontSize = 9.5,
+    double fontSize = 14.5,
     Color? valueColor,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1.5),
+      padding: const EdgeInsets.symmetric(vertical: 2.5),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontFamily: fontFamily,
-              fontSize: fontSize,
-              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-              color: Colors.black,
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontFamily: fontFamily,
+                fontSize: fontSize,
+                fontWeight: bold ? FontWeight.bold : FontWeight.w600,
+                color: Colors.black,
+              ),
             ),
           ),
+          const SizedBox(width: 8),
           Text(
             value,
             style: TextStyle(
               fontFamily: fontFamily,
               fontSize: fontSize,
-              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+              fontWeight: bold ? FontWeight.bold : FontWeight.w600,
               color: valueColor ?? Colors.black,
             ),
           ),
         ],
       ),
     );
+  }
+
+  static String _statusLabel(OrderStatus status) {
+    switch (status) {
+      case OrderStatus.processing:
+        return 'قيد التجهيز';
+      case OrderStatus.ready:
+        return 'جاهز';
+      case OrderStatus.completed:
+        return 'مكتمل';
+      case OrderStatus.cancelled:
+        return 'ملغي';
+    }
   }
 }
 
@@ -555,18 +803,36 @@ class ThermalInvoiceRenderer {
 class _ItemsTable extends StatelessWidget {
   final List<InvoiceLineItem> lines;
   final String fontFamily;
+  final double typographyScale;
+  final bool solidBlackText;
 
-  const _ItemsTable({required this.lines, required this.fontFamily});
+  const _ItemsTable({
+    required this.lines,
+    required this.fontFamily,
+    this.typographyScale = 1.0,
+    this.solidBlackText = true,
+  });
 
   @override
   Widget build(BuildContext context) {
-    const headerStyle = TextStyle(fontWeight: FontWeight.bold, fontSize: 8.5);
-    const rowStyle = TextStyle(fontSize: 8.5);
+    final secondaryColor = solidBlackText ? Colors.black : Colors.black87;
+
+    final headerStyle = TextStyle(
+      fontFamily: fontFamily,
+      fontWeight: FontWeight.bold,
+      fontSize: 30.0 * typographyScale,
+      color: Colors.black,
+    );
+    final rowStyle = TextStyle(
+      fontFamily: fontFamily,
+      fontSize: 28.0 * typographyScale,
+      color: Colors.black,
+    );
 
     return Table(
       columnWidths: const {
-        0: FlexColumnWidth(4.0), // البند والخدمة
-        1: FlexColumnWidth(1.5), // الكمية
+        0: FlexColumnWidth(4.5), // البند والخدمة — wider for Arabic item names
+        1: FlexColumnWidth(1.2), // الكمية — narrower
         2: FlexColumnWidth(2.0), // سعر الوحدة
         3: FlexColumnWidth(2.0), // الإجمالي
       },
@@ -574,71 +840,71 @@ class _ItemsTable extends StatelessWidget {
         // Header row
         TableRow(
           decoration: const BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: Colors.black54, width: 0.5),
-            ),
+            border: Border(bottom: BorderSide(color: Colors.black, width: 1.5)),
           ),
           children: [
-            _cell('البند والخدمة', style: headerStyle, align: TextAlign.right),
+            _cell('البند والخدمة', style: headerStyle, align: TextAlign.start),
             _cell('الكمية', style: headerStyle, align: TextAlign.center),
-            _cell('السعر', style: headerStyle, align: TextAlign.left),
-            _cell('الإجمالي', style: headerStyle, align: TextAlign.left),
+            _cell('سعر الوحدة', style: headerStyle, align: TextAlign.end),
+            _cell('الإجمالي', style: headerStyle, align: TextAlign.end),
           ],
         ),
         // Data rows
         ...lines.map((line) {
           return TableRow(
+            decoration: const BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Colors.black, width: 0.5),
+              ),
+            ),
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       line.title,
-                      style: rowStyle.copyWith(fontFamily: fontFamily),
-                      textAlign: TextAlign.right,
+                      style: rowStyle.copyWith(fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.start,
                     ),
                     if (line.dimensionsSubtext != null)
                       Text(
                         line.dimensionsSubtext!,
                         style: rowStyle.copyWith(
-                          fontFamily: fontFamily,
-                          fontSize: 7.5,
-                          color: Colors.black54,
+                          fontSize: 22.0 * typographyScale,
+                          color: secondaryColor,
+                          fontWeight: FontWeight.w600,
                         ),
-                        textAlign: TextAlign.right,
+                        textAlign: TextAlign.start,
                       ),
                     if (line.notes != null)
                       Text(
                         'ملاحظة: ${line.notes!}',
                         style: rowStyle.copyWith(
-                          fontFamily: fontFamily,
-                          fontSize: 7.5,
-                          color: Colors.black54,
+                          fontSize: 22.0 * typographyScale,
+                          color: secondaryColor,
+                          fontWeight: FontWeight.w600,
                         ),
-                        textAlign: TextAlign.right,
+                        textAlign: TextAlign.start,
                       ),
                   ],
                 ),
               ),
               _cell(
                 line.quantityDisplay,
-                style: rowStyle.copyWith(fontFamily: fontFamily),
+                style: rowStyle.copyWith(fontWeight: FontWeight.bold),
                 align: TextAlign.center,
               ),
               _cell(
-                line.unitPrice.toEgp.toStringAsFixed(2),
-                style: rowStyle.copyWith(fontFamily: fontFamily),
-                align: TextAlign.left,
+                '${line.unitPrice.toEgp.toStringAsFixed(2)} ج.م',
+                style: rowStyle.copyWith(fontWeight: FontWeight.w600),
+                align: TextAlign.end,
               ),
               _cell(
-                line.calculatedTotal.toEgp.toStringAsFixed(2),
-                style: rowStyle.copyWith(
-                  fontFamily: fontFamily,
-                  fontWeight: FontWeight.bold,
-                ),
-                align: TextAlign.left,
+                '${line.calculatedTotal.toEgp.toStringAsFixed(2)} ج.م',
+                style: rowStyle.copyWith(fontWeight: FontWeight.bold),
+                align: TextAlign.end,
               ),
             ],
           );
@@ -650,10 +916,10 @@ class _ItemsTable extends StatelessWidget {
   Widget _cell(
     String text, {
     TextStyle? style,
-    TextAlign align = TextAlign.right,
+    TextAlign align = TextAlign.start,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 1),
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
       child: Text(text, style: style, textAlign: align),
     );
   }

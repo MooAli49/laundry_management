@@ -399,12 +399,11 @@ class _CustomerDetailView extends StatelessWidget {
                             data.paidAmounts[order.id] ??
                             Money.zero;
                         final refunded = summary?.totalRefunded ?? Money.zero;
-                        final remaining =
-                            isCancelled
-                                ? Money.zero
-                                : (summary?.remaining ??
-                                    data.remainingAmounts[order.id] ??
-                                    Money.zero);
+                        final remaining = isCancelled
+                            ? Money.zero
+                            : (summary?.remaining ??
+                                  data.remainingAmounts[order.id] ??
+                                  Money.zero);
                         final isFullyPaid = remaining.isZero;
 
                         return AppCard(
@@ -517,16 +516,16 @@ class _CustomerDetailView extends StatelessWidget {
                                     isCancelled
                                         ? AppStrings.remainingAmount('0.00')
                                         : isFullyPaid
-                                            ? AppStrings.fullyPaid
-                                            : AppStrings.remainingAmount(
-                                                remaining.toEgp.toStringAsFixed(2),
-                                              ),
+                                        ? AppStrings.fullyPaid
+                                        : AppStrings.remainingAmount(
+                                            remaining.toEgp.toStringAsFixed(2),
+                                          ),
                                     style: AppTextStyles.bodySmall.copyWith(
                                       color: isCancelled
                                           ? AppColors.textSecondary
                                           : isFullyPaid
-                                              ? AppColors.success
-                                              : AppColors.warning,
+                                          ? AppColors.success
+                                          : AppColors.warning,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),

@@ -298,7 +298,9 @@ void main() {
       // Seed local master data in both devices
       final now = DateTime.now();
       for (final device in [deviceA, deviceB]) {
-        await device.db.into(device.db.services).insertOnConflictUpdate(
+        await device.db
+            .into(device.db.services)
+            .insertOnConflictUpdate(
               app_db.ServicesCompanion.insert(
                 id: pieceServiceId,
                 name: 'غسيل وكوي',
@@ -310,7 +312,9 @@ void main() {
               ),
             );
 
-        await device.db.into(device.db.services).insertOnConflictUpdate(
+        await device.db
+            .into(device.db.services)
+            .insertOnConflictUpdate(
               app_db.ServicesCompanion.insert(
                 id: carpetServiceId,
                 name: 'غسيل سجاد',
@@ -344,7 +348,9 @@ void main() {
           ],
         );
 
-        await device.db.into(device.db.carpetSizes).insertOnConflictUpdate(
+        await device.db
+            .into(device.db.carpetSizes)
+            .insertOnConflictUpdate(
               app_db.CarpetSizesCompanion.insert(
                 id: carpetSizeId,
                 length: 3.0,
@@ -418,11 +424,17 @@ void main() {
         final custDeadline = DateTime.now().add(const Duration(seconds: 15));
         while (DateTime.now().isBefore(custDeadline)) {
           await deviceB.syncEngine.sync();
-          custOnB = await deviceB.customerRepository.getCustomerById(testCustomerId);
+          custOnB = await deviceB.customerRepository.getCustomerById(
+            testCustomerId,
+          );
           if (custOnB != null) break;
           await Future<void>.delayed(const Duration(milliseconds: 500));
         }
-        expect(custOnB, isNotNull, reason: 'Customer must replicate from Device A to Device B');
+        expect(
+          custOnB,
+          isNotNull,
+          reason: 'Customer must replicate from Device A to Device B',
+        );
 
         // ---------------------------------------------------------------------
         // STEP 2: Device A creates initial Order with Item 1 (piece) and Item 2 (carpet)
@@ -442,7 +454,9 @@ void main() {
           customerPickupFee: Money.zero,
           customerDeliveryRequested: false,
           customerDeliveryFee: Money.zero,
-          subtotal: Money.fromPiastres(1500 + (4000 * 6)), // 1500 + 24000 = 25500
+          subtotal: Money.fromPiastres(
+            1500 + (4000 * 6),
+          ), // 1500 + 24000 = 25500
           discount: Money.zero,
           tax: Money.zero,
           total: Money.fromPiastres(25500),
@@ -509,10 +523,16 @@ void main() {
         }
 
         // Assert Device B has initial aggregate
-        expect(orderOnB, isNotNull, reason: 'Order must replicate from Device A to Device B');
+        expect(
+          orderOnB,
+          isNotNull,
+          reason: 'Order must replicate from Device A to Device B',
+        );
         expect(orderOnB!.total, equals(Money.fromPiastres(25500)));
 
-        final itemsOnB = await deviceB.ordersDao.getOrderItemsWithCarpets(testOrderId);
+        final itemsOnB = await deviceB.ordersDao.getOrderItemsWithCarpets(
+          testOrderId,
+        );
         expect(itemsOnB.length, equals(2));
 
         // ---------------------------------------------------------------------
@@ -559,13 +579,16 @@ void main() {
         );
 
         // Perform local edit on Device A
-        final editedOrderA = await deviceA.orderRepository.editProcessingOrder(editInput);
+        final editedOrderA = await deviceA.orderRepository.editProcessingOrder(
+          editInput,
+        );
         expect(editedOrderA.status, equals(OrderStatus.processing));
         // Subtotal: 5000*6 (30000) + 2000 = 32000
         expect(editedOrderA.total, equals(Money.fromPiastres(32000)));
 
         // Device A has outbox entry for edit
-        final pendingOpsA = await deviceA.syncOperationsDao.getPendingOperations();
+        final pendingOpsA = await deviceA.syncOperationsDao
+            .getPendingOperations();
         final editOpA = pendingOpsA.firstWhere(
           (o) => o.entityId == testOrderId && o.operationType == 'edit',
         );
@@ -576,14 +599,24 @@ void main() {
         // ---------------------------------------------------------------------
         await deviceA.syncEngine.sync();
 
-        final pendingOpsAAfter = await deviceA.syncOperationsDao.getPendingOperations();
-        expect(pendingOpsAAfter, isEmpty, reason: 'Device A outbox should be empty after sync');
+        final pendingOpsAAfter = await deviceA.syncOperationsDao
+            .getPendingOperations();
+        expect(
+          pendingOpsAAfter,
+          isEmpty,
+          reason: 'Device A outbox should be empty after sync',
+        );
 
         // ---------------------------------------------------------------------
         // STEP 5: Device B checks outbox BEFORE pulling
         // ---------------------------------------------------------------------
-        final pendingOpsBBefore = await deviceB.syncOperationsDao.getPendingOperations();
-        expect(pendingOpsBBefore, isEmpty, reason: 'Device B outbox must be 0 before pulling');
+        final pendingOpsBBefore = await deviceB.syncOperationsDao
+            .getPendingOperations();
+        expect(
+          pendingOpsBBefore,
+          isEmpty,
+          reason: 'Device B outbox must be 0 before pulling',
+        );
 
         // ---------------------------------------------------------------------
         // STEP 6: Device B pulls remote sync_changes and applies _applyOrderEdit
@@ -592,48 +625,64 @@ void main() {
         final editDeadline = DateTime.now().add(const Duration(seconds: 15));
         while (DateTime.now().isBefore(editDeadline)) {
           await deviceB.syncEngine.sync();
-          final bOrder = await deviceB.orderRepository.getOrderById(testOrderId);
+          final bOrder = await deviceB.orderRepository.getOrderById(
+            testOrderId,
+          );
           if (bOrder != null && bOrder.notes == 'تم التعديل على جهاز A') {
             editedOnB = bOrder;
             break;
           }
           await Future<void>.delayed(const Duration(milliseconds: 500));
         }
-        expect(editedOnB, isNotNull, reason: 'Edited order must replicate from Device A to Device B');
+        expect(
+          editedOnB,
+          isNotNull,
+          reason: 'Edited order must replicate from Device A to Device B',
+        );
 
         // ---------------------------------------------------------------------
         // STEP 7: Verify Device B authoritative aggregate reconciliation
         // ---------------------------------------------------------------------
         // A. Full aggregate replacement: Item 1 must NO LONGER exist on Device B
-        final localItem1OnB = await (deviceB.db.select(deviceB.db.orderItems)
-              ..where((t) => t.id.equals(testItem1Id)))
-            .getSingleOrNull();
-        expect(localItem1OnB, isNull, reason: 'Item 1 was removed on Device A; must be deleted on Device B');
+        final localItem1OnB = await (deviceB.db.select(
+          deviceB.db.orderItems,
+        )..where((t) => t.id.equals(testItem1Id))).getSingleOrNull();
+        expect(
+          localItem1OnB,
+          isNull,
+          reason: 'Item 1 was removed on Device A; must be deleted on Device B',
+        );
 
         // B & C. Existing item update: Item 2 must have updated price on Device B
-        final localItem2OnB = await (deviceB.db.select(deviceB.db.orderItems)
-              ..where((t) => t.id.equals(testItem2Id)))
-            .getSingleOrNull();
+        final localItem2OnB = await (deviceB.db.select(
+          deviceB.db.orderItems,
+        )..where((t) => t.id.equals(testItem2Id))).getSingleOrNull();
         expect(localItem2OnB, isNotNull);
         expect(localItem2OnB!.unitPrice, equals(5000));
         expect(localItem2OnB.calculatedTotal, equals(30000));
         expect(localItem2OnB.notes, equals('تعديل سعر السجاد'));
 
         // D. Carpet metadata: Item 2 carpet is intact with area 6.0
-        final carpetOnB = await (deviceB.db.select(deviceB.db.orderItemCarpets)
-              ..where((t) => t.orderItemId.equals(testItem2Id)))
-            .getSingleOrNull();
+        final carpetOnB = await (deviceB.db.select(
+          deviceB.db.orderItemCarpets,
+        )..where((t) => t.orderItemId.equals(testItem2Id))).getSingleOrNull();
         expect(carpetOnB, isNotNull);
         expect(carpetOnB!.area, equals(6.0));
 
         // B. New item replication: Exactly 2 items total on Device B (Item 2 and the newly added item)
-        final allItemsOnB = await (deviceB.db.select(deviceB.db.orderItems)
-              ..where((t) => t.orderId.equals(testOrderId)))
-            .get();
-        expect(allItemsOnB.length, equals(2), reason: 'Device B must have exactly surviving item + new item');
+        final allItemsOnB = await (deviceB.db.select(
+          deviceB.db.orderItems,
+        )..where((t) => t.orderId.equals(testOrderId))).get();
+        expect(
+          allItemsOnB.length,
+          equals(2),
+          reason: 'Device B must have exactly surviving item + new item',
+        );
 
         // G. Status and order header on Device B
-        final localOrderB = await deviceB.orderRepository.getOrderById(testOrderId);
+        final localOrderB = await deviceB.orderRepository.getOrderById(
+          testOrderId,
+        );
         expect(localOrderB!.status, equals(OrderStatus.processing));
         expect(localOrderB.total, equals(Money.fromPiastres(32000)));
         expect(localOrderB.notes, equals('تم التعديل على جهاز A'));
@@ -641,11 +690,13 @@ void main() {
         // ---------------------------------------------------------------------
         // STEP 8: STRICT CONSTRAINT 3 & 6F: ZERO NEW OUTBOX OPERATIONS ON DEVICE B!
         // ---------------------------------------------------------------------
-        final pendingOpsBAfter = await deviceB.syncOperationsDao.getPendingOperations();
+        final pendingOpsBAfter = await deviceB.syncOperationsDao
+            .getPendingOperations();
         expect(
           pendingOpsBAfter,
           isEmpty,
-          reason: 'Remote reconciliation on Device B must NEVER create outbox operations (zero echo)',
+          reason:
+              'Remote reconciliation on Device B must NEVER create outbox operations (zero echo)',
         );
 
         // ---------------------------------------------------------------------
@@ -653,12 +704,17 @@ void main() {
         // ---------------------------------------------------------------------
         await deviceB.syncEngine.sync();
 
-        final allItemsOnBAfter = await (deviceB.db.select(deviceB.db.orderItems)
-              ..where((t) => t.orderId.equals(testOrderId)))
-            .get();
-        expect(allItemsOnBAfter.length, equals(2), reason: 'Re-sync must not duplicate items');
+        final allItemsOnBAfter = await (deviceB.db.select(
+          deviceB.db.orderItems,
+        )..where((t) => t.orderId.equals(testOrderId))).get();
+        expect(
+          allItemsOnBAfter.length,
+          equals(2),
+          reason: 'Re-sync must not duplicate items',
+        );
 
-        final pendingOpsBFinal = await deviceB.syncOperationsDao.getPendingOperations();
+        final pendingOpsBFinal = await deviceB.syncOperationsDao
+            .getPendingOperations();
         expect(pendingOpsBFinal, isEmpty);
       },
       timeout: const Timeout(Duration(minutes: 2)),

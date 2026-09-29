@@ -588,7 +588,7 @@ void main() {
           'id': 'ord-1',
           'notes': 'updated notes',
           'items': [
-            {'id': 'oi-1', 'unit_price': 1500}
+            {'id': 'oi-1', 'unit_price': 1500},
           ],
         };
         await dispatcher.dispatch(
@@ -622,32 +622,38 @@ void main() {
       expect(paymentApi.lastBody?['amount'], equals(5000));
     });
 
-    test('dispatches refund create preserving operation ID and payload', () async {
-      final refundPayload = {
-        'id': 'ref-1',
-        'order_id': 'ord-1',
-        'amount': 3000,
-        'refund_method': 'cash',
-        'reason': 'Customer requested cancellation',
-        'refunded_at': '2026-09-24T12:00:00.000Z',
-      };
-      final op = createOp(
-        id: 'op-r-1',
-        entityType: 'refund',
-        entityId: 'ref-1',
-        operationType: 'create',
-        payload: jsonEncode(refundPayload),
-      );
+    test(
+      'dispatches refund create preserving operation ID and payload',
+      () async {
+        final refundPayload = {
+          'id': 'ref-1',
+          'order_id': 'ord-1',
+          'amount': 3000,
+          'refund_method': 'cash',
+          'reason': 'Customer requested cancellation',
+          'refunded_at': '2026-09-24T12:00:00.000Z',
+        };
+        final op = createOp(
+          id: 'op-r-1',
+          entityType: 'refund',
+          entityId: 'ref-1',
+          operationType: 'create',
+          payload: jsonEncode(refundPayload),
+        );
 
-      await dispatcher.dispatch(op);
+        await dispatcher.dispatch(op);
 
-      expect(refundApi.lastOpId, equals('op-r-1'));
-      expect(refundApi.lastBody?['id'], equals('ref-1'));
-      expect(refundApi.lastBody?['order_id'], equals('ord-1'));
-      expect(refundApi.lastBody?['amount'], equals(3000));
-      expect(refundApi.lastBody?['refund_method'], equals('cash'));
-      expect(refundApi.lastBody?['reason'], equals('Customer requested cancellation'));
-    });
+        expect(refundApi.lastOpId, equals('op-r-1'));
+        expect(refundApi.lastBody?['id'], equals('ref-1'));
+        expect(refundApi.lastBody?['order_id'], equals('ord-1'));
+        expect(refundApi.lastBody?['amount'], equals(3000));
+        expect(refundApi.lastBody?['refund_method'], equals('cash'));
+        expect(
+          refundApi.lastBody?['reason'],
+          equals('Customer requested cancellation'),
+        );
+      },
+    );
 
     test('propagates remote exceptions when refund creation fails', () async {
       refundApi.shouldThrow = true;
@@ -671,25 +677,28 @@ void main() {
       );
     });
 
-    test('throws UnsupportedError on unsupported operation type for refund', () async {
-      final op = createOp(
-        id: 'op-r-del',
-        entityType: 'refund',
-        entityId: 'ref-1',
-        operationType: 'delete',
-      );
+    test(
+      'throws UnsupportedError on unsupported operation type for refund',
+      () async {
+        final op = createOp(
+          id: 'op-r-del',
+          entityType: 'refund',
+          entityId: 'ref-1',
+          operationType: 'delete',
+        );
 
-      expect(
-        () => dispatcher.dispatch(op),
-        throwsA(
-          isA<UnsupportedError>().having(
-            (e) => e.message,
-            'message',
-            contains('Unsupported operation "delete" for entity "refund"'),
+        expect(
+          () => dispatcher.dispatch(op),
+          throwsA(
+            isA<UnsupportedError>().having(
+              (e) => e.message,
+              'message',
+              contains('Unsupported operation "delete" for entity "refund"'),
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
 
     test('dispatches storage operations (create, move, unstore)', () async {
       // Create

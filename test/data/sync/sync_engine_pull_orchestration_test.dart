@@ -252,59 +252,60 @@ void main() {
       'Scenario C: Realtime signal during pagination triggers exactly ONE trailing pull after pagination finishes',
       () async {
         int pageCounter = 0;
-        remoteDataSource.onGetChanges = ({required int after, int? limit}) async {
-          pageCounter++;
-          if (pageCounter == 1) {
-            // While page 1 is returning, fire Realtime signal
-            realtimeAdapter.emitSignal();
-            return PullChangesResponseDto(
-              changes: [
-                SyncChangeDto(
-                  sequence: 1,
-                  operationId: 'op-1',
-                  entityType: 'customer',
-                  entityId: 'cust-1',
-                  operationType: 'create',
-                  payload: {
-                    'id': 'cust-1',
-                    'name': 'Customer 1',
-                    'phone': '111',
-                  },
-                  createdAt: DateTime.now(),
-                ),
-              ],
-              hasMore: true,
-              latestSequence: 2,
-            );
-          } else if (pageCounter == 2) {
-            return PullChangesResponseDto(
-              changes: [
-                SyncChangeDto(
-                  sequence: 2,
-                  operationId: 'op-2',
-                  entityType: 'customer',
-                  entityId: 'cust-2',
-                  operationType: 'create',
-                  payload: {
-                    'id': 'cust-2',
-                    'name': 'Customer 2',
-                    'phone': '222',
-                  },
-                  createdAt: DateTime.now(),
-                ),
-              ],
-              hasMore: false,
-              latestSequence: 2,
-            );
-          } else {
-            // Trailing pull iteration
-            return PullChangesResponseDto(
-              changes: const [],
-              hasMore: false,
-              latestSequence: 2,
-            );
-          }
-        };
+        remoteDataSource.onGetChanges =
+            ({required int after, int? limit}) async {
+              pageCounter++;
+              if (pageCounter == 1) {
+                // While page 1 is returning, fire Realtime signal
+                realtimeAdapter.emitSignal();
+                return PullChangesResponseDto(
+                  changes: [
+                    SyncChangeDto(
+                      sequence: 1,
+                      operationId: 'op-1',
+                      entityType: 'customer',
+                      entityId: 'cust-1',
+                      operationType: 'create',
+                      payload: {
+                        'id': 'cust-1',
+                        'name': 'Customer 1',
+                        'phone': '111',
+                      },
+                      createdAt: DateTime.now(),
+                    ),
+                  ],
+                  hasMore: true,
+                  latestSequence: 2,
+                );
+              } else if (pageCounter == 2) {
+                return PullChangesResponseDto(
+                  changes: [
+                    SyncChangeDto(
+                      sequence: 2,
+                      operationId: 'op-2',
+                      entityType: 'customer',
+                      entityId: 'cust-2',
+                      operationType: 'create',
+                      payload: {
+                        'id': 'cust-2',
+                        'name': 'Customer 2',
+                        'phone': '222',
+                      },
+                      createdAt: DateTime.now(),
+                    ),
+                  ],
+                  hasMore: false,
+                  latestSequence: 2,
+                );
+              } else {
+                // Trailing pull iteration
+                return PullChangesResponseDto(
+                  changes: const [],
+                  hasMore: false,
+                  latestSequence: 2,
+                );
+              }
+            };
 
         await syncEngine.initialize(triggerInitialSync: false);
 
@@ -325,74 +326,75 @@ void main() {
     test(
       'Scenario D: Multi-page pagination: sequential pages verify sequential persisted cursors',
       () async {
-        remoteDataSource.onGetChanges = ({required int after, int? limit}) async {
-          if (after == 0) {
-            return PullChangesResponseDto(
-              changes: [
-                SyncChangeDto(
-                  sequence: 10,
-                  operationId: 'op-page1',
-                  entityType: 'customer',
-                  entityId: 'cust-10',
-                  operationType: 'create',
-                  payload: {
-                    'id': 'cust-10',
-                    'name': 'Page 1 Cust',
-                    'phone': '111',
-                  },
-                  createdAt: DateTime.now(),
-                ),
-              ],
-              hasMore: true,
-              latestSequence: 30,
-            );
-          } else if (after == 10) {
-            return PullChangesResponseDto(
-              changes: [
-                SyncChangeDto(
-                  sequence: 20,
-                  operationId: 'op-page2',
-                  entityType: 'customer',
-                  entityId: 'cust-20',
-                  operationType: 'create',
-                  payload: {
-                    'id': 'cust-20',
-                    'name': 'Page 2 Cust',
-                    'phone': '222',
-                  },
-                  createdAt: DateTime.now(),
-                ),
-              ],
-              hasMore: true,
-              latestSequence: 30,
-            );
-          } else if (after == 20) {
-            return PullChangesResponseDto(
-              changes: [
-                SyncChangeDto(
-                  sequence: 30,
-                  operationId: 'op-page3',
-                  entityType: 'customer',
-                  entityId: 'cust-30',
-                  operationType: 'create',
-                  payload: {
-                    'id': 'cust-30',
-                    'name': 'Page 3 Cust',
-                    'phone': '333',
-                  },
-                  createdAt: DateTime.now(),
-                ),
-              ],
-              hasMore: false,
-              latestSequence: 30,
-            );
-          }
-          return PullChangesResponseDto(
-            changes: const [],
-            hasMore: false,
-            latestSequence: after,
-          );
-        };
+        remoteDataSource.onGetChanges =
+            ({required int after, int? limit}) async {
+              if (after == 0) {
+                return PullChangesResponseDto(
+                  changes: [
+                    SyncChangeDto(
+                      sequence: 10,
+                      operationId: 'op-page1',
+                      entityType: 'customer',
+                      entityId: 'cust-10',
+                      operationType: 'create',
+                      payload: {
+                        'id': 'cust-10',
+                        'name': 'Page 1 Cust',
+                        'phone': '111',
+                      },
+                      createdAt: DateTime.now(),
+                    ),
+                  ],
+                  hasMore: true,
+                  latestSequence: 30,
+                );
+              } else if (after == 10) {
+                return PullChangesResponseDto(
+                  changes: [
+                    SyncChangeDto(
+                      sequence: 20,
+                      operationId: 'op-page2',
+                      entityType: 'customer',
+                      entityId: 'cust-20',
+                      operationType: 'create',
+                      payload: {
+                        'id': 'cust-20',
+                        'name': 'Page 2 Cust',
+                        'phone': '222',
+                      },
+                      createdAt: DateTime.now(),
+                    ),
+                  ],
+                  hasMore: true,
+                  latestSequence: 30,
+                );
+              } else if (after == 20) {
+                return PullChangesResponseDto(
+                  changes: [
+                    SyncChangeDto(
+                      sequence: 30,
+                      operationId: 'op-page3',
+                      entityType: 'customer',
+                      entityId: 'cust-30',
+                      operationType: 'create',
+                      payload: {
+                        'id': 'cust-30',
+                        'name': 'Page 3 Cust',
+                        'phone': '333',
+                      },
+                      createdAt: DateTime.now(),
+                    ),
+                  ],
+                  hasMore: false,
+                  latestSequence: 30,
+                );
+              }
+              return PullChangesResponseDto(
+                changes: const [],
+                hasMore: false,
+                latestSequence: after,
+              );
+            };
 
         await syncEngine.pull();
 
@@ -413,54 +415,56 @@ void main() {
       'Scenario E: Partial pagination failure: page 1 commits, page 2 fails, next pull starts from page 1 cursor',
       () async {
         int callCount = 0;
-        remoteDataSource.onGetChanges = ({required int after, int? limit}) async {
-          callCount++;
-          if (callCount == 1) {
-            return PullChangesResponseDto(
-              changes: [
-                SyncChangeDto(
-                  sequence: 15,
-                  operationId: 'op-page1-ok',
-                  entityType: 'customer',
-                  entityId: 'cust-15',
-                  operationType: 'create',
-                  payload: {
-                    'id': 'cust-15',
-                    'name': 'Cust 15',
-                    'phone': '1515',
-                  },
-                  createdAt: DateTime.now(),
-                ),
-              ],
-              hasMore: true,
-              latestSequence: 30,
-            );
-          } else {
-            throw DioException(
-              requestOptions: RequestOptions(path: '/sync/changes'),
-              type: DioExceptionType.connectionTimeout,
-            );
-          }
-        };
+        remoteDataSource.onGetChanges =
+            ({required int after, int? limit}) async {
+              callCount++;
+              if (callCount == 1) {
+                return PullChangesResponseDto(
+                  changes: [
+                    SyncChangeDto(
+                      sequence: 15,
+                      operationId: 'op-page1-ok',
+                      entityType: 'customer',
+                      entityId: 'cust-15',
+                      operationType: 'create',
+                      payload: {
+                        'id': 'cust-15',
+                        'name': 'Cust 15',
+                        'phone': '1515',
+                      },
+                      createdAt: DateTime.now(),
+                    ),
+                  ],
+                  hasMore: true,
+                  latestSequence: 30,
+                );
+              } else {
+                throw DioException(
+                  requestOptions: RequestOptions(path: '/sync/changes'),
+                  type: DioExceptionType.connectionTimeout,
+                );
+              }
+            };
 
         // First pull attempt: page 1 succeeds, page 2 fails
         await syncEngine.pull();
 
         // Page 1 remained committed and advanced cursor to 15
         expect(await syncStateDao.getLastAppliedSequence(), equals(15));
-        final cust15 = await (db.select(db.customers)
-              ..where((t) => t.id.equals('cust-15')))
-            .getSingleOrNull();
+        final cust15 = await (db.select(
+          db.customers,
+        )..where((t) => t.id.equals('cust-15'))).getSingleOrNull();
         expect(cust15, isNotNull);
 
         // Next pull attempt: resumes strictly from after: 15
-        remoteDataSource.onGetChanges = ({required int after, int? limit}) async {
-          return PullChangesResponseDto(
-            changes: const [],
-            hasMore: false,
-            latestSequence: 15,
-          );
-        };
+        remoteDataSource.onGetChanges =
+            ({required int after, int? limit}) async {
+              return PullChangesResponseDto(
+                changes: const [],
+                hasMore: false,
+                latestSequence: 15,
+              );
+            };
 
         await syncEngine.pull();
         expect(remoteDataSource.requestedAfterCursors.last, equals(15));
@@ -473,7 +477,9 @@ void main() {
     test(
       'Scenario F: Lifecycle: dispose cancels subscriptions/timers, prevents new work from starting',
       () async {
-        await syncEngine.initialize(periodicSyncInterval: const Duration(minutes: 5));
+        await syncEngine.initialize(
+          periodicSyncInterval: const Duration(minutes: 5),
+        );
         expect(realtimeAdapter.subscribeCount, equals(1));
         expect(syncEngine.isInitialized, isTrue);
 
@@ -503,46 +509,49 @@ void main() {
           payload: '{"name":"Local Cust"}',
         );
 
-        final initialOps = await syncOperationsDao.getEligibleOperations(asOf: fixedTime);
+        final initialOps = await syncOperationsDao.getEligibleOperations(
+          asOf: fixedTime,
+        );
         expect(initialOps.length, equals(1));
         final localOpId = initialOps.first.id;
 
         // Configure remote pull to return the committed change
-        remoteDataSource.onGetChanges = ({required int after, int? limit}) async {
-          return PullChangesResponseDto(
-            changes: [
-              SyncChangeDto(
-                sequence: 100,
-                operationId: localOpId,
-                entityType: 'customer',
-                entityId: 'cust-local-1',
-                operationType: 'create',
-                payload: {
-                  'id': 'cust-local-1',
-                  'name': 'Local Cust',
-                  'phone': '999',
-                },
-                createdAt: DateTime.now(),
-              ),
-            ],
-            hasMore: false,
-            latestSequence: 100,
-          );
-        };
+        remoteDataSource.onGetChanges =
+            ({required int after, int? limit}) async {
+              return PullChangesResponseDto(
+                changes: [
+                  SyncChangeDto(
+                    sequence: 100,
+                    operationId: localOpId,
+                    entityType: 'customer',
+                    entityId: 'cust-local-1',
+                    operationType: 'create',
+                    payload: {
+                      'id': 'cust-local-1',
+                      'name': 'Local Cust',
+                      'phone': '999',
+                    },
+                    createdAt: DateTime.now(),
+                  ),
+                ],
+                hasMore: false,
+                latestSequence: 100,
+              );
+            };
 
         // Run full sync: pushes op-local-1, then pulls change 100
         await syncEngine.sync();
 
         // Verify local op was marked synced
-        final op = await (db.select(db.syncOperations)
-              ..where((t) => t.id.equals(localOpId)))
-            .getSingle();
+        final op = await (db.select(
+          db.syncOperations,
+        )..where((t) => t.id.equals(localOpId))).getSingle();
         expect(op.status, equals('synced'));
 
         // Verify customer was written into local SQLite
-        final cust = await (db.select(db.customers)
-              ..where((t) => t.id.equals('cust-local-1')))
-            .getSingle();
+        final cust = await (db.select(
+          db.customers,
+        )..where((t) => t.id.equals('cust-local-1'))).getSingle();
         expect(cust.name, equals('Local Cust'));
 
         // CRITICAL INVARIANT: applying remote change created ZERO new SyncOperation rows!
@@ -567,12 +576,13 @@ void main() {
         );
 
         // Remote throws CursorTooOldException
-        remoteDataSource.onGetChanges = ({required int after, int? limit}) async {
-          throw const CursorTooOldException(
-            message: 'Cursor is too old',
-            oldestAvailableSequence: 500,
-          );
-        };
+        remoteDataSource.onGetChanges =
+            ({required int after, int? limit}) async {
+              throw const CursorTooOldException(
+                message: 'Cursor is too old',
+                oldestAvailableSequence: 500,
+              );
+            };
 
         await syncEngine.pull();
 
@@ -614,19 +624,26 @@ void main() {
             },
           );
 
-          remoteDataSource.onGetChanges = ({required int after, int? limit}) async {
-            throw const CursorTooOldException(
-              message: 'Retention expired at sequence 42',
-              oldestAvailableSequence: 42,
-            );
-          };
+          remoteDataSource.onGetChanges =
+              ({required int after, int? limit}) async {
+                throw const CursorTooOldException(
+                  message: 'Retention expired at sequence 42',
+                  oldestAvailableSequence: 42,
+                );
+              };
 
           await customEngine.pull();
 
           expect(customEngine.state.status, equals(SyncEngineStatus.failed));
           expect(customEngine.state.lastError, startsWith('CURSOR_TOO_OLD:'));
-          expect(customEngine.state.lastError, contains('Retention expired at sequence 42'));
-          expect(capturedLog, contains('CURSOR_TOO_OLD encountered during pull'));
+          expect(
+            customEngine.state.lastError,
+            contains('Retention expired at sequence 42'),
+          );
+          expect(
+            capturedLog,
+            contains('CURSOR_TOO_OLD encountered during pull'),
+          );
         },
       );
 
@@ -683,15 +700,22 @@ void main() {
             },
           );
 
-          remoteDataSource.onGetChanges = ({required int after, int? limit}) async {
+          remoteDataSource
+              .onGetChanges = ({required int after, int? limit}) async {
             throw const ServerException('500 Service Unavailable from proxy');
           };
 
           await customEngine.pull();
 
           expect(customEngine.state.status, equals(SyncEngineStatus.failed));
-          expect(customEngine.state.lastError, startsWith('PULL_ERROR: [ServerException]'));
-          expect(customEngine.state.lastError, contains('500 Service Unavailable from proxy'));
+          expect(
+            customEngine.state.lastError,
+            startsWith('PULL_ERROR: [ServerException]'),
+          );
+          expect(
+            customEngine.state.lastError,
+            contains('500 Service Unavailable from proxy'),
+          );
           expect(capturedLog, contains('Unexpected pull failure'));
           expect(capturedError, isA<ServerException>());
         },
@@ -711,13 +735,16 @@ void main() {
             operationType: 'create',
             payload: '{"name":"Local Preserved Cust"}',
           );
-          final initialOps = await syncOperationsDao.getEligibleOperations(asOf: fixedTime);
+          final initialOps = await syncOperationsDao.getEligibleOperations(
+            asOf: fixedTime,
+          );
           expect(initialOps.length, equals(1));
 
           // Remote throws unexpected exception during getChanges
-          remoteDataSource.onGetChanges = ({required int after, int? limit}) async {
-            throw Exception('Database connection dropped unexpectedly');
-          };
+          remoteDataSource.onGetChanges =
+              ({required int after, int? limit}) async {
+                throw Exception('Database connection dropped unexpectedly');
+              };
 
           await syncEngine.pull();
 
@@ -726,13 +753,20 @@ void main() {
 
           // 2. State is failed
           expect(syncEngine.state.status, equals(SyncEngineStatus.failed));
-          expect(syncEngine.state.lastError, contains('PULL_ERROR: Exception: Database connection dropped unexpectedly'));
+          expect(
+            syncEngine.state.lastError,
+            contains(
+              'PULL_ERROR: Exception: Database connection dropped unexpectedly',
+            ),
+          );
 
           // 3. Pending operations count is preserved
           expect(syncEngine.state.pendingOperationsCount, equals(1));
 
           // 4. Pending local operation is untouched and still pending
-          final remainingOps = await syncOperationsDao.getEligibleOperations(asOf: fixedTime);
+          final remainingOps = await syncOperationsDao.getEligibleOperations(
+            asOf: fixedTime,
+          );
           expect(remainingOps.length, equals(1));
           expect(remainingOps.first.entityId, equals('cust-local-preserve'));
           expect(remainingOps.first.status, equals('pending'));
@@ -763,23 +797,27 @@ void main() {
             },
           );
 
-          remoteDataSource.onGetChanges = ({required int after, int? limit}) async {
-            throw DioException(
-              requestOptions: RequestOptions(path: '/sync/changes'),
-              response: Response(
-                requestOptions: RequestOptions(path: '/sync/changes'),
-                statusCode: 502,
-                statusMessage: 'Bad Gateway',
-              ),
-              type: DioExceptionType.badResponse,
-              message: 'Bad Gateway',
-            );
-          };
+          remoteDataSource.onGetChanges =
+              ({required int after, int? limit}) async {
+                throw DioException(
+                  requestOptions: RequestOptions(path: '/sync/changes'),
+                  response: Response(
+                    requestOptions: RequestOptions(path: '/sync/changes'),
+                    statusCode: 502,
+                    statusMessage: 'Bad Gateway',
+                  ),
+                  type: DioExceptionType.badResponse,
+                  message: 'Bad Gateway',
+                );
+              };
 
           await customEngine.pull();
 
           expect(customEngine.state.status, equals(SyncEngineStatus.failed));
-          expect(customEngine.state.lastError, startsWith('PULL_ERROR: DioException (HTTP 502): Bad Gateway'));
+          expect(
+            customEngine.state.lastError,
+            startsWith('PULL_ERROR: DioException (HTTP 502): Bad Gateway'),
+          );
           expect(capturedLog, contains('Unexpected pull failure'));
         },
       );

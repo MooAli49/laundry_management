@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'bluetooth_printer_service.dart';
 import 'printer_profile.dart';
-import 'thermal_command_builder.dart';
 
 /// SharedPreferences keys for printer persistence.
 const _kPrinterName = 'bt_printer_name';
@@ -503,8 +502,7 @@ class BluetoothPrinterServiceImpl implements BluetoothPrinterService {
     }
 
     dev.log(
-      '[BluetoothPrinterService] PRINT WRITE START bytes=${bytes.length} '
-      'chunkCount=1 chunkSizes=[${bytes.length}] method=BluetoothPrintPlus.write',
+      'PRINT WRITE START bytes=${bytes.length}',
       name: 'BluetoothPrinterService',
     );
 
@@ -513,14 +511,14 @@ class BluetoothPrinterServiceImpl implements BluetoothPrinterService {
       final data = bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
       await BluetoothPrintPlus.write(data);
       dev.log(
-        '[BluetoothPrinterService] PRINT WRITE SUCCESS bytes=${bytes.length}',
+        'PRINT WRITE SUCCESS bytes=${bytes.length}',
         name: 'BluetoothPrinterService',
       );
       // Return to connected state after write.
       _emitState(BluetoothPrinterConnectionState.connected);
     } catch (e, stackTrace) {
       dev.log(
-        '[BluetoothPrinterService] PRINT WRITE FAILURE error=$e',
+        'PRINT WRITE FAILURE error=$e',
         name: 'BluetoothPrinterService',
         error: e,
         stackTrace: stackTrace,
@@ -534,94 +532,66 @@ class BluetoothPrinterServiceImpl implements BluetoothPrinterService {
   }
 
   @override
-  Future<void> diagnosticPrint() async {
-    dev.log('DIAGNOSTIC RASTER START', name: 'BluetoothPrinterService');
-    final command = ThermalCommandBuilder.buildDiagnosticRasterCommand();
-    const width = 128;
-    const height = 64;
-    const widthBytes = 16;
-    const rasterPayloadLength = widthBytes * height;
-    const rasterHeaderOffset = 8;
-    final rasterHeader = command.sublist(
-      rasterHeaderOffset,
-      rasterHeaderOffset + 8,
-    );
-    final actualRasterLength = command.length - 16 - 3;
-    if (rasterHeader.join(',') != '29,118,48,0,16,0,64,0' ||
-        actualRasterLength != rasterPayloadLength) {
-      throw StateError(
-        'Invalid diagnostic raster command: header=$rasterHeader '
-        'actualRasterLength=$actualRasterLength',
+  Future<void> writeBlockSequence(
+    List<List<int>> blocks, {
+    Duration delay = const Duration(milliseconds: 50),
+  }) async {
+    _guardDisposed();
+    final isConnected = BluetoothPrintPlus.isConnected;
+    if (!isConnected) {
+      throw const BluetoothPrinterException(
+        errorCode: BluetoothPrinterErrorCode.notConnected,
+        diagnosticMessage: 'Printer is not connected',
       );
     }
+
+    if (blocks.isEmpty) return;
+
+    final totalBlocks = blocks.length;
+    final totalBytes = blocks.fold<int>(0, (sum, b) => sum + b.length);
+
     dev.log(
-      'DIAGNOSTIC RASTER COMMAND BUILT protocol=ESC/POS '
-      'width=$width height=$height widthBytes=$widthBytes '
-      'rasterPayloadLength=$rasterPayloadLength '
-      'totalCommandLength=${command.length}',
+      'PRINT WRITE START bytes=$totalBytes',
       name: 'BluetoothPrinterService',
     );
-    try {
-      dev.log(
-        'DIAGNOSTIC RASTER WRITE bytes=${command.length}',
-        name: 'BluetoothPrinterService',
-      );
-      await writeBytes(command);
-      dev.log('DIAGNOSTIC RASTER SUCCESS', name: 'BluetoothPrinterService');
-    } catch (error, stackTrace) {
-      dev.log(
-        'DIAGNOSTIC RASTER FAILED error=$error',
-        name: 'BluetoothPrinterService',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      rethrow;
-    }
-  }
-
-  @override
-  Future<void> diagnosticRasterPrint() async {
-    await diagnosticRasterPrintVariant(DiagnosticRasterFormat.gsV0);
-  }
-
-  @override
-  Future<void> diagnosticRasterPrintVariant(
-    DiagnosticRasterFormat format,
-  ) async {
-    final command = switch (format) {
-      DiagnosticRasterFormat.gsV0 =>
-        ThermalCommandBuilder.buildDiagnosticRasterCommand(),
-      DiagnosticRasterFormat.gsL =>
-        ThermalCommandBuilder.buildDiagnosticGsLCommand(),
-    };
-    const payloadLength = 16 * 64;
-    final headerLength = format == DiagnosticRasterFormat.gsV0 ? 16 : 13;
     dev.log(
-      'DIAGNOSTIC FORMAT=${format.name.toUpperCase()} '
-      'commandLength=${command.length} '
-      'headerHex=${_hex(command.take(headerLength).toList())} '
-      'payloadLength=$payloadLength',
+      'PRINT WRITE BLOCK SEQUENCE START blocks=$totalBlocks totalBytes=$totalBytes delayMs=${delay.inMilliseconds}',
       name: 'BluetoothPrinterService',
     );
+
     try {
-      await writeBytes(command);
+      _emitState(BluetoothPrinterConnectionState.printing);
+
+      for (var i = 0; i < totalBlocks; i++) {
+        final block = blocks[i];
+        final data = block is Uint8List ? block : Uint8List.fromList(block);
+
+        await BluetoothPrintPlus.write(data);
+
+        if (delay > Duration.zero && i < totalBlocks - 1) {
+          await Future.delayed(delay);
+        }
+      }
+
       dev.log(
-        'DIAGNOSTIC FORMAT=${format.name.toUpperCase()} write result=SUCCESS',
+        'PRINT WRITE BLOCK SEQUENCE SUCCESS blocks=$totalBlocks totalBytes=$totalBytes',
         name: 'BluetoothPrinterService',
       );
-    } catch (error, stackTrace) {
+      _emitState(BluetoothPrinterConnectionState.connected);
+    } catch (e, stackTrace) {
       dev.log(
-        'DIAGNOSTIC FORMAT=${format.name.toUpperCase()} write result=FAILED error=$error',
+        'PRINT WRITE BLOCK SEQUENCE FAILURE error=$e',
         name: 'BluetoothPrinterService',
-        error: error,
+        error: e,
         stackTrace: stackTrace,
       );
-      rethrow;
+      _emitState(BluetoothPrinterConnectionState.printFailed);
+      throw BluetoothPrinterException(
+        errorCode: BluetoothPrinterErrorCode.printFailed,
+        diagnosticMessage: 'Block sequence print write failed: $e',
+      );
     }
   }
-
-  String _hex(List<int> bytes) =>
-      bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join(' ');
 
   // -------------------------------------------------------------------------
   // Lifecycle

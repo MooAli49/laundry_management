@@ -528,7 +528,8 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     final startOfToday = todayDate.isUtc
         ? DateTime.utc(todayDate.year, todayDate.month, todayDate.day)
         : DateTime(todayDate.year, todayDate.month, todayDate.day);
-    final startOfNextDay = tomorrowDate ??
+    final startOfNextDay =
+        tomorrowDate ??
         (todayDate.isUtc
             ? DateTime.utc(todayDate.year, todayDate.month, todayDate.day + 1)
             : DateTime(todayDate.year, todayDate.month, todayDate.day + 1));

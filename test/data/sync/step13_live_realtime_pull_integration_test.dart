@@ -76,11 +76,13 @@ void main() {
 
       testCustomerId = 'c1300000-0000-4000-8000-$runId';
       testCustomerName = 'Step 13 Realtime Tester $runId';
-      testPhone = '012${(DateTime.now().microsecondsSinceEpoch % 100000000).toString().padLeft(8, '0')}';
+      testPhone =
+          '012${(DateTime.now().microsecondsSinceEpoch % 100000000).toString().padLeft(8, '0')}';
 
       noSignalCustomerId = 'c1300000-0000-4000-8001-$runId';
       noSignalCustomerName = 'Step 13 No-Signal Tester $runId';
-      noSignalPhone = '013${(DateTime.now().microsecondsSinceEpoch % 100000000).toString().padLeft(8, '0')}';
+      noSignalPhone =
+          '013${(DateTime.now().microsecondsSinceEpoch % 100000000).toString().padLeft(8, '0')}';
 
       try {
         final res = await dio.get('/customers', queryParameters: {'limit': 1});
@@ -96,10 +98,7 @@ void main() {
       db = AppDatabase(NativeDatabase.memory());
       syncOperationsDao = SyncOperationsDao(db);
       syncStateDao = SyncStateDao(db);
-      changeApplier = RemoteChangeApplier(
-        db: db,
-        syncStateDao: syncStateDao,
-      );
+      changeApplier = RemoteChangeApplier(db: db, syncStateDao: syncStateDao);
       remoteDataSource = SyncRemoteDataSourceImpl(SyncRemoteApi(dio));
       realtimeAdapter = SupabaseRealtimeSyncAdapter(client: supabaseClient);
 
@@ -136,10 +135,7 @@ void main() {
     );
 
     Future<int> fastForwardCursor() async {
-      final probe = await remoteDataSource.getChanges(
-        after: 0,
-        limit: 1,
-      );
+      final probe = await remoteDataSource.getChanges(after: 0, limit: 1);
       final currentMaxSeq = probe.latestSequence;
       await syncStateDao.updateLastAppliedSequence(currentMaxSeq);
       return currentMaxSeq;
@@ -202,9 +198,9 @@ void main() {
           Customer? localCustomer;
           final deadline = DateTime.now().add(const Duration(seconds: 10));
           while (DateTime.now().isBefore(deadline)) {
-            localCustomer = await (db.select(db.customers)
-                  ..where((tbl) => tbl.id.equals(testCustomerId)))
-                .getSingleOrNull();
+            localCustomer = await (db.select(
+              db.customers,
+            )..where((tbl) => tbl.id.equals(testCustomerId))).getSingleOrNull();
             if (localCustomer != null) break;
             await Future<void>.delayed(const Duration(milliseconds: 200));
           }
@@ -263,9 +259,10 @@ void main() {
         final deadline = DateTime.now().add(const Duration(seconds: 10));
         while (DateTime.now().isBefore(deadline)) {
           await syncEngine.pull();
-          localCustomer = await (db.select(db.customers)
-                ..where((tbl) => tbl.id.equals(noSignalCustomerId)))
-              .getSingleOrNull();
+          localCustomer =
+              await (db.select(db.customers)
+                    ..where((tbl) => tbl.id.equals(noSignalCustomerId)))
+                  .getSingleOrNull();
           if (localCustomer != null) break;
           await Future<void>.delayed(const Duration(milliseconds: 200));
         }

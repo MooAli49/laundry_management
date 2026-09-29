@@ -56,9 +56,8 @@ class EditProcessingOrderInput {
 class EditProcessingOrderUseCase {
   final OrderRepository _orderRepository;
 
-  EditProcessingOrderUseCase({
-    required OrderRepository orderRepository,
-  }) : _orderRepository = orderRepository;
+  EditProcessingOrderUseCase({required OrderRepository orderRepository})
+    : _orderRepository = orderRepository;
 
   Future<Order> execute(EditProcessingOrderInput input) async {
     if (input.orderId.trim().isEmpty) {

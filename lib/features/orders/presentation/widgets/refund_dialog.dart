@@ -56,8 +56,8 @@ class _RefundDialogState extends State<RefundDialog> {
 
   void _fillFullAmount() {
     setState(() {
-      _amountController.text =
-          widget.refundBalance.remainingRefundable.toEgp.toStringAsFixed(2);
+      _amountController.text = widget.refundBalance.remainingRefundable.toEgp
+          .toStringAsFixed(2);
       _clientValidationError = null;
     });
   }
@@ -74,15 +74,16 @@ class _RefundDialogState extends State<RefundDialog> {
     final parsedMoney = Money.tryParseEgp(text);
     if (parsedMoney == null || !parsedMoney.isPositive) {
       setState(
-        () => _clientValidationError = 'مبلغ الاسترداد يجب أن يكون أكبر من الصفر',
+        () =>
+            _clientValidationError = 'مبلغ الاسترداد يجب أن يكون أكبر من الصفر',
       );
       return;
     }
 
     if (parsedMoney > widget.refundBalance.remainingRefundable) {
       setState(
-        () =>
-            _clientValidationError = 'مبلغ الاسترداد يتجاوز المبلغ القابل للاسترداد',
+        () => _clientValidationError =
+            'مبلغ الاسترداد يتجاوز المبلغ القابل للاسترداد',
       );
       return;
     }
@@ -120,8 +121,7 @@ class _RefundDialogState extends State<RefundDialog> {
         },
         builder: (context, state) {
           final isSubmitting = state.isSubmitting;
-          final activeError =
-              _clientValidationError ?? state.errorMessage;
+          final activeError = _clientValidationError ?? state.errorMessage;
 
           return Dialog(
             shape: RoundedRectangleBorder(

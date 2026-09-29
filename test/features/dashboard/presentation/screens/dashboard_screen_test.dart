@@ -14,6 +14,7 @@ import 'package:laundry_management/domain/value_objects/order_date.dart';
 import 'package:laundry_management/features/customers/presentation/widgets/customer_form_dialog.dart';
 import 'package:laundry_management/features/dashboard/presentation/cubit/dashboard_cubit.dart';
 import 'package:laundry_management/features/dashboard/presentation/screens/dashboard_screen.dart';
+import 'package:laundry_management/features/dashboard/presentation/widgets/dashboard_recent_orders_section.dart';
 import 'package:laundry_management/features/dashboard/presentation/widgets/record_payment_dialog.dart';
 import 'package:laundry_management/features/expenses/presentation/widgets/add_expense_dialog.dart';
 
@@ -259,6 +260,50 @@ void main() {
         expect(find.text('لا توجد طلبات مستحقة اليوم'), findsOneWidget);
         expect(find.text('لا توجد طلبات للاستلام اليوم'), findsOneWidget);
         expect(find.text('لا توجد طلبات حتى الآن'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'does not throw RenderFlex overflow with long order number in recent orders',
+      (tester) async {
+        final now = DateTime.now();
+        final longOrderItem = DashboardOrderItem(
+          order: Order(
+            id: 'ord-test-long',
+            orderNumber: 'ORD-TEST-REF-1501-5c8be4123864',
+            customerId: 'c1',
+            customerNameSnapshot: 'أحمد محمد علي عبد الرحيم',
+            customerPhoneSnapshot: '01122334455',
+            status: OrderStatus.processing,
+            expectedPickupDate: OrderDate.today(),
+            subtotal: const Money.fromPiastres(12000),
+            total: const Money.fromPiastres(12000),
+            createdAt: now,
+            updatedAt: now,
+          ),
+          totalPaid: const Money.fromPiastres(6000),
+          remainingAmount: const Money.fromPiastres(6000),
+        );
+
+        fakeDashboardRepository.mockData = DashboardData(
+          todayOrdersCount: 1,
+          processingOrdersCount: 1,
+          readyOrdersCount: 0,
+          totalRemainingAmount: const Money.fromPiastres(6000),
+          unpaidOrdersCount: 1,
+          storageAttentionCount: 0,
+          overdueOrdersCount: 0,
+          todayPickupOrdersCount: 1,
+          todayPickupOrders: [longOrderItem],
+          recentOrders: [longOrderItem],
+        );
+
+        await tester.pumpWidget(buildTestableWidget(const DashboardScreen()));
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        expect(find.byType(DashboardRecentOrdersSection), findsOneWidget);
+        expect(find.text('#ORD-TEST-REF-1501-5c8be4123864'), findsWidgets);
       },
     );
   });

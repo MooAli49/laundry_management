@@ -50,7 +50,8 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
   final TextEditingController _notesController = TextEditingController();
   final TextEditingController _pickupFeeController = TextEditingController();
   final TextEditingController _deliveryFeeController = TextEditingController();
-  final TextEditingController _initialPaymentController = TextEditingController();
+  final TextEditingController _initialPaymentController =
+      TextEditingController();
 
   @override
   void dispose() {
@@ -182,8 +183,8 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                 0.001) {
               _initialPaymentController.text =
                   state.initialPaymentAmount.isPositive
-                      ? state.initialPaymentAmount.toEgp.toStringAsFixed(2)
-                      : '';
+                  ? state.initialPaymentAmount.toEgp.toStringAsFixed(2)
+                  : '';
             }
           }
         },
@@ -777,16 +778,15 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
     CreateOrderCubit cubit,
   ) {
     final isEnabled = state.isInitialPaymentEnabled;
-    final isFullyPaid =
-        isEnabled && state.remainingAmount == Money.zero;
+    final isFullyPaid = isEnabled && state.remainingAmount == Money.zero;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
         color: isEnabled
             ? (isFullyPaid
-                ? AppColors.successLight
-                : AppColors.primaryLighter.withValues(alpha: 0.5))
+                  ? AppColors.successLight
+                  : AppColors.primaryLighter.withValues(alpha: 0.5))
             : AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
         border: Border.all(
@@ -816,9 +816,7 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                         : Icons.payments_outlined,
                     size: 18,
                     color: isEnabled
-                        ? (isFullyPaid
-                            ? AppColors.success
-                            : AppColors.primary)
+                        ? (isFullyPaid ? AppColors.success : AppColors.primary)
                         : AppColors.textTertiary,
                   ),
                   AppSpacing.gapHorizontalSm,
@@ -838,14 +836,14 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                         Text(
                           isEnabled
                               ? (isFullyPaid
-                                  ? 'مدفوع بالكامل ✓'
-                                  : 'أدخل المبلغ المُقدَّم أدناه')
+                                    ? 'مدفوع بالكامل ✓'
+                                    : 'أدخل المبلغ المُقدَّم أدناه')
                               : 'اختياري — اضغط للتفعيل',
                           style: AppTextStyles.caption.copyWith(
                             color: isEnabled
                                 ? (isFullyPaid
-                                    ? AppColors.success
-                                    : AppColors.primary)
+                                      ? AppColors.success
+                                      : AppColors.primary)
                                 : AppColors.textTertiary,
                           ),
                         ),
@@ -865,9 +863,10 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                       } else {
                         _initialPaymentController.text =
                             state.initialPaymentAmount.isPositive
-                                ? state.initialPaymentAmount.toEgp
-                                    .toStringAsFixed(2)
-                                : '';
+                            ? state.initialPaymentAmount.toEgp.toStringAsFixed(
+                                2,
+                              )
+                            : '';
                       }
                     },
                   ),
@@ -889,19 +888,15 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
 
                           // Amount field
                           AppTextField(
-                            key: const ValueKey(
-                              'advance_payment_amount_field',
-                            ),
+                            key: const ValueKey('advance_payment_amount_field'),
                             controller: _initialPaymentController,
                             label: 'مبلغ الدفعة (ج.م)',
                             hintText: '0.00',
-                            keyboardType:
-                                const TextInputType.numberWithOptions(
+                            keyboardType: const TextInputType.numberWithOptions(
                               decimal: true,
                             ),
                             onChanged: (val) {
-                              final amount =
-                                  double.tryParse(val) ?? 0.0;
+                              final amount = double.tryParse(val) ?? 0.0;
                               cubit.updateInitialPaymentAmount(
                                 Money.fromEgp(amount),
                               );
@@ -965,13 +960,15 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
             borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
           ),
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-          backgroundColor: isActive ? AppColors.primaryLighter : AppColors.surface,
+          backgroundColor: isActive
+              ? AppColors.primaryLighter
+              : AppColors.surface,
         ),
         onPressed: canPress
             ? () {
                 cubit.setFullInitialPayment();
-                _initialPaymentController.text =
-                    state.total.toEgp.toStringAsFixed(2);
+                _initialPaymentController.text = state.total.toEgp
+                    .toStringAsFixed(2);
               }
             : null,
         icon: Icon(
@@ -1015,8 +1012,7 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
             key: const ValueKey('advance_payment_method_instapay'),
             label: 'إنستا باي',
             icon: Icons.bolt_outlined,
-            isSelected:
-                state.initialPaymentMethod == PaymentMethod.instapay,
+            isSelected: state.initialPaymentMethod == PaymentMethod.instapay,
             onTap: () =>
                 cubit.updateInitialPaymentMethod(PaymentMethod.instapay),
           ),
@@ -1027,8 +1023,7 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
             key: const ValueKey('advance_payment_method_wallet'),
             label: 'محفظة',
             icon: Icons.account_balance_wallet_outlined,
-            isSelected:
-                state.initialPaymentMethod == PaymentMethod.ewallet,
+            isSelected: state.initialPaymentMethod == PaymentMethod.ewallet,
             onTap: () =>
                 cubit.updateInitialPaymentMethod(PaymentMethod.ewallet),
           ),
@@ -1081,8 +1076,7 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: AppTextStyles.labelSmall.copyWith(
-                  fontWeight:
-                      isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   color: isSelected
                       ? AppColors.primaryDark
                       : AppColors.textSecondary,
@@ -1097,7 +1091,9 @@ class _CreateOrderViewState extends State<_CreateOrderView> {
 
   Widget _buildRemainingAmountBanner(CreateOrderState state) {
     final isFullyPaid = state.remainingAmount == Money.zero;
-    final bannerColor = isFullyPaid ? AppColors.successDark : AppColors.warningDark;
+    final bannerColor = isFullyPaid
+        ? AppColors.successDark
+        : AppColors.warningDark;
 
     return Container(
       padding: const EdgeInsets.symmetric(

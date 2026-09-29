@@ -126,7 +126,8 @@ void main() {
       customerNameSnapshot: 'عميل القائمة',
       customerPhoneSnapshot: '01012345678',
       status: status,
-      expectedPickupDate: expectedPickupDate ??
+      expectedPickupDate:
+          expectedPickupDate ??
           (expectedPickupDateTime != null
               ? OrderDate.fromDate(expectedPickupDateTime)
               : OrderDate(2026, 9, 20)),
@@ -516,22 +517,24 @@ void main() {
           );
 
           // Insert raw SQLite row directly with status = 'completed' and completedAt = null
-          await db.into(db.orders).insert(
-            db_pkg.OrdersCompanion.insert(
-              id: 'ord-sync-comp',
-              orderNumber: '26-SC01',
-              customerId: 'cust-sync-comp',
-              customerNameSnapshot: const Value('عميل مزامنة مكتمل'),
-              customerPhoneSnapshot: const Value('01077777777'),
-              status: Value(OrderStatus.completed.value),
-              expectedPickupDate: DateTime(2026, 9, 20),
-              subtotal: 6000,
-              total: 6000,
-              completedAt: const Value(null),
-              createdAt: DateTime(2026, 9, 1, 10, 0),
-              updatedAt: DateTime(2026, 9, 1, 12, 0),
-            ),
-          );
+          await db
+              .into(db.orders)
+              .insert(
+                db_pkg.OrdersCompanion.insert(
+                  id: 'ord-sync-comp',
+                  orderNumber: '26-SC01',
+                  customerId: 'cust-sync-comp',
+                  customerNameSnapshot: const Value('عميل مزامنة مكتمل'),
+                  customerPhoneSnapshot: const Value('01077777777'),
+                  status: Value(OrderStatus.completed.value),
+                  expectedPickupDate: DateTime(2026, 9, 20),
+                  subtotal: 6000,
+                  total: 6000,
+                  completedAt: const Value(null),
+                  createdAt: DateTime(2026, 9, 1, 10, 0),
+                  updatedAt: DateTime(2026, 9, 1, 12, 0),
+                ),
+              );
 
           cubit.setFilter(OrderListFilter.completed);
           await pumpEventQueue();
@@ -561,24 +564,26 @@ void main() {
           );
 
           // Insert raw SQLite row directly with status = 'cancelled', cancelledAt = null, cancellationReason = null
-          await db.into(db.orders).insert(
-            db_pkg.OrdersCompanion.insert(
-              id: 'ord-sync-canc',
-              orderNumber: '26-SX01',
-              customerId: 'cust-sync-canc',
-              customerNameSnapshot: const Value('عميل مزامنة ملغي'),
-              customerPhoneSnapshot: const Value('01088888888'),
-              status: Value(OrderStatus.cancelled.value),
-              expectedPickupDate: DateTime(2026, 9, 20),
-              notes: const Value('ملاحظة سبب يدوي'),
-              subtotal: 4500,
-              total: 4500,
-              cancelledAt: const Value(null),
-              cancellationReason: const Value(null),
-              createdAt: DateTime(2026, 9, 2, 10, 0),
-              updatedAt: DateTime(2026, 9, 2, 11, 0),
-            ),
-          );
+          await db
+              .into(db.orders)
+              .insert(
+                db_pkg.OrdersCompanion.insert(
+                  id: 'ord-sync-canc',
+                  orderNumber: '26-SX01',
+                  customerId: 'cust-sync-canc',
+                  customerNameSnapshot: const Value('عميل مزامنة ملغي'),
+                  customerPhoneSnapshot: const Value('01088888888'),
+                  status: Value(OrderStatus.cancelled.value),
+                  expectedPickupDate: DateTime(2026, 9, 20),
+                  notes: const Value('ملاحظة سبب يدوي'),
+                  subtotal: 4500,
+                  total: 4500,
+                  cancelledAt: const Value(null),
+                  cancellationReason: const Value(null),
+                  createdAt: DateTime(2026, 9, 2, 10, 0),
+                  updatedAt: DateTime(2026, 9, 2, 11, 0),
+                ),
+              );
 
           cubit.setFilter(OrderListFilter.cancelled);
           await pumpEventQueue();
@@ -732,7 +737,14 @@ void main() {
 
     group('Deterministic Date-based Filters (Today Pickup vs Overdue)', () {
       late OrdersListCubit testCubit;
-      final fixedNow = DateTime(2026, 9, 26, 12, 0, 0); // Saturday 2026-09-26 12:00:00
+      final fixedNow = DateTime(
+        2026,
+        9,
+        26,
+        12,
+        0,
+        0,
+      ); // Saturday 2026-09-26 12:00:00
 
       setUp(() async {
         testCubit = OrdersListCubit(
@@ -900,11 +912,15 @@ void main() {
         () async {
           testCubit.setFilter(OrderListFilter.todayPickup);
           await pumpEventQueue();
-          final todayIds = testCubit.state.orders.map((o) => o.order.id).toSet();
+          final todayIds = testCubit.state.orders
+              .map((o) => o.order.id)
+              .toSet();
 
           testCubit.setFilter(OrderListFilter.overdue);
           await pumpEventQueue();
-          final overdueIds = testCubit.state.orders.map((o) => o.order.id).toSet();
+          final overdueIds = testCubit.state.orders
+              .map((o) => o.order.id)
+              .toSet();
 
           expect(todayIds.contains('ord-det-tomorrow-midnight'), isFalse);
           expect(todayIds.contains('ord-det-tomorrow-afternoon'), isFalse);
@@ -1105,7 +1121,8 @@ void main() {
             expect(item.remainingAmount.isPositive, isTrue);
             expect(item.isFullyPaid, isFalse);
             expect(item.order.status, isNot(equals(OrderStatus.cancelled)));
-            final domainRemaining = await paymentRepository.getRemainingAmountForOrder(item.order.id);
+            final domainRemaining = await paymentRepository
+                .getRemainingAmountForOrder(item.order.id);
             expect(item.remainingAmount, domainRemaining);
           }
         },
@@ -1261,96 +1278,105 @@ void main() {
     );
 
     group('Reactive SQLite Signal & Concurrency', () {
-      test('1. DB signal triggers reload while list is empty / first page', () async {
-        expect(cubit.state.orders, isEmpty);
+      test(
+        '1. DB signal triggers reload while list is empty / first page',
+        () async {
+          expect(cubit.state.orders, isEmpty);
 
-        await seedOrder(
-          orderId: 'ord-signal-1',
-          orderNumber: '26-901',
-          customerId: 'cust-901',
-          customerName: 'عميل التحديث التلقائي',
-          phone: '01090000001',
-          status: OrderStatus.processing,
-          totalPiastres: 3000,
-        );
-
-        await pumpEventQueue();
-
-        expect(cubit.state.orders.length, 1);
-        expect(cubit.state.orders.first.order.orderNumber, '26-901');
-      });
-
-      test('2. Current filter and search state are preserved on DB signal', () async {
-        cubit.setFilter(OrderListFilter.ready);
-        cubit.search('26-902');
-        await pumpEventQueue();
-        expect(cubit.state.orders, isEmpty);
-
-        // Seed an order that matches both filter (ready) and search (26-902)
-        await seedOrder(
-          orderId: 'ord-signal-ready',
-          orderNumber: '26-902',
-          customerId: 'cust-902',
-          customerName: 'عميل جاهز',
-          phone: '01090000002',
-          status: OrderStatus.ready,
-          totalPiastres: 4000,
-        );
-
-        // Seed an order that does NOT match (processing)
-        await seedOrder(
-          orderId: 'ord-signal-processing',
-          orderNumber: '26-903',
-          customerId: 'cust-903',
-          customerName: 'عميل تجهيز',
-          phone: '01090000003',
-          status: OrderStatus.processing,
-          totalPiastres: 4000,
-        );
-
-        await pumpEventQueue();
-
-        expect(cubit.state.orders.length, 1);
-        expect(cubit.state.orders.first.order.orderNumber, '26-902');
-        expect(cubit.state.activeFilter, OrderListFilter.ready);
-        expect(cubit.state.searchQuery, '26-902');
-      });
-
-      test('3. DB signal does NOT reset a paginated list where length > _pageSize', () async {
-        for (var i = 1; i <= 25; i++) {
           await seedOrder(
-            orderId: 'ord-pag-$i',
-            orderNumber: '26-${i.toString().padLeft(3, '0')}',
-            customerId: 'cust-pag-$i',
-            customerName: 'عميل $i',
-            phone: '0108000${i.toString().padLeft(4, '0')}',
+            orderId: 'ord-signal-1',
+            orderNumber: '26-901',
+            customerId: 'cust-901',
+            customerName: 'عميل التحديث التلقائي',
+            phone: '01090000001',
             status: OrderStatus.processing,
-            totalPiastres: 1000 * i,
+            totalPiastres: 3000,
           );
-        }
 
-        await cubit.loadOrders();
-        expect(cubit.state.orders.length, 20);
+          await pumpEventQueue();
 
-        await cubit.loadMore();
-        expect(cubit.state.orders.length, 25);
+          expect(cubit.state.orders.length, 1);
+          expect(cubit.state.orders.first.order.orderNumber, '26-901');
+        },
+      );
 
-        // Write a 26th order to trigger DB signal
-        await seedOrder(
-          orderId: 'ord-pag-26',
-          orderNumber: '26-026',
-          customerId: 'cust-pag-26',
-          customerName: 'عميل 26',
-          phone: '01080000026',
-          status: OrderStatus.processing,
-          totalPiastres: 26000,
-        );
+      test(
+        '2. Current filter and search state are preserved on DB signal',
+        () async {
+          cubit.setFilter(OrderListFilter.ready);
+          cubit.search('26-902');
+          await pumpEventQueue();
+          expect(cubit.state.orders, isEmpty);
 
-        await pumpEventQueue();
+          // Seed an order that matches both filter (ready) and search (26-902)
+          await seedOrder(
+            orderId: 'ord-signal-ready',
+            orderNumber: '26-902',
+            customerId: 'cust-902',
+            customerName: 'عميل جاهز',
+            phone: '01090000002',
+            status: OrderStatus.ready,
+            totalPiastres: 4000,
+          );
 
-        // Must still have 25 orders; first-page guard dropped the signal and preserved pagination
-        expect(cubit.state.orders.length, 25);
-      });
+          // Seed an order that does NOT match (processing)
+          await seedOrder(
+            orderId: 'ord-signal-processing',
+            orderNumber: '26-903',
+            customerId: 'cust-903',
+            customerName: 'عميل تجهيز',
+            phone: '01090000003',
+            status: OrderStatus.processing,
+            totalPiastres: 4000,
+          );
+
+          await pumpEventQueue();
+
+          expect(cubit.state.orders.length, 1);
+          expect(cubit.state.orders.first.order.orderNumber, '26-902');
+          expect(cubit.state.activeFilter, OrderListFilter.ready);
+          expect(cubit.state.searchQuery, '26-902');
+        },
+      );
+
+      test(
+        '3. DB signal does NOT reset a paginated list where length > _pageSize',
+        () async {
+          for (var i = 1; i <= 25; i++) {
+            await seedOrder(
+              orderId: 'ord-pag-$i',
+              orderNumber: '26-${i.toString().padLeft(3, '0')}',
+              customerId: 'cust-pag-$i',
+              customerName: 'عميل $i',
+              phone: '0108000${i.toString().padLeft(4, '0')}',
+              status: OrderStatus.processing,
+              totalPiastres: 1000 * i,
+            );
+          }
+
+          await cubit.loadOrders();
+          expect(cubit.state.orders.length, 20);
+
+          await cubit.loadMore();
+          expect(cubit.state.orders.length, 25);
+
+          // Write a 26th order to trigger DB signal
+          await seedOrder(
+            orderId: 'ord-pag-26',
+            orderNumber: '26-026',
+            customerId: 'cust-pag-26',
+            customerName: 'عميل 26',
+            phone: '01080000026',
+            status: OrderStatus.processing,
+            totalPiastres: 26000,
+          );
+
+          await pumpEventQueue();
+
+          // Must still have 25 orders; first-page guard dropped the signal and preserved pagination
+          expect(cubit.state.orders.length, 25);
+        },
+      );
 
       test('4. A stale earlier async load cannot overwrite a newer load', () async {
         final delayedRepo = DelayedOrderRepository(orderRepository);
@@ -1390,7 +1416,10 @@ void main() {
         final secondLoadFuture = testCubit.loadOrders(refresh: true);
         await secondLoadFuture;
 
-        expect(testCubit.state.orders.any((vm) => vm.order.id == 'ord-stale-2'), isTrue);
+        expect(
+          testCubit.state.orders.any((vm) => vm.order.id == 'ord-stale-2'),
+          isTrue,
+        );
 
         // Now complete the stale request 1 with only the old order
         final now = DateTime.now();
@@ -1412,136 +1441,145 @@ void main() {
         await firstLoadFuture;
 
         // Stale result should NOT overwrite newer state (order-stale-2 must still be present)
-        expect(testCubit.state.orders.any((vm) => vm.order.id == 'ord-stale-2'), isTrue);
+        expect(
+          testCubit.state.orders.any((vm) => vm.order.id == 'ord-stale-2'),
+          isTrue,
+        );
       });
 
-      test('5. Critical race: signal while loading triggers pending refresh after load', () async {
-        final delayedRepo = DelayedOrderRepository(orderRepository)
-          ..useCustomUpdates = true;
-        final testCubit = OrdersListCubit(
-          orderRepository: delayedRepo,
-          customerRepository: customerRepository,
-          paymentRepository: paymentRepository,
-        );
-        addTearDown(() {
-          delayedRepo.dispose();
-          return testCubit.close();
-        });
+      test(
+        '5. Critical race: signal while loading triggers pending refresh after load',
+        () async {
+          final delayedRepo = DelayedOrderRepository(orderRepository)
+            ..useCustomUpdates = true;
+          final testCubit = OrdersListCubit(
+            orderRepository: delayedRepo,
+            customerRepository: customerRepository,
+            paymentRepository: paymentRepository,
+          );
+          addTearDown(() {
+            delayedRepo.dispose();
+            return testCubit.close();
+          });
 
-        // Seed order into DB so enrichment queries succeed
-        await seedOrder(
-          orderId: 'ord-race-new',
-          orderNumber: '26-999',
-          customerId: 'cust-race',
-          customerName: 'عميل جديد',
-          phone: '01012345678',
-          status: OrderStatus.processing,
-          totalPiastres: 3000,
-        );
+          // Seed order into DB so enrichment queries succeed
+          await seedOrder(
+            orderId: 'ord-race-new',
+            orderNumber: '26-999',
+            customerId: 'cust-race',
+            customerName: 'عميل جديد',
+            phone: '01012345678',
+            status: OrderStatus.processing,
+            totalPiastres: 3000,
+          );
 
-        // 1. Start OrdersListCubit (testCubit started above)
-        expect(testCubit.state.isLoading, isFalse);
-        expect(testCubit.hasPendingReload, isFalse);
+          // 1. Start OrdersListCubit (testCubit started above)
+          expect(testCubit.state.isLoading, isFalse);
+          expect(testCubit.hasPendingReload, isFalse);
 
-        // 2 & 3. Call loadOrders() and keep getOrders() pending
-        final completer1 = Completer<List<Order>>();
-        delayedRepo.getOrdersCompleter = completer1;
-        final loadFuture = testCubit.loadOrders();
+          // 2 & 3. Call loadOrders() and keep getOrders() pending
+          final completer1 = Completer<List<Order>>();
+          delayedRepo.getOrdersCompleter = completer1;
+          final loadFuture = testCubit.loadOrders();
 
-        expect(testCubit.state.isLoading, isTrue);
-        expect(delayedRepo.getOrdersCallCount, 1);
+          expect(testCubit.state.isLoading, isTrue);
+          expect(delayedRepo.getOrdersCallCount, 1);
 
-        // 4. While it is pending, emit the repository DB update signal
-        delayedRepo.emitDbSignal();
-        await pumpEventQueue();
+          // 4. While it is pending, emit the repository DB update signal
+          delayedRepo.emitDbSignal();
+          await pumpEventQueue();
 
-        // 5. Verify the signal sets pending invalidation instead of being lost
-        expect(testCubit.hasPendingReload, isTrue);
-        expect(delayedRepo.getOrdersCallCount, 1);
+          // 5. Verify the signal sets pending invalidation instead of being lost
+          expect(testCubit.hasPendingReload, isTrue);
+          expect(delayedRepo.getOrdersCallCount, 1);
 
-        // 6. Complete the first request with stale/empty data
-        final completer2 = Completer<List<Order>>();
-        delayedRepo.getOrdersCompleter = completer2;
-        completer1.complete(<Order>[]);
-        await pumpEventQueue();
+          // 6. Complete the first request with stale/empty data
+          final completer2 = Completer<List<Order>>();
+          delayedRepo.getOrdersCompleter = completer2;
+          completer1.complete(<Order>[]);
+          await pumpEventQueue();
 
-        // 7. Verify exactly one fresh reload occurs automatically
-        expect(delayedRepo.getOrdersCallCount, 2);
-        expect(testCubit.hasPendingReload, isFalse);
-        expect(testCubit.state.isLoading, isTrue);
+          // 7. Verify exactly one fresh reload occurs automatically
+          expect(delayedRepo.getOrdersCallCount, 2);
+          expect(testCubit.hasPendingReload, isFalse);
+          expect(testCubit.state.isLoading, isTrue);
 
-        // 8. Complete the fresh reload with the new order
-        final freshOrders = await orderRepository.getOrders();
-        completer2.complete(freshOrders);
-        await loadFuture;
-        await pumpEventQueue();
+          // 8. Complete the fresh reload with the new order
+          final freshOrders = await orderRepository.getOrders();
+          completer2.complete(freshOrders);
+          await loadFuture;
+          await pumpEventQueue();
 
-        // 9. Verify final state contains the new order
-        expect(testCubit.state.orders.length, 1);
-        expect(testCubit.state.orders.first.order.id, 'ord-race-new');
-        expect(testCubit.state.isLoading, isFalse);
-      });
+          // 9. Verify final state contains the new order
+          expect(testCubit.state.orders.length, 1);
+          expect(testCubit.state.orders.first.order.id, 'ord-race-new');
+          expect(testCubit.state.isLoading, isFalse);
+        },
+      );
 
-      test('6. Multiple signals while loading coalesce into exactly one fresh reload', () async {
-        final delayedRepo = DelayedOrderRepository(orderRepository)
-          ..useCustomUpdates = true;
-        final testCubit = OrdersListCubit(
-          orderRepository: delayedRepo,
-          customerRepository: customerRepository,
-          paymentRepository: paymentRepository,
-        );
-        addTearDown(() {
-          delayedRepo.dispose();
-          return testCubit.close();
-        });
+      test(
+        '6. Multiple signals while loading coalesce into exactly one fresh reload',
+        () async {
+          final delayedRepo = DelayedOrderRepository(orderRepository)
+            ..useCustomUpdates = true;
+          final testCubit = OrdersListCubit(
+            orderRepository: delayedRepo,
+            customerRepository: customerRepository,
+            paymentRepository: paymentRepository,
+          );
+          addTearDown(() {
+            delayedRepo.dispose();
+            return testCubit.close();
+          });
 
-        await seedOrder(
-          orderId: 'ord-multi-signal',
-          orderNumber: '26-888',
-          customerId: 'cust-multi',
-          customerName: 'عميل إشارات متعددة',
-          phone: '01012345678',
-          status: OrderStatus.processing,
-          totalPiastres: 2500,
-        );
+          await seedOrder(
+            orderId: 'ord-multi-signal',
+            orderNumber: '26-888',
+            customerId: 'cust-multi',
+            customerName: 'عميل إشارات متعددة',
+            phone: '01012345678',
+            status: OrderStatus.processing,
+            totalPiastres: 2500,
+          );
 
-        final completer1 = Completer<List<Order>>();
-        delayedRepo.getOrdersCompleter = completer1;
-        final loadFuture = testCubit.loadOrders();
+          final completer1 = Completer<List<Order>>();
+          delayedRepo.getOrdersCompleter = completer1;
+          final loadFuture = testCubit.loadOrders();
 
-        expect(testCubit.state.isLoading, isTrue);
-        expect(delayedRepo.getOrdersCallCount, 1);
+          expect(testCubit.state.isLoading, isTrue);
+          expect(delayedRepo.getOrdersCallCount, 1);
 
-        // Emit multiple signals while load is in-flight
-        delayedRepo.emitDbSignal();
-        delayedRepo.emitDbSignal();
-        delayedRepo.emitDbSignal();
-        await pumpEventQueue();
+          // Emit multiple signals while load is in-flight
+          delayedRepo.emitDbSignal();
+          delayedRepo.emitDbSignal();
+          delayedRepo.emitDbSignal();
+          await pumpEventQueue();
 
-        expect(testCubit.hasPendingReload, isTrue);
-        expect(delayedRepo.getOrdersCallCount, 1);
+          expect(testCubit.hasPendingReload, isTrue);
+          expect(delayedRepo.getOrdersCallCount, 1);
 
-        // Prepare completer2 for the single coalesced reload
-        final completer2 = Completer<List<Order>>();
-        delayedRepo.getOrdersCompleter = completer2;
-        completer1.complete(<Order>[]);
-        await pumpEventQueue();
+          // Prepare completer2 for the single coalesced reload
+          final completer2 = Completer<List<Order>>();
+          delayedRepo.getOrdersCompleter = completer2;
+          completer1.complete(<Order>[]);
+          await pumpEventQueue();
 
-        // Exactly one reload triggered
-        expect(delayedRepo.getOrdersCallCount, 2);
-        expect(testCubit.hasPendingReload, isFalse);
+          // Exactly one reload triggered
+          expect(delayedRepo.getOrdersCallCount, 2);
+          expect(testCubit.hasPendingReload, isFalse);
 
-        final freshOrders = await orderRepository.getOrders();
-        completer2.complete(freshOrders);
-        await loadFuture;
-        await pumpEventQueue();
+          final freshOrders = await orderRepository.getOrders();
+          completer2.complete(freshOrders);
+          await loadFuture;
+          await pumpEventQueue();
 
-        // Ensure no third reload occurred
-        expect(delayedRepo.getOrdersCallCount, 2);
-        expect(testCubit.state.orders.length, 1);
-        expect(testCubit.state.orders.first.order.id, 'ord-multi-signal');
-        expect(testCubit.state.isLoading, isFalse);
-      });
+          // Ensure no third reload occurred
+          expect(delayedRepo.getOrdersCallCount, 2);
+          expect(testCubit.state.orders.length, 1);
+          expect(testCubit.state.orders.first.order.id, 'ord-multi-signal');
+          expect(testCubit.state.isLoading, isFalse);
+        },
+      );
 
       test('7. Subscription is cancelled on close', () async {
         await cubit.close();

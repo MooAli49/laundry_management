@@ -497,7 +497,10 @@ void main() {
 
         // 3. Financial totals across non-cancelled orders for remaining:
         expect(data.totalPaid, equals(const Money.fromPiastres(34500)));
-        expect(data.totalRemaining, equals(const Money.fromPiastres(10000))); // Non-cancelled orders only
+        expect(
+          data.totalRemaining,
+          equals(const Money.fromPiastres(10000)),
+        ); // Non-cancelled orders only
 
         // 4. First history page remains limited to 20 orders:
         expect(data.orders.length, equals(20));

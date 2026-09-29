@@ -182,8 +182,9 @@ void main() {
       expect(find.text('المتبقي: 120.00 ج.م'), findsOneWidget);
 
       // Verify outstanding amount uses AppColors.warning (amber) and NOT AppColors.error (red)
-      final remainingText =
-          tester.widget<Text>(find.text('المتبقي: 120.00 ج.م'));
+      final remainingText = tester.widget<Text>(
+        find.text('المتبقي: 120.00 ج.م'),
+      );
       expect(remainingText.style?.color, AppColors.warning);
 
       final outstandingKpiText = tester.widget<Text>(find.text('120.00 ج.م'));

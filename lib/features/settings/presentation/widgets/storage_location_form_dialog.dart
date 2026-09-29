@@ -139,9 +139,7 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
                     padding: const EdgeInsets.all(AppSpacing.md),
                     decoration: BoxDecoration(
                       color: AppColors.errorLight,
-                      borderRadius: BorderRadius.circular(
-                        AppSpacing.radiusMd,
-                      ),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                       border: Border.all(
                         color: AppColors.error.withValues(alpha: 0.3),
                       ),
@@ -199,9 +197,7 @@ class _StorageLocationFormDialogState extends State<StorageLocationFormDialog> {
                     spacing: AppSpacing.sm,
                     runSpacing: AppSpacing.sm,
                     children: widget.availableItemTypes.map((type) {
-                      final isSelected = _selectedTypeIds.contains(
-                        type.id,
-                      );
+                      final isSelected = _selectedTypeIds.contains(type.id);
                       return FilterChip(
                         label: Text(type.name),
                         selected: isSelected,

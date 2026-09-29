@@ -138,7 +138,7 @@ void main() {
           final payload = {
             'notes': 'updated notes',
             'items': [
-              {'id': 'oi-1', 'unit_price': 1500}
+              {'id': 'oi-1', 'unit_price': 1500},
             ],
           };
           await api.editOrderAggregate(

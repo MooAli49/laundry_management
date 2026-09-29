@@ -64,10 +64,16 @@ void main() {
                   showDialog(
                     context: context,
                     builder: (_) => CustomerFormDialog(
-                      onSave: ({required name, required phone, address, notes}) async {
-                        savedName = name;
-                        savedPhone = phone;
-                      },
+                      onSave:
+                          ({
+                            required name,
+                            required phone,
+                            address,
+                            notes,
+                          }) async {
+                            savedName = name;
+                            savedPhone = phone;
+                          },
                     ),
                   );
                 },
@@ -144,28 +150,31 @@ void main() {
       expect(find.text('حفظ التعديلات'), findsOneWidget);
     });
 
-    testWidgets('CustomerFormDialog normalizes whitespace-only address to null on save', (tester) async {
-      String? savedAddress = 'initial';
-      await tester.pumpWidget(
-        testBoilerplate(
-          CustomerFormDialog(
-            onSave: ({required name, required phone, address, notes}) async {
-              savedAddress = address;
-            },
+    testWidgets(
+      'CustomerFormDialog normalizes whitespace-only address to null on save',
+      (tester) async {
+        String? savedAddress = 'initial';
+        await tester.pumpWidget(
+          testBoilerplate(
+            CustomerFormDialog(
+              onSave: ({required name, required phone, address, notes}) async {
+                savedAddress = address;
+              },
+            ),
           ),
-        ),
-      );
+        );
 
-      // Enter valid name and phone
-      await tester.enterText(find.byType(TextFormField).at(0), 'محمد علي');
-      await tester.enterText(find.byType(TextFormField).at(1), '01012345678');
-      // Enter whitespace-only address
-      await tester.enterText(find.byType(TextFormField).at(2), '   \t  ');
+        // Enter valid name and phone
+        await tester.enterText(find.byType(TextFormField).at(0), 'محمد علي');
+        await tester.enterText(find.byType(TextFormField).at(1), '01012345678');
+        // Enter whitespace-only address
+        await tester.enterText(find.byType(TextFormField).at(2), '   \t  ');
 
-      await tester.tap(find.text('حفظ العميل'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('حفظ العميل'));
+        await tester.pumpAndSettle();
 
-      expect(savedAddress, isNull);
-    });
+        expect(savedAddress, isNull);
+      },
+    );
   });
 }

@@ -5,7 +5,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../services/bluetooth_printer/bluetooth_printer_service.dart';
 import '../services/bluetooth_printer/printer_profile.dart';
-import '../services/bluetooth_printer/thermal_command_builder.dart';
 import 'bluetooth_printer_state.dart';
 
 /// Cubit managing the Bluetooth printer selection, discovery, connection,
@@ -248,33 +247,49 @@ class BluetoothPrinterCubit extends Cubit<BluetoothPrinterState> {
     }
   }
 
-  Future<void> diagnosticPrint() async {
-    dev.log(
-      '[BluetoothPrinterCubit] DIAGNOSTIC PRINT START',
-      name: 'BluetoothPrinterCubit',
+  Future<void> writeBlockSequence(
+    List<List<int>> blocks, {
+    Duration delay = const Duration(milliseconds: 50),
+  }) async {
+    emit(
+      state.copyWith(
+        connectionState: BluetoothPrinterConnectionState.printing,
+        clearPrintError: true,
+      ),
     );
     try {
-      await _printerService.diagnosticPrint();
+      await _printerService.writeBlockSequence(blocks, delay: delay);
+      emit(
+        state.copyWith(
+          connectionState: BluetoothPrinterConnectionState.connected,
+        ),
+      );
+    } on BluetoothPrinterException catch (e) {
       dev.log(
-        '[BluetoothPrinterCubit] DIAGNOSTIC PRINT SUCCESS',
+        '[BluetoothPrinterCubit] PRINT BLOCK SEQUENCE FAILED error=$e',
         name: 'BluetoothPrinterCubit',
       );
-    } catch (error, stackTrace) {
+      emit(
+        state.copyWith(
+          connectionState: BluetoothPrinterConnectionState.printFailed,
+          printError: _mapErrorCode(e.errorCode),
+        ),
+      );
+      rethrow;
+    } catch (e) {
       dev.log(
-        '[BluetoothPrinterCubit] DIAGNOSTIC PRINT FAILED error=$error',
+        '[BluetoothPrinterCubit] PRINT BLOCK SEQUENCE FAILED error=$e',
         name: 'BluetoothPrinterCubit',
-        error: error,
-        stackTrace: stackTrace,
+      );
+      emit(
+        state.copyWith(
+          connectionState: BluetoothPrinterConnectionState.printFailed,
+          printError: 'فشلت عملية الطباعة',
+        ),
       );
       rethrow;
     }
   }
-
-  Future<void> diagnosticRasterPrint() =>
-      _printerService.diagnosticRasterPrint();
-
-  Future<void> diagnosticRasterPrintVariant(DiagnosticRasterFormat format) =>
-      _printerService.diagnosticRasterPrintVariant(format);
 
   // ---------------------------------------------------------------------------
   // Error mapping (error codes → Arabic user-facing messages)

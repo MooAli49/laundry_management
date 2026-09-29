@@ -74,15 +74,15 @@ class Refund {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        orderId,
-        amount,
-        refundMethod,
-        reason,
-        refundedAt,
-        createdAt,
-        updatedAt,
-      );
+    id,
+    orderId,
+    amount,
+    refundMethod,
+    reason,
+    refundedAt,
+    createdAt,
+    updatedAt,
+  );
 
   @override
   String toString() =>

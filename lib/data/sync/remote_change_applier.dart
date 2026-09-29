@@ -25,8 +25,8 @@ class RemoteChangeApplier {
   RemoteChangeApplier({
     required app_db.AppDatabase db,
     required SyncStateDao syncStateDao,
-  })  : _db = db,
-        _syncStateDao = syncStateDao;
+  }) : _db = db,
+       _syncStateDao = syncStateDao;
 
   /// Applies a full page response from the Pull API.
   Future<void> applyPage(PullChangesResponseDto page) async {
@@ -253,8 +253,7 @@ class RemoteChangeApplier {
         await _db.into(_db.orderItems).insertOnConflictUpdate(itemCompanion);
 
         // 3. Optional carpet details
-        final rawCarpet =
-            rawItem['carpet_data'] ?? rawItem['carpet'];
+        final rawCarpet = rawItem['carpet_data'] ?? rawItem['carpet'];
         if (rawCarpet is Map<String, dynamic>) {
           final carpetId = rawCarpet['id'] as String;
           final carpetCompanion = app_db.OrderItemCarpetsCompanion(
@@ -286,9 +285,9 @@ class RemoteChangeApplier {
     } else {
       // Subsequent Order updates (e.g. status transition, notes, cancellation)
       // Read existing local order before applying updates to accurately capture previous status
-      final existingOrder = await (_db.select(_db.orders)
-            ..where((t) => t.id.equals(orderId)))
-          .getSingleOrNull();
+      final existingOrder = await (_db.select(
+        _db.orders,
+      )..where((t) => t.id.equals(orderId))).getSingleOrNull();
       final previousStatus = existingOrder?.status;
       final incomingStatus = payload['status'] as String?;
 
@@ -304,7 +303,8 @@ class RemoteChangeApplier {
         status: payload.containsKey('status')
             ? Value(payload['status'] as String)
             : const Value.absent(),
-        expectedPickupDate: payload.containsKey('expected_pickup_date') &&
+        expectedPickupDate:
+            payload.containsKey('expected_pickup_date') &&
                 payload['expected_pickup_date'] != null
             ? Value(DateTime.parse(payload['expected_pickup_date'] as String))
             : const Value.absent(),
@@ -347,8 +347,9 @@ class RemoteChangeApplier {
         ),
       );
 
-      await (_db.update(_db.orders)..where((t) => t.id.equals(orderId)))
-          .write(updates);
+      await (_db.update(
+        _db.orders,
+      )..where((t) => t.id.equals(orderId))).write(updates);
 
       // Lifecycle Storage Reconciliation Rule:
       // Deactivate active local storage records if:
@@ -356,14 +357,15 @@ class RemoteChangeApplier {
       // 2. Order transitioned to cancelled
       // 3. Order corrected from ready back to processing
       // For processing -> ready: active storage MUST be preserved.
-      final shouldDeactivateStorage = incomingStatus == 'completed' ||
+      final shouldDeactivateStorage =
+          incomingStatus == 'completed' ||
           incomingStatus == 'cancelled' ||
           (previousStatus == 'ready' && incomingStatus == 'processing');
 
       if (shouldDeactivateStorage) {
-        final orderItems = await (_db.select(_db.orderItems)
-              ..where((t) => t.orderId.equals(orderId)))
-            .get();
+        final orderItems = await (_db.select(
+          _db.orderItems,
+        )..where((t) => t.orderId.equals(orderId))).get();
         final itemIds = orderItems.map((e) => e.id).toList();
 
         if (itemIds.isNotEmpty) {
@@ -371,12 +373,9 @@ class RemoteChangeApplier {
               ? DateTime.parse(payload['updated_at'] as String)
               : change.createdAt;
 
-          await (_db.update(_db.storageRecords)
-                ..where(
-                  (t) =>
-                      t.orderItemId.isIn(itemIds) &
-                      t.isActive.equals(true),
-                ))
+          await (_db.update(_db.storageRecords)..where(
+                (t) => t.orderItemId.isIn(itemIds) & t.isActive.equals(true),
+              ))
               .write(
                 app_db.StorageRecordsCompanion(
                   isActive: const Value(false),
@@ -404,9 +403,9 @@ class RemoteChangeApplier {
 
     await _db.transaction(() async {
       // 1. Reconcile Order Header
-      final existingOrder = await (_db.select(_db.orders)
-            ..where((t) => t.id.equals(orderId)))
-          .getSingleOrNull();
+      final existingOrder = await (_db.select(
+        _db.orders,
+      )..where((t) => t.id.equals(orderId))).getSingleOrNull();
 
       final orderCompanion = app_db.OrdersCompanion(
         id: Value(orderId),
@@ -416,9 +415,7 @@ class RemoteChangeApplier {
               '',
         ),
         customerId: Value(
-          payload['customer_id'] as String? ??
-              existingOrder?.customerId ??
-              '',
+          payload['customer_id'] as String? ?? existingOrder?.customerId ?? '',
         ),
         customerNameSnapshot: Value(
           payload['customer_name_snapshot'] as String? ??
@@ -431,9 +428,7 @@ class RemoteChangeApplier {
               '',
         ),
         status: Value(
-          payload['status'] as String? ??
-              existingOrder?.status ??
-              'processing',
+          payload['status'] as String? ?? existingOrder?.status ?? 'processing',
         ),
         expectedPickupDate: Value(
           payload['expected_pickup_date'] != null
@@ -520,9 +515,9 @@ class RemoteChangeApplier {
       }
 
       // Existing local items
-      final localItems = await (_db.select(_db.orderItems)
-            ..where((t) => t.orderId.equals(orderId)))
-          .get();
+      final localItems = await (_db.select(
+        _db.orderItems,
+      )..where((t) => t.orderId.equals(orderId))).get();
       final localItemIds = localItems.map((e) => e.id).toSet();
 
       // Local items missing from incoming aggregate must be removed
@@ -530,12 +525,9 @@ class RemoteChangeApplier {
 
       for (final removedId in removedItemIds) {
         // Deactivate active local storage records for removed items
-        await (_db.update(_db.storageRecords)
-              ..where(
-                (t) =>
-                    t.orderItemId.equals(removedId) &
-                    t.isActive.equals(true),
-              ))
+        await (_db.update(_db.storageRecords)..where(
+              (t) => t.orderItemId.equals(removedId) & t.isActive.equals(true),
+            ))
             .write(
               app_db.StorageRecordsCompanion(
                 isActive: const Value(false),
@@ -544,20 +536,20 @@ class RemoteChangeApplier {
             );
 
         // Delete carpet metadata
-        await (_db.delete(_db.orderItemCarpets)
-              ..where((t) => t.orderItemId.equals(removedId)))
-            .go();
+        await (_db.delete(
+          _db.orderItemCarpets,
+        )..where((t) => t.orderItemId.equals(removedId))).go();
 
         // Delete storage records for this removed item so SQLite foreign key
         // constraint (ON DELETE RESTRICT) allows deleting the item without affecting unrelated records
-        await (_db.delete(_db.storageRecords)
-              ..where((t) => t.orderItemId.equals(removedId)))
-            .go();
+        await (_db.delete(
+          _db.storageRecords,
+        )..where((t) => t.orderItemId.equals(removedId))).go();
 
         // Delete order item
-        await (_db.delete(_db.orderItems)
-              ..where((t) => t.id.equals(removedId)))
-            .go();
+        await (_db.delete(
+          _db.orderItems,
+        )..where((t) => t.id.equals(removedId))).go();
       }
 
       // Upsert surviving & new items
@@ -580,9 +572,7 @@ class RemoteChangeApplier {
           serviceNameSnapshot: Value(
             (rawItem['service_name_snapshot'] as String?)?.trim() ?? '',
           ),
-          pricingType: Value(
-            rawItem['pricing_type'] as String? ?? 'per_piece',
-          ),
+          pricingType: Value(rawItem['pricing_type'] as String? ?? 'per_piece'),
           quantity: Value((rawItem['quantity'] as num?)?.toDouble() ?? 1.0),
           unitPrice: Value((rawItem['unit_price'] as num?)?.toInt() ?? 0),
           calculatedTotal: Value(
@@ -631,18 +621,15 @@ class RemoteChangeApplier {
               .insertOnConflictUpdate(carpetCompanion);
 
           // Clean up any obsolete carpet records for this item with different id
-          await (_db.delete(_db.orderItemCarpets)
-                ..where(
-                  (t) =>
-                      t.orderItemId.equals(itemId) &
-                      t.id.isNotValue(carpetId),
-                ))
+          await (_db.delete(_db.orderItemCarpets)..where(
+                (t) => t.orderItemId.equals(itemId) & t.id.isNotValue(carpetId),
+              ))
               .go();
         } else {
           // If item is no longer carpet, delete any carpet metadata for this item
-          await (_db.delete(_db.orderItemCarpets)
-                ..where((t) => t.orderItemId.equals(itemId)))
-              .go();
+          await (_db.delete(
+            _db.orderItemCarpets,
+          )..where((t) => t.orderItemId.equals(itemId))).go();
         }
       }
     });
@@ -749,13 +736,12 @@ class RemoteChangeApplier {
     // that is NOT this record. This is a pure sync application rule;
     // it does NOT invoke repositories, use cases, or emit domain events.
     if (isActive && orderItemId.isNotEmpty) {
-      await (_db.update(_db.storageRecords)
-            ..where(
-              (t) =>
-                  t.orderItemId.equals(orderItemId) &
-                  t.isActive.equals(true) &
-                  t.id.isNotValue(recordId),
-            ))
+      await (_db.update(_db.storageRecords)..where(
+            (t) =>
+                t.orderItemId.equals(orderItemId) &
+                t.isActive.equals(true) &
+                t.id.isNotValue(recordId),
+          ))
           .write(
             app_db.StorageRecordsCompanion(
               isActive: const Value(false),
@@ -785,10 +771,13 @@ class RemoteChangeApplier {
 
     String categorySnapshot =
         payload['category_name_snapshot'] as String? ?? '';
-    if (categorySnapshot.isEmpty && payload.containsKey('expense_category_id')) {
-      final cat = await (_db.select(_db.expenseCategories)
-            ..where((t) => t.id.equals(payload['expense_category_id'] as String)))
-          .getSingleOrNull();
+    if (categorySnapshot.isEmpty &&
+        payload.containsKey('expense_category_id')) {
+      final cat =
+          await (_db.select(_db.expenseCategories)..where(
+                (t) => t.id.equals(payload['expense_category_id'] as String),
+              ))
+              .getSingleOrNull();
       if (cat != null) {
         categorySnapshot = cat.name;
       }
@@ -796,9 +785,7 @@ class RemoteChangeApplier {
 
     final companion = app_db.ExpensesCompanion(
       id: Value(id),
-      expenseCategoryId: Value(
-        payload['expense_category_id'] as String? ?? '',
-      ),
+      expenseCategoryId: Value(payload['expense_category_id'] as String? ?? ''),
       categoryNameSnapshot: Value(categorySnapshot),
       amount: Value((payload['amount'] as num?)?.toInt() ?? 0),
       expenseName: Value(payload['expense_name'] as String?),
@@ -881,15 +868,18 @@ class RemoteChangeApplier {
     // Optional supported item type IDs (canonical: supported_item_type_ids, fallback: item_type_ids)
     if (payload.containsKey('supported_item_type_ids') ||
         payload.containsKey('item_type_ids')) {
-      final rawIds = (payload['supported_item_type_ids'] ??
-          payload['item_type_ids']) as List<dynamic>?;
+      final rawIds =
+          (payload['supported_item_type_ids'] ?? payload['item_type_ids'])
+              as List<dynamic>?;
       if (rawIds != null) {
-        await (_db.delete(_db.serviceItemTypes)
-              ..where((t) => t.serviceId.equals(id)))
-            .go();
+        await (_db.delete(
+          _db.serviceItemTypes,
+        )..where((t) => t.serviceId.equals(id))).go();
         for (final itemTypeId in rawIds) {
           if (itemTypeId is String) {
-            await _db.into(_db.serviceItemTypes).insert(
+            await _db
+                .into(_db.serviceItemTypes)
+                .insert(
                   app_db.ServiceItemTypesCompanion(
                     id: Value(const Uuid().v4()),
                     serviceId: Value(id),
@@ -1010,12 +1000,14 @@ class RemoteChangeApplier {
     if (payload.containsKey('supported_item_type_ids')) {
       final rawIds = payload['supported_item_type_ids'] as List<dynamic>?;
       if (rawIds != null) {
-        await (_db.delete(_db.storageLocationItemTypes)
-              ..where((t) => t.storageLocationId.equals(id)))
-            .go();
+        await (_db.delete(
+          _db.storageLocationItemTypes,
+        )..where((t) => t.storageLocationId.equals(id))).go();
         for (final itemTypeId in rawIds) {
           if (itemTypeId is String) {
-            await _db.into(_db.storageLocationItemTypes).insert(
+            await _db
+                .into(_db.storageLocationItemTypes)
+                .insert(
                   app_db.StorageLocationItemTypesCompanion(
                     id: Value(const Uuid().v4()),
                     storageLocationId: Value(id),
@@ -1035,8 +1027,8 @@ class RemoteChangeApplier {
   // ---------------------------------------------------------------------------
   Future<void> _applyBusinessSettings(SyncChangeDto change) async {
     final payload = change.payload;
-    final id = payload['id'] as String? ??
-        '00000000-0000-0000-0000-000000000001';
+    final id =
+        payload['id'] as String? ?? '00000000-0000-0000-0000-000000000001';
 
     final companion = app_db.BusinessSettingsCompanion(
       id: Value(id),

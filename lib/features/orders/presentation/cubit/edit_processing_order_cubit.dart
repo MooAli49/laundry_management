@@ -84,19 +84,24 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
         return;
       }
 
-      final totalPaidPiastres = await _paymentsDao.getTotalPaidForOrder(orderId);
+      final totalPaidPiastres = await _paymentsDao.getTotalPaidForOrder(
+        orderId,
+      );
       final totalPaid = Money.fromPiastres(totalPaidPiastres);
 
-      final customer = await _customerRepository.getCustomerById(order.customerId);
+      final customer = await _customerRepository.getCustomerById(
+        order.customerId,
+      );
       final rawItems = await _orderRepository.getOrderItems(orderId);
 
       // Fetch storage records for items
       final editableItems = <EditableOrderItem>[];
       for (final item in rawItems) {
-        final count =
-            await _storageRecordsDao.countAllRecordsForOrderItem(item.id);
-        final activeRecord =
-            await _storageRecordsDao.getActiveRecordForOrderItem(item.id);
+        final count = await _storageRecordsDao.countAllRecordsForOrderItem(
+          item.id,
+        );
+        final activeRecord = await _storageRecordsDao
+            .getActiveRecordForOrderItem(item.id);
         String? locName;
         if (activeRecord != null) {
           final loc = await _storageLocationRepository.getStorageLocationById(
@@ -162,7 +167,12 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
   Future<void> searchCustomers(String query) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) {
-      emit(state.copyWith(customerSearchResults: const [], isSearchingCustomer: false));
+      emit(
+        state.copyWith(
+          customerSearchResults: const [],
+          isSearchingCustomer: false,
+        ),
+      );
       return;
     }
 
@@ -170,7 +180,12 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
     try {
       final results = await _customerRepository.searchCustomers(query: trimmed);
       if (isClosed) return;
-      emit(state.copyWith(customerSearchResults: results, isSearchingCustomer: false));
+      emit(
+        state.copyWith(
+          customerSearchResults: results,
+          isSearchingCustomer: false,
+        ),
+      );
     } catch (e) {
       if (isClosed) return;
       emit(state.copyWith(isSearchingCustomer: false));
@@ -238,11 +253,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
   }
 
   void toggleCustomerPickup(bool requested) {
-    emit(
-      state.copyWith(
-        customerPickupRequested: requested,
-      ),
-    );
+    emit(state.copyWith(customerPickupRequested: requested));
   }
 
   void updateCustomerPickupFee(Money fee) {
@@ -250,11 +261,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
   }
 
   void toggleCustomerDelivery(bool requested) {
-    emit(
-      state.copyWith(
-        customerDeliveryRequested: requested,
-      ),
-    );
+    emit(state.copyWith(customerDeliveryRequested: requested));
   }
 
   void updateCustomerDeliveryFee(Money fee) {
@@ -295,14 +302,19 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
     }
 
     try {
-      final services =
-          await _serviceRepository.getServicesForItemType(itemType.id);
+      final services = await _serviceRepository.getServicesForItemType(
+        itemType.id,
+      );
       final definitions = await _itemDefinitionRepository
           .getDefinitionsForItemType(itemType.id, activeOnly: true);
 
       // Deduplicate by ID
-      final uniqueServices = {for (final s in services.where((s) => s.isActive)) s.id: s}.values.toList();
-      final uniqueDefs = {for (final d in definitions.where((d) => d.isActive)) d.id: d}.values.toList();
+      final uniqueServices = {
+        for (final s in services.where((s) => s.isActive)) s.id: s,
+      }.values.toList();
+      final uniqueDefs = {
+        for (final d in definitions.where((d) => d.isActive)) d.id: d,
+      }.values.toList();
 
       emit(
         state.copyWith(
@@ -348,10 +360,12 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
         draftService: service,
         draftUnitPrice: service.price,
         clearDraftCarpetSize: service.pricingType != PricingType.perSquareMeter,
-        draftCarpetLength:
-            service.pricingType != PricingType.perSquareMeter ? 0.0 : state.draftCarpetLength,
-        draftCarpetWidth:
-            service.pricingType != PricingType.perSquareMeter ? 0.0 : state.draftCarpetWidth,
+        draftCarpetLength: service.pricingType != PricingType.perSquareMeter
+            ? 0.0
+            : state.draftCarpetLength,
+        draftCarpetWidth: service.pricingType != PricingType.perSquareMeter
+            ? 0.0
+            : state.draftCarpetWidth,
       ),
     );
   }
@@ -379,12 +393,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
   }
 
   void updateDraftCarpetDimensions(double length, double width) {
-    emit(
-      state.copyWith(
-        draftCarpetLength: length,
-        draftCarpetWidth: width,
-      ),
-    );
+    emit(state.copyWith(draftCarpetLength: length, draftCarpetWidth: width));
   }
 
   void updateDraftNotes(String? notes) {
@@ -407,8 +416,9 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
     );
 
     // Load compatible services and definitions
-    final services =
-        await _serviceRepository.getServicesForItemType(matchingType.id);
+    final services = await _serviceRepository.getServicesForItemType(
+      matchingType.id,
+    );
     final definitions = await _itemDefinitionRepository
         .getDefinitionsForItemType(matchingType.id, activeOnly: true);
 
@@ -509,7 +519,11 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
 
     if (state.draftService!.pricingType == PricingType.perSquareMeter) {
       if (state.draftCarpetLength <= 0 || state.draftCarpetWidth <= 0) {
-        emit(state.copyWith(errorMessage: 'أبعاد السجاد مطلوبة ويجب أن تكون أكبر من الصفر'));
+        emit(
+          state.copyWith(
+            errorMessage: 'أبعاد السجاد مطلوبة ويجب أن تكون أكبر من الصفر',
+          ),
+        );
         return;
       }
     }
@@ -620,7 +634,11 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
       return;
     }
     if (state.items.isEmpty) {
-      emit(state.copyWith(errorMessage: 'يجب أن يحتوي الطلب على عنصر واحد على الأقل'));
+      emit(
+        state.copyWith(
+          errorMessage: 'يجب أن يحتوي الطلب على عنصر واحد على الأقل',
+        ),
+      );
       return;
     }
     if (!state.isTotalValid) {
