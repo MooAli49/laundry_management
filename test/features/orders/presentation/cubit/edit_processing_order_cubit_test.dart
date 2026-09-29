@@ -210,9 +210,9 @@ void main() {
     serviceId: 'srv-1',
     serviceNameSnapshot: 'غسيل',
     pricingType: PricingType.perPiece,
-    quantity: 2,
+    quantity: 1,
     unitPrice: Money.fromEgp(20),
-    calculatedTotal: Money.fromEgp(40),
+    calculatedTotal: Money.fromEgp(20),
     createdAt: now,
     updatedAt: now,
   );
@@ -535,6 +535,38 @@ void main() {
           expect(cubit.state.items.length, 1);
           expect(cubit.state.items[0].isExisting, isTrue);
           expect(cubit.state.items[0].physicalQuantity, 1);
+        },
+      );
+    });
+
+    group('Custom Item Total Editing & Reset in EditProcessingOrder', () {
+      test(
+        'editing existing item total updates its calculatedTotal and order total',
+        () async {
+          await cubit.loadOrder('order-1');
+          expect(cubit.state.items[0].calculatedTotal, Money.fromEgp(20));
+          expect(cubit.state.total, Money.fromEgp(20));
+
+          // Start editing item 0
+          await cubit.startEditItem(0);
+          expect(cubit.state.effectiveDraftTotal, Money.fromEgp(20));
+
+          // Update total to 35 EGP
+          cubit.updateDraftTotal(Money.fromEgp(35));
+          expect(cubit.state.effectiveDraftTotal, Money.fromEgp(35));
+          expect(cubit.state.isDraftTotalOverridden, isTrue);
+
+          // Reset back to default
+          cubit.resetDraftTotal();
+          expect(cubit.state.effectiveDraftTotal, Money.fromEgp(20));
+          expect(cubit.state.isDraftTotalOverridden, isFalse);
+
+          // Update to 35 and save
+          cubit.updateDraftTotal(Money.fromEgp(35));
+          cubit.saveDraftItem();
+
+          expect(cubit.state.items[0].calculatedTotal, Money.fromEgp(35));
+          expect(cubit.state.total, Money.fromEgp(35));
         },
       );
     });

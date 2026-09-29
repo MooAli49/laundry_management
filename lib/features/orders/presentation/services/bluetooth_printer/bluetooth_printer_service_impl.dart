@@ -84,6 +84,7 @@ class BluetoothPrinterServiceImpl implements BluetoothPrinterService {
 
   /// Must be called once after construction to set up internal subscriptions.
   void init() {
+    BluetoothPrintPlus.ensureInitialized();
     _blueStateSub = BluetoothPrintPlus.blueState.listen((blueState) {
       dev.log(
         '[BluetoothPrinterService] blueState=$blueState',

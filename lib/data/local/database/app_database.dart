@@ -22,6 +22,7 @@ import '../tables/services_table.dart';
 import '../tables/storage_location_item_types_table.dart';
 import '../tables/storage_locations_table.dart';
 import '../tables/storage_records_table.dart';
+import '../tables/license_cache_table.dart';
 import '../tables/sync_operations_table.dart';
 import '../tables/sync_states_table.dart';
 import 'seed_data.dart';
@@ -49,13 +50,14 @@ part 'app_database.g.dart';
     BusinessSettings,
     SyncOperations,
     SyncStates,
+    LicenseCache,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -115,6 +117,12 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 6) {
         await m.addColumn(customers, customers.address);
+      }
+      if (from < 7) {
+        // Add local license cache table.
+        // Single-row singleton that mirrors the remote license_info state.
+        // This table does NOT participate in the SyncEngine or outbox.
+        await m.createTable(licenseCache);
       }
     },
     beforeOpen: (OpeningDetails details) async {

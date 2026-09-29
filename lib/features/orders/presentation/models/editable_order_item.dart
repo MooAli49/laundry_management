@@ -12,6 +12,7 @@ class EditableOrderItem {
   final String serviceName;
   final PricingType pricingType;
   final Money unitPrice;
+  final Money? customTotal;
   final int
   physicalQuantity; // 1 for existing physical piece; for new can be >= 1
   final String? carpetSizeId;
@@ -32,6 +33,7 @@ class EditableOrderItem {
     required this.serviceName,
     required this.pricingType,
     required this.unitPrice,
+    this.customTotal,
     this.physicalQuantity = 1,
     this.carpetSizeId,
     this.length = 0.0,
@@ -45,7 +47,7 @@ class EditableOrderItem {
   bool get canDelete => !hasStorageRecords;
   double get carpetArea => length * width;
 
-  Money get calculatedTotal {
+  Money get defaultTotal {
     if (pricingType == PricingType.perSquareMeter) {
       if (carpetArea <= 0) return Money.zero;
       final areaTotalPiastres = (unitPrice.piastres * carpetArea).round();
@@ -53,6 +55,8 @@ class EditableOrderItem {
     }
     return unitPrice * physicalQuantity;
   }
+
+  Money get calculatedTotal => customTotal ?? defaultTotal;
 
   EditableOrderItem copyWith({
     String? id,
@@ -65,6 +69,8 @@ class EditableOrderItem {
     String? serviceName,
     PricingType? pricingType,
     Money? unitPrice,
+    Money? customTotal,
+    bool clearCustomTotal = false,
     int? physicalQuantity,
     String? carpetSizeId,
     double? length,
@@ -87,6 +93,7 @@ class EditableOrderItem {
       serviceName: serviceName ?? this.serviceName,
       pricingType: pricingType ?? this.pricingType,
       unitPrice: unitPrice ?? this.unitPrice,
+      customTotal: clearCustomTotal ? null : (customTotal ?? this.customTotal),
       physicalQuantity: physicalQuantity ?? this.physicalQuantity,
       carpetSizeId: carpetSizeId ?? this.carpetSizeId,
       length: length ?? this.length,

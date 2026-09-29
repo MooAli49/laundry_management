@@ -209,16 +209,28 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
 
   void selectService(Service? service) {
     if (service == null) {
-      emit(state.copyWith(clearDraftService: true));
+      emit(state.copyWith(clearDraftService: true, clearDraftItemTotal: true));
     } else {
       emit(
-        state.copyWith(draftService: service, draftUnitPrice: service.price),
+        state.copyWith(
+          draftService: service,
+          draftUnitPrice: service.price,
+          clearDraftItemTotal: true,
+        ),
       );
     }
   }
 
   void updateUnitPrice(Money price) {
-    emit(state.copyWith(draftUnitPrice: price));
+    emit(state.copyWith(draftUnitPrice: price, clearDraftItemTotal: true));
+  }
+
+  void updateDraftTotal(Money total) {
+    emit(state.copyWith(draftItemTotal: total));
+  }
+
+  void resetDraftTotal() {
+    emit(state.copyWith(clearDraftItemTotal: true));
   }
 
   void updateQuantity(int quantity) {
@@ -268,9 +280,10 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
       return;
     }
     final price = state.draftUnitPrice ?? state.draftService!.price;
-    if (price <= Money.zero) {
+    final total = state.effectiveDraftTotal;
+    if (total <= Money.zero) {
       emit(
-        state.copyWith(errorMessage: 'سعر القطعة يجب أن يكون أكبر من الصفر'),
+        state.copyWith(errorMessage: 'إجمالي القطعة يجب أن يكون أكبر من الصفر'),
       );
       return;
     }
@@ -299,6 +312,7 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
       serviceName: state.draftService!.name,
       pricingType: state.draftService!.pricingType,
       unitPrice: price,
+      customTotal: state.isDraftTotalOverridden ? state.draftItemTotal : null,
       physicalQuantity: state.draftQuantity,
       carpetSizeId: state.draftCarpetSize?.id,
       length: state.draftCarpetLength,
@@ -317,6 +331,7 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
           clearDraftItemType: true,
           clearDraftItemDefinition: true,
           clearDraftService: true,
+          clearDraftItemTotal: true,
           clearDraftCarpetSize: true,
           draftCarpetLength: 0.0,
           draftCarpetWidth: 0.0,
@@ -487,6 +502,7 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
           itemDefinitionId: draft.itemDefinitionId,
           serviceId: draft.serviceId,
           customUnitPrice: draft.unitPrice,
+          customTotal: draft.customTotal,
           physicalQuantity: draft.physicalQuantity,
           notes: draft.notes,
           carpetData: carpetData,

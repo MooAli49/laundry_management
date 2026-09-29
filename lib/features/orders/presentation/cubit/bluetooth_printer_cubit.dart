@@ -202,6 +202,9 @@ class BluetoothPrinterCubit extends Cubit<BluetoothPrinterState> {
   // Printing
   // ---------------------------------------------------------------------------
 
+  /// Alias for [writeBytes] to send a complete print payload.
+  Future<void> write(List<int> bytes) => writeBytes(bytes);
+
   Future<void> writeBytes(List<int> bytes) async {
     emit(
       state.copyWith(

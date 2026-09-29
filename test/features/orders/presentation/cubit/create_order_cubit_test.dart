@@ -831,5 +831,95 @@ void main() {
         },
       );
     });
+
+    group('Custom Item Total Editing & Reset', () {
+      Future<Service> seedService(String id, int piastres) async {
+        final now = DateTime.now();
+        final itemType = cubit.state.itemTypes.first;
+        final service = Service(
+          id: id,
+          name: 'خدمة تفاوض',
+          pricingType: PricingType.perPiece,
+          price: Money.fromPiastres(piastres),
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        );
+        await serviceRepository.createService(
+          service,
+          supportedItemTypeIds: [itemType.id],
+        );
+        return service;
+      }
+
+      test(
+        'editing item total updates effectiveDraftTotal and marks as overridden',
+        () async {
+          await cubit.initialize();
+          final service = await seedService('srv-edit-tot', 1500); // 15 EGP
+          await cubit.selectItemType(cubit.state.itemTypes.first);
+          cubit.selectService(service);
+          cubit.updateQuantity(12);
+
+          // Default total = 12 * 15 = 180 EGP
+          expect(cubit.state.draftDefaultTotal, Money.fromEgp(180));
+          expect(cubit.state.effectiveDraftTotal, Money.fromEgp(180));
+          expect(cubit.state.isDraftTotalOverridden, isFalse);
+
+          // Edit total to 200 EGP
+          cubit.updateDraftTotal(Money.fromEgp(200));
+          expect(cubit.state.effectiveDraftTotal, Money.fromEgp(200));
+          expect(cubit.state.isDraftTotalOverridden, isTrue);
+
+          // Reset back to default
+          cubit.resetDraftTotal();
+          expect(cubit.state.effectiveDraftTotal, Money.fromEgp(180));
+          expect(cubit.state.isDraftTotalOverridden, isFalse);
+        },
+      );
+
+      test(
+        'adding draft with custom total creates order with negotiated total',
+        () async {
+          await cubit.initialize();
+          final now = DateTime.now();
+          final customer = Customer(
+            id: 'cust-custom-tot',
+            name: 'عميل تفاوض',
+            phone: '01011119999',
+            createdAt: now,
+            updatedAt: now,
+          );
+          await customerRepository.createCustomer(customer);
+          cubit.selectCustomer(customer);
+
+          final service = await seedService('srv-neg-1', 1500); // 15 EGP
+          await cubit.selectItemType(cubit.state.itemTypes.first);
+          cubit.selectService(service);
+          cubit.updateQuantity(12);
+          cubit.updateDraftTotal(Money.fromEgp(200));
+          cubit.addItemDraftToOrder();
+
+          expect(cubit.state.items.length, 1);
+          expect(cubit.state.items.first.calculatedTotal, Money.fromEgp(200));
+          expect(cubit.state.subtotal, Money.fromEgp(200));
+
+          await cubit.submitOrder();
+
+          final order = cubit.state.createdOrder;
+          expect(order, isNotNull);
+          expect(order!.total, Money.fromEgp(200));
+          expect(order.subtotal, Money.fromEgp(200));
+
+          final savedItems = await orderRepository.getOrderItems(order.id);
+          expect(savedItems.length, 12);
+          final sumTotal = savedItems.fold<int>(
+            0,
+            (acc, item) => acc + item.calculatedTotal.piastres,
+          );
+          expect(Money.fromPiastres(sumTotal), Money.fromEgp(200));
+        },
+      );
+    });
   });
 }

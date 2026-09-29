@@ -8,7 +8,14 @@ import '../bluetooth_print_plus.dart';
 
 class BluetoothPrintPlus {
   static bool _initialized = false;
-  static Future<dynamic> _initFlutterBluePlus() async {
+
+  /// Ensures that the plugin channels are set up and the native EventChannel
+  /// stream is actively subscribed before any connection attempts occur.
+  static Future<void> ensureInitialized() async {
+    await _initFlutterBluePlus();
+  }
+
+  static Future<void> _initFlutterBluePlus() async {
     if (_initialized) {
       return;
     }
@@ -17,9 +24,70 @@ class BluetoothPrintPlus {
     _methodChannel.setMethodCallHandler((MethodCall call) async {
       _methodStream.add(call);
     });
-    _state.listen((event) {});
+    // Immediately and directly listen to the state broadcast stream so onListen is triggered on native platform
+    _stateChannel.receiveBroadcastStream().listen(
+      _handleRawStateEvent,
+      onError: (e) {
+        dev.log('[DART BRIDGE] EventChannel state error: $e',
+            name: 'BluetoothPrintPlus');
+      },
+    );
     dev.log('[DART BRIDGE] EventChannel listener registered',
         name: 'BluetoothPrintPlus');
+    _queryInitialState();
+  }
+
+  static void _queryInitialState() {
+    if (_stateNow != null) return;
+    _methodChannel.invokeMethod('state').then((result) {
+      if (result is int) {
+        _stateNow = result;
+        if (result == 0) {
+          _blueState.add(BlueState.blueOn);
+        } else if (result == 1) {
+          _blueState.add(BlueState.blueOff);
+        }
+      }
+    }).catchError((e) {
+      dev.log('[DART BRIDGE] initial state query error: $e',
+          name: 'BluetoothPrintPlus');
+    });
+  }
+
+  static void _handleRawStateEvent(dynamic rawState) {
+    dev.log('[DART BRIDGE] raw event received=$rawState',
+        name: 'BluetoothPrintPlus');
+    final state = rawState is Map ? rawState['state'] as int : rawState as int;
+    final generation = rawState is Map ? rawState['generation'] as int? : null;
+    final connectionAttempt =
+        rawState is Map ? rawState['connectionAttempt'] as int? : null;
+    dev.log(
+      '[DART BRIDGE] parsed state=$state attempt=$connectionAttempt generation=$generation',
+      name: 'BluetoothPrintPlus',
+    );
+    if (state <= 1) {
+      if (state == 0) {
+        _blueState.add(BlueState.blueOn);
+      } else if (state == 1) {
+        _blueState.add(BlueState.blueOff);
+      }
+    } else {
+      if (state == 2) {
+        _connectState.add(ConnectState.connected);
+        _connectStateEvents.add(ConnectStateEvent(
+          state: ConnectState.connected,
+          generation: generation,
+          connectionAttempt: connectionAttempt,
+        ));
+      } else if (state == 3) {
+        _connectState.add(ConnectState.disconnected);
+        _connectStateEvents.add(ConnectStateEvent(
+          state: ConnectState.disconnected,
+          generation: generation,
+          connectionAttempt: connectionAttempt,
+        ));
+      }
+    }
   }
 
   /// native platform methods channel
@@ -173,54 +241,6 @@ class BluetoothPrintPlus {
         .where((m) => m.method == "ReceivedData")
         .map((m) {
       return m.arguments;
-    });
-  }
-
-  /// Gets the current state of the Bluetooth module
-  static Stream<int> get _state async* {
-    if (_stateNow == null) {
-      var result = await _methodChannel.invokeMethod('state');
-      // update _adapterStateNow if it is still null after the await
-      _stateNow ??= result;
-    }
-
-    yield* _stateChannel.receiveBroadcastStream().map((rawState) {
-      dev.log('[DART BRIDGE] raw event received=$rawState',
-          name: 'BluetoothPrintPlus');
-      final state =
-          rawState is Map ? rawState['state'] as int : rawState as int;
-      final generation =
-          rawState is Map ? rawState['generation'] as int? : null;
-      final connectionAttempt =
-          rawState is Map ? rawState['connectionAttempt'] as int? : null;
-      dev.log(
-        '[DART BRIDGE] parsed state=$state attempt=$connectionAttempt generation=$generation',
-        name: 'BluetoothPrintPlus',
-      );
-      if (state <= 1) {
-        if (state == 0) {
-          _blueState.add(BlueState.blueOn);
-        } else if (state == 1) {
-          _blueState.add(BlueState.blueOff);
-        }
-      } else {
-        if (state == 2) {
-          _connectState.add(ConnectState.connected);
-          _connectStateEvents.add(ConnectStateEvent(
-            state: ConnectState.connected,
-            generation: generation,
-            connectionAttempt: connectionAttempt,
-          ));
-        } else if (state == 3) {
-          _connectState.add(ConnectState.disconnected);
-          _connectStateEvents.add(ConnectStateEvent(
-            state: ConnectState.disconnected,
-            generation: generation,
-            connectionAttempt: connectionAttempt,
-          ));
-        }
-      }
-      return 1;
     });
   }
 

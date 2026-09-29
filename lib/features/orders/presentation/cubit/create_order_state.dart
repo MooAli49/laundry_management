@@ -6,6 +6,7 @@ import '../../../../domain/entities/item_type.dart';
 import '../../../../domain/entities/order.dart';
 import '../../../../domain/entities/service.dart';
 import '../../../../domain/enums/payment_method.dart';
+import '../../../../domain/enums/pricing_type.dart';
 import '../../../../domain/value_objects/money.dart';
 import '../../../../domain/value_objects/order_date.dart';
 import '../models/order_item_draft.dart';
@@ -27,6 +28,7 @@ class CreateOrderState {
   final ItemDefinition? draftItemDefinition;
   final Service? draftService;
   final Money? draftUnitPrice;
+  final Money? draftItemTotal;
   final int draftQuantity;
   final CarpetSize? draftCarpetSize;
   final double draftCarpetLength;
@@ -68,6 +70,7 @@ class CreateOrderState {
     this.draftItemDefinition,
     this.draftService,
     this.draftUnitPrice,
+    this.draftItemTotal,
     this.draftQuantity = 1,
     this.draftCarpetSize,
     this.draftCarpetLength = 0.0,
@@ -88,6 +91,23 @@ class CreateOrderState {
     this.errorMessage,
     this.createdOrder,
   });
+
+  Money get draftDefaultTotal {
+    if (draftService == null) return Money.zero;
+    final price = draftUnitPrice ?? draftService!.price;
+    if (draftService!.pricingType == PricingType.perSquareMeter) {
+      final area = draftCarpetLength * draftCarpetWidth;
+      if (area <= 0) return Money.zero;
+      final areaTotalPiastres = (price.piastres * area).round();
+      return Money.fromPiastres(areaTotalPiastres * draftQuantity);
+    }
+    return price * draftQuantity;
+  }
+
+  Money get effectiveDraftTotal => draftItemTotal ?? draftDefaultTotal;
+
+  bool get isDraftTotalOverridden =>
+      draftItemTotal != null && draftItemTotal != draftDefaultTotal;
 
   Money get subtotal {
     var sum = Money.zero;
@@ -150,6 +170,8 @@ class CreateOrderState {
     Service? draftService,
     bool clearDraftService = false,
     Money? draftUnitPrice,
+    Money? draftItemTotal,
+    bool clearDraftItemTotal = false,
     int? draftQuantity,
     CarpetSize? draftCarpetSize,
     bool clearDraftCarpetSize = false,
@@ -196,6 +218,9 @@ class CreateOrderState {
           ? null
           : (draftService ?? this.draftService),
       draftUnitPrice: draftUnitPrice ?? this.draftUnitPrice,
+      draftItemTotal: clearDraftItemTotal
+          ? null
+          : (draftItemTotal ?? this.draftItemTotal),
       draftQuantity: draftQuantity ?? this.draftQuantity,
       draftCarpetSize: clearDraftCarpetSize
           ? null

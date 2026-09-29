@@ -21,6 +21,7 @@ class CreateOrderItemInput {
   final String? itemDefinitionId;
   final String serviceId;
   final Money? customUnitPrice;
+  final Money? customTotal;
   final int physicalQuantity;
   final String? notes;
   final CarpetItemInput? carpetData;
@@ -30,6 +31,7 @@ class CreateOrderItemInput {
     this.itemDefinitionId,
     required this.serviceId,
     this.customUnitPrice,
+    this.customTotal,
     required this.physicalQuantity,
     this.notes,
     this.carpetData,
@@ -233,9 +235,21 @@ class CreateOrderUseCase {
         }
 
         final area = itemInput.carpetData!.length * itemInput.carpetData!.width;
-        final calculatedTotal = Money.fromPiastres(
+        final defaultPieceTotal = Money.fromPiastres(
           (unitPrice.piastres * area).round(),
         );
+        final totalPiastres = itemInput.customTotal != null
+            ? itemInput.customTotal!.piastres
+            : (defaultPieceTotal.piastres * itemInput.physicalQuantity);
+
+        final basePiecePiastres = totalPiastres ~/ itemInput.physicalQuantity;
+        final remainder = totalPiastres % itemInput.physicalQuantity;
+
+        final effectiveUnitPrice = itemInput.customTotal != null && area > 0
+            ? Money.fromPiastres(
+                (totalPiastres / (area * itemInput.physicalQuantity)).round(),
+              )
+            : unitPrice;
 
         for (var i = 0; i < itemInput.physicalQuantity; i++) {
           final itemId = _uuid.v4();
@@ -250,6 +264,9 @@ class CreateOrderUseCase {
             updatedAt: now,
           );
 
+          final piecePiastres = basePiecePiastres + (i < remainder ? 1 : 0);
+          final pieceTotal = Money.fromPiastres(piecePiastres);
+
           expandedItems.add(
             OrderItem(
               id: itemId,
@@ -262,8 +279,8 @@ class CreateOrderUseCase {
               serviceNameSnapshot: service.name,
               pricingType: service.pricingType,
               quantity: 1.0,
-              unitPrice: unitPrice,
-              calculatedTotal: calculatedTotal,
+              unitPrice: effectiveUnitPrice,
+              calculatedTotal: pieceTotal,
               notes: itemInput.notes,
               carpetData: carpetData,
               createdAt: now,
@@ -273,10 +290,24 @@ class CreateOrderUseCase {
         }
       } else {
         // perPiece or fixedPrice
-        final calculatedTotal = unitPrice;
+        final totalPiastres = itemInput.customTotal != null
+            ? itemInput.customTotal!.piastres
+            : (unitPrice.piastres * itemInput.physicalQuantity);
+
+        final basePiecePiastres = totalPiastres ~/ itemInput.physicalQuantity;
+        final remainder = totalPiastres % itemInput.physicalQuantity;
+
+        final effectiveUnitPrice = itemInput.customTotal != null
+            ? Money.fromPiastres(
+                (totalPiastres / itemInput.physicalQuantity).round(),
+              )
+            : unitPrice;
 
         for (var i = 0; i < itemInput.physicalQuantity; i++) {
           final itemId = _uuid.v4();
+          final piecePiastres = basePiecePiastres + (i < remainder ? 1 : 0);
+          final pieceTotal = Money.fromPiastres(piecePiastres);
+
           expandedItems.add(
             OrderItem(
               id: itemId,
@@ -289,8 +320,8 @@ class CreateOrderUseCase {
               serviceNameSnapshot: service.name,
               pricingType: service.pricingType,
               quantity: 1.0,
-              unitPrice: unitPrice,
-              calculatedTotal: calculatedTotal,
+              unitPrice: effectiveUnitPrice,
+              calculatedTotal: pieceTotal,
               notes: itemInput.notes,
               createdAt: now,
               updatedAt: now,

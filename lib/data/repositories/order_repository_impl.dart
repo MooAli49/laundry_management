@@ -388,9 +388,13 @@ class OrderRepositoryImpl implements OrderRepository {
               );
             }
             final area = mod.carpetData!.length * mod.carpetData!.width;
-            calculatedTotal = Money.fromPiastres(
-              (unitPrice.piastres * area).round(),
-            );
+            calculatedTotal =
+                mod.customTotal ??
+                Money.fromPiastres((unitPrice.piastres * area).round());
+
+            final savedUnitPrice = mod.customTotal != null && area > 0
+                ? Money.fromPiastres((mod.customTotal!.piastres / area).round())
+                : unitPrice;
 
             final existingCarpet = existing.carpet;
             final carpetId = existingCarpet?.id ?? const Uuid().v4();
@@ -404,39 +408,57 @@ class OrderRepositoryImpl implements OrderRepository {
               createdAt: Value(existingCarpet?.createdAt ?? now),
               updatedAt: Value(now),
             );
+
+            updatedItemsMap[mod.id] = (
+              item: app_db.OrderItemsCompanion(
+                id: Value(mod.id),
+                orderId: Value(input.orderId),
+                itemTypeId: Value(itemTypeId),
+                itemDefinitionId: Value(mod.itemDefinitionId),
+                serviceId: Value(mod.serviceId),
+                itemTypeNameSnapshot: Value(itemTypeNameSnapshot),
+                itemDefinitionNameSnapshot: Value(itemDefNameSnapshot),
+                serviceNameSnapshot: Value(serviceRow.name),
+                pricingType: Value(pricingType.value),
+                quantity: Value(area),
+                unitPrice: Value(savedUnitPrice.piastres),
+                calculatedTotal: Value(calculatedTotal.piastres),
+                notes: Value(mod.notes),
+                updatedAt: Value(now),
+              ),
+              carpet: carpetCompanion,
+              total: calculatedTotal,
+            );
           } else {
             if (mod.carpetData != null) {
               throw const ValidationFailure(
                 'Carpet data is not allowed for non-carpet pricing types',
               );
             }
-            calculatedTotal = unitPrice;
-          }
+            calculatedTotal = mod.customTotal ?? unitPrice;
+            final savedUnitPrice = mod.customTotal ?? unitPrice;
 
-          updatedItemsMap[mod.id] = (
-            item: app_db.OrderItemsCompanion(
-              id: Value(mod.id),
-              orderId: Value(input.orderId),
-              itemTypeId: Value(itemTypeId),
-              itemDefinitionId: Value(mod.itemDefinitionId),
-              serviceId: Value(mod.serviceId),
-              itemTypeNameSnapshot: Value(itemTypeNameSnapshot),
-              itemDefinitionNameSnapshot: Value(itemDefNameSnapshot),
-              serviceNameSnapshot: Value(serviceRow.name),
-              pricingType: Value(pricingType.value),
-              quantity: Value(
-                pricingType == PricingType.perSquareMeter
-                    ? (mod.carpetData!.length * mod.carpetData!.width)
-                    : 1.0,
+            updatedItemsMap[mod.id] = (
+              item: app_db.OrderItemsCompanion(
+                id: Value(mod.id),
+                orderId: Value(input.orderId),
+                itemTypeId: Value(itemTypeId),
+                itemDefinitionId: Value(mod.itemDefinitionId),
+                serviceId: Value(mod.serviceId),
+                itemTypeNameSnapshot: Value(itemTypeNameSnapshot),
+                itemDefinitionNameSnapshot: Value(itemDefNameSnapshot),
+                serviceNameSnapshot: Value(serviceRow.name),
+                pricingType: Value(pricingType.value),
+                quantity: const Value(1.0),
+                unitPrice: Value(savedUnitPrice.piastres),
+                calculatedTotal: Value(calculatedTotal.piastres),
+                notes: Value(mod.notes),
+                updatedAt: Value(now),
               ),
-              unitPrice: Value(unitPrice.piastres),
-              calculatedTotal: Value(calculatedTotal.piastres),
-              notes: Value(mod.notes),
-              updatedAt: Value(now),
-            ),
-            carpet: carpetCompanion,
-            total: calculatedTotal,
-          );
+              carpet: null,
+              total: calculatedTotal,
+            );
+          }
         }
 
         // 8. Validate and prepare brand new items
@@ -535,13 +557,31 @@ class OrderRepositoryImpl implements OrderRepository {
             final area =
                 newItemInput.carpetData!.length *
                 newItemInput.carpetData!.width;
-            final calcTotal = Money.fromPiastres(
+            final defaultPieceTotal = Money.fromPiastres(
               (unitPrice.piastres * area).round(),
             );
+            final totalPiastres = newItemInput.customTotal != null
+                ? newItemInput.customTotal!.piastres
+                : (defaultPieceTotal.piastres * newItemInput.physicalQuantity);
+
+            final basePiecePiastres =
+                totalPiastres ~/ newItemInput.physicalQuantity;
+            final remainder = totalPiastres % newItemInput.physicalQuantity;
+
+            final effectiveUnitPrice =
+                newItemInput.customTotal != null && area > 0
+                ? Money.fromPiastres(
+                    (totalPiastres / (area * newItemInput.physicalQuantity))
+                        .round(),
+                  )
+                : unitPrice;
 
             for (var i = 0; i < newItemInput.physicalQuantity; i++) {
               final itemId = const Uuid().v4();
               final carpetId = const Uuid().v4();
+              final piecePiastres = basePiecePiastres + (i < remainder ? 1 : 0);
+              final pieceTotal = Money.fromPiastres(piecePiastres);
+
               newItemsList.add((
                 item: app_db.OrderItemsCompanion(
                   id: Value(itemId),
@@ -554,8 +594,8 @@ class OrderRepositoryImpl implements OrderRepository {
                   serviceNameSnapshot: Value(service.name),
                   pricingType: Value(pricingType.value),
                   quantity: Value(area),
-                  unitPrice: Value(unitPrice.piastres),
-                  calculatedTotal: Value(calcTotal.piastres),
+                  unitPrice: Value(effectiveUnitPrice.piastres),
+                  calculatedTotal: Value(pieceTotal.piastres),
                   notes: Value(newItemInput.notes),
                   createdAt: Value(now),
                   updatedAt: Value(now),
@@ -570,7 +610,7 @@ class OrderRepositoryImpl implements OrderRepository {
                   createdAt: Value(now),
                   updatedAt: Value(now),
                 ),
-                total: calcTotal,
+                total: pieceTotal,
               ));
             }
           } else {
@@ -579,9 +619,25 @@ class OrderRepositoryImpl implements OrderRepository {
                 'Carpet data is not allowed for non-carpet pricing types',
               );
             }
-            final calcTotal = unitPrice;
+            final totalPiastres = newItemInput.customTotal != null
+                ? newItemInput.customTotal!.piastres
+                : (unitPrice.piastres * newItemInput.physicalQuantity);
+
+            final basePiecePiastres =
+                totalPiastres ~/ newItemInput.physicalQuantity;
+            final remainder = totalPiastres % newItemInput.physicalQuantity;
+
+            final effectiveUnitPrice = newItemInput.customTotal != null
+                ? Money.fromPiastres(
+                    (totalPiastres / newItemInput.physicalQuantity).round(),
+                  )
+                : unitPrice;
+
             for (var i = 0; i < newItemInput.physicalQuantity; i++) {
               final itemId = const Uuid().v4();
+              final piecePiastres = basePiecePiastres + (i < remainder ? 1 : 0);
+              final pieceTotal = Money.fromPiastres(piecePiastres);
+
               newItemsList.add((
                 item: app_db.OrderItemsCompanion(
                   id: Value(itemId),
@@ -594,14 +650,14 @@ class OrderRepositoryImpl implements OrderRepository {
                   serviceNameSnapshot: Value(service.name),
                   pricingType: Value(pricingType.value),
                   quantity: const Value(1.0),
-                  unitPrice: Value(unitPrice.piastres),
-                  calculatedTotal: Value(calcTotal.piastres),
+                  unitPrice: Value(effectiveUnitPrice.piastres),
+                  calculatedTotal: Value(pieceTotal.piastres),
                   notes: Value(newItemInput.notes),
                   createdAt: Value(now),
                   updatedAt: Value(now),
                 ),
                 carpet: null,
-                total: calcTotal,
+                total: pieceTotal,
               ));
             }
           }

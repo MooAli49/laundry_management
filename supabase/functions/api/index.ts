@@ -207,6 +207,46 @@ Deno.serve(async (req: Request) => {
 
   try {
     // -------------------------------------------------------------------------
+    // License Info API (read-only, admin-controlled)
+    // Returns the singleton license status so the client can enforce license
+    // gating. Write operations are intentionally not exposed here — the owner
+    // manages license state directly via the Supabase dashboard or service-role
+    // tooling. The client is strictly a consumer of this endpoint.
+    // -------------------------------------------------------------------------
+    if (path === "/license") {
+      if (method === "GET") {
+        const { data, error } = await supabase
+          .from("license_info")
+          .select("id, status, suspended_at, updated_at")
+          .eq("id", "singleton")
+          .maybeSingle();
+
+        if (error) return mapPostgresError(error, operationId);
+
+        // If the singleton row is somehow absent (new project before migration),
+        // return a safe default so the client remains operational.
+        if (!data) {
+          return jsonResponse({
+            id: "singleton",
+            status: "active",
+            suspended_at: null,
+            updated_at: new Date().toISOString(),
+          }, 200);
+        }
+
+        return jsonResponse(data, 200);
+      }
+
+      // Block all write methods — license is owner-controlled only
+      return errorResponse(
+        "METHOD_NOT_ALLOWED",
+        "License write operations are not permitted from the client",
+        operationId,
+        405,
+      );
+    }
+
+    // -------------------------------------------------------------------------
     // Sync Changes API (Cursor-based Pull)
     // -------------------------------------------------------------------------
     if (path === "/sync/changes" || path.startsWith("/sync/changes")) {

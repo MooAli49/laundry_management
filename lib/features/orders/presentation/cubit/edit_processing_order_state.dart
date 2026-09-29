@@ -5,6 +5,7 @@ import '../../../../domain/entities/item_definition.dart';
 import '../../../../domain/entities/item_type.dart';
 import '../../../../domain/entities/order.dart';
 import '../../../../domain/entities/service.dart';
+import '../../../../domain/enums/pricing_type.dart';
 import '../../../../domain/value_objects/money.dart';
 import '../../../../domain/value_objects/order_date.dart';
 import '../models/editable_order_item.dart';
@@ -46,6 +47,7 @@ class EditProcessingOrderState {
   final ItemDefinition? draftItemDefinition;
   final Service? draftService;
   final Money? draftUnitPrice;
+  final Money? draftItemTotal;
   final int draftQuantity;
   final CarpetSize? draftCarpetSize;
   final double draftCarpetLength;
@@ -81,6 +83,7 @@ class EditProcessingOrderState {
     this.draftItemDefinition,
     this.draftService,
     this.draftUnitPrice,
+    this.draftItemTotal,
     this.draftQuantity = 1,
     this.draftCarpetSize,
     this.draftCarpetLength = 0.0,
@@ -89,6 +92,23 @@ class EditProcessingOrderState {
   });
 
   bool get canChangeCustomer => totalPaid == Money.zero;
+
+  Money get draftDefaultTotal {
+    if (draftService == null) return Money.zero;
+    final price = draftUnitPrice ?? draftService!.price;
+    if (draftService!.pricingType == PricingType.perSquareMeter) {
+      final area = draftCarpetLength * draftCarpetWidth;
+      if (area <= 0) return Money.zero;
+      final areaTotalPiastres = (price.piastres * area).round();
+      return Money.fromPiastres(areaTotalPiastres * draftQuantity);
+    }
+    return price * draftQuantity;
+  }
+
+  Money get effectiveDraftTotal => draftItemTotal ?? draftDefaultTotal;
+
+  bool get isDraftTotalOverridden =>
+      draftItemTotal != null && draftItemTotal != draftDefaultTotal;
 
   Money get subtotal {
     var sum = Money.zero;
@@ -170,6 +190,8 @@ class EditProcessingOrderState {
     bool clearDraftService = false,
     Money? draftUnitPrice,
     bool clearDraftUnitPrice = false,
+    Money? draftItemTotal,
+    bool clearDraftItemTotal = false,
     int? draftQuantity,
     CarpetSize? draftCarpetSize,
     bool clearDraftCarpetSize = false,
@@ -224,6 +246,9 @@ class EditProcessingOrderState {
       draftUnitPrice: clearDraftUnitPrice
           ? null
           : (draftUnitPrice ?? this.draftUnitPrice),
+      draftItemTotal: clearDraftItemTotal
+          ? null
+          : (draftItemTotal ?? this.draftItemTotal),
       draftQuantity: draftQuantity ?? this.draftQuantity,
       draftCarpetSize: clearDraftCarpetSize
           ? null

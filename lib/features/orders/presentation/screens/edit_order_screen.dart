@@ -95,18 +95,14 @@ class _EditOrderViewState extends State<EditOrderView> {
   }
 
   void _syncItemFormControllers(EditProcessingOrderState state) {
-    if (state.draftUnitPrice != null) {
-      final textVal = state.draftUnitPrice!.toEgp.toStringAsFixed(2);
-      if (_priceController.text != textVal) {
-        _priceController.text = textVal;
-      }
-    } else if (state.draftService != null) {
-      final textVal = state.draftService!.price.toEgp.toStringAsFixed(2);
-      if (_priceController.text != textVal) {
-        _priceController.text = textVal;
-      }
-    } else {
+    if (state.draftService == null && state.draftItemTotal == null) {
       _priceController.clear();
+    } else {
+      final currentNum = double.tryParse(_priceController.text);
+      final targetNum = state.effectiveDraftTotal.toEgp;
+      if (currentNum == null || (currentNum - targetNum).abs() > 0.001) {
+        _priceController.text = targetNum.toStringAsFixed(2);
+      }
     }
 
     final quantityText = state.draftQuantity.toString();
@@ -584,26 +580,56 @@ class _EditOrderViewState extends State<EditOrderView> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'سعر الوحدة (ج.م) *',
-                              style: AppTextStyles.labelMedium,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'إجمالي الخدمة (ج.م) *',
+                                  style: AppTextStyles.labelMedium,
+                                ),
+                                if (state.isDraftTotalOverridden)
+                                  InkWell(
+                                    onTap: () {
+                                      cubit.resetDraftTotal();
+                                    },
+                                    child: Text(
+                                      'إعادة الحساب الافتراضي',
+                                      style: AppTextStyles.labelSmall.copyWith(
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                             AppSpacing.gapXs,
                             AppTextField(
                               controller: _priceController,
-                              hintText: 'سعر الوحدة',
+                              hintText: 'إجمالي الخدمة',
                               keyboardType:
                                   const TextInputType.numberWithOptions(
                                     decimal: true,
                                   ),
                               onChanged: (val) {
                                 final parsed = double.tryParse(val);
-                                if (parsed != null && parsed > 0) {
-                                  cubit.updateDraftUnitPrice(
-                                    Money.fromEgp(parsed),
-                                  );
+                                if (parsed != null && parsed >= 0) {
+                                  cubit.updateDraftTotal(Money.fromEgp(parsed));
                                 }
                               },
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              state.isDraftTotalOverridden
+                                  ? 'تم تعديل الإجمالي يدوياً (الافتراضي: ${state.draftDefaultTotal.toEgp.toStringAsFixed(2)} ج.م)'
+                                  : (selectedService != null
+                                        ? 'سعر الوحدة الافتراضي: ${(state.draftUnitPrice ?? selectedService.price).toEgp.toStringAsFixed(2)} ج.م'
+                                        : 'يُحسب تلقائياً من سعر الخدمة'),
+                              style: AppTextStyles.labelSmall.copyWith(
+                                color: state.isDraftTotalOverridden
+                                    ? AppColors.warning
+                                    : AppColors.textTertiary,
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         ),

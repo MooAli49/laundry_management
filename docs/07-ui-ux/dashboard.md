@@ -729,7 +729,7 @@ Examples:
         ↓
     Orders filtered by overdue condition
 
-    استلام اليوم
+    تسليمات اليوم
         ↓
     Orders filtered by today's Expected Pickup
 

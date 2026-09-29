@@ -121,6 +121,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
             serviceName: item.serviceNameSnapshot,
             pricingType: item.pricingType,
             unitPrice: item.unitPrice,
+            customTotal: item.calculatedTotal,
             physicalQuantity: 1,
             carpetSizeId: item.carpetData?.carpetSizeId,
             length: item.carpetData?.length ?? 0.0,
@@ -347,6 +348,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
         state.copyWith(
           clearDraftService: true,
           clearDraftUnitPrice: true,
+          clearDraftItemTotal: true,
           clearDraftCarpetSize: true,
           draftCarpetLength: 0.0,
           draftCarpetWidth: 0.0,
@@ -359,6 +361,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
       state.copyWith(
         draftService: service,
         draftUnitPrice: service.price,
+        clearDraftItemTotal: true,
         clearDraftCarpetSize: service.pricingType != PricingType.perSquareMeter,
         draftCarpetLength: service.pricingType != PricingType.perSquareMeter
             ? 0.0
@@ -371,7 +374,15 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
   }
 
   void updateDraftUnitPrice(Money price) {
-    emit(state.copyWith(draftUnitPrice: price));
+    emit(state.copyWith(draftUnitPrice: price, clearDraftItemTotal: true));
+  }
+
+  void updateDraftTotal(Money total) {
+    emit(state.copyWith(draftItemTotal: total));
+  }
+
+  void resetDraftTotal() {
+    emit(state.copyWith(clearDraftItemTotal: true));
   }
 
   void updateDraftQuantity(int quantity) {
@@ -469,6 +480,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
         clearDraftItemDefinition: matchingDef == null,
         draftService: matchingService,
         draftUnitPrice: item.unitPrice,
+        draftItemTotal: item.calculatedTotal,
         draftQuantity: item.physicalQuantity,
         draftCarpetSize: matchingSize,
         clearDraftCarpetSize: matchingSize == null,
@@ -491,6 +503,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
         clearDraftItemDefinition: true,
         clearDraftService: true,
         clearDraftUnitPrice: true,
+        clearDraftItemTotal: true,
         clearDraftCarpetSize: true,
         draftCarpetLength: 0.0,
         draftCarpetWidth: 0.0,
@@ -512,8 +525,11 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
       return;
     }
     final unitPrice = state.draftUnitPrice ?? state.draftService!.price;
-    if (unitPrice <= Money.zero) {
-      emit(state.copyWith(errorMessage: 'يجب أن يكون السعر أكبر من الصفر'));
+    final effectiveTotal = state.effectiveDraftTotal;
+    if (effectiveTotal <= Money.zero) {
+      emit(
+        state.copyWith(errorMessage: 'إجمالي الخدمة يجب أن يكون أكبر من الصفر'),
+      );
       return;
     }
 
@@ -541,6 +557,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
         serviceName: state.draftService!.name,
         pricingType: state.draftService!.pricingType,
         unitPrice: unitPrice,
+        customTotal: state.isDraftTotalOverridden ? state.draftItemTotal : null,
         carpetSizeId: state.draftCarpetSize?.id,
         length: state.draftCarpetLength,
         width: state.draftCarpetWidth,
@@ -550,24 +567,55 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
     } else {
       // Adding new item(s) - expand physical quantity into individual physical piece entries
       final count = state.draftQuantity > 0 ? state.draftQuantity : 1;
-      for (var i = 0; i < count; i++) {
-        final newItem = EditableOrderItem(
-          itemTypeId: state.draftItemType!.id,
-          itemTypeName: state.draftItemType!.name,
-          itemDefinitionId: state.draftItemDefinition?.id,
-          itemDefinitionName: state.draftItemDefinition?.name,
-          serviceId: state.draftService!.id,
-          serviceName: state.draftService!.name,
-          pricingType: state.draftService!.pricingType,
-          unitPrice: unitPrice,
-          physicalQuantity: 1,
-          carpetSizeId: state.draftCarpetSize?.id,
-          length: state.draftCarpetLength,
-          width: state.draftCarpetWidth,
-          notes: state.draftNotes,
-          hasStorageRecords: false,
-        );
-        currentItems.add(newItem);
+      final customTotal = state.isDraftTotalOverridden
+          ? state.draftItemTotal
+          : null;
+      if (customTotal != null && count > 1) {
+        final totalPiastres = customTotal.piastres;
+        final base = totalPiastres ~/ count;
+        final remainder = totalPiastres % count;
+        for (var i = 0; i < count; i++) {
+          final itemPiastres = base + (i < remainder ? 1 : 0);
+          final newItem = EditableOrderItem(
+            itemTypeId: state.draftItemType!.id,
+            itemTypeName: state.draftItemType!.name,
+            itemDefinitionId: state.draftItemDefinition?.id,
+            itemDefinitionName: state.draftItemDefinition?.name,
+            serviceId: state.draftService!.id,
+            serviceName: state.draftService!.name,
+            pricingType: state.draftService!.pricingType,
+            unitPrice: unitPrice,
+            customTotal: Money.fromPiastres(itemPiastres),
+            physicalQuantity: 1,
+            carpetSizeId: state.draftCarpetSize?.id,
+            length: state.draftCarpetLength,
+            width: state.draftCarpetWidth,
+            notes: state.draftNotes,
+            hasStorageRecords: false,
+          );
+          currentItems.add(newItem);
+        }
+      } else {
+        for (var i = 0; i < count; i++) {
+          final newItem = EditableOrderItem(
+            itemTypeId: state.draftItemType!.id,
+            itemTypeName: state.draftItemType!.name,
+            itemDefinitionId: state.draftItemDefinition?.id,
+            itemDefinitionName: state.draftItemDefinition?.name,
+            serviceId: state.draftService!.id,
+            serviceName: state.draftService!.name,
+            pricingType: state.draftService!.pricingType,
+            unitPrice: unitPrice,
+            customTotal: customTotal,
+            physicalQuantity: 1,
+            carpetSizeId: state.draftCarpetSize?.id,
+            length: state.draftCarpetLength,
+            width: state.draftCarpetWidth,
+            notes: state.draftNotes,
+            hasStorageRecords: false,
+          );
+          currentItems.add(newItem);
+        }
       }
     }
 
@@ -579,6 +627,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
         clearDraftItemDefinition: true,
         clearDraftService: true,
         clearDraftUnitPrice: true,
+        clearDraftItemTotal: true,
         clearDraftCarpetSize: true,
         draftCarpetLength: 0.0,
         draftCarpetWidth: 0.0,
@@ -682,6 +731,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
               itemDefinitionId: item.itemDefinitionId,
               serviceId: item.serviceId,
               customUnitPrice: item.unitPrice,
+              customTotal: item.customTotal,
               notes: item.notes,
               carpetData: carpetInput,
             ),
@@ -693,6 +743,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
               itemDefinitionId: item.itemDefinitionId,
               serviceId: item.serviceId,
               customUnitPrice: item.unitPrice,
+              customTotal: item.customTotal,
               physicalQuantity: item.physicalQuantity,
               notes: item.notes,
               carpetData: carpetInput,

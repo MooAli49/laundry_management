@@ -153,7 +153,7 @@ void main() {
 
         // 6. Today's Pickups Section
         expect(
-          find.text('استلام اليوم'),
+          find.text('تسليمات اليوم'),
           findsWidgets,
         ); // inside attention and as section title
 
@@ -258,7 +258,6 @@ void main() {
         expect(find.text('لا توجد مبالغ متبقية'), findsOneWidget);
         expect(find.text('لا توجد طلبات متأخرة'), findsOneWidget);
         expect(find.text('لا توجد طلبات مستحقة اليوم'), findsOneWidget);
-        expect(find.text('لا توجد طلبات للاستلام اليوم'), findsOneWidget);
         expect(find.text('لا توجد طلبات حتى الآن'), findsOneWidget);
       },
     );

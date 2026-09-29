@@ -4,6 +4,8 @@ import 'package:laundry_management/core/di/injection.dart';
 import 'package:laundry_management/data/local/database/app_database.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('Dependency Injection & Release Safety Tests', () {
     tearDown(() async {
       if (getIt.isRegistered<AppDatabase>()) {

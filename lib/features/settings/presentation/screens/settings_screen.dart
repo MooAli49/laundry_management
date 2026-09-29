@@ -17,7 +17,6 @@ import '../widgets/bluetooth_printer_section.dart';
 import '../widgets/business_info_section.dart';
 import '../widgets/carpet_sizes_section.dart';
 import '../widgets/expense_categories_section.dart';
-import '../widgets/invoice_settings_section.dart';
 import '../widgets/item_definitions_section.dart';
 import '../widgets/item_types_section.dart';
 import '../widgets/services_section.dart';
@@ -116,7 +115,7 @@ class _SettingsScreenContent extends StatelessWidget {
       case 0:
         return const BusinessInfoSection();
       case 1:
-        return const InvoiceSettingsSection();
+        return const BluetoothPrinterSection();
       case 2:
         return const ServicesSection();
       case 3:
@@ -129,8 +128,6 @@ class _SettingsScreenContent extends StatelessWidget {
         return const StorageLocationsSection();
       case 7:
         return const ExpenseCategoriesSection();
-      case 8:
-        return const BluetoothPrinterSection();
       default:
         return const BusinessInfoSection();
     }

@@ -39,7 +39,7 @@ class DashboardTodayPickupsSection extends StatelessWidget {
                   size: 22,
                 ),
                 AppSpacing.gapHorizontalSm,
-                Text('استلام اليوم', style: AppTextStyles.titleLarge),
+                Text('تسليمات اليوم', style: AppTextStyles.titleLarge),
               ],
             ),
             if (orders.isNotEmpty)

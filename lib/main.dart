@@ -4,10 +4,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'app.dart';
+import 'application/license/license_service.dart';
 import 'core/di/injection.dart';
 import 'data/sync/sync_engine.dart';
 
 AppLifecycleListener? _appLifecycleListener;
+AppLifecycleListener? _licenseLifecycleListener;
 
 /// Attaches an [AppLifecycleListener] to trigger [SyncEngine.sync] when the application resumes.
 AppLifecycleListener setupAppLifecycleSync(SyncEngine syncEngine) {
@@ -30,6 +32,22 @@ void disposeAppLifecycleSync() {
   } catch (_) {}
 }
 
+/// Attaches an [AppLifecycleListener] to call [LicenseService.checkIfDue]
+/// on application resume. The service internally enforces the 24-hour
+/// throttle, so this is safe to call on every resume event.
+AppLifecycleListener setupAppLifecycleLicenseCheck(
+  LicenseService licenseService,
+) {
+  _licenseLifecycleListener?.dispose();
+  final listener = AppLifecycleListener(
+    onResume: () {
+      unawaited(licenseService.checkIfDue().catchError((_) {}));
+    },
+  );
+  _licenseLifecycleListener = listener;
+  return listener;
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -48,6 +66,13 @@ void main() async {
   }
 
   await initDependencies(enableDevTestData: kDebugMode);
+
+  // Initialize license service BEFORE runApp so GoRouter's initial redirect
+  // has the correct license status on the first frame.
+  // Fails open (active) if there is no cache and no connectivity.
+  final licenseService = getIt<LicenseService>();
+  await licenseService.initialize();
+  setupAppLifecycleLicenseCheck(licenseService);
 
   // Initialize foreground synchronization infrastructure (non-blocking)
   final syncEngine = getIt<SyncEngine>();

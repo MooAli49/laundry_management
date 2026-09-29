@@ -29,17 +29,13 @@ class _MonochromeArgs {
   final int threshold;
 }
 
-/// Top-level function executed in a background isolate by [compute].
-///
-/// Converts raw RGBA pixel data to a 1-bit monochrome representation and then
-/// builds the protocol-specific printer command blocks.
-List<List<int>> _buildBlocksInIsolate(_MonochromeArgs args) {
+List<List<bool>> _rgbaToMonochrome(
+  Uint8List pixels,
+  int width,
+  int height,
+  int threshold,
+) {
   final lines = <List<bool>>[];
-  final width = args.width;
-  final height = args.height;
-  final pixels = args.pixels;
-  final threshold = args.threshold;
-
   for (int y = 0; y < height; y++) {
     final line = <bool>[];
     for (int x = 0; x < width; x++) {
@@ -53,6 +49,17 @@ List<List<int>> _buildBlocksInIsolate(_MonochromeArgs args) {
     }
     lines.add(line);
   }
+  return lines;
+}
+
+/// Top-level function executed in a background isolate by [compute].
+///
+/// Converts raw RGBA pixel data to a 1-bit monochrome representation and then
+/// builds the protocol-specific printer command blocks.
+List<List<int>> _buildBlocksInIsolate(_MonochromeArgs args) {
+  final width = args.width;
+  final height = args.height;
+  final lines = _rgbaToMonochrome(args.pixels, width, height, args.threshold);
 
   switch (args.protocol) {
     case PrinterProtocol.tspl:
@@ -139,12 +146,12 @@ class ThermalCommandBuilder {
   /// Build the print command blocks from PNG [imageBytes] for [profile].
   ///
   /// For ESC/POS receipts, splits the image vertically into fixed-height blocks
-  /// (default 64 rows, matching the physically validated Test 5/6 baseline).
+  /// (default 256 rows).
   /// This prevents the printer firmware's raster decoder buffer from overflowing.
   static Future<List<List<int>>> buildPrintCommandBlocks({
     required Uint8List imageBytes,
     required PrinterProfile profile,
-    int blockHeight = 64,
+    int blockHeight = 256,
   }) async {
     final codec = await ui.instantiateImageCodec(imageBytes);
     final frame = await codec.getNextFrame();
@@ -191,7 +198,7 @@ class ThermalCommandBuilder {
   static Future<List<int>> buildPrintCommand({
     required Uint8List imageBytes,
     required PrinterProfile profile,
-    int blockHeight = 64,
+    int blockHeight = 256,
   }) async {
     final blocks = await buildPrintCommandBlocks(
       imageBytes: imageBytes,
@@ -248,7 +255,7 @@ class ThermalCommandBuilder {
     return <int>[...header, ...rasterPayload, ...trailer];
   }
 
-  /// Builds a raw ESC/POS raster from known monochrome rows for diagnostics/tests.
+  /// Builds a raw ESC/POS raster from known monochrome rows.
   static List<int> buildEscPosRasterCommand({
     required List<List<bool>> rows,
     required int width,
@@ -260,8 +267,7 @@ class ThermalCommandBuilder {
 
   /// Builds a sequence of individual GS v 0 commands split vertically into fixed-height blocks.
   ///
-  /// Each block contains at most [blockHeight] rows (default 64 rows, matching
-  /// the physically verified 576x64 diagnostic).
+  /// Each block contains at most [blockHeight] rows (default 256 rows).
   ///
   /// - The first block begins with ESC @ (init), ESC 3 0 (0-dot line spacing), and ESC a 1 (center).
   /// - Each block contains its own GS v 0 header (`1D 76 30 00 [xL] [xH] [yL] [yH]`) and packed raster rows.
@@ -269,7 +275,7 @@ class ThermalCommandBuilder {
   static List<List<int>> buildVerticallySplitEscPosRasterCommands({
     required List<List<bool>> rows,
     required int width,
-    int blockHeight = 64,
+    int blockHeight = 256,
   }) {
     final totalRows = rows.length;
     if (totalRows == 0) return const [];

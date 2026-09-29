@@ -175,17 +175,14 @@ class _BluetoothPrinterSectionContentState
         profile: profile,
       );
 
-      final blocks = await ThermalCommandBuilder.buildPrintCommandBlocks(
+      final command = await ThermalCommandBuilder.buildPrintCommand(
         imageBytes: imageBytes,
         profile: profile,
-        blockHeight: 64,
+        blockHeight: 256,
       );
 
       if (!mounted) return;
-      await cubit.writeBlockSequence(
-        blocks,
-        delay: const Duration(milliseconds: 50),
-      );
+      await cubit.write(command);
 
       if (mounted) {
         messenger.showSnackBar(

@@ -34,8 +34,9 @@ class _OrderItemFormState extends State<OrderItemForm> {
   @override
   void initState() {
     super.initState();
-    if (widget.state.draftUnitPrice != null) {
-      _priceController.text = widget.state.draftUnitPrice!.toEgp
+    if (widget.state.draftService != null &&
+        widget.state.effectiveDraftTotal > Money.zero) {
+      _priceController.text = widget.state.effectiveDraftTotal.toEgp
           .toStringAsFixed(2);
     }
     if (widget.state.draftCarpetLength > 0) {
@@ -52,12 +53,13 @@ class _OrderItemFormState extends State<OrderItemForm> {
   @override
   void didUpdateWidget(covariant OrderItemForm oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.state.draftUnitPrice != oldWidget.state.draftUnitPrice) {
-      if (widget.state.draftUnitPrice != null) {
-        _priceController.text = widget.state.draftUnitPrice!.toEgp
-            .toStringAsFixed(2);
-      } else {
-        _priceController.clear();
+    if (widget.state.draftService == null) {
+      _priceController.clear();
+    } else {
+      final currentNum = double.tryParse(_priceController.text);
+      final targetNum = widget.state.effectiveDraftTotal.toEgp;
+      if (currentNum == null || (currentNum - targetNum).abs() > 0.001) {
+        _priceController.text = targetNum.toStringAsFixed(2);
       }
     }
     if (widget.state.draftCarpetLength != oldWidget.state.draftCarpetLength) {
@@ -103,10 +105,7 @@ class _OrderItemFormState extends State<OrderItemForm> {
     final isCarpetPricing =
         state.draftService?.pricingType == PricingType.perSquareMeter;
     final hasDefinitions = state.itemDefinitions.isNotEmpty;
-    final isPriceOverridden =
-        state.draftUnitPrice != null &&
-        state.draftService != null &&
-        state.draftUnitPrice != state.draftService!.price;
+    final isTotalOverridden = state.isDraftTotalOverridden;
 
     return AppCard(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -420,23 +419,24 @@ class _OrderItemFormState extends State<OrderItemForm> {
             AppSpacing.gapMd,
           ],
 
-          // Price Field + Helper Text + Reset Button
+          // Total Field ("إجمالي الخدمة") + Helper Text + Reset Button
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('سعر العنصر (ج.م) *', style: AppTextStyles.labelLarge),
-                  if (isPriceOverridden)
+                  Text(
+                    'إجمالي الخدمة (ج.م) *',
+                    style: AppTextStyles.labelLarge,
+                  ),
+                  if (isTotalOverridden)
                     InkWell(
                       onTap: () {
-                        cubit.updateUnitPrice(state.draftService!.price);
-                        _priceController.text = state.draftService!.price.toEgp
-                            .toStringAsFixed(2);
+                        cubit.resetDraftTotal();
                       },
                       child: Text(
-                        'إعادة الافتراضي',
+                        'إعادة الحساب الافتراضي',
                         style: AppTextStyles.labelSmall.copyWith(
                           color: AppColors.primary,
                           fontWeight: FontWeight.bold,
@@ -449,22 +449,24 @@ class _OrderItemFormState extends State<OrderItemForm> {
               AppTextField(
                 controller: _priceController,
                 hintText: '0.00',
-                keyboardType: TextInputType.number,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 onChanged: (val) {
                   final numVal = double.tryParse(val);
-                  if (numVal != null && numVal > 0) {
-                    cubit.updateUnitPrice(Money.fromEgp(numVal));
+                  if (numVal != null && numVal >= 0) {
+                    cubit.updateDraftTotal(Money.fromEgp(numVal));
                   }
                 },
               ),
               if (state.draftService != null) ...[
                 AppSpacing.gapXs,
                 Text(
-                  isPriceOverridden
-                      ? 'السعر الافتراضي للخدمة ${state.draftService!.price.toEgp.toStringAsFixed(2)} ج.م — تم تعديله لهذا العنصر'
-                      : 'السعر الافتراضي للخدمة ${state.draftService!.price.toEgp.toStringAsFixed(2)} ج.م — يمكنك تعديله لهذا العنصر فقط',
+                  isTotalOverridden
+                      ? 'تم تعديل إجمالي الخدمة يدوياً — المحسوب افتراضياً: ${state.draftDefaultTotal.toEgp.toStringAsFixed(2)} ج.م'
+                      : 'سعر الوحدة الافتراضي: ${(state.draftUnitPrice ?? state.draftService!.price).toEgp.toStringAsFixed(2)} ج.م / ${isCarpetPricing ? 'م²' : 'قطعة'} — الإجمالي محسوب تلقائياً',
                   style: AppTextStyles.labelSmall.copyWith(
-                    color: isPriceOverridden
+                    color: isTotalOverridden
                         ? AppColors.warning
                         : AppColors.textTertiary,
                   ),

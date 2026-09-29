@@ -136,18 +136,15 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
         solidBlackText: true,
       );
 
-      // 2. Build printer command blocks (64-row vertically split GS v 0 commands)
-      final blocks = await ThermalCommandBuilder.buildPrintCommandBlocks(
+      // 2. Build printer command with vertically chunked GS v 0 raster segments (256 rows)
+      final command = await ThermalCommandBuilder.buildPrintCommand(
         imageBytes: imageBytes,
         profile: profile,
-        blockHeight: 64,
+        blockHeight: 256,
       );
 
-      // 3. Send blocks sequentially to printer
-      await cubit.writeBlockSequence(
-        blocks,
-        delay: const Duration(milliseconds: 50),
-      );
+      // 3. Send command to printer in one transmission
+      await cubit.write(command);
 
       if (mounted) {
         messenger.showSnackBar(

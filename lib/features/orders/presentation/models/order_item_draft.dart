@@ -10,6 +10,7 @@ class OrderItemDraft {
   final String serviceName;
   final PricingType pricingType;
   final Money unitPrice;
+  final Money? customTotal;
   final int physicalQuantity;
   final String? carpetSizeId;
   final double length;
@@ -25,6 +26,7 @@ class OrderItemDraft {
     required this.serviceName,
     required this.pricingType,
     required this.unitPrice,
+    this.customTotal,
     this.physicalQuantity = 1,
     this.carpetSizeId,
     this.length = 0.0,
@@ -34,7 +36,7 @@ class OrderItemDraft {
 
   double get carpetArea => length * width;
 
-  Money get calculatedTotal {
+  Money get defaultTotal {
     if (pricingType == PricingType.perSquareMeter) {
       if (carpetArea <= 0) return Money.zero;
       final areaTotalPiastres = (unitPrice.piastres * carpetArea).round();
@@ -43,6 +45,8 @@ class OrderItemDraft {
     // perPiece and fixedPrice (fixed price per physical piece)
     return unitPrice * physicalQuantity;
   }
+
+  Money get calculatedTotal => customTotal ?? defaultTotal;
 
   OrderItemDraft copyWith({
     String? itemTypeId,
@@ -53,6 +57,8 @@ class OrderItemDraft {
     String? serviceName,
     PricingType? pricingType,
     Money? unitPrice,
+    Money? customTotal,
+    bool clearCustomTotal = false,
     int? physicalQuantity,
     String? carpetSizeId,
     double? length,
@@ -68,6 +74,7 @@ class OrderItemDraft {
       serviceName: serviceName ?? this.serviceName,
       pricingType: pricingType ?? this.pricingType,
       unitPrice: unitPrice ?? this.unitPrice,
+      customTotal: clearCustomTotal ? null : (customTotal ?? this.customTotal),
       physicalQuantity: physicalQuantity ?? this.physicalQuantity,
       carpetSizeId: carpetSizeId ?? this.carpetSizeId,
       length: length ?? this.length,

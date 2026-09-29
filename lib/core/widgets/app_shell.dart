@@ -3,12 +3,16 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../constants/app_constants.dart';
+import '../di/injection.dart';
+import '../license/license_guard.dart';
 import '../localization/app_strings.dart';
 import '../routing/app_routes.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
 import 'sync_status_indicator.dart';
+import '../../domain/license/license_status.dart';
+import '../../features/license/presentation/widgets/license_warning_banner.dart';
 
 class AppShell extends StatelessWidget {
   final Widget mainContent;
@@ -52,17 +56,35 @@ class AppShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final selectedIndex = _calculateSelectedIndex(context);
 
+    final mainRow = Row(
+      children: [
+        AppSidebar(
+          selectedIndex: selectedIndex,
+          onDestinationSelected: (index) => _onItemTapped(index, context),
+        ),
+        const VerticalDivider(thickness: 1, width: 1),
+        Expanded(child: mainContent),
+      ],
+    );
+
     return Scaffold(
       body: SafeArea(
-        child: Row(
-          children: [
-            AppSidebar(
-              selectedIndex: selectedIndex,
-              onDestinationSelected: (index) => _onItemTapped(index, context),
-            ),
-            const VerticalDivider(thickness: 1, width: 1),
-            Expanded(child: mainContent),
-          ],
+        child: ListenableBuilder(
+          listenable: getIt<LicenseGuard>(),
+          builder: (context, _) {
+            final guard = getIt<LicenseGuard>();
+            if (guard.status == LicenseStatus.gracePeriod) {
+              return Column(
+                children: [
+                  LicenseWarningBanner(
+                    daysRemaining: guard.daysRemainingInGrace,
+                  ),
+                  Expanded(child: mainRow),
+                ],
+              );
+            }
+            return mainRow;
+          },
         ),
       ),
     );

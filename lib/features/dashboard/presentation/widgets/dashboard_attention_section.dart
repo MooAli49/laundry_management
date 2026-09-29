@@ -87,7 +87,7 @@ class DashboardAttentionSection extends StatelessWidget {
         _buildAttentionItem(
           context: context,
           key: const ValueKey('attention_today_pickup_item'),
-          title: 'استلام اليوم',
+          title: 'تسليمات اليوم',
           subtitle: data.todayPickupOrdersCount > 0
               ? '${data.todayPickupOrdersCount} طلبات موعد استلامها المتوقع اليوم'
               : 'لا توجد طلبات مستحقة اليوم',

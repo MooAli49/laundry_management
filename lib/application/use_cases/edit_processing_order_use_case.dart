@@ -10,6 +10,7 @@ class OrderItemEditInput {
   final String? itemDefinitionId;
   final String serviceId;
   final Money? customUnitPrice;
+  final Money? customTotal;
   final String? notes;
   final CarpetItemInput? carpetData;
 
@@ -18,6 +19,7 @@ class OrderItemEditInput {
     this.itemDefinitionId,
     required this.serviceId,
     this.customUnitPrice,
+    this.customTotal,
     this.notes,
     this.carpetData,
   });

@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:get_it/get_it.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../application/license/license_service.dart';
 import '../../application/use_cases/cancel_order_use_case.dart';
 import '../../application/use_cases/change_order_status_use_case.dart';
 import '../../application/use_cases/complete_order_use_case.dart';
@@ -11,7 +12,10 @@ import '../../application/use_cases/edit_processing_order_use_case.dart';
 import '../../application/use_cases/move_stored_item_use_case.dart';
 import '../../application/use_cases/store_order_items_use_case.dart';
 import '../../application/use_cases/unstore_item_use_case.dart';
+import '../../core/license/license_guard.dart';
 import '../../data/datasources/remote/customer_remote_api.dart';
+import '../../data/datasources/remote/license_remote_api.dart';
+import '../../data/datasources/remote/license_remote_data_source.dart';
 import '../../data/datasources/remote/expense_remote_api.dart';
 import '../../data/datasources/remote/master_data_remote_api.dart';
 import '../../data/datasources/remote/order_remote_api.dart';
@@ -28,6 +32,7 @@ import '../../data/local/daos/customers_dao.dart';
 import '../../data/local/daos/expense_categories_dao.dart';
 import '../../data/local/daos/expenses_dao.dart';
 import '../../data/local/daos/item_definitions_dao.dart';
+import '../../data/local/daos/license_cache_dao.dart';
 import '../../data/local/daos/item_types_dao.dart';
 import '../../data/local/daos/orders_dao.dart';
 import '../../data/local/daos/payments_dao.dart';
@@ -264,6 +269,40 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
       () => SyncStateDao(getIt<AppDatabase>()),
     );
   }
+  // License Infrastructure (registered before SyncEngine; must be ready
+  // before runApp so LicenseService.initialize() can be awaited in main()).
+  if (!getIt.isRegistered<LicenseCacheDao>()) {
+    getIt.registerLazySingleton<LicenseCacheDao>(
+      () => LicenseCacheDao(getIt<AppDatabase>()),
+    );
+  }
+  if (!getIt.isRegistered<LicenseRemoteApi>()) {
+    getIt.registerLazySingleton<LicenseRemoteApi>(
+      () => LicenseRemoteApi(getIt<Dio>()),
+    );
+  }
+  if (!getIt.isRegistered<LicenseRemoteDataSource>()) {
+    getIt.registerLazySingleton<LicenseRemoteDataSource>(
+      () => LicenseRemoteDataSourceImpl(getIt<LicenseRemoteApi>()),
+    );
+  }
+  if (!getIt.isRegistered<LicenseService>()) {
+    getIt.registerLazySingleton<LicenseService>(
+      () => LicenseService(
+        remoteDataSource: getIt<LicenseRemoteDataSource>(),
+        cacheDao: getIt<LicenseCacheDao>(),
+        networkInfo: getIt<NetworkInfo>(),
+      ),
+      dispose: (service) => service.dispose(),
+    );
+  }
+  if (!getIt.isRegistered<LicenseGuard>()) {
+    getIt.registerLazySingleton<LicenseGuard>(
+      () => LicenseGuard(getIt<LicenseService>()),
+      dispose: (guard) => guard.dispose(),
+    );
+  }
+
   if (!getIt.isRegistered<RemoteChangeApplier>()) {
     getIt.registerLazySingleton<RemoteChangeApplier>(
       () => RemoteChangeApplier(

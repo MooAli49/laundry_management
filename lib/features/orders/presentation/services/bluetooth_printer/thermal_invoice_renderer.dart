@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../../core/theme/app_text_styles.dart';
 import '../../../../../domain/entities/business_settings.dart';
 import '../../../../../domain/entities/customer.dart';
 import '../../../../../domain/entities/order.dart';
@@ -191,7 +192,7 @@ class ThermalInvoiceRenderer {
   }
 
   // ---------------------------------------------------------------------------
-  // Widget builder (available for testing and diagnostic rendering)
+  // Widget builder (available for testing and widget rendering)
   // ---------------------------------------------------------------------------
 
   @visibleForTesting
@@ -334,14 +335,29 @@ class ThermalInvoiceRenderer {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'فاتورة #${order.orderNumber}',
-                            style: TextStyle(
-                              fontFamily: regularFamily,
-                              fontSize: invoiceNumberFs,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'فاتورة ',
+                                style: AppTextStyles.titleLarge.copyWith(
+                                  fontFamily: regularFamily,
+                                  fontSize: invoiceNumberFs,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              Text(
+                                '#${order.orderNumber}',
+                                textDirection: TextDirection.ltr,
+                                style: AppTextStyles.titleLarge.copyWith(
+                                  fontFamily: regularFamily,
+                                  fontSize: invoiceNumberFs,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 4),
                           Text(

@@ -9957,6 +9957,397 @@ class SyncStatesCompanion extends UpdateCompanion<SyncState> {
   }
 }
 
+class $LicenseCacheTable extends LicenseCache
+    with TableInfo<$LicenseCacheTable, LicenseCacheData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LicenseCacheTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('singleton'),
+  );
+  static const VerificationMeta _remoteStatusMeta = const VerificationMeta(
+    'remoteStatus',
+  );
+  @override
+  late final GeneratedColumn<String> remoteStatus = GeneratedColumn<String>(
+    'remote_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('active'),
+  );
+  static const VerificationMeta _suspendedAtMeta = const VerificationMeta(
+    'suspendedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> suspendedAt = GeneratedColumn<DateTime>(
+    'suspended_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastCheckedAtMeta = const VerificationMeta(
+    'lastCheckedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastCheckedAt =
+      GeneratedColumn<DateTime>(
+        'last_checked_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    remoteStatus,
+    suspendedAt,
+    lastCheckedAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'license_cache';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LicenseCacheData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('remote_status')) {
+      context.handle(
+        _remoteStatusMeta,
+        remoteStatus.isAcceptableOrUnknown(
+          data['remote_status']!,
+          _remoteStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('suspended_at')) {
+      context.handle(
+        _suspendedAtMeta,
+        suspendedAt.isAcceptableOrUnknown(
+          data['suspended_at']!,
+          _suspendedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_checked_at')) {
+      context.handle(
+        _lastCheckedAtMeta,
+        lastCheckedAt.isAcceptableOrUnknown(
+          data['last_checked_at']!,
+          _lastCheckedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LicenseCacheData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LicenseCacheData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      remoteStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}remote_status'],
+      )!,
+      suspendedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}suspended_at'],
+      ),
+      lastCheckedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_checked_at'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $LicenseCacheTable createAlias(String alias) {
+    return $LicenseCacheTable(attachedDatabase, alias);
+  }
+}
+
+class LicenseCacheData extends DataClass
+    implements Insertable<LicenseCacheData> {
+  /// Always 'singleton' — enforces a single-row design.
+  final String id;
+
+  /// Raw remote status value: 'active' or 'suspended'.
+  final String remoteStatus;
+
+  /// Authoritative suspension timestamp from Supabase `license_info.suspended_at`.
+  /// NULL when status is 'active' or when the remote has not provided a timestamp.
+  final DateTime? suspendedAt;
+
+  /// Timestamp of the last successful remote license check.
+  /// NULL on first install before any remote check has succeeded.
+  final DateTime? lastCheckedAt;
+
+  /// Row update timestamp (local).
+  final DateTime updatedAt;
+  const LicenseCacheData({
+    required this.id,
+    required this.remoteStatus,
+    this.suspendedAt,
+    this.lastCheckedAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['remote_status'] = Variable<String>(remoteStatus);
+    if (!nullToAbsent || suspendedAt != null) {
+      map['suspended_at'] = Variable<DateTime>(suspendedAt);
+    }
+    if (!nullToAbsent || lastCheckedAt != null) {
+      map['last_checked_at'] = Variable<DateTime>(lastCheckedAt);
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  LicenseCacheCompanion toCompanion(bool nullToAbsent) {
+    return LicenseCacheCompanion(
+      id: Value(id),
+      remoteStatus: Value(remoteStatus),
+      suspendedAt: suspendedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(suspendedAt),
+      lastCheckedAt: lastCheckedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastCheckedAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory LicenseCacheData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LicenseCacheData(
+      id: serializer.fromJson<String>(json['id']),
+      remoteStatus: serializer.fromJson<String>(json['remoteStatus']),
+      suspendedAt: serializer.fromJson<DateTime?>(json['suspendedAt']),
+      lastCheckedAt: serializer.fromJson<DateTime?>(json['lastCheckedAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'remoteStatus': serializer.toJson<String>(remoteStatus),
+      'suspendedAt': serializer.toJson<DateTime?>(suspendedAt),
+      'lastCheckedAt': serializer.toJson<DateTime?>(lastCheckedAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  LicenseCacheData copyWith({
+    String? id,
+    String? remoteStatus,
+    Value<DateTime?> suspendedAt = const Value.absent(),
+    Value<DateTime?> lastCheckedAt = const Value.absent(),
+    DateTime? updatedAt,
+  }) => LicenseCacheData(
+    id: id ?? this.id,
+    remoteStatus: remoteStatus ?? this.remoteStatus,
+    suspendedAt: suspendedAt.present ? suspendedAt.value : this.suspendedAt,
+    lastCheckedAt: lastCheckedAt.present
+        ? lastCheckedAt.value
+        : this.lastCheckedAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  LicenseCacheData copyWithCompanion(LicenseCacheCompanion data) {
+    return LicenseCacheData(
+      id: data.id.present ? data.id.value : this.id,
+      remoteStatus: data.remoteStatus.present
+          ? data.remoteStatus.value
+          : this.remoteStatus,
+      suspendedAt: data.suspendedAt.present
+          ? data.suspendedAt.value
+          : this.suspendedAt,
+      lastCheckedAt: data.lastCheckedAt.present
+          ? data.lastCheckedAt.value
+          : this.lastCheckedAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LicenseCacheData(')
+          ..write('id: $id, ')
+          ..write('remoteStatus: $remoteStatus, ')
+          ..write('suspendedAt: $suspendedAt, ')
+          ..write('lastCheckedAt: $lastCheckedAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, remoteStatus, suspendedAt, lastCheckedAt, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LicenseCacheData &&
+          other.id == this.id &&
+          other.remoteStatus == this.remoteStatus &&
+          other.suspendedAt == this.suspendedAt &&
+          other.lastCheckedAt == this.lastCheckedAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class LicenseCacheCompanion extends UpdateCompanion<LicenseCacheData> {
+  final Value<String> id;
+  final Value<String> remoteStatus;
+  final Value<DateTime?> suspendedAt;
+  final Value<DateTime?> lastCheckedAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const LicenseCacheCompanion({
+    this.id = const Value.absent(),
+    this.remoteStatus = const Value.absent(),
+    this.suspendedAt = const Value.absent(),
+    this.lastCheckedAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LicenseCacheCompanion.insert({
+    this.id = const Value.absent(),
+    this.remoteStatus = const Value.absent(),
+    this.suspendedAt = const Value.absent(),
+    this.lastCheckedAt = const Value.absent(),
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : updatedAt = Value(updatedAt);
+  static Insertable<LicenseCacheData> custom({
+    Expression<String>? id,
+    Expression<String>? remoteStatus,
+    Expression<DateTime>? suspendedAt,
+    Expression<DateTime>? lastCheckedAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (remoteStatus != null) 'remote_status': remoteStatus,
+      if (suspendedAt != null) 'suspended_at': suspendedAt,
+      if (lastCheckedAt != null) 'last_checked_at': lastCheckedAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LicenseCacheCompanion copyWith({
+    Value<String>? id,
+    Value<String>? remoteStatus,
+    Value<DateTime?>? suspendedAt,
+    Value<DateTime?>? lastCheckedAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return LicenseCacheCompanion(
+      id: id ?? this.id,
+      remoteStatus: remoteStatus ?? this.remoteStatus,
+      suspendedAt: suspendedAt ?? this.suspendedAt,
+      lastCheckedAt: lastCheckedAt ?? this.lastCheckedAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (remoteStatus.present) {
+      map['remote_status'] = Variable<String>(remoteStatus.value);
+    }
+    if (suspendedAt.present) {
+      map['suspended_at'] = Variable<DateTime>(suspendedAt.value);
+    }
+    if (lastCheckedAt.present) {
+      map['last_checked_at'] = Variable<DateTime>(lastCheckedAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LicenseCacheCompanion(')
+          ..write('id: $id, ')
+          ..write('remoteStatus: $remoteStatus, ')
+          ..write('suspendedAt: $suspendedAt, ')
+          ..write('lastCheckedAt: $lastCheckedAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -9991,6 +10382,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $SyncOperationsTable syncOperations = $SyncOperationsTable(this);
   late final $SyncStatesTable syncStates = $SyncStatesTable(this);
+  late final $LicenseCacheTable licenseCache = $LicenseCacheTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -10015,6 +10407,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     businessSettings,
     syncOperations,
     syncStates,
+    licenseCache,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -18558,6 +18951,212 @@ typedef $$SyncStatesTableProcessedTableManager =
       SyncState,
       PrefetchHooks Function()
     >;
+typedef $$LicenseCacheTableCreateCompanionBuilder =
+    LicenseCacheCompanion Function({
+      Value<String> id,
+      Value<String> remoteStatus,
+      Value<DateTime?> suspendedAt,
+      Value<DateTime?> lastCheckedAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$LicenseCacheTableUpdateCompanionBuilder =
+    LicenseCacheCompanion Function({
+      Value<String> id,
+      Value<String> remoteStatus,
+      Value<DateTime?> suspendedAt,
+      Value<DateTime?> lastCheckedAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$LicenseCacheTableFilterComposer
+    extends Composer<_$AppDatabase, $LicenseCacheTable> {
+  $$LicenseCacheTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get remoteStatus => $composableBuilder(
+    column: $table.remoteStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get suspendedAt => $composableBuilder(
+    column: $table.suspendedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastCheckedAt => $composableBuilder(
+    column: $table.lastCheckedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LicenseCacheTableOrderingComposer
+    extends Composer<_$AppDatabase, $LicenseCacheTable> {
+  $$LicenseCacheTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get remoteStatus => $composableBuilder(
+    column: $table.remoteStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get suspendedAt => $composableBuilder(
+    column: $table.suspendedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastCheckedAt => $composableBuilder(
+    column: $table.lastCheckedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LicenseCacheTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LicenseCacheTable> {
+  $$LicenseCacheTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get remoteStatus => $composableBuilder(
+    column: $table.remoteStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get suspendedAt => $composableBuilder(
+    column: $table.suspendedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastCheckedAt => $composableBuilder(
+    column: $table.lastCheckedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$LicenseCacheTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LicenseCacheTable,
+          LicenseCacheData,
+          $$LicenseCacheTableFilterComposer,
+          $$LicenseCacheTableOrderingComposer,
+          $$LicenseCacheTableAnnotationComposer,
+          $$LicenseCacheTableCreateCompanionBuilder,
+          $$LicenseCacheTableUpdateCompanionBuilder,
+          (
+            LicenseCacheData,
+            BaseReferences<_$AppDatabase, $LicenseCacheTable, LicenseCacheData>,
+          ),
+          LicenseCacheData,
+          PrefetchHooks Function()
+        > {
+  $$LicenseCacheTableTableManager(_$AppDatabase db, $LicenseCacheTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LicenseCacheTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LicenseCacheTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LicenseCacheTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> remoteStatus = const Value.absent(),
+                Value<DateTime?> suspendedAt = const Value.absent(),
+                Value<DateTime?> lastCheckedAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LicenseCacheCompanion(
+                id: id,
+                remoteStatus: remoteStatus,
+                suspendedAt: suspendedAt,
+                lastCheckedAt: lastCheckedAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> remoteStatus = const Value.absent(),
+                Value<DateTime?> suspendedAt = const Value.absent(),
+                Value<DateTime?> lastCheckedAt = const Value.absent(),
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => LicenseCacheCompanion.insert(
+                id: id,
+                remoteStatus: remoteStatus,
+                suspendedAt: suspendedAt,
+                lastCheckedAt: lastCheckedAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LicenseCacheTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LicenseCacheTable,
+      LicenseCacheData,
+      $$LicenseCacheTableFilterComposer,
+      $$LicenseCacheTableOrderingComposer,
+      $$LicenseCacheTableAnnotationComposer,
+      $$LicenseCacheTableCreateCompanionBuilder,
+      $$LicenseCacheTableUpdateCompanionBuilder,
+      (
+        LicenseCacheData,
+        BaseReferences<_$AppDatabase, $LicenseCacheTable, LicenseCacheData>,
+      ),
+      LicenseCacheData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -18603,4 +19202,6 @@ class $AppDatabaseManager {
       $$SyncOperationsTableTableManager(_db, _db.syncOperations);
   $$SyncStatesTableTableManager get syncStates =>
       $$SyncStatesTableTableManager(_db, _db.syncStates);
+  $$LicenseCacheTableTableManager get licenseCache =>
+      $$LicenseCacheTableTableManager(_db, _db.licenseCache);
 }

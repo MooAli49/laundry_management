@@ -192,23 +192,25 @@ public class BluetoothPrintPlusPlugin
     event.put("generation", generation);
     event.put("connectionAttempt", connectionAttempt);
     LogUtils.d(TAG, "[NATIVE] emitState payload=" + event + " sinkExists=" + (sink != null));
-    synchronized (connectionLock) {
-      if (sink != null) {
-        if (generation == null || state <= BPPState.BlueOn.getValue()) {
-          LogUtils.d(TAG, "[NATIVE] sink.success completed payload=" + state);
-          sink.success(state);
+    new Handler(Looper.getMainLooper()).post(() -> {
+      synchronized (connectionLock) {
+        if (sink != null) {
+          if (generation == null || state <= BPPState.BlueOn.getValue()) {
+            LogUtils.d(TAG, "[NATIVE] sink.success completed payload=" + state);
+            sink.success(state);
+          } else {
+            sink.success(event);
+            LogUtils.d(TAG, "[NATIVE] sink.success completed payload=" + event);
+          }
+        } else if (generation != null) {
+          pendingConnectionEvents.add(event);
+          LogUtils.d(TAG, "[NATIVE] EventSink unavailable; buffered connection event count="
+                  + pendingConnectionEvents.size());
         } else {
-          sink.success(event);
-          LogUtils.d(TAG, "[NATIVE] sink.success completed payload=" + event);
+          LogUtils.d(TAG, "[NATIVE] EventSink unavailable; dropped non-connection event");
         }
-      } else if (generation != null) {
-        pendingConnectionEvents.add(event);
-        LogUtils.d(TAG, "[NATIVE] EventSink unavailable; buffered connection event count="
-                + pendingConnectionEvents.size());
-      } else {
-        LogUtils.d(TAG, "[NATIVE] EventSink unavailable; dropped non-connection event");
       }
-    }
+    });
   }
 
   private void invokeMethodIfAttached(String method, Object arguments) {
@@ -394,13 +396,17 @@ public class BluetoothPrintPlusPlugin
 
                     @Override
                     public void onSuccess(PrinterDevices printerDevices) {
+                      final String deviceName = (printerDevices != null && printerDevices.getBlueName() != null)
+                              ? printerDevices.getBlueName()
+                              : "unknown";
                       if (isCurrentConnection(generation)) {
-                        LogUtils.d(TAG, "connectionAttempt=" + generation + " nativeGeneration=" + generation + " callback=onSuccess state=connected");
+                        LogUtils.d(TAG, "connectionAttempt=" + generation + " nativeGeneration=" + generation
+                                + " callback=onSuccess state=connected device=" + deviceName);
                         emitState(BPPState.DeviceConnected.getValue(), generation, generation);
                       } else {
                         LogUtils.d(TAG, "IGNORING STALE CALLBACK connectionGeneration=" + generation
                                 + " currentGeneration=" + getActiveConnectionGeneration()
-                                + " callback=onSuccess");
+                                + " callback=onSuccess device=" + deviceName);
                       }
                     }
 
