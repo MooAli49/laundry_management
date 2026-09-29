@@ -1417,10 +1417,23 @@ The system includes a remote licensing mechanism to manage client deployments wh
 
 ---
 
+# 24B. Device Orientation & Form Factor
+
+The system is a Point of Sale (POS) and counter operations management application designed exclusively for tablet and large-screen usage in Landscape mode:
+
+1. **Landscape-Only Operation**: The application operates strictly in landscape orientations (`DeviceOrientation.landscapeLeft` and `DeviceOrientation.landscapeRight`).
+2. **Portrait Unsupported**: Portrait orientation is explicitly unsupported. The application must not render in portrait mode or provide portrait-specific layouts.
+3. **Centralized Startup Enforcement**: The orientation lock is applied globally at application bootstrap (`main()`) via `SystemChrome.setPreferredOrientations` and natively via `android:screenOrientation="sensorLandscape"`. Individual screens must not manage orientation independently.
+4. **Landscape Responsive Viewports**: UI responsiveness is required across different landscape display sizes (e.g., 8-inch, 10-inch, 12-inch tablets, and desktop landscape windows). Single-column or two-column master-detail layouts must adapt to varying landscape widths without overflow.
+5. **No Portrait Workarounds**: Portrait overflow workarounds (such as wrapping entire screens in portrait-specific scroll views or introducing conditional portrait logic) are out of scope.
+
+---
+
 # 25. Explicitly Out of Scope for V1
 
 The following features must not be implemented unless explicitly added to the requirements later:
 
+- Portrait orientation and portrait-specific mobile layouts (Landscape-only system)
 - Multiple user roles
 - Permissions
 - Employee management

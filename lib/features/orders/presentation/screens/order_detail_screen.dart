@@ -281,16 +281,18 @@ class _OrderDetailView extends StatelessWidget {
                 // Left Column (Financial Summary & Order Actions)
                 Expanded(
                   flex: 3,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Financial Summary Card
-                      _buildFinancialSummaryCard(context, state),
-                      AppSpacing.gapLg,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Financial Summary Card
+                        _buildFinancialSummaryCard(context, state),
+                        AppSpacing.gapLg,
 
-                      // Actions Card
-                      _buildActionsCard(context, state),
-                    ],
+                        // Actions Card
+                        _buildActionsCard(context, state),
+                      ],
+                    ),
                   ),
                 ),
               ],

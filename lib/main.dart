@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'app.dart';
 import 'application/license/license_service.dart';
@@ -50,6 +51,12 @@ AppLifecycleListener setupAppLifecycleLicenseCheck(
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Enforce Landscape-only application mode (POS / Tablet architecture)
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+  ]);
 
   // Intercept known Flutter framework assertion mismatch on Android Emulator
   // when forwarding host physical keyboard shortcuts (e.g. Ctrl+V / modifier keys).

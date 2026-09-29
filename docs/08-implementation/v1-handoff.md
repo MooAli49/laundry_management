@@ -9,7 +9,7 @@ The Laundry Management System V1 has successfully completed all development task
 
 ## 2. Technology Stack
 
-- **Framework**: Flutter (Targeting Android, Windows Desktop, Desktop/Tablet responsive viewports)
+- **Framework**: Flutter (Targeting Android tablets and large screens, strictly Landscape-only: `landscapeLeft` & `landscapeRight`)
 - **Language**: Dart (Sound null safety)
 - **State Management**: Bloc / Cubit
 - **Dependency Injection**: GetIt (Service locator pattern with clean lazy singletons and factories)
@@ -29,9 +29,11 @@ The Laundry Management System V1 has successfully completed all development task
   - `domain/`: Pure business entities, value objects, repository contracts, and UseCases. Zero Flutter or Drift dependencies.
   - `data/`: Local Drift database, DAOs, Retrofit remote APIs, and repository implementations bridging domain and storage.
   - `presentation/`: Screens, Cubits, States, Dialogs, and widgets styled according to the Design System.
+- **Tablet-First & Landscape-Only POS Form Factor**: Centrally locked to landscape orientations at application startup (`lib/main.dart` and `AndroidManifest.xml`). Portrait orientation is officially unsupported and out of scope.
 - **Repository Pattern**: Repositories orchestrate atomic local persistence and sync operation enqueueing inside single database transactions.
 - **Local-First Operation**: The local SQLite database is the immediate operational source of truth. All user workflows remain fully functional without network connectivity.
 - **Synchronization Boundary**: Decoupled background synchronization engine operating independently of UI threads and presentation widgets.
+
 
 ---
 

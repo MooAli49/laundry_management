@@ -1235,15 +1235,23 @@ Avoid implementing RTL by manually reversing arbitrary left/right values.
 
 The architecture should allow localization and RTL behavior to be handled globally.
 
-## 67. Tablet-First Architecture
+## 67. Tablet-First & Landscape-Only Architecture
 
-The application is tablet-first.
+The application is a tablet-first, point-of-sale management system.
 
-Feature layouts should be designed to work well on tablet-sized screens.
+1. **Landscape-Only Operation**:
+   - The application operates strictly in landscape orientations (`DeviceOrientation.landscapeLeft` and `DeviceOrientation.landscapeRight`).
+   - Portrait orientation (`portraitUp`, `portraitDown`) is explicitly unsupported across the entire application.
+2. **Centralized Enforcement**:
+   - Device orientation is locked globally at application bootstrap (`lib/main.dart`) via `SystemChrome.setPreferredOrientations` and natively via `android:screenOrientation="sensorLandscape"`.
+   - Orientation logic must never be scattered across feature widgets or screens.
+3. **Responsive Landscape Boundaries**:
+   - Layouts must adapt gracefully across different landscape viewport widths and heights (e.g., varying tablet form factors, landscape terminals).
+   - Reusable widgets should avoid hardcoding narrow portrait assumptions.
+4. **Prohibition of Portrait Workarounds**:
+   - Do NOT introduce portrait-specific layouts, portrait conditional checks, or orientation toggling.
+   - Do NOT patch layout overflows that occur only in unsupported portrait mode with unnecessary wrappers (`SingleChildScrollView`, `Expanded`, `Flexible`, `OrientationBuilder`).
 
-Architecture should not assume a mobile-only layout.
-
-Reusable widgets should avoid hardcoding narrow screen assumptions.
 
 ## 68. Responsive Boundaries
 

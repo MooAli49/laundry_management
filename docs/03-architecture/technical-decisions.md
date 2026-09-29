@@ -1645,7 +1645,41 @@ Physical POS checkout requires direct, instant printing of 80mm receipts from An
 
 ---
 
-## 63. Final Rule
+## 63. Landscape-Only Form Factor & Device Orientation (Approved)
+
+### Status
+Approved
+
+### Context
+The Laundry Management System is a POS / point-of-sale management system designed primarily for tablet and large-screen counter environments. Dual-orientation support (portrait and landscape) introduces unwarranted layout complexity, inconsistent checkout flows, and fragile responsive compromises without providing operational value for counter POS operations.
+
+### Decision
+1. **Landscape-Only Orientation Lock**:
+   - The application operates exclusively in landscape mode:
+     - `DeviceOrientation.landscapeLeft`
+     - `DeviceOrientation.landscapeRight`
+   - Portrait orientation (`portraitUp`, `portraitDown`) is strictly unsupported across the entire application.
+2. **Centralized Enforcement**:
+   - Orientation locking is applied once and centrally at application bootstrap in `lib/main.dart` immediately after `WidgetsFlutterBinding.ensureInitialized()` via:
+     ```dart
+     await SystemChrome.setPreferredOrientations([
+       DeviceOrientation.landscapeLeft,
+       DeviceOrientation.landscapeRight,
+     ]);
+     ```
+   - Orientation calls must NOT be scattered across individual screens or features.
+   - Native Android launch configuration (`android/app/src/main/AndroidManifest.xml`) configures `android:screenOrientation="sensorLandscape"` on `MainActivity` to lock the native launch window and prevent rotation flicker during startup.
+3. **Responsive Landscape Support**:
+   - While Portrait mode is unsupported and out of scope, the application remains responsive across different Landscape viewport widths and heights (e.g., varying tablet sizes, landscape phone viewports, desktop/windowed environments).
+   - Layout decisions rely on local constraints (e.g., `LayoutBuilder`, `MediaQuery.sizeOf(context).width`) rather than orientation switching.
+4. **Prohibition of Portrait Workarounds**:
+   - Do NOT add Portrait-specific layouts or conditional Portrait UI logic.
+   - Do NOT attempt to fix Portrait-only overflow issues by adding unnecessary wrappers (`SingleChildScrollView`, `Expanded`, `Flexible`, `OrientationBuilder`).
+   - Overflows occurring only in unsupported Portrait mode are by definition unsupported behavior and must not be patched.
+
+---
+
+## 64. Final Rule
 
 The most important technical rule is:
 
@@ -1667,4 +1701,4 @@ The system should remain:
     +
     Easy for AI coding tools to implement
 
-Any significant technical decision made after this document is finalized must either fit within these principles or be explicitly documented as a new architectural decision.
+Any significant technical decision made after this document is finalized must either fit within these principles or be explicitly documented as a new architectural decision.

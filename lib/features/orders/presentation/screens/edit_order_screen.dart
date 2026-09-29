@@ -225,7 +225,9 @@ class _EditOrderViewState extends State<EditOrderView> {
                 // Left Column (Financial Summary & Save Button)
                 Expanded(
                   flex: 3,
-                  child: _buildFinancialSummaryColumn(context, state, cubit),
+                  child: SingleChildScrollView(
+                    child: _buildFinancialSummaryColumn(context, state, cubit),
+                  ),
                 ),
               ],
             ),
