@@ -9,8 +9,6 @@ class DashboardData {
   final int unpaidOrdersCount;
   final int storageAttentionCount;
   final int overdueOrdersCount;
-  final int todayPickupOrdersCount;
-  final List<DashboardOrderItem> todayPickupOrders;
   final List<DashboardOrderItem> recentOrders;
 
   const DashboardData({
@@ -21,8 +19,6 @@ class DashboardData {
     required this.unpaidOrdersCount,
     required this.storageAttentionCount,
     required this.overdueOrdersCount,
-    required this.todayPickupOrdersCount,
-    required this.todayPickupOrders,
     required this.recentOrders,
   });
 
@@ -34,8 +30,6 @@ class DashboardData {
     unpaidOrdersCount: 0,
     storageAttentionCount: 0,
     overdueOrdersCount: 0,
-    todayPickupOrdersCount: 0,
-    todayPickupOrders: [],
     recentOrders: [],
   );
 }

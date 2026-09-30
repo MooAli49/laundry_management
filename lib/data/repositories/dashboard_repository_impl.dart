@@ -1,12 +1,10 @@
 import '../../domain/entities/dashboard_data.dart';
 import '../../domain/entities/dashboard_order_item.dart';
-import '../../domain/enums/order_status.dart';
 import '../../domain/repositories/dashboard_repository.dart';
 import '../../domain/repositories/order_repository.dart';
 import '../../domain/repositories/payment_repository.dart';
 import '../../domain/repositories/storage_repository.dart';
 import '../../domain/value_objects/money.dart';
-import '../../domain/value_objects/order_date.dart';
 import '../local/daos/orders_dao.dart';
 
 class DashboardRepositoryImpl implements DashboardRepository {
@@ -41,33 +39,14 @@ class DashboardRepositoryImpl implements DashboardRepository {
     final storageAttentionCount = await _storageRepository
         .countItemsRequiringStorage();
 
-    // Fetch Today's pickups (Date-only active orders capped at 5)
-    final activeTodayPickups = await _orderRepository.getOrders(
-      expectedPickupDate: OrderDate.today(),
-      excludedStatuses: const [OrderStatus.completed, OrderStatus.cancelled],
-      limit: 5,
-    );
-
     // Fetch Recent orders
     final recentOrdersRaw = await _orderRepository.getOrders(limit: 5);
 
     // Batch enrich with payment summaries
-    final orderIdsToEnrich = <String>{
-      ...activeTodayPickups.map((o) => o.id),
-      ...recentOrdersRaw.map((o) => o.id),
-    }.toList();
+    final orderIdsToEnrich = recentOrdersRaw.map((o) => o.id).toList();
 
     final paymentSummaries = await _paymentRepository
         .getPaymentSummariesForOrders(orderIdsToEnrich);
-
-    final todayPickupItems = activeTodayPickups.map((order) {
-      final summary = paymentSummaries[order.id];
-      return DashboardOrderItem(
-        order: order,
-        totalPaid: summary?.totalPaid ?? Money.zero,
-        remainingAmount: summary?.remaining ?? order.total,
-      );
-    }).toList();
 
     final recentItems = recentOrdersRaw.map((order) {
       final summary = paymentSummaries[order.id];
@@ -86,8 +65,6 @@ class DashboardRepositoryImpl implements DashboardRepository {
       unpaidOrdersCount: stats.unpaidOrdersCount,
       storageAttentionCount: storageAttentionCount,
       overdueOrdersCount: stats.overdueOrdersCount,
-      todayPickupOrdersCount: stats.todayPickupOrdersCount,
-      todayPickupOrders: todayPickupItems,
       recentOrders: recentItems,
     );
   }

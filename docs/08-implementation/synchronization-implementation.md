@@ -1903,8 +1903,8 @@ The Dashboard operates in accordance with the system's Offline-First principles:
 
 ### 66.1 Architecture & Local Source of Truth
 - **Zero Remote Dependencies**: The Dashboard does not issue remote HTTP queries or RPCs. It reads exclusively from the local Drift SQLite database.
-- **Database-Side Aggregation**: All operational overview metrics (`todayOrdersCount`, `readyOrdersCount`, `processingOrdersCount`, `totalRemaining`, `unpaidOrdersCount`, `overdueOrdersCount`, `todayPickupOrdersCount`) are evaluated within SQLite using conditional aggregations (`SUM(CASE ...)`). Dart memory is not used to scan or filter full table collections.
-- **Enrichment**: Recent orders and today's pickups are retrieved with minimal joins and enriched with `PaymentSummary` calculations directly from local records.
+- **Database-Side Aggregation**: All operational overview metrics (`todayOrdersCount`, `readyOrdersCount`, `processingOrdersCount`, `totalRemaining`, `unpaidOrdersCount`, `overdueOrdersCount`) are evaluated within SQLite using conditional aggregations (`SUM(CASE ...)`). Dart memory is not used to scan or filter full table collections.
+- **Enrichment**: Recent orders are retrieved with minimal joins and enriched with `PaymentSummary` calculations directly from local records.
 
 ### 66.2 Reactive Stream via Drift Table Updates
 - **Mechanism**: `DashboardRepository.watchDashboardData()` observes local table events via `db.tableUpdates()` for `orders`, `payments`, `storage_records`, and `order_items`.

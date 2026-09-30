@@ -1457,15 +1457,13 @@ Never silently invent a new rule during implementation.
   - `totalRemaining`: remaining balance in minor units (piastres) on non-cancelled orders (`total - paid > 0`).
   - `unpaidOrdersCount`: count of non-cancelled orders with positive remaining balance.
   - `overdueOrdersCount`: active orders (`status != completed AND status != cancelled`) with `expectedPickupDate < today`.
-  - `todayPickupOrdersCount`: active orders with `expectedPickupDate == today`.
 - [x] Order lists:
-  - `todayPickupOrders`: up to 5 active orders scheduled for pickup today, sorted by pickup date ascending.
   - `recentOrders`: up to 5 latest orders created, sorted by `createdAt` descending, enriched with `PaymentSummary` calculations.
 - [x] Date handling and boundary enforcement:
   - Today start (`00:00:00.000`) and end (`23:59:59.999`) strictly tested across midnight boundaries.
   - `OrderDate.today()` serialized to `DateTime.utc(year, month, day)` matching Drift `expected_pickup_date` column format.
   - Overdue vs due today vs tomorrow boundary separation strictly validated.
-  - Completed and cancelled orders strictly excluded from attention cards and pickup lists.
+  - Completed and cancelled orders strictly excluded from attention cards and recent orders.
 - [x] Outstanding payment semantics:
   - Reuses existing payment calculation rules (`total - paid`).
   - Fully paid orders (`remaining == 0`) excluded from outstanding lists and counts.

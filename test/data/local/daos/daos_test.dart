@@ -202,7 +202,7 @@ void main() {
     );
 
     test(
-      'BUG-002: getDashboardOperationalStats filters expected_pickup_date using half-open interval [startOfToday, startOfNextDay)',
+      'getDashboardOperationalStats correctly calculates overdue orders and operational statistics',
       () async {
         final refDay = DateTime.utc(2026, 9, 19);
         final todayStart = DateTime(2026, 9, 19, 0, 0, 0);
@@ -219,7 +219,7 @@ void main() {
           ),
         );
 
-        // Case A: Order with expected_pickup_date at midnight today (00:00:00) -> INCLUDED
+        // Case A: Order with expected_pickup_date at midnight today (00:00:00)
         await ordersDao.insertOrder(
           OrdersCompanion.insert(
             id: 'ord-midnight-today',
@@ -234,7 +234,7 @@ void main() {
           ),
         );
 
-        // Case B: Order with expected_pickup_date during today (14:30:00) -> INCLUDED
+        // Case B: Order with expected_pickup_date during today (14:30:00)
         await ordersDao.insertOrder(
           OrdersCompanion.insert(
             id: 'ord-afternoon-today',
@@ -249,7 +249,7 @@ void main() {
           ),
         );
 
-        // Case C: Order with expected_pickup_date near end of today (23:59:59) -> INCLUDED
+        // Case C: Order with expected_pickup_date near end of today (23:59:59)
         await ordersDao.insertOrder(
           OrdersCompanion.insert(
             id: 'ord-end-today',
@@ -264,7 +264,7 @@ void main() {
           ),
         );
 
-        // Case D: Order with expected_pickup_date exactly at start of tomorrow (00:00:00) -> EXCLUDED
+        // Case D: Order with expected_pickup_date exactly at start of tomorrow (00:00:00)
         await ordersDao.insertOrder(
           OrdersCompanion.insert(
             id: 'ord-tomorrow-start',
@@ -279,7 +279,7 @@ void main() {
           ),
         );
 
-        // Case E: Order with expected_pickup_date yesterday (2026-09-18 23:59:59) -> EXCLUDED from today, counted in OVERDUE
+        // Case E: Order with expected_pickup_date yesterday (2026-09-18 23:59:59) -> counted in OVERDUE
         await ordersDao.insertOrder(
           OrdersCompanion.insert(
             id: 'ord-yesterday',
@@ -302,14 +302,6 @@ void main() {
         );
 
         // Verification:
-        // Cases A, B, C are included in todayPickupOrdersCount -> exactly 3
-        expect(
-          stats.todayPickupOrdersCount,
-          equals(3),
-          reason:
-              'Midnight (00:00), afternoon (14:30), and end-of-day (23:59) orders must be included in today pickups',
-        );
-
         // Case E is overdue (< startOfToday) -> exactly 1
         expect(
           stats.overdueOrdersCount,

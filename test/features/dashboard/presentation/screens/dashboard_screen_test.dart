@@ -28,8 +28,6 @@ class FakeDashboardRepository implements DashboardRepository {
     unpaidOrdersCount: 2,
     storageAttentionCount: 4,
     overdueOrdersCount: 1,
-    todayPickupOrdersCount: 1,
-    todayPickupOrders: [],
     recentOrders: [],
   );
 
@@ -147,15 +145,8 @@ void main() {
           find.byKey(const ValueKey('attention_overdue_item')),
           findsOneWidget,
         );
-        expect(
-          find.byKey(const ValueKey('attention_today_pickup_item')),
-          findsNothing,
-        );
 
-        // 6. Verification of Exclusions: "تسليمات اليوم" must NOT exist on Dashboard
-        expect(find.text('تسليمات اليوم'), findsNothing);
-
-        // 7. Recent Orders Section
+        // 6. Recent Orders Section
         expect(find.text('أحدث الطلبات'), findsOneWidget);
       },
     );
@@ -200,49 +191,46 @@ void main() {
       expect(find.text('تسجيل دفعة'), findsWidgets);
     });
 
-    testWidgets(
-      'displays orders in today pickups and recent orders when populated',
-      (tester) async {
-        final now = DateTime.now();
-        final orderItem = DashboardOrderItem(
-          order: Order(
-            id: 'ord-test-1',
-            orderNumber: '26-101',
-            customerId: 'c1',
-            customerNameSnapshot: 'محمود خليل',
-            customerPhoneSnapshot: '01122334455',
-            status: OrderStatus.processing,
-            expectedPickupDate: OrderDate.today(),
-            subtotal: const Money.fromPiastres(8000),
-            total: const Money.fromPiastres(8000),
-            createdAt: now,
-            updatedAt: now,
-          ),
-          totalPaid: const Money.fromPiastres(3000),
-          remainingAmount: const Money.fromPiastres(5000),
-        );
+    testWidgets('displays orders in recent orders when populated', (
+      tester,
+    ) async {
+      final now = DateTime.now();
+      final orderItem = DashboardOrderItem(
+        order: Order(
+          id: 'ord-test-1',
+          orderNumber: '26-101',
+          customerId: 'c1',
+          customerNameSnapshot: 'محمود خليل',
+          customerPhoneSnapshot: '01122334455',
+          status: OrderStatus.processing,
+          expectedPickupDate: OrderDate.today(),
+          subtotal: const Money.fromPiastres(8000),
+          total: const Money.fromPiastres(8000),
+          createdAt: now,
+          updatedAt: now,
+        ),
+        totalPaid: const Money.fromPiastres(3000),
+        remainingAmount: const Money.fromPiastres(5000),
+      );
 
-        fakeDashboardRepository.mockData = DashboardData(
-          todayOrdersCount: 1,
-          processingOrdersCount: 1,
-          readyOrdersCount: 0,
-          totalRemainingAmount: const Money.fromPiastres(5000),
-          unpaidOrdersCount: 1,
-          storageAttentionCount: 0,
-          overdueOrdersCount: 0,
-          todayPickupOrdersCount: 1,
-          todayPickupOrders: [orderItem],
-          recentOrders: [orderItem],
-        );
+      fakeDashboardRepository.mockData = DashboardData(
+        todayOrdersCount: 1,
+        processingOrdersCount: 1,
+        readyOrdersCount: 0,
+        totalRemainingAmount: const Money.fromPiastres(5000),
+        unpaidOrdersCount: 1,
+        storageAttentionCount: 0,
+        overdueOrdersCount: 0,
+        recentOrders: [orderItem],
+      );
 
-        await tester.pumpWidget(buildTestableWidget(const DashboardScreen()));
-        await tester.pumpAndSettle();
+      await tester.pumpWidget(buildTestableWidget(const DashboardScreen()));
+      await tester.pumpAndSettle();
 
-        expect(find.text('#26-101'), findsWidgets);
-        expect(find.text('محمود خليل'), findsWidgets);
-        expect(find.text('قيد التجهيز'), findsWidgets);
-      },
-    );
+      expect(find.text('#26-101'), findsWidgets);
+      expect(find.text('محمود خليل'), findsWidgets);
+      expect(find.text('قيد التجهيز'), findsWidgets);
+    });
 
     testWidgets(
       'displays meaningful empty states when attention items and lists are empty',
@@ -290,8 +278,6 @@ void main() {
           unpaidOrdersCount: 1,
           storageAttentionCount: 0,
           overdueOrdersCount: 0,
-          todayPickupOrdersCount: 1,
-          todayPickupOrders: [longOrderItem],
           recentOrders: [longOrderItem],
         );
 
@@ -315,8 +301,6 @@ void main() {
           unpaidOrdersCount: 2,
           storageAttentionCount: 4,
           overdueOrdersCount: 1,
-          todayPickupOrdersCount: 0,
-          todayPickupOrders: [],
           recentOrders: [],
         );
 
@@ -361,13 +345,6 @@ void main() {
         expect(overdueIconFinder, findsOneWidget);
         final overdueIcon = tester.widget<Icon>(overdueIconFinder);
         expect(overdueIcon.color, AppColors.error);
-
-        // 4. Confirm "تسليمات اليوم" is completely absent
-        expect(
-          find.byKey(const ValueKey('attention_today_pickup_item')),
-          findsNothing,
-        );
-        expect(find.text('تسليمات اليوم'), findsNothing);
       },
     );
 
