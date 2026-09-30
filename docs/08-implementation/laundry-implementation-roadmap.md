@@ -204,7 +204,7 @@ The Dashboard provides an operational overview of real system data without repla
   3. Items requiring storage (`itemsRequiringStorageCount` matching active orders with no active storage records via `StorageRepository.countItemsRequiringStorage()`)
   4. Outstanding payments (`totalRemaining` in piastres + `unpaidOrdersCount` for non-cancelled orders with `total - paid > 0`)
   5. Overdue orders (`overdueOrdersCount` where `expectedPickupDate < today` and order not completed or cancelled)
-  6. Today's expected pickups (`todayPickupOrdersCount` count + list capped at 5 active orders due today)
+  6. Today's expected pickups (Removed from V1 Dashboard UI)
   7. Recent orders (latest 5 orders with `PaymentSummary` remaining amount enrichment)
 - **Reactive Stream**: `DashboardRepository.watchDashboardData()` reactive via Drift `db.tableUpdates` monitoring `orders`, `payments`, `storage_records`, and `order_items` tables with zero polling and zero pending timers.
 - **Quick Actions**: All 4 actions operational:

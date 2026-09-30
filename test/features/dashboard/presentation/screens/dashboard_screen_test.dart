@@ -2,6 +2,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/core/di/injection.dart';
+import 'package:laundry_management/core/theme/app_colors.dart';
 import 'package:laundry_management/data/local/database/app_database.dart'
     hide Order;
 import 'package:laundry_management/domain/entities/dashboard_data.dart';
@@ -148,14 +149,11 @@ void main() {
         );
         expect(
           find.byKey(const ValueKey('attention_today_pickup_item')),
-          findsOneWidget,
+          findsNothing,
         );
 
-        // 6. Today's Pickups Section
-        expect(
-          find.text('تسليمات اليوم'),
-          findsWidgets,
-        ); // inside attention and as section title
+        // 6. Verification of Exclusions: "تسليمات اليوم" must NOT exist on Dashboard
+        expect(find.text('تسليمات اليوم'), findsNothing);
 
         // 7. Recent Orders Section
         expect(find.text('أحدث الطلبات'), findsOneWidget);
@@ -257,7 +255,7 @@ void main() {
         expect(find.text('لا توجد عناصر تحتاج إلى تخزين'), findsOneWidget);
         expect(find.text('لا توجد مبالغ متبقية'), findsOneWidget);
         expect(find.text('لا توجد طلبات متأخرة'), findsOneWidget);
-        expect(find.text('لا توجد طلبات مستحقة اليوم'), findsOneWidget);
+        expect(find.text('لا توجد طلبات مستحقة اليوم'), findsNothing);
         expect(find.text('لا توجد طلبات حتى الآن'), findsOneWidget);
       },
     );
@@ -303,6 +301,117 @@ void main() {
         expect(tester.takeException(), isNull);
         expect(find.byType(DashboardRecentOrdersSection), findsOneWidget);
         expect(find.text('#ORD-TEST-REF-1501-5c8be4123864'), findsWidgets);
+      },
+    );
+
+    testWidgets(
+      'attention items render correct semantic colors for warning, unpaid, and error',
+      (tester) async {
+        fakeDashboardRepository.mockData = const DashboardData(
+          todayOrdersCount: 5,
+          processingOrdersCount: 2,
+          readyOrdersCount: 3,
+          totalRemainingAmount: Money.fromPiastres(12000),
+          unpaidOrdersCount: 2,
+          storageAttentionCount: 4,
+          overdueOrdersCount: 1,
+          todayPickupOrdersCount: 0,
+          todayPickupOrders: [],
+          recentOrders: [],
+        );
+
+        await tester.pumpWidget(buildTestableWidget(const DashboardScreen()));
+        await tester.pumpAndSettle();
+
+        // 1. Storage Attention item uses Warning semantic color
+        final storageCardFinder = find.byKey(
+          const ValueKey('attention_storage_item'),
+        );
+        expect(storageCardFinder, findsOneWidget);
+        final storageIconFinder = find.descendant(
+          of: storageCardFinder,
+          matching: find.byIcon(Icons.inventory_2_outlined),
+        );
+        expect(storageIconFinder, findsOneWidget);
+        final storageIcon = tester.widget<Icon>(storageIconFinder);
+        expect(storageIcon.color, AppColors.warning);
+
+        // 2. Unpaid Attention item uses Warning semantic color (not info, not success)
+        final unpaidCardFinder = find.byKey(
+          const ValueKey('attention_unpaid_item'),
+        );
+        expect(unpaidCardFinder, findsOneWidget);
+        final unpaidIconFinder = find.descendant(
+          of: unpaidCardFinder,
+          matching: find.byIcon(Icons.payments_outlined),
+        );
+        expect(unpaidIconFinder, findsOneWidget);
+        final unpaidIcon = tester.widget<Icon>(unpaidIconFinder);
+        expect(unpaidIcon.color, AppColors.warning);
+
+        // 3. Overdue Attention item uses Error semantic color (not success, not warning)
+        final overdueCardFinder = find.byKey(
+          const ValueKey('attention_overdue_item'),
+        );
+        expect(overdueCardFinder, findsOneWidget);
+        final overdueIconFinder = find.descendant(
+          of: overdueCardFinder,
+          matching: find.byIcon(Icons.access_time_filled),
+        );
+        expect(overdueIconFinder, findsOneWidget);
+        final overdueIcon = tester.widget<Icon>(overdueIconFinder);
+        expect(overdueIcon.color, AppColors.error);
+
+        // 4. Confirm "تسليمات اليوم" is completely absent
+        expect(
+          find.byKey(const ValueKey('attention_today_pickup_item')),
+          findsNothing,
+        );
+        expect(find.text('تسليمات اليوم'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'attention items with 0 count do NOT render green background on leading icon container',
+      (tester) async {
+        fakeDashboardRepository.mockData = DashboardData.empty;
+
+        await tester.pumpWidget(buildTestableWidget(const DashboardScreen()));
+        await tester.pumpAndSettle();
+
+        // When count == 0, leading icons should use neutral textSecondary, not success
+        final storageCardFinder = find.byKey(
+          const ValueKey('attention_storage_item'),
+        );
+        final storageIcon = tester.widget<Icon>(
+          find.descendant(
+            of: storageCardFinder,
+            matching: find.byIcon(Icons.inventory_2_outlined),
+          ),
+        );
+        expect(storageIcon.color, AppColors.textSecondary);
+
+        final unpaidCardFinder = find.byKey(
+          const ValueKey('attention_unpaid_item'),
+        );
+        final unpaidIcon = tester.widget<Icon>(
+          find.descendant(
+            of: unpaidCardFinder,
+            matching: find.byIcon(Icons.payments_outlined),
+          ),
+        );
+        expect(unpaidIcon.color, AppColors.textSecondary);
+
+        final overdueCardFinder = find.byKey(
+          const ValueKey('attention_overdue_item'),
+        );
+        final overdueIcon = tester.widget<Icon>(
+          find.descendant(
+            of: overdueCardFinder,
+            matching: find.byIcon(Icons.access_time_filled),
+          ),
+        );
+        expect(overdueIcon.color, AppColors.textSecondary);
       },
     );
   });

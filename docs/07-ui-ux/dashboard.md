@@ -345,18 +345,18 @@ Overdue information belongs in the Attention Required section rather than becomi
 
 ---
 
-## 21. Today's Expected Pickups
+## 21. Today's Expected Pickups (Removed from V1 Dashboard Scope)
 
-The Dashboard may show a concise list or indicator for Orders whose Expected Pickup Date is today.
+Today's expected pickups / deliveries section ("تسليمات اليوم") has been intentionally removed from the approved V1 Dashboard scope to streamline the operational view.
 
-The displayed date must remain date-only.
-
-Example:
-
-    موعد الاستلام المتوقع
-    26 أغسطس 2026
-
-The Dashboard must not introduce pickup times or appointment scheduling.
+The Dashboard focuses strictly on active operational priorities:
+- Orders Today
+- Ready Orders
+- Items Requiring Storage
+- Outstanding Payments
+- Overdue Orders
+- Recent Orders
+- Quick Actions
 
 ---
 
@@ -364,12 +364,11 @@ The Dashboard must not introduce pickup times or appointment scheduling.
 
 A dedicated section should highlight items that require operator attention.
 
-Possible approved conditions include:
+Approved operational conditions include:
 
     Orders awaiting storage
     Orders with remaining payment
     Overdue orders
-    Today's expected pickups
     Synchronization requiring attention
 
 Only meaningful actionable conditions should appear.
@@ -728,10 +727,6 @@ Examples:
     طلبات متأخرة
         ↓
     Orders filtered by overdue condition
-
-    تسليمات اليوم
-        ↓
-    Orders filtered by today's Expected Pickup
 
 Navigation should preserve the relevant filter/context.
 

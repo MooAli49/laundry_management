@@ -39,12 +39,8 @@ class DashboardAttentionSection extends StatelessWidget {
               : 'لا توجد عناصر تحتاج إلى تخزين',
           count: data.storageAttentionCount,
           icon: Icons.inventory_2_outlined,
-          badgeColor: data.storageAttentionCount > 0
-              ? AppColors.warning
-              : AppColors.success,
-          badgeBg: data.storageAttentionCount > 0
-              ? AppColors.warningLight
-              : AppColors.successLight,
+          attentionColor: AppColors.warning,
+          attentionBg: AppColors.warningLight,
           onTap: () => context.push(AppRoutes.storage),
         ),
         AppSpacing.gapSm,
@@ -57,12 +53,8 @@ class DashboardAttentionSection extends StatelessWidget {
               : 'لا توجد مبالغ متبقية',
           count: data.unpaidOrdersCount,
           icon: Icons.payments_outlined,
-          badgeColor: data.unpaidOrdersCount > 0
-              ? AppColors.info
-              : AppColors.success,
-          badgeBg: data.unpaidOrdersCount > 0
-              ? AppColors.infoLight
-              : AppColors.successLight,
+          attentionColor: AppColors.warning,
+          attentionBg: AppColors.warningLight,
           onTap: () => context.push('${AppRoutes.orders}?filter=hasRemaining'),
         ),
         AppSpacing.gapSm,
@@ -75,31 +67,9 @@ class DashboardAttentionSection extends StatelessWidget {
               : 'لا توجد طلبات متأخرة',
           count: data.overdueOrdersCount,
           icon: Icons.access_time_filled,
-          badgeColor: data.overdueOrdersCount > 0
-              ? AppColors.error
-              : AppColors.success,
-          badgeBg: data.overdueOrdersCount > 0
-              ? AppColors.errorLight
-              : AppColors.successLight,
+          attentionColor: AppColors.error,
+          attentionBg: AppColors.errorLight,
           onTap: () => context.push('${AppRoutes.orders}?filter=overdue'),
-        ),
-        AppSpacing.gapSm,
-        _buildAttentionItem(
-          context: context,
-          key: const ValueKey('attention_today_pickup_item'),
-          title: 'تسليمات اليوم',
-          subtitle: data.todayPickupOrdersCount > 0
-              ? '${data.todayPickupOrdersCount} طلبات موعد استلامها المتوقع اليوم'
-              : 'لا توجد طلبات مستحقة اليوم',
-          count: data.todayPickupOrdersCount,
-          icon: Icons.calendar_today_outlined,
-          badgeColor: data.todayPickupOrdersCount > 0
-              ? AppColors.primary
-              : AppColors.textSecondary,
-          badgeBg: data.todayPickupOrdersCount > 0
-              ? AppColors.primaryLighter
-              : AppColors.backgroundSecondary,
-          onTap: () => context.push('${AppRoutes.orders}?filter=todayPickup'),
         ),
       ],
     );
@@ -112,11 +82,13 @@ class DashboardAttentionSection extends StatelessWidget {
     required String subtitle,
     required int count,
     required IconData icon,
-    required Color badgeColor,
-    required Color badgeBg,
+    required Color attentionColor,
+    required Color attentionBg,
     required VoidCallback onTap,
   }) {
     final hasAttention = count > 0;
+    final iconColor = hasAttention ? attentionColor : AppColors.textSecondary;
+    final iconBg = hasAttention ? attentionBg : AppColors.backgroundSecondary;
 
     return AppCard(
       key: key,
@@ -126,7 +98,7 @@ class DashboardAttentionSection extends StatelessWidget {
         vertical: AppSpacing.md,
       ),
       borderColor: hasAttention
-          ? badgeColor.withValues(alpha: 0.3)
+          ? attentionColor.withValues(alpha: 0.3)
           : AppColors.border,
       child: Row(
         children: [
@@ -134,10 +106,10 @@ class DashboardAttentionSection extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: badgeBg,
+              color: iconBg,
               borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
             ),
-            child: Icon(icon, color: badgeColor, size: 20),
+            child: Icon(icon, color: iconColor, size: 20),
           ),
           AppSpacing.gapHorizontalMd,
           Expanded(
@@ -169,13 +141,13 @@ class DashboardAttentionSection extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: badgeBg,
+                color: attentionBg,
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
                 '$count',
                 style: AppTextStyles.labelSmall.copyWith(
-                  color: badgeColor,
+                  color: attentionColor,
                   fontWeight: FontWeight.bold,
                 ),
               ),

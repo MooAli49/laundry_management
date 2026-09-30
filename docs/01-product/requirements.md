@@ -1101,7 +1101,6 @@ It should focus on:
 - Items requiring storage
 - Outstanding payments
 - Overdue orders
-- Today's expected pickups
 - Recent orders
 
 The Dashboard must provide Quick Actions for:
@@ -1434,6 +1433,7 @@ The system is a Point of Sale (POS) and counter operations management applicatio
 The following features must not be implemented unless explicitly added to the requirements later:
 
 - Portrait orientation and portrait-specific mobile layouts (Landscape-only system)
+- "Today's Deliveries" / "تسليمات اليوم" Dashboard section (intentionally removed from V1 Dashboard scope)
 - Multiple user roles
 - Permissions
 - Employee management

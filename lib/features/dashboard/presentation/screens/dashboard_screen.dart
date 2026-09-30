@@ -20,7 +20,6 @@ import '../cubit/dashboard_state.dart';
 import '../widgets/dashboard_attention_section.dart';
 import '../widgets/dashboard_metric_card.dart';
 import '../widgets/dashboard_recent_orders_section.dart';
-import '../widgets/dashboard_today_pickups_section.dart';
 import '../widgets/record_payment_dialog.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -299,21 +298,11 @@ class _DashboardView extends StatelessWidget {
                                 child: DashboardAttentionSection(data: data),
                               ),
                               AppSpacing.gapHorizontalXl,
-                              // Left / End in RTL: Today's Pickups & Recent Orders
+                              // Left / End in RTL: Recent Orders
                               Expanded(
                                 flex: 6,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    DashboardTodayPickupsSection(
-                                      orders: data.todayPickupOrders,
-                                      totalCount: data.todayPickupOrdersCount,
-                                    ),
-                                    AppSpacing.gapXxl,
-                                    DashboardRecentOrdersSection(
-                                      orders: data.recentOrders,
-                                    ),
-                                  ],
+                                child: DashboardRecentOrdersSection(
+                                  orders: data.recentOrders,
                                 ),
                               ),
                             ],
@@ -323,11 +312,6 @@ class _DashboardView extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               DashboardAttentionSection(data: data),
-                              AppSpacing.gapXxl,
-                              DashboardTodayPickupsSection(
-                                orders: data.todayPickupOrders,
-                                totalCount: data.todayPickupOrdersCount,
-                              ),
                               AppSpacing.gapXxl,
                               DashboardRecentOrdersSection(
                                 orders: data.recentOrders,
