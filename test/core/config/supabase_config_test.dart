@@ -29,7 +29,7 @@ void main() {
           expect(config.urlRoot, equals('https://staging.supabase.co'));
           expect(
             config.apiUrl,
-            equals('https://staging.supabase.co/functions/v1/api'),
+            equals('https://staging.supabase.co/functions/v1'),
           );
           expect(config.anonKey, equals(SupabaseConfig.defaultDevAnonKey));
         },
@@ -46,7 +46,7 @@ void main() {
           expect(config.urlRoot, equals('https://custom-api.supabase.co'));
           expect(
             config.apiUrl,
-            equals('https://custom-api.supabase.co/functions/v1/api'),
+            equals('https://custom-api.supabase.co/functions/v1'),
           );
           expect(config.anonKey, equals(SupabaseConfig.defaultDevAnonKey));
         },
@@ -172,7 +172,7 @@ void main() {
           expect(config.urlRoot, equals('https://prod-project.supabase.co'));
           expect(
             config.apiUrl,
-            equals('https://prod-project.supabase.co/functions/v1/api'),
+            equals('https://prod-project.supabase.co/functions/v1'),
           );
           expect(config.anonKey, equals('prod-public-anon-key-12345'));
         },
@@ -190,7 +190,7 @@ void main() {
           expect(config.urlRoot, equals('https://prod-api.supabase.co'));
           expect(
             config.apiUrl,
-            equals('https://prod-api.supabase.co/functions/v1/api'),
+            equals('https://prod-api.supabase.co/functions/v1'),
           );
           expect(config.anonKey, equals('prod-public-anon-key-67890'));
         },
@@ -303,7 +303,7 @@ void main() {
           );
           expect(
             config.apiUrl,
-            equals('https://rvrskluqfbrkvvlxtxfp.supabase.co/functions/v1/api'),
+            equals('https://rvrskluqfbrkvvlxtxfp.supabase.co/functions/v1'),
           );
           expect(config.anonKey, equals('valid-prod-anon-key-67890'));
         },
@@ -355,10 +355,7 @@ void main() {
           );
 
           final client = DioClient(config: config);
-          expect(
-            client.dio.options.baseUrl,
-            equals('$customUrl/functions/v1/api'),
-          );
+          expect(client.dio.options.baseUrl, equals('$customUrl/functions/v1'));
 
           final interceptor = client.dio.interceptors
               .whereType<ApiKeyInterceptor>()

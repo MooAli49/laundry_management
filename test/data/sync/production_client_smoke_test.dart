@@ -82,7 +82,7 @@ void main() {
         );
         expect(
           config.apiUrl,
-          equals('https://rvrskluqfbrkvvlxtxfp.supabase.co/functions/v1/api'),
+          equals('https://rvrskluqfbrkvvlxtxfp.supabase.co/functions/v1'),
         );
         expect(config.anonKey, isNotEmpty);
         expect(config.anonKey, isNot(equals(SupabaseConfig.defaultDevAnonKey)));
@@ -165,12 +165,16 @@ void main() {
     test(
       '4. Sync pull beyond baseline returns zero changes (Production is clean)',
       () async {
-        final initialResponse =
-            await syncRemoteApi.getChanges(after: 0, limit: 1);
+        final initialResponse = await syncRemoteApi.getChanges(
+          after: 0,
+          limit: 1,
+        );
         final latestSeq =
             (initialResponse as Map<String, dynamic>)['latest_sequence'] as int;
-        final response =
-            await syncRemoteApi.getChanges(after: latestSeq, limit: 10);
+        final response = await syncRemoteApi.getChanges(
+          after: latestSeq,
+          limit: 10,
+        );
         final data = response as Map<String, dynamic>;
 
         expect(data['has_more'], isFalse);

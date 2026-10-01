@@ -15,7 +15,7 @@ class SupabaseConfig {
   /// The root URL of the Supabase project (e.g. `https://<ref>.supabase.co`).
   final String urlRoot;
 
-  /// The base URL for Edge Function REST APIs (e.g. `https://<ref>.supabase.co/functions/v1/api`).
+  /// The base URL for Edge Function REST APIs (e.g. `https://<ref>.supabase.co/functions/v1`).
   final String apiUrl;
 
   /// The public anonymous client key.
@@ -35,7 +35,7 @@ class SupabaseConfig {
 
   /// Expected production Edge Function REST API endpoint.
   static const String prodApiUrl =
-      'https://rvrskluqfbrkvvlxtxfp.supabase.co/functions/v1/api';
+      'https://rvrskluqfbrkvvlxtxfp.supabase.co/functions/v1';
 
   /// Development project reference.
   static const String devProjectRef = 'dyhfgnbhijukbdptreto';
@@ -46,7 +46,7 @@ class SupabaseConfig {
 
   /// Default development Edge Function REST API endpoint.
   static const String defaultDevApiUrl =
-      'https://dyhfgnbhijukbdptreto.supabase.co/functions/v1/api';
+      'https://dyhfgnbhijukbdptreto.supabase.co/functions/v1';
 
   /// Default development public anonymous key.
   static const String defaultDevAnonKey =
@@ -82,6 +82,9 @@ class SupabaseConfig {
         (customApiUrl != null && customApiUrl.trim().isNotEmpty)
         ? customApiUrl.trim()
         : (envUrl.trim().isNotEmpty ? envUrl.trim() : null);
+    final normalizedSuppliedApiUrl = suppliedApiUrl == null
+        ? null
+        : _normalizeApiUrl(suppliedApiUrl);
 
     final suppliedAnonKey =
         (customAnonKey != null && customAnonKey.trim().isNotEmpty)
@@ -135,14 +138,14 @@ class SupabaseConfig {
 
     final effectiveUrlRoot =
         suppliedUrlRoot ??
-        (suppliedApiUrl != null
-            ? _extractRootFromApiUrl(suppliedApiUrl)
+        (normalizedSuppliedApiUrl != null
+            ? _extractRootFromApiUrl(normalizedSuppliedApiUrl)
             : defaultDevUrlRoot);
 
     final effectiveApiUrl =
-        suppliedApiUrl ??
+        normalizedSuppliedApiUrl ??
         (suppliedUrlRoot != null
-            ? '$suppliedUrlRoot/functions/v1/api'
+            ? '$suppliedUrlRoot/functions/v1'
             : defaultDevApiUrl);
 
     final effectiveAnonKey = suppliedAnonKey ?? defaultDevAnonKey;
@@ -160,6 +163,13 @@ class SupabaseConfig {
   static String _extractRootFromApiUrl(String apiUrl) {
     final uri = Uri.parse(apiUrl);
     return '${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}';
+  }
+
+  static String _normalizeApiUrl(String apiUrl) {
+    final normalized = apiUrl.replaceFirst(RegExp(r'/+$'), '');
+    return normalized.endsWith('/api')
+        ? normalized.substring(0, normalized.length - '/api'.length)
+        : normalized;
   }
 
   static void _validateUrl(String url, String label) {

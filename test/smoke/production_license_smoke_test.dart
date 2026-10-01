@@ -46,8 +46,7 @@ void main() {
     HttpOverrides.global = _RealHttpOverrides();
   }
 
-  const prodApiUrl =
-      'https://rvrskluqfbrkvvlxtxfp.supabase.co/functions/v1/api';
+  const prodApiUrl = 'https://rvrskluqfbrkvvlxtxfp.supabase.co/functions/v1';
   const prodAnonKey = 'sb_publishable__UIcu7AHpwHejCE9b7RA6w_PEwn8aNY';
 
   late Dio dio;
