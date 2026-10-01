@@ -15,8 +15,8 @@ import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../domain/entities/carpet_size.dart';
 import '../../../../domain/entities/item_definition.dart';
 import '../../../../domain/entities/item_type.dart';
-import '../../../../domain/entities/service.dart';
 import '../../../../domain/enums/pricing_type.dart';
+import '../../../../domain/models/service_with_pricing.dart';
 import '../../../../domain/value_objects/money.dart';
 import '../../../../domain/value_objects/order_date.dart';
 import '../cubit/edit_processing_order_cubit.dart';
@@ -432,10 +432,6 @@ class _EditOrderViewState extends State<EditOrderView> {
               final uniqueServices = {
                 for (final s in state.compatibleServices) s.id: s,
               }.values.toList();
-              if (state.draftService != null &&
-                  !uniqueServices.any((s) => s.id == state.draftService!.id)) {
-                uniqueServices.insert(0, state.draftService!);
-              }
               final selectedService = state.draftService != null
                   ? uniqueServices
                         .where((s) => s.id == state.draftService!.id)
@@ -554,7 +550,7 @@ class _EditOrderViewState extends State<EditOrderView> {
                           children: [
                             Text('الخدمة *', style: AppTextStyles.labelMedium),
                             AppSpacing.gapXs,
-                            DropdownButtonFormField<Service>(
+                            DropdownButtonFormField<ServiceWithPricing>(
                               key: ValueKey('service_${selectedService?.id}'),
                               initialValue: selectedService,
                               isExpanded: true,
@@ -562,11 +558,11 @@ class _EditOrderViewState extends State<EditOrderView> {
                                 hintText: 'اختر الخدمة',
                                 border: OutlineInputBorder(),
                               ),
-                              items: uniqueServices.map((service) {
+                              items: uniqueServices.map((sp) {
                                 return DropdownMenuItem(
-                                  value: service,
+                                  value: sp,
                                   child: Text(
-                                    '${service.name} (${service.price.toEgp} ج.م)',
+                                    '${sp.name} (${sp.price.toEgp} ج.م)',
                                   ),
                                 );
                               }).toList(),
@@ -711,7 +707,7 @@ class _EditOrderViewState extends State<EditOrderView> {
                   ],
 
                   // Row 4: Carpet details if perSquareMeter (independent from quantity)
-                  if (state.draftService?.pricingType ==
+                  if (state.draftPricingType ==
                       PricingType.perSquareMeter) ...[
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,

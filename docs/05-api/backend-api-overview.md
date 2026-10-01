@@ -697,21 +697,21 @@ Conceptually:
     POST   /api/v1/services
     PATCH  /api/v1/services/{id}
 
-Service configuration may include:
+Service configuration includes:
 
 - Name
-- Pricing Type
-- Price
+- Description (optional)
 - Active state
-- Supported Item Types
+
+The Service entity must NOT own a single default/current price or pricing type. Pricing configuration belongs to the ServiceItemType relationship.
 
 Changing a current Service configuration must not rewrite historical OrderItem snapshots.
 
 ---
 
-# 33. Service/ItemType Compatibility API
+# 33. Service/ItemType Compatibility & Pricing API
 
-The API must support synchronization of ServiceItemType relationships.
+The API must support synchronization of ServiceItemType relationships and operational pricing configurations.
 
 Conceptually:
 
@@ -719,7 +719,16 @@ Conceptually:
     POST   /api/v1/service-item-types
     PATCH  /api/v1/service-item-types/{id}
 
-The backend must prevent duplicate Service/ItemType compatibility relationships.
+ServiceItemType configuration includes:
+
+- `service_id`
+- `item_type_id`
+- `pricing_type` (`per_piece`, `per_square_meter`)
+- `price` (strictly positive minor currency units)
+
+The backend must prevent duplicate Service/ItemType compatibility relationships (`UNIQUE(service_id, item_type_id)`).
+
+Changing a ServiceItemType pricing configuration must not rewrite historical OrderItem snapshots (`order_items.unit_price`).
 
 ---
 
@@ -1771,11 +1780,11 @@ The backend must preserve master data changes independently from transaction sna
 
 Example:
 
-    Service price = 100
+    Service + Item Type price = 100
         ↓
     Historical OrderItem.unitPrice = 100
         ↓
-    Service price becomes 120
+    Service + Item Type price becomes 120
 
 The historical OrderItem remains:
 

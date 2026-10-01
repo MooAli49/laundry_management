@@ -211,14 +211,14 @@ class AppStrings {
   static const String pricingTypeLabel = 'نوع التسعير *';
   static const String pricingPerPiece = 'بالقطعة';
   static const String pricingPerSquareMeter = 'بالمتر المربع';
-  static const String pricingFixedPrice = 'سعر ثابت';
   static const String servicePriceLabel = 'السعر *';
   static const String priceLabelPerPiece = 'سعر القطعة';
   static const String priceLabelPerSquareMeter = 'سعر المتر المربع';
-  static const String priceLabelFixedPrice = 'السعر الثابت';
-  static const String supportedItemTypesLabel = 'أنواع القطع المدعومة *';
+  static const String supportedItemTypesLabel = 'أنواع القطع المدعومة والتسعير *';
+  static const String itemTypePricingMatrixPrompt =
+      'حدد أنواع القطع المدعومة وضع تسعيراً خاصاً لكل نوع:';
   static const String selectAtLeastOneItemType =
-      'يجب اختيار نوع قطعة واحد على الأقل';
+      'يجب اختيار نوع قطعة واحد على الأقل مع تحديد السعر';
   static const String serviceNameRequired = 'اسم الخدمة مطلوب';
   static const String servicePriceRequired = 'السعر مطلوب';
   static const String servicePriceMustBePositive =

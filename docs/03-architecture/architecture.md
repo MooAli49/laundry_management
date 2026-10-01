@@ -829,7 +829,7 @@ The feature handles:
 
 Reports should use local historical data.
 
-Historical transaction values must not depend on current Service prices.
+Historical transaction values must not depend on current Service pricing configurations.
 
 ---
 
@@ -856,19 +856,31 @@ Examples of fixed V1 configuration:
 
 Pricing logic should not be implemented directly inside widgets.
 
-The pricing calculation should be performed by Domain logic or a small Domain Service when appropriate.
+The Service entity must NOT own a single default/current price.
+
+In this laundry system, the actual price depends on the combination of:
+
+> **Service + Item Type**
+
+Pricing configuration belongs to the `ServiceItemType` associative entity.
 
 Supported V1 Operational Pricing Types are:
 
-    Per Piece
-    Fixed Price
-    Per Square Meter
+    Per Piece (`per_piece`)
+    Per Square Meter (`per_square_meter`)
 
-*(Note: Per Kilogram pricing has been completely removed from the V1 operational model and workflow by locked business decision).*
+*(Note: `fixed_price` is removed from the V1 operational model because each physical item is represented as an individual OrderItem with a unit price, making fixed price functionally identical to per-piece pricing. Per Kilogram remains excluded).*
 
-Historical OrderItem pricing must be preserved.
+Example:
 
-Current Service prices must not silently recalculate old orders.
+Washing
+  ├── Clothing → per_piece → 50 EGP
+  ├── Blanket  → per_piece → 100 EGP
+  └── Carpet   → per_square_meter → 60 EGP
+
+Historical OrderItem pricing must be preserved (`order_items.unit_price`).
+
+Current Service pricing configurations must not silently recalculate old orders.
 
 ---
 

@@ -14,10 +14,10 @@ import 'package:laundry_management/domain/entities/item_definition.dart';
 import 'package:laundry_management/domain/entities/item_type.dart';
 import 'package:laundry_management/domain/entities/order.dart';
 import 'package:laundry_management/domain/entities/order_item.dart';
-import 'package:laundry_management/domain/entities/service.dart';
 import 'package:laundry_management/domain/entities/storage_location.dart';
 import 'package:laundry_management/domain/enums/order_status.dart';
 import 'package:laundry_management/domain/enums/pricing_type.dart';
+import 'package:laundry_management/domain/models/service_with_pricing.dart';
 import 'package:laundry_management/domain/repositories/carpet_size_repository.dart';
 import 'package:laundry_management/domain/repositories/customer_repository.dart';
 import 'package:laundry_management/domain/repositories/item_definition_repository.dart';
@@ -76,10 +76,10 @@ class MockCustomerRepo implements CustomerRepository {
 }
 
 class MockServiceRepo implements ServiceRepository {
-  List<Service> services = [];
+  List<ServiceWithPricing> services = [];
 
   @override
-  Future<List<Service>> getServicesForItemType(String itemTypeId) async =>
+  Future<List<ServiceWithPricing>> getServicesForItemType(String itemTypeId) async =>
       services;
 
   @override

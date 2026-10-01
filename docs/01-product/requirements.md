@@ -388,12 +388,18 @@ Snapshot rules:
 
 The user must be able to create, edit, activate, and deactivate services.
 
-A service must contain at least:
+A service must contain:
 
+- Unique identifier
 - Service name
-- Pricing type
-- Price
-- Supported item types
+- Description (optional)
+- Active state
+
+Pricing configuration belongs to the **Service–Item Type** relationship (`ServiceItemType`), not directly to Service. The Service entity must NOT own a single default/current price.
+
+For each supported Item Type linked to a Service, the user configures:
+- Pricing type (`per_piece` or `per_square_meter`)
+- Price (strictly positive money amount in minor currency units)
 
 ---
 
@@ -413,24 +419,33 @@ the system should show only services configured for Clothing.
 
 ## 5.3 Service Pricing
 
-The system must support the following pricing models at the domain level:
+In this laundry system, the actual price depends on the combination of:
 
-- Per Piece
-- Per Kilogram
-- Per Square Meter
-- Fixed Price
+> **Service + Item Type**
 
-V1 UI should only expose pricing options that are actually relevant to the selected service/item combination.
+The supported operational pricing models in V1 are:
 
-The system should not unnecessarily show unsupported or irrelevant pricing options.
+- Per Piece (`per_piece`)
+- Per Square Meter (`per_square_meter`)
+
+*(Note: `fixed_price` has been removed from the V1 operational model because each physical item is represented as an individual OrderItem with a unit price, making fixed price functionally identical to per-piece pricing without distinct business behavior. Per Kilogram pricing remains completely excluded from V1).*
+
+Example:
+
+Washing
+  ├── Clothing → per_piece → 50 EGP
+  ├── Blanket  → per_piece → 100 EGP
+  └── Carpet   → per_square_meter → 60 EGP
+
+The UI exposes only the pricing type and fields configured for the selected Service + Item Type combination.
 
 ---
 
 ## 5.4 Price Snapshot
 
-When a service is added to an order, the price used for that OrderItem must be preserved as historical data.
+When a Service + Item Type combination is selected for an OrderItem, the actual price used at that time must be preserved as historical data (snapshotted into `order_items.unit_price`).
 
-Changing the service's current price must not change the price of existing orders.
+Changing a Service's pricing configuration later must NOT change the price of existing OrderItems or historical orders.
 
 ---
 
@@ -438,11 +453,11 @@ Changing the service's current price must not change the price of existing order
 
 During Order creation, the user must be able to adjust the applicable item/service price before saving the order according to the approved pricing behavior.
 
-The adjusted price becomes part of the historical order data.
+The adjusted price becomes part of the historical order data (`order_items.unit_price`).
 
 Opening an existing editable order must allow the user to modify its applicable price when permitted by the business rules.
 
-Historical orders must not be recalculated using the current service price.
+Historical orders must not be recalculated using current Service pricing configurations.
 
 ---
 
@@ -573,7 +588,7 @@ The user may manually override the calculated draft total for an item group:
   - Remainder = `totalPiastres % quantity`
   - The first `remainder` items receive `basePiecePiastres + 1` piastre, and the remaining items receive `basePiecePiastres`.
   - The sum of physical piece totals is strictly guaranteed to equal the custom total.
-- **Historical Price Stability**: The stored snapshot values (`unitPrice`, `calculatedTotal`) are saved permanently with each `OrderItem` in local SQLite and are never recalculated from updated service prices.
+- **Historical Price Stability**: The stored snapshot values (`unitPrice`, `calculatedTotal`) are saved permanently with each `OrderItem` in local SQLite and are never recalculated from updated service–item pricing configurations.
 
 ---
 
@@ -1342,7 +1357,7 @@ Historical order information must remain stable even when master data changes.
 
 For example:
 
-If a service price changes from:
+If a Service + Item Type configured price changes from:
 
     40 ج.م
 
@@ -1354,7 +1369,7 @@ existing orders must continue to show:
 
     40 ج.م
 
-Similarly, historical order items should preserve the relevant item/service information used at the time the order was created.
+Similarly, historical order items must preserve the relevant item/service information used at the time the order was created.
 
 Historical Order financial information must preserve the applicable:
 

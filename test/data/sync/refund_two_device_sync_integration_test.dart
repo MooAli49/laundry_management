@@ -362,9 +362,20 @@ void main() {
               app_db.ServicesCompanion.insert(
                 id: '00000000-0000-0000-0002-000000000001',
                 name: 'غسيل',
+                isActive: const drift.Value(true),
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
+        await device.db
+            .into(device.db.serviceItemTypes)
+            .insertOnConflictUpdate(
+              app_db.ServiceItemTypesCompanion.insert(
+                id: '00000000-0000-0000-0003-000000000001',
+                serviceId: '00000000-0000-0000-0002-000000000001',
+                itemTypeId: '00000000-0000-0000-0001-000000000001',
                 pricingType: 'per_piece',
                 price: 1000,
-                isActive: const drift.Value(true),
                 createdAt: now,
                 updatedAt: now,
               ),

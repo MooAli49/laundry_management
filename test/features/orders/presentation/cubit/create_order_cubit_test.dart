@@ -22,8 +22,10 @@ import 'package:laundry_management/data/repositories/service_repository_impl.dar
 import 'package:laundry_management/data/repositories/settings_repository_impl.dart';
 import 'package:laundry_management/domain/entities/customer.dart';
 import 'package:laundry_management/domain/entities/service.dart';
+import 'package:laundry_management/domain/entities/service_item_type.dart';
 import 'package:laundry_management/domain/enums/payment_method.dart';
 import 'package:laundry_management/domain/enums/pricing_type.dart';
+import 'package:laundry_management/domain/models/service_with_pricing.dart';
 import 'package:laundry_management/domain/value_objects/money.dart';
 import 'package:laundry_management/features/orders/presentation/cubit/create_order_cubit.dart';
 
@@ -129,6 +131,37 @@ void main() {
     await db.close();
   });
 
+  Future<ServiceWithPricing> seedTestService({
+    required String id,
+    required String name,
+    required String itemTypeId,
+    required Money price,
+    PricingType pricingType = PricingType.perPiece,
+  }) async {
+    final now = DateTime.now();
+    final service = Service(
+      id: id,
+      name: name,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final sit = ServiceItemType(
+      id: 'sit-$id-$itemTypeId',
+      serviceId: id,
+      itemTypeId: itemTypeId,
+      pricingType: pricingType,
+      price: price,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await serviceRepository.createService(
+      service,
+      serviceItemTypes: [sit],
+    );
+    return ServiceWithPricing(service: service, serviceItemType: sit);
+  }
+
   group('CreateOrderCubit', () {
     test('initial state loads master data and defaults', () async {
       await cubit.initialize();
@@ -146,36 +179,26 @@ void main() {
         createdAt: now,
         updatedAt: now,
       );
-
       cubit.selectCustomer(customer);
       expect(cubit.state.selectedCustomer, customer);
     });
 
     test(
-      'Fixed Price quantity expansion produces subtotal = unitPrice * quantity',
+      'Per Piece quantity expansion produces subtotal = unitPrice * quantity',
       () async {
         await cubit.initialize();
 
-        // Seed a service with fixed price
-        final now = DateTime.now();
         final itemType = cubit.state.itemTypes.first;
-        final service = Service(
+        final serviceWithPricing = await seedTestService(
           id: 'srv-fixed',
           name: 'تنظيف خاص',
-          pricingType: PricingType.perPiece,
+          itemTypeId: itemType.id,
           price: const Money.fromPiastres(50000), // 500 EGP
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        );
-        await serviceRepository.createService(
-          service,
-          supportedItemTypeIds: [itemType.id],
         );
 
         // Select item type & service
         await cubit.selectItemType(itemType);
-        cubit.selectService(service);
+        cubit.selectService(serviceWithPricing);
         cubit.updateQuantity(5); // 5 pieces
 
         expect(cubit.state.draftQuantity, 5);
@@ -201,24 +224,16 @@ void main() {
       () async {
         await cubit.initialize();
 
-        final now = DateTime.now();
         final itemType = cubit.state.itemTypes.first;
-        final service = Service(
+        final serviceWithPricing = await seedTestService(
           id: 'srv-1',
           name: 'غسيل عادي',
-          pricingType: PricingType.perPiece,
+          itemTypeId: itemType.id,
           price: const Money.fromPiastres(10000), // 100 EGP
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        );
-        await serviceRepository.createService(
-          service,
-          supportedItemTypeIds: [itemType.id],
         );
 
         await cubit.selectItemType(itemType);
-        cubit.selectService(service);
+        cubit.selectService(serviceWithPricing);
         cubit.updateQuantity(2); // 2 * 100 = 200 EGP (20000 piastres)
         cubit.addItemDraftToOrder();
 
@@ -255,22 +270,15 @@ void main() {
         cubit.selectCustomer(customer);
 
         final itemType = cubit.state.itemTypes.first;
-        final service = Service(
+        final serviceWithPricing = await seedTestService(
           id: 'srv-suite',
           name: 'تنظيف بدلة',
-          pricingType: PricingType.perPiece,
+          itemTypeId: itemType.id,
           price: const Money.fromPiastres(5000), // 50 EGP
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
-        );
-        await serviceRepository.createService(
-          service,
-          supportedItemTypeIds: [itemType.id],
         );
 
         await cubit.selectItemType(itemType);
-        cubit.selectService(service);
+        cubit.selectService(serviceWithPricing);
         cubit.updateQuantity(3); // 3 physical items!
         cubit.addItemDraftToOrder();
 
@@ -329,22 +337,15 @@ void main() {
       () async {
         await cubit.initialize();
         final itemType = cubit.state.itemTypes.first;
-        final service = Service(
+        final serviceWithPricing = await seedTestService(
           id: 'srv-notes-1',
           name: 'كي بالبخار',
-          pricingType: PricingType.perPiece,
+          itemTypeId: itemType.id,
           price: const Money.fromPiastres(3000),
-          isActive: true,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-        await serviceRepository.createService(
-          service,
-          supportedItemTypeIds: [itemType.id],
         );
 
         await cubit.selectItemType(itemType);
-        cubit.selectService(service);
+        cubit.selectService(serviceWithPricing);
         cubit.updateDraftNotes('بقعة زيت على الكم الأيمن');
 
         expect(cubit.state.draftNotes, 'بقعة زيت على الكم الأيمن');
@@ -365,31 +366,17 @@ void main() {
       () async {
         await cubit.initialize();
         final itemType = cubit.state.itemTypes.first;
-        final service1 = Service(
+        final service1 = await seedTestService(
           id: 'srv-leak-1',
           name: 'غسيل خاص',
-          pricingType: PricingType.perPiece,
+          itemTypeId: itemType.id,
           price: const Money.fromPiastres(4000),
-          isActive: true,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
         );
-        final service2 = Service(
+        final service2 = await seedTestService(
           id: 'srv-leak-2',
           name: 'تنظيف جاف',
-          pricingType: PricingType.perPiece,
+          itemTypeId: itemType.id,
           price: const Money.fromPiastres(6000),
-          isActive: true,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-        await serviceRepository.createService(
-          service1,
-          supportedItemTypeIds: [itemType.id],
-        );
-        await serviceRepository.createService(
-          service2,
-          supportedItemTypeIds: [itemType.id],
         );
 
         // Add First Item with a specific note
@@ -425,18 +412,11 @@ void main() {
         () async {
           await cubit.initialize();
           final itemType = cubit.state.itemTypes.first;
-          final service = Service(
+          final service = await seedTestService(
             id: 'srv-test-pay',
             name: 'غسيل',
-            pricingType: PricingType.fixedPrice,
+            itemTypeId: itemType.id,
             price: const Money.fromPiastres(5000), // 50 EGP
-            isActive: true,
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          );
-          await serviceRepository.createService(
-            service,
-            supportedItemTypeIds: [itemType.id],
           );
           await cubit.selectItemType(itemType);
           cubit.selectService(service);
@@ -460,18 +440,11 @@ void main() {
         () async {
           await cubit.initialize();
           final itemType = cubit.state.itemTypes.first;
-          final service = Service(
+          final service = await seedTestService(
             id: 'srv-test-pay-2',
             name: 'غسيل',
-            pricingType: PricingType.fixedPrice,
+            itemTypeId: itemType.id,
             price: const Money.fromPiastres(4000),
-            isActive: true,
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          );
-          await serviceRepository.createService(
-            service,
-            supportedItemTypeIds: [itemType.id],
           );
           await cubit.selectItemType(itemType);
           cubit.selectService(service);
@@ -493,18 +466,11 @@ void main() {
       test('setFullInitialPayment sets amount to total', () async {
         await cubit.initialize();
         final itemType = cubit.state.itemTypes.first;
-        final service = Service(
+        final service = await seedTestService(
           id: 'srv-test-pay-3',
           name: 'غسيل',
-          pricingType: PricingType.fixedPrice,
+          itemTypeId: itemType.id,
           price: const Money.fromPiastres(7500),
-          isActive: true,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-        await serviceRepository.createService(
-          service,
-          supportedItemTypeIds: [itemType.id],
         );
         await cubit.selectItemType(itemType);
         cubit.selectService(service);
@@ -525,18 +491,11 @@ void main() {
         () async {
           await cubit.initialize();
           final itemType = cubit.state.itemTypes.first;
-          final service = Service(
+          final service = await seedTestService(
             id: 'srv-test-pay-4',
             name: 'غسيل',
-            pricingType: PricingType.fixedPrice,
+            itemTypeId: itemType.id,
             price: const Money.fromPiastres(3000),
-            isActive: true,
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          );
-          await serviceRepository.createService(
-            service,
-            supportedItemTypeIds: [itemType.id],
           );
           await cubit.selectItemType(itemType);
           cubit.selectService(service);
@@ -562,18 +521,11 @@ void main() {
         () async {
           await cubit.initialize();
           final itemType = cubit.state.itemTypes.first;
-          final service = Service(
+          final service = await seedTestService(
             id: 'srv-test-pay-5',
             name: 'غسيل',
-            pricingType: PricingType.fixedPrice,
+            itemTypeId: itemType.id,
             price: const Money.fromPiastres(5000),
-            isActive: true,
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          );
-          await serviceRepository.createService(
-            service,
-            supportedItemTypeIds: [itemType.id],
           );
           await cubit.selectItemType(itemType);
           cubit.selectService(service);
@@ -621,23 +573,14 @@ void main() {
     // Every order must have tax = Money.zero regardless of business settings.
     // ─────────────────────────────────────────────────────────────────────────
     group('V1 Tax Requirement — tax is always Money.zero', () {
-      Future<Service> seedService(String id, int piastres) async {
-        final now = DateTime.now();
+      Future<ServiceWithPricing> seedService(String id, int piastres) async {
         final itemType = cubit.state.itemTypes.first;
-        final service = Service(
+        return seedTestService(
           id: id,
           name: 'خدمة اختبار',
-          pricingType: PricingType.perPiece,
+          itemTypeId: itemType.id,
           price: Money.fromPiastres(piastres),
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
         );
-        await serviceRepository.createService(
-          service,
-          supportedItemTypeIds: [itemType.id],
-        );
-        return service;
       }
 
       test(
@@ -833,23 +776,14 @@ void main() {
     });
 
     group('Custom Item Total Editing & Reset', () {
-      Future<Service> seedService(String id, int piastres) async {
-        final now = DateTime.now();
+      Future<ServiceWithPricing> seedService(String id, int piastres) async {
         final itemType = cubit.state.itemTypes.first;
-        final service = Service(
+        return seedTestService(
           id: id,
           name: 'خدمة تفاوض',
-          pricingType: PricingType.perPiece,
+          itemTypeId: itemType.id,
           price: Money.fromPiastres(piastres),
-          isActive: true,
-          createdAt: now,
-          updatedAt: now,
         );
-        await serviceRepository.createService(
-          service,
-          supportedItemTypeIds: [itemType.id],
-        );
-        return service;
       }
 
       test(

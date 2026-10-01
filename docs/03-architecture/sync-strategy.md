@@ -1245,7 +1245,7 @@ Synchronization must never modify historical transaction snapshots merely becaus
 
 Example:
 
-Service current price:
+ServiceItemType current price:
 
 60 EGP
 
@@ -1253,7 +1253,7 @@ Historical OrderItem:
 
 50 EGP
 
-Syncing the Service update must not change:
+Syncing the Service / ServiceItemType pricing update must not change:
 
 OrderItem.unit\_price
 
@@ -1625,7 +1625,7 @@ Master data updates can affect future operations but must not rewrite history.
 
 Examples:
 
-Service price changes.
+Service–Item Type pricing configuration changes.
 
 Expense Category rename.
 
@@ -2574,7 +2574,7 @@ Synchronization must never rewrite historical business truth because current mas
 
 Examples:
 
-Service price changes
+Service–Item Type pricing changes
 
 ≠
 

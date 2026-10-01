@@ -557,9 +557,9 @@ Existing orders using an inactive service must remain valid.
 
 ---
 
-## BR-052 — Service Price Snapshot
+## BR-052 — Service + Item Type Price Snapshot
 
-When a service is selected for an OrderItem, the price used at that time must be preserved in the OrderItem.
+When a valid Service + Item Type pricing configuration is selected for an OrderItem, the actual price used at that time must be preserved in the OrderItem (`order_items.unit_price`).
 
 ---
 
@@ -577,7 +577,7 @@ Historical OrderItems must capture and preserve explicit name snapshots:
 
 ## BR-053 — Historical Price Stability
 
-Changing the current service price must not change the price of existing OrderItems.
+Changing a Service's pricing configuration (the price configured for that Service + Item Type combination) later must NOT change the price of existing OrderItems or historical orders.
 
 ---
 
@@ -593,11 +593,10 @@ Deactivating a service must not modify historical orders.
 
 The supported V1 operational pricing types are:
 
-- Per Piece
-- Fixed Price
-- Per Square Meter
+- Per Piece (`per_piece`)
+- Per Square Meter (`per_square_meter`)
 
-*(Note: Per Kilogram pricing has been completely removed from the V1 operational workflow and domain model by locked business decision. No PerKg items, migrations, or workflows exist in V1).*
+*(Note: `fixed_price` has been removed from the V1 operational pricing model because under the current OrderItem model, fixed price behaves effectively the same as per-piece pricing since each physical item is represented as its own OrderItem and receives a unit price; it does not represent a distinct business behavior. Per Kilogram pricing remains completely excluded from V1).*
 
 ---
 
@@ -607,26 +606,43 @@ For V1, an order item's final unit price must be strictly positive:
 
 > `unitPrice > Money.zero`
 
-This requirement applies to both the Service's default price and any `customUnitPrice`. Zero price and negative price are strictly invalid and rejected.
+This requirement applies to both the Service + Item Type configured price and any `customUnitPrice`. Zero price and negative price are strictly invalid and rejected.
 
 ---
 
-## BR-056 — Relevant Pricing Types
+## BR-056 — Pricing Configuration on Service–Item Type Relationship
 
-The UI should expose only pricing types relevant to the selected service and Item Type.
+The Service entity must NOT own a single default/current price or pricing type.
 
-The user should not be forced to choose from irrelevant pricing models.
+Pricing configuration belongs strictly to the combination of:
+
+> **Service + Item Type**
+
+Each valid Service + Item Type combination defines:
+1. `pricing_type` (`per_piece` or `per_square_meter`)
+2. `price` (strictly positive money amount)
+
+During order creation, when an Item Type and Service are selected, the applicable pricing configuration is resolved from their combination.
 
 ---
 
-## BR-057 — Current Expected Pricing
+## BR-057 — Current Expected Pricing Configurations
 
-The normal V1 use cases are:
+In this laundry system, the actual price depends on the combination of Service + Item Type.
 
-- Clothing → Per Piece
-- Blankets → Per Piece
-- Carpet Covers → Per Piece
-- Carpets → Per Square Meter
+Example:
+
+Washing
+  ├── Clothing → per_piece → 50 EGP
+  ├── Blanket  → per_piece → 100 EGP
+  └── Carpet   → per_square_meter → 60 EGP
+
+Typical V1 configurations:
+
+- Clothing + Service → Per Piece (`per_piece`)
+- Blankets + Service → Per Piece (`per_piece`)
+- Carpet Covers + Service → Per Piece (`per_piece`)
+- Carpets + Service → Per Square Meter (`per_square_meter`)
 
 ---
 
@@ -705,7 +721,7 @@ When creating or editing an order item group, the user may manually override the
      - Non-carpets: `Money.fromPiastres((totalPiastres / count).round())`
 
 3. **Historical Value Immutability**:
-   - The stored transaction-time `OrderItem.calculatedTotal` and `OrderItem.unitPrice` are permanently saved in SQLite and are NEVER recalculated from updated `Service` prices.
+   - The stored transaction-time `OrderItem.calculatedTotal` and `OrderItem.unitPrice` are permanently saved in SQLite and are NEVER recalculated from updated `Service` or `ServiceItemType` pricing configurations.
 
 ---
 
@@ -1060,7 +1076,7 @@ This is separate from the order creation date.
 
 ## BR-106 — Historical Price Usage
 
-Reports must use historical OrderItem prices rather than current service prices.
+Reports must use historical OrderItem prices (`order_items.unit_price`) rather than current Service pricing configurations.
 
 ---
 
@@ -1925,7 +1941,7 @@ Cancelled orders contribute 0 to Total Sales.
 
 Refunds are not subtracted from Total Sales.
 
-Current Service prices must not be used to reconstruct historical Order totals.
+Current Service pricing configurations must not be used to reconstruct historical Order totals.
 
 ---
 

@@ -205,12 +205,12 @@ void main() {
             equals('idx_sync_operations_status_next_retry'),
           );
 
-          // Verify schema version is now 6 (migrated through v3, v4, v5, and v6)
+          // Verify schema version is now 8 (migrated through current version)
           final versionRow = await migratedDb
               .customSelect('PRAGMA user_version;')
               .getSingle();
-          expect(versionRow.read<int>('user_version'), equals(6));
-          expect(migratedDb.schemaVersion, equals(6));
+          expect(versionRow.read<int>('user_version'), equals(8));
+          expect(migratedDb.schemaVersion, equals(8));
 
           // Verify customer table has address column added in v6
           final customerCols = await migratedDb

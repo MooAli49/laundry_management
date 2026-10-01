@@ -318,30 +318,55 @@ class OrderRepositoryImpl implements OrderRepository {
           final itemTypeId = existingItem.itemTypeId;
           final itemTypeNameSnapshot = existingItem.itemTypeNameSnapshot;
 
-          // Validate service
-          final serviceRow = await (_db.select(
-            _db.services,
-          )..where((t) => t.id.equals(mod.serviceId))).getSingleOrNull();
-          if (serviceRow == null) {
-            throw const ValidationFailure('Service not found');
-          }
-          if (!serviceRow.isActive) {
-            throw const BusinessRuleFailure('Service is inactive');
-          }
+          final isServiceChanged = mod.serviceId != existingItem.serviceId;
+          final app_db.Service? serviceRow;
+          final PricingType pricingType;
+          final Money unitPrice;
+          final String serviceNameSnapshot;
 
-          // Verify service compatibility with itemTypeId via service_item_types
-          final isServiceCompatible =
-              await (_db.select(_db.serviceItemTypes)..where(
-                    (t) =>
-                        t.serviceId.equals(mod.serviceId) &
-                        t.itemTypeId.equals(itemTypeId),
-                  ))
-                  .getSingleOrNull();
-          if (isServiceCompatible == null) {
-            throw IncompatibleServiceFailure(
-              serviceId: mod.serviceId,
-              itemTypeId: itemTypeId,
-            );
+          if (isServiceChanged) {
+            // Validate service
+            serviceRow = await (_db.select(
+              _db.services,
+            )..where((t) => t.id.equals(mod.serviceId))).getSingleOrNull();
+            if (serviceRow == null) {
+              throw const ValidationFailure('Service not found');
+            }
+            if (!serviceRow.isActive) {
+              throw const BusinessRuleFailure('Service is inactive');
+            }
+
+            // Verify service compatibility with itemTypeId via service_item_types
+            final isServiceCompatible =
+                await (_db.select(_db.serviceItemTypes)..where(
+                      (t) =>
+                          t.serviceId.equals(mod.serviceId) &
+                          t.itemTypeId.equals(itemTypeId),
+                    ))
+                    .getSingleOrNull();
+            if (isServiceCompatible == null) {
+              throw IncompatibleServiceFailure(
+                serviceId: mod.serviceId,
+                itemTypeId: itemTypeId,
+              );
+            }
+
+            pricingType = PricingType.fromValue(isServiceCompatible.pricingType);
+            unitPrice =
+                mod.customUnitPrice ?? Money.fromPiastres(isServiceCompatible.price);
+            serviceNameSnapshot = serviceRow.name;
+          } else {
+            // Unchanged service: historical snapshot data is preserved.
+            // Do NOT reject if catalog mapping is removed or service is inactive.
+            serviceRow = await (_db.select(
+              _db.services,
+            )..where((t) => t.id.equals(mod.serviceId))).getSingleOrNull();
+
+            pricingType = PricingType.fromValue(existingItem.pricingType);
+            unitPrice =
+                mod.customUnitPrice ?? Money.fromPiastres(existingItem.unitPrice);
+            serviceNameSnapshot =
+                serviceRow?.name ?? existingItem.serviceNameSnapshot;
           }
 
           // Validate item definition if provided
@@ -351,28 +376,28 @@ class OrderRepositoryImpl implements OrderRepository {
                 await (_db.select(_db.itemDefinitions)
                       ..where((t) => t.id.equals(mod.itemDefinitionId!)))
                     .getSingleOrNull();
-            if (defRow == null) {
+            if (defRow != null) {
+              if (defRow.itemTypeId != itemTypeId) {
+                throw const BusinessRuleFailure(
+                  'Item definition does not belong to the selected item type',
+                );
+              }
+              itemDefNameSnapshot = defRow.name;
+            } else if (mod.itemDefinitionId == existingItem.itemDefinitionId) {
+              itemDefNameSnapshot = existingItem.itemDefinitionNameSnapshot;
+            } else {
               throw const ValidationFailure('Item definition not found');
             }
-            if (defRow.itemTypeId != itemTypeId) {
-              throw const BusinessRuleFailure(
-                'Item definition does not belong to the selected item type',
-              );
-            }
-            itemDefNameSnapshot = defRow.name;
           } else {
             itemDefNameSnapshot = null;
           }
 
-          final unitPrice =
-              mod.customUnitPrice ?? Money.fromPiastres(serviceRow.price);
           if (unitPrice <= Money.zero) {
             throw const ValidationFailure(
               'Unit price must be strictly greater than zero',
             );
           }
 
-          final pricingType = PricingType.fromValue(serviceRow.pricingType);
           Money calculatedTotal;
           app_db.OrderItemCarpetsCompanion? carpetCompanion;
 
@@ -418,7 +443,7 @@ class OrderRepositoryImpl implements OrderRepository {
                 serviceId: Value(mod.serviceId),
                 itemTypeNameSnapshot: Value(itemTypeNameSnapshot),
                 itemDefinitionNameSnapshot: Value(itemDefNameSnapshot),
-                serviceNameSnapshot: Value(serviceRow.name),
+                serviceNameSnapshot: Value(serviceNameSnapshot),
                 pricingType: Value(pricingType.value),
                 quantity: Value(area),
                 unitPrice: Value(savedUnitPrice.piastres),
@@ -447,7 +472,7 @@ class OrderRepositoryImpl implements OrderRepository {
                 serviceId: Value(mod.serviceId),
                 itemTypeNameSnapshot: Value(itemTypeNameSnapshot),
                 itemDefinitionNameSnapshot: Value(itemDefNameSnapshot),
-                serviceNameSnapshot: Value(serviceRow.name),
+                serviceNameSnapshot: Value(serviceNameSnapshot),
                 pricingType: Value(pricingType.value),
                 quantity: const Value(1.0),
                 unitPrice: Value(savedUnitPrice.piastres),
@@ -533,14 +558,14 @@ class OrderRepositoryImpl implements OrderRepository {
           }
 
           final unitPrice =
-              newItemInput.customUnitPrice ?? Money.fromPiastres(service.price);
+              newItemInput.customUnitPrice ?? Money.fromPiastres(isComp.price);
           if (unitPrice <= Money.zero) {
             throw const ValidationFailure(
               'Unit price must be strictly greater than zero',
             );
           }
 
-          final pricingType = PricingType.fromValue(service.pricingType);
+          final pricingType = PricingType.fromValue(isComp.pricingType);
 
           if (pricingType == PricingType.perSquareMeter) {
             if (newItemInput.carpetData == null) {

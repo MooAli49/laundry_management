@@ -858,18 +858,16 @@ for:
 
 ---
 
-## 42. Service Pricing Type Index
+## 42. Service Item Type Pricing Type Index
 
 Recommended:
 
-    INDEX services(pricing_type)
+    INDEX service_item_types(pricing_type)
 
-This supports queries that group/filter Services by:
+This supports queries that group/filter Service–Item Type configurations by:
 
     Per Piece
-    Per KG
     Per Square Meter
-    Fixed Price
 
 If pricing type is not used as a query filter, this index may be omitted.
 
@@ -1973,11 +1971,11 @@ The relevant indexes are:
 
     INDEX services(is_active)
 
-    INDEX services(pricing_type)
-
     INDEX service_item_types(service_id)
 
     INDEX service_item_types(item_type_id)
+
+    INDEX service_item_types(pricing_type)
 
 ---
 
@@ -2313,7 +2311,7 @@ The following indexes may be added when supported by actual query patterns:
 
     payments.order_id + paid_at
 
-    services.pricing_type
+    service_item_types.pricing_type
 
     services.updated_at
 

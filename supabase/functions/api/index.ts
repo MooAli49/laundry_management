@@ -406,18 +406,18 @@ Deno.serve(async (req: Request) => {
 
       if (method === "POST") {
         const body = await req.json();
-        const supportedItemTypeIds = body.supported_item_type_ids || null;
+        const serviceItemTypes = body.service_item_types || null;
         const result = await supabase.rpc("sync_create_service", {
           p_op_id: operationId,
           p_service: body,
-          p_item_type_ids: supportedItemTypeIds,
+          p_service_item_types: serviceItemTypes,
         });
         return handleMutation(result, 201);
       }
 
       if (method === "PATCH" && serviceId) {
         const body = await req.json();
-        const supportedItemTypeIds = body.supported_item_type_ids || null;
+        const serviceItemTypes = body.service_item_types || null;
         const baseVersion = getBaseVersion(req, body);
         if (baseVersion !== null) {
           body.base_version = baseVersion;
@@ -426,7 +426,7 @@ Deno.serve(async (req: Request) => {
           p_op_id: operationId,
           p_service_id: serviceId,
           p_service: body,
-          p_item_type_ids: supportedItemTypeIds,
+          p_service_item_types: serviceItemTypes,
         });
         return handleMutation(result, 200);
       }

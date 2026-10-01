@@ -1724,19 +1724,16 @@ Local mutations occur atomically within Drift transactions in their respective r
   ```
 
 #### 2. Item Definitions (`item_definitions`)
-- **Local Domain**: `ItemDefinition` (`id`, `itemTypeId`, `name`, `pricingType`, `defaultPrice`, `isActive`, `createdAt`, `updatedAt`).
+- **Local Domain**: `ItemDefinition` (`id`, `itemTypeId`, `name`, `isActive`, `createdAt`, `updatedAt`).
 - **Foreign Key**: References `item_types(id)` with `ON DELETE RESTRICT`.
-- **Pricing Type Mapping**: `perItem` → `"fixed"`, `perMeter` → `"per_meter"`, `custom` → `"custom"`.
-- **Monetary Unit**: Minor units (piastres / `BIGINT`).
-- **Composite Uniqueness**: `UNIQUE (item_type_id, name)`.
+- **Composite Uniqueness**: `UNIQUE (item_type_id, LOWER(TRIM(name)))`.
+- **Pricing Note**: `ItemDefinition` does NOT hold pricing data; pricing is strictly configured per Service + Item Type in `service_item_types`.
 - **Create Payload**:
   ```json
   {
     "id": "<UUID>",
     "item_type_id": "<UUID>",
     "name": "<string>",
-    "pricing_type": "fixed | per_meter | custom",
-    "default_price": 2500,
     "is_active": true,
     "created_at": "<ISO-8601 UTC>",
     "updated_at": "<ISO-8601 UTC>"
@@ -1745,9 +1742,8 @@ Local mutations occur atomically within Drift transactions in their respective r
 - **Update Payload**:
   ```json
   {
+    "item_type_id": "<UUID>",
     "name": "<string>",
-    "pricing_type": "fixed | per_meter | custom",
-    "default_price": 2500,
     "is_active": true,
     "updated_at": "<ISO-8601 UTC>"
   }
@@ -2137,7 +2133,7 @@ Standard codes:
 - **Location**: `OrderRepositoryImpl._mapOrderItemToDomain`, `ServiceRepositoryImpl._mapToDomain`, `StorageRepositoryImpl._mapOrderItemToDomain`
 - **Issue**: The mapper methods previously used `PricingType.values.byName(item.pricingType)` instead of `PricingType.fromValue(item.pricingType)`.
 - **Effect**: When remote `OrderItems` or services contained pricing types such as `per_square_meter` (serialized as `'per_square_meter'`), `byName` threw an `ArgumentError` because the Dart enum identifier is `perSquareMeter`.
-- **Resolution**: Resolved in C4-E. Updated `OrderRepositoryImpl`, `ServiceRepositoryImpl`, and `StorageRepositoryImpl` to use canonical `PricingType.fromValue(...)` (which safely maps both serialized snake_case values and camelCase enum identifiers). Added dedicated regression test suite `pricing_type_mapping_regression_test.dart` covering all supported values (`per_piece`, `per_square_meter`, `fixed_price`) across local SQLite, remote sync applier, and repository read paths.
+- **Resolution**: Resolved in C4-E. Updated `OrderRepositoryImpl`, `ServiceRepositoryImpl`, and `StorageRepositoryImpl` to use canonical `PricingType.fromValue(...)` (which safely maps both serialized snake_case values and camelCase enum identifiers). Added dedicated regression test suite `pricing_type_mapping_regression_test.dart` covering mapping across local SQLite, remote sync applier, and repository read paths. *(Note: As per the finalized V1 Service Pricing clarification, `fixed_price` is removed from the V1 operational model, leaving `per_piece` and `per_square_meter`).*
 - **Status**: Resolved and verified in C4-E.
 
 ### 75.2 Phase 3B Remote Foreign Key Integrity Hardening

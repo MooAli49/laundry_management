@@ -17,8 +17,8 @@ void main() {
   });
 
   group('1. Schema and Table Initialization', () {
-    test('all 20 tables exist and schema version is 7', () async {
-      expect(db.schemaVersion, equals(7));
+    test('all 20 tables exist and schema version is 8', () async {
+      expect(db.schemaVersion, equals(8));
 
       // Query sqlite_master to verify all 20 tables are physically present
       final tables = await db
@@ -102,8 +102,6 @@ void main() {
               ServicesCompanion.insert(
                 id: 'serv-1',
                 name: 'غسيل سجاد',
-                pricingType: 'per_square_meter',
-                price: 5000,
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -369,8 +367,6 @@ void main() {
               ServicesCompanion.insert(
                 id: 'serv-kg',
                 name: 'غسيل بالكيلو',
-                pricingType: 'per_kg',
-                price: 5000,
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -693,8 +689,6 @@ void main() {
               ServicesCompanion.insert(
                 id: 'serv-storage',
                 name: 'خدمة تخزين',
-                pricingType: 'per_piece',
-                price: 1000,
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -967,16 +961,26 @@ void main() {
       );
     });
 
-    test('rejects negative price on services', () async {
+    test('rejects non-positive price on service_item_types', () async {
       final now = DateTime.now();
+
+      await db.into(db.services).insert(
+            ServicesCompanion.insert(
+              id: 'serv-neg-price',
+              name: 'خدمة سالبة',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
 
       expect(
         () async => await db
-            .into(db.services)
+            .into(db.serviceItemTypes)
             .insert(
-              ServicesCompanion.insert(
-                id: 'serv-neg-price',
-                name: 'خدمة سالبة',
+              ServiceItemTypesCompanion.insert(
+                id: 'sit-neg-price',
+                serviceId: 'serv-neg-price',
+                itemTypeId: '00000000-0000-0000-0001-000000000001',
                 pricingType: 'per_piece',
                 price: -1000, // Invalid!
                 createdAt: now,
@@ -1025,8 +1029,6 @@ void main() {
               ServicesCompanion.insert(
                 id: 'serv-chk-2',
                 name: 'خدمة فحص',
-                pricingType: 'per_piece',
-                price: 1000,
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -1340,8 +1342,6 @@ void main() {
               ServicesCompanion.insert(
                 id: 'serv-setnull-1',
                 name: 'غسيل بدلة',
-                pricingType: 'per_piece',
-                price: 15000,
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -1443,8 +1443,6 @@ void main() {
               ServicesCompanion.insert(
                 id: 'serv-setnull-2',
                 name: 'تنظيف سجاد فاخر',
-                pricingType: 'per_square_meter',
-                price: 5000,
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -1519,8 +1517,6 @@ void main() {
             ServicesCompanion.insert(
               id: 'serv-u-1',
               name: 'كي بالبخار',
-              pricingType: 'per_piece',
-              price: 2000,
               createdAt: now,
               updatedAt: now,
             ),
@@ -1533,8 +1529,6 @@ void main() {
               ServicesCompanion.insert(
                 id: 'serv-u-2',
                 name: 'كي بالبخار', // Duplicate name!
-                pricingType: 'per_piece',
-                price: 2500,
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -1622,8 +1616,6 @@ void main() {
               ServicesCompanion.insert(
                 id: 'serv-sit-1',
                 name: 'خدمة تجربة توافق',
-                pricingType: 'per_piece',
-                price: 1000,
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -1636,7 +1628,10 @@ void main() {
                 id: 'sit-1',
                 serviceId: 'serv-sit-1',
                 itemTypeId: itemTypeId,
+                pricingType: 'per_piece',
+                price: 1000,
                 createdAt: now,
+                updatedAt: now,
               ),
             );
 
@@ -1649,7 +1644,10 @@ void main() {
                   id: 'sit-2',
                   serviceId: 'serv-sit-1',
                   itemTypeId: itemTypeId, // Duplicate composite pair!
+                  pricingType: 'per_piece',
+                  price: 1500,
                   createdAt: now,
+                  updatedAt: now,
                 ),
               ),
           throwsA(isA<SqliteException>()),
@@ -1738,8 +1736,6 @@ void main() {
               ServicesCompanion.insert(
                 id: 'serv-snap-1',
                 name: 'تنظيف جاف أصلي',
-                pricingType: 'per_piece',
-                price: 5000,
                 createdAt: now,
                 updatedAt: now,
               ),

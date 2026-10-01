@@ -46,11 +46,21 @@ void main() {
       ['cust-trans', 'عميل الحالات', '01011223344', nowTimestamp, nowTimestamp],
     );
     await db.customStatement(
-      'INSERT INTO services (id, name, pricing_type, price, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?);',
+      'INSERT INTO services (id, name, is_active, created_at, updated_at) VALUES (?, ?, 1, ?, ?);',
       [
         'srv-trans',
         'خدمة الحالات',
-        'perPiece',
+        nowTimestamp,
+        nowTimestamp,
+      ],
+    );
+    await db.customStatement(
+      'INSERT INTO service_item_types (id, service_id, item_type_id, pricing_type, price, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?);',
+      [
+        'sit-trans',
+        'srv-trans',
+        '00000000-0000-0000-0001-000000000001',
+        'per_piece',
         3000,
         nowTimestamp,
         nowTimestamp,

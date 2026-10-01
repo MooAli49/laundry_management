@@ -11,8 +11,10 @@ import '../../../../domain/entities/customer.dart';
 import '../../../../domain/entities/item_definition.dart';
 import '../../../../domain/entities/item_type.dart';
 import '../../../../domain/entities/service.dart';
+import '../../../../domain/entities/service_item_type.dart';
 import '../../../../domain/enums/order_status.dart';
 import '../../../../domain/enums/pricing_type.dart';
+import '../../../../domain/models/service_with_pricing.dart';
 import '../../../../domain/repositories/carpet_size_repository.dart';
 import '../../../../domain/repositories/customer_repository.dart';
 import '../../../../domain/repositories/item_definition_repository.dart';
@@ -294,6 +296,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
           clearDraftItemType: true,
           clearDraftItemDefinition: true,
           clearDraftService: true,
+          clearDraftPricingType: true,
           clearDraftUnitPrice: true,
           compatibleServices: const [],
           itemDefinitions: const [],
@@ -322,6 +325,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
           draftItemType: itemType,
           clearDraftItemDefinition: true,
           clearDraftService: true,
+          clearDraftPricingType: true,
           clearDraftUnitPrice: true,
           compatibleServices: uniqueServices,
           itemDefinitions: uniqueDefs,
@@ -342,11 +346,12 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
     );
   }
 
-  void selectService(Service? service) {
-    if (service == null) {
+  void selectService(ServiceWithPricing? serviceWithPricing) {
+    if (serviceWithPricing == null) {
       emit(
         state.copyWith(
           clearDraftService: true,
+          clearDraftPricingType: true,
           clearDraftUnitPrice: true,
           clearDraftItemTotal: true,
           clearDraftCarpetSize: true,
@@ -359,16 +364,20 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
 
     emit(
       state.copyWith(
-        draftService: service,
-        draftUnitPrice: service.price,
+        draftService: serviceWithPricing.service,
+        draftPricingType: serviceWithPricing.pricingType,
+        draftUnitPrice: serviceWithPricing.price,
         clearDraftItemTotal: true,
-        clearDraftCarpetSize: service.pricingType != PricingType.perSquareMeter,
-        draftCarpetLength: service.pricingType != PricingType.perSquareMeter
-            ? 0.0
-            : state.draftCarpetLength,
-        draftCarpetWidth: service.pricingType != PricingType.perSquareMeter
-            ? 0.0
-            : state.draftCarpetWidth,
+        clearDraftCarpetSize:
+            serviceWithPricing.pricingType != PricingType.perSquareMeter,
+        draftCarpetLength:
+            serviceWithPricing.pricingType != PricingType.perSquareMeter
+                ? 0.0
+                : state.draftCarpetLength,
+        draftCarpetWidth:
+            serviceWithPricing.pricingType != PricingType.perSquareMeter
+                ? 0.0
+                : state.draftCarpetWidth,
       ),
     );
   }
@@ -433,17 +442,33 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
     final definitions = await _itemDefinitionRepository
         .getDefinitionsForItemType(matchingType.id, activeOnly: true);
 
-    final matchingService = services.firstWhere(
-      (s) => s.id == item.serviceId,
-      orElse: () => Service(
+    ServiceWithPricing matchingServiceWithPricing;
+    try {
+      matchingServiceWithPricing = services.firstWhere(
+        (s) => s.id == item.serviceId,
+      );
+    } catch (_) {
+      final now = DateTime.now();
+      final serviceEntity = Service(
         id: item.serviceId,
         name: item.serviceName,
-        price: item.unitPrice,
+        createdAt: now,
+        updatedAt: now,
+      );
+      final sit = ServiceItemType(
+        id: 'fallback-${item.serviceId}',
+        serviceId: item.serviceId,
+        itemTypeId: matchingType.id,
         pricingType: item.pricingType,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-    );
+        price: item.unitPrice,
+        createdAt: now,
+        updatedAt: now,
+      );
+      matchingServiceWithPricing = ServiceWithPricing(
+        service: serviceEntity,
+        serviceItemType: sit,
+      );
+    }
 
     ItemDefinition? matchingDef;
     if (item.itemDefinitionId != null) {
@@ -465,7 +490,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
 
     // Deduplicate and ensure matchingService and matchingDef are in lists
     final servicesList = {for (final s in services) s.id: s};
-    servicesList[matchingService.id] = matchingService;
+    servicesList[matchingServiceWithPricing.id] = matchingServiceWithPricing;
 
     final defsList = {for (final d in definitions) d.id: d};
     if (matchingDef != null) {
@@ -478,7 +503,8 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
         draftItemType: matchingType,
         draftItemDefinition: matchingDef,
         clearDraftItemDefinition: matchingDef == null,
-        draftService: matchingService,
+        draftService: matchingServiceWithPricing.service,
+        draftPricingType: matchingServiceWithPricing.pricingType,
         draftUnitPrice: item.unitPrice,
         draftItemTotal: item.calculatedTotal,
         draftQuantity: item.physicalQuantity,
@@ -502,6 +528,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
         clearDraftItemType: true,
         clearDraftItemDefinition: true,
         clearDraftService: true,
+        clearDraftPricingType: true,
         clearDraftUnitPrice: true,
         clearDraftItemTotal: true,
         clearDraftCarpetSize: true,
@@ -520,11 +547,16 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
       emit(state.copyWith(errorMessage: 'نوع العنصر مطلوب'));
       return;
     }
-    if (state.draftService == null) {
+    if (state.draftService == null || state.draftPricingType == null) {
       emit(state.copyWith(errorMessage: 'الخدمة مطلوبة'));
       return;
     }
-    final unitPrice = state.draftUnitPrice ?? state.draftService!.price;
+    if (state.draftUnitPrice == null) {
+      emit(state.copyWith(errorMessage: 'سعر الخدمة مطلوب'));
+      return;
+    }
+    final unitPrice = state.draftUnitPrice!;
+    final pricingType = state.draftPricingType!;
     final effectiveTotal = state.effectiveDraftTotal;
     if (effectiveTotal <= Money.zero) {
       emit(
@@ -533,7 +565,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
       return;
     }
 
-    if (state.draftService!.pricingType == PricingType.perSquareMeter) {
+    if (pricingType == PricingType.perSquareMeter) {
       if (state.draftCarpetLength <= 0 || state.draftCarpetWidth <= 0) {
         emit(
           state.copyWith(
@@ -555,7 +587,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
         clearItemDefinition: state.draftItemDefinition == null,
         serviceId: state.draftService!.id,
         serviceName: state.draftService!.name,
-        pricingType: state.draftService!.pricingType,
+        pricingType: pricingType,
         unitPrice: unitPrice,
         customTotal: state.isDraftTotalOverridden ? state.draftItemTotal : null,
         carpetSizeId: state.draftCarpetSize?.id,
@@ -583,7 +615,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
             itemDefinitionName: state.draftItemDefinition?.name,
             serviceId: state.draftService!.id,
             serviceName: state.draftService!.name,
-            pricingType: state.draftService!.pricingType,
+            pricingType: pricingType,
             unitPrice: unitPrice,
             customTotal: Money.fromPiastres(itemPiastres),
             physicalQuantity: 1,
@@ -604,7 +636,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
             itemDefinitionName: state.draftItemDefinition?.name,
             serviceId: state.draftService!.id,
             serviceName: state.draftService!.name,
-            pricingType: state.draftService!.pricingType,
+            pricingType: pricingType,
             unitPrice: unitPrice,
             customTotal: customTotal,
             physicalQuantity: 1,
@@ -626,6 +658,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
         clearDraftItemType: true,
         clearDraftItemDefinition: true,
         clearDraftService: true,
+        clearDraftPricingType: true,
         clearDraftUnitPrice: true,
         clearDraftItemTotal: true,
         clearDraftCarpetSize: true,

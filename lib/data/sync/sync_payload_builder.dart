@@ -13,6 +13,7 @@ import '../../domain/entities/order_item.dart';
 import '../../domain/entities/payment.dart';
 import '../../domain/entities/refund.dart';
 import '../../domain/entities/service.dart';
+import '../../domain/entities/service_item_type.dart';
 import '../../domain/entities/storage_location.dart';
 import '../../domain/entities/storage_record.dart';
 import '../../domain/enums/order_status.dart';
@@ -211,16 +212,21 @@ class SyncPayloadBuilder {
   /// Builds a self-contained payload for service creation and update.
   static String buildServicePayload(
     Service service,
-    List<String> supportedItemTypeIds,
+    List<ServiceItemType> serviceItemTypes,
   ) {
     return jsonEncode(<String, dynamic>{
       'id': service.id,
       'name': service.name,
       'description': service.description,
-      'pricing_type': service.pricingType.value,
-      'price': service.price.piastres,
       'is_active': service.isActive,
-      'supported_item_type_ids': supportedItemTypeIds,
+      'service_item_types': serviceItemTypes
+          .map((sit) => <String, dynamic>{
+                'id': sit.id,
+                'item_type_id': sit.itemTypeId,
+                'pricing_type': sit.pricingType.value,
+                'price': sit.price.piastres,
+              })
+          .toList(),
       'created_at': service.createdAt.toIso8601String(),
       'updated_at': service.updatedAt.toIso8601String(),
     });

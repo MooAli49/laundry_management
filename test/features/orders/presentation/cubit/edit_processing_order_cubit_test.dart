@@ -12,9 +12,11 @@ import 'package:laundry_management/domain/entities/item_type.dart';
 import 'package:laundry_management/domain/entities/order.dart';
 import 'package:laundry_management/domain/entities/order_item.dart';
 import 'package:laundry_management/domain/entities/service.dart';
+import 'package:laundry_management/domain/entities/service_item_type.dart';
 import 'package:laundry_management/domain/entities/storage_location.dart';
 import 'package:laundry_management/domain/enums/order_status.dart';
 import 'package:laundry_management/domain/enums/pricing_type.dart';
+import 'package:laundry_management/domain/models/service_with_pricing.dart';
 import 'package:laundry_management/domain/repositories/carpet_size_repository.dart';
 import 'package:laundry_management/domain/repositories/customer_repository.dart';
 import 'package:laundry_management/domain/repositories/item_definition_repository.dart';
@@ -67,11 +69,11 @@ class MockCustomerRepo implements CustomerRepository {
 }
 
 class MockServiceRepo implements ServiceRepository {
-  List<Service> services = [];
+  List<ServiceWithPricing> servicesWithPricing = [];
 
   @override
-  Future<List<Service>> getServicesForItemType(String itemTypeId) async =>
-      services;
+  Future<List<ServiceWithPricing>> getServicesForItemType(String itemTypeId) async =>
+      servicesWithPricing;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -187,8 +189,6 @@ void main() {
   final testService = Service(
     id: 'srv-1',
     name: 'غسيل',
-    price: Money.fromEgp(20),
-    pricingType: PricingType.perPiece,
     createdAt: now,
     updatedAt: now,
   );
@@ -196,10 +196,34 @@ void main() {
   final testCarpetService = Service(
     id: 'srv-carpet',
     name: 'غسيل سجاد',
-    price: Money.fromEgp(30),
-    pricingType: PricingType.perSquareMeter,
     createdAt: now,
     updatedAt: now,
+  );
+
+  final testServiceWithPricing = ServiceWithPricing(
+    service: testService,
+    serviceItemType: ServiceItemType(
+      id: 'sit-1',
+      serviceId: 'srv-1',
+      itemTypeId: 'type-1',
+      pricingType: PricingType.perPiece,
+      price: Money.fromEgp(20),
+      createdAt: now,
+      updatedAt: now,
+    ),
+  );
+
+  final testCarpetServiceWithPricing = ServiceWithPricing(
+    service: testCarpetService,
+    serviceItemType: ServiceItemType(
+      id: 'sit-carpet',
+      serviceId: 'srv-carpet',
+      itemTypeId: 'type-1',
+      pricingType: PricingType.perSquareMeter,
+      price: Money.fromEgp(30),
+      createdAt: now,
+      updatedAt: now,
+    ),
   );
 
   final testItem = OrderItem(
@@ -247,7 +271,7 @@ void main() {
     orderRepo.items = [testItem];
     customerRepo.customers = [testCustomer];
     itemTypeRepo.types = [testType];
-    serviceRepo.services = [testService, testCarpetService];
+    serviceRepo.servicesWithPricing = [testServiceWithPricing, testCarpetServiceWithPricing];
 
     useCase = EditProcessingOrderUseCase(orderRepository: orderRepo);
 
@@ -360,7 +384,7 @@ void main() {
 
       // Add a second item first
       await cubit.selectItemType(testType);
-      cubit.selectService(testService);
+      cubit.selectService(testServiceWithPricing);
       cubit.saveDraftItem();
       expect(cubit.state.items.length, 2);
 
@@ -406,7 +430,7 @@ void main() {
           expect(cubit.state.items.length, 1);
 
           await cubit.selectItemType(testType);
-          cubit.selectService(testService);
+          cubit.selectService(testServiceWithPricing);
           cubit.updateDraftQuantity(2);
           cubit.saveDraftItem();
 
@@ -434,7 +458,7 @@ void main() {
           await cubit.loadOrder('order-1');
 
           await cubit.selectItemType(testType);
-          cubit.selectService(testService);
+          cubit.selectService(testServiceWithPricing);
           cubit.updateDraftQuantity(2);
           cubit.saveDraftItem();
           expect(cubit.state.items.length, 3);
@@ -458,7 +482,7 @@ void main() {
           await cubit.loadOrder('order-1');
 
           await cubit.selectItemType(testType);
-          cubit.selectService(testService);
+          cubit.selectService(testServiceWithPricing);
           cubit.updateDraftQuantity(2);
           cubit.saveDraftItem();
 
@@ -481,7 +505,7 @@ void main() {
           expect(cubit.state.items.length, 1);
 
           await cubit.selectItemType(testType);
-          cubit.selectService(testService);
+          cubit.selectService(testServiceWithPricing);
           cubit.updateDraftQuantity(1);
           cubit.saveDraftItem();
 
@@ -499,7 +523,7 @@ void main() {
           expect(cubit.state.items.length, 1);
 
           await cubit.selectItemType(testType);
-          cubit.selectService(testCarpetService);
+          cubit.selectService(testCarpetServiceWithPricing);
           cubit.updateDraftQuantity(2);
           cubit.updateDraftCarpetDimensions(3.0, 2.0);
           cubit.saveDraftItem();

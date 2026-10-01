@@ -287,13 +287,14 @@ Important current constraints include:
 
 ### Pricing
 
-V1 supports only:
+Pricing belongs to the Service + Item Type relationship (`service_item_types`). Services do not own a single price.
 
-- Per Piece
-- Fixed Price
-- Per Square Meter
+V1 operational pricing supports only:
 
-Per Kg is not part of the current V1 implementation.
+- Per Piece (`per_piece`)
+- Per Square Meter (`per_square_meter`)
+
+*(Fixed Price is removed from the V1 operational model; Per Kg remains completely excluded from V1).*
 
 ### Pricing Validation
 

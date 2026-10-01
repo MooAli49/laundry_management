@@ -303,8 +303,6 @@ void main() {
               app_db.ServicesCompanion.insert(
                 id: pieceServiceId,
                 name: 'غسيل وكوي',
-                pricingType: 'per_piece',
-                price: 1500,
                 isActive: const drift.Value(true),
                 createdAt: now,
                 updatedAt: now,
@@ -321,6 +319,20 @@ void main() {
             now.millisecondsSinceEpoch ~/ 1000,
           ],
         );
+
+        await device.db
+            .into(device.db.serviceItemTypes)
+            .insertOnConflictUpdate(
+              app_db.ServiceItemTypesCompanion.insert(
+                id: 'sit-lifecycle-${device.name}',
+                serviceId: pieceServiceId,
+                itemTypeId: pieceItemTypeId,
+                pricingType: 'per_piece',
+                price: 1500,
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
 
         await device.db
             .into(device.db.storageLocations)

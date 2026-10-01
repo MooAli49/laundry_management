@@ -24,6 +24,7 @@ import 'package:laundry_management/data/repositories/order_repository_impl.dart'
 import 'package:laundry_management/data/repositories/service_repository_impl.dart';
 import 'package:laundry_management/data/repositories/settings_repository_impl.dart';
 import 'package:laundry_management/domain/entities/service.dart';
+import 'package:laundry_management/domain/entities/service_item_type.dart';
 import 'package:laundry_management/domain/enums/pricing_type.dart';
 import 'package:laundry_management/domain/value_objects/money.dart';
 import 'package:laundry_management/features/orders/presentation/cubit/create_order_cubit.dart';
@@ -146,18 +147,26 @@ void main() {
     (tester) async {
       await cubit.initialize();
       final itemType = cubit.state.itemTypes.first;
+      final now = DateTime.now();
       final service = Service(
         id: 'srv-form-test',
         name: 'غسيل وكي',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      );
+      final sit = ServiceItemType(
+        id: 'sit-form-test',
+        serviceId: service.id,
+        itemTypeId: itemType.id,
         pricingType: PricingType.perPiece,
         price: const Money.fromPiastres(2500),
-        isActive: true,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
+        createdAt: now,
+        updatedAt: now,
       );
       await serviceRepository.createService(
         service,
-        supportedItemTypeIds: [itemType.id],
+        serviceItemTypes: [sit],
       );
 
       await cubit.selectItemType(itemType);
@@ -219,18 +228,26 @@ void main() {
   ) async {
     await cubit.initialize();
     final itemType = cubit.state.itemTypes.first;
+    final now = DateTime.now();
     final service = Service(
       id: 'srv-form-leak-test',
       name: 'غسيل سريع',
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final sit = ServiceItemType(
+      id: 'sit-form-leak-test',
+      serviceId: service.id,
+      itemTypeId: itemType.id,
       pricingType: PricingType.perPiece,
       price: const Money.fromPiastres(3500),
-      isActive: true,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
+      createdAt: now,
+      updatedAt: now,
     );
     await serviceRepository.createService(
       service,
-      supportedItemTypeIds: [itemType.id],
+      serviceItemTypes: [sit],
     );
 
     // Item 1
@@ -299,18 +316,26 @@ void main() {
         (t) => t.name.contains('سجاد'),
       );
 
+      final now = DateTime.now();
       final carpetService = Service(
         id: 'srv-carpet-regression-test',
         name: 'غسيل سجاد',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      );
+      final sit = ServiceItemType(
+        id: 'sit-carpet-reg',
+        serviceId: carpetService.id,
+        itemTypeId: carpetType.id,
         pricingType: PricingType.perSquareMeter,
         price: const Money.fromPiastres(6000), // 60 EGP / m2
-        isActive: true,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
+        createdAt: now,
+        updatedAt: now,
       );
       await serviceRepository.createService(
         carpetService,
-        supportedItemTypeIds: [carpetType.id],
+        serviceItemTypes: [sit],
       );
 
       // 1. Select item type "سجاد"

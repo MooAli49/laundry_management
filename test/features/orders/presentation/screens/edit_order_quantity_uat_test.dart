@@ -15,9 +15,11 @@ import 'package:laundry_management/domain/entities/item_type.dart';
 import 'package:laundry_management/domain/entities/order.dart';
 import 'package:laundry_management/domain/entities/order_item.dart';
 import 'package:laundry_management/domain/entities/service.dart';
+import 'package:laundry_management/domain/entities/service_item_type.dart';
 import 'package:laundry_management/domain/entities/storage_location.dart';
 import 'package:laundry_management/domain/enums/order_status.dart';
 import 'package:laundry_management/domain/enums/pricing_type.dart';
+import 'package:laundry_management/domain/models/service_with_pricing.dart';
 import 'package:laundry_management/domain/repositories/carpet_size_repository.dart';
 import 'package:laundry_management/domain/repositories/customer_repository.dart';
 import 'package:laundry_management/domain/repositories/item_definition_repository.dart';
@@ -101,11 +103,11 @@ class MockItemDefRepo implements ItemDefinitionRepository {
 }
 
 class MockServiceRepo implements ServiceRepository {
-  List<Service> services = [];
+  List<ServiceWithPricing> servicesWithPricing = [];
 
   @override
-  Future<List<Service>> getServicesForItemType(String itemTypeId) async =>
-      services;
+  Future<List<ServiceWithPricing>> getServicesForItemType(String itemTypeId) async =>
+      servicesWithPricing;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -190,8 +192,6 @@ void main() {
   final testPieceService = Service(
     id: 'srv-piece',
     name: 'غسيل قطعة',
-    price: Money.fromEgp(25),
-    pricingType: PricingType.perPiece,
     createdAt: now,
     updatedAt: now,
   );
@@ -199,10 +199,34 @@ void main() {
   final testCarpetService = Service(
     id: 'srv-carpet',
     name: 'غسيل بالمتر',
-    price: Money.fromEgp(40),
-    pricingType: PricingType.perSquareMeter,
     createdAt: now,
     updatedAt: now,
+  );
+
+  final testPieceServiceWithPricing = ServiceWithPricing(
+    service: testPieceService,
+    serviceItemType: ServiceItemType(
+      id: 'sit-piece',
+      serviceId: 'srv-piece',
+      itemTypeId: 'type-1',
+      pricingType: PricingType.perPiece,
+      price: Money.fromEgp(25),
+      createdAt: now,
+      updatedAt: now,
+    ),
+  );
+
+  final testCarpetServiceWithPricing = ServiceWithPricing(
+    service: testCarpetService,
+    serviceItemType: ServiceItemType(
+      id: 'sit-carpet',
+      serviceId: 'srv-carpet',
+      itemTypeId: 'type-1',
+      pricingType: PricingType.perSquareMeter,
+      price: Money.fromEgp(40),
+      createdAt: now,
+      updatedAt: now,
+    ),
   );
 
   final testOrder = Order(
@@ -255,7 +279,7 @@ void main() {
     itemTypeRepo = MockItemTypeRepo()..types = [testType];
     itemDefRepo = MockItemDefRepo()..defs = [];
     serviceRepo = MockServiceRepo()
-      ..services = [testPieceService, testCarpetService];
+      ..servicesWithPricing = [testPieceServiceWithPricing, testCarpetServiceWithPricing];
     carpetSizeRepo = MockCarpetSizeRepo()..sizes = [];
     paymentsDao = MockPaymentsDao()..totalPaidPiastres = 0;
     storageDao = MockStorageRecordsDao();
@@ -322,7 +346,7 @@ void main() {
 
         // Select item type and service via cubit for reliable state setup
         await cubit.selectItemType(testType);
-        cubit.selectService(testPieceService);
+        cubit.selectService(testPieceServiceWithPricing);
         await tester.pumpAndSettle();
 
         // Enter quantity = 2
@@ -360,7 +384,7 @@ void main() {
         await tester.pumpAndSettle();
 
         await cubit.selectItemType(testType);
-        cubit.selectService(testCarpetService);
+        cubit.selectService(testCarpetServiceWithPricing);
         await tester.pumpAndSettle();
 
         // Both Quantity AND Carpet Dimensions must be visible simultaneously
@@ -431,7 +455,7 @@ void main() {
         await tester.pumpAndSettle();
 
         await cubit.selectItemType(testType);
-        cubit.selectService(testPieceService);
+        cubit.selectService(testPieceServiceWithPricing);
         cubit.updateDraftQuantity(1);
         await tester.pumpAndSettle();
 

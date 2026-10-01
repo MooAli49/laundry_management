@@ -89,8 +89,6 @@ void main() {
       db_pkg.ServicesCompanion.insert(
         id: 'srv-1',
         name: 'غسيل',
-        pricingType: 'perPiece',
-        price: totalPiastres,
         createdAt: now,
         updatedAt: now,
       ),
@@ -354,8 +352,6 @@ void main() {
             db_pkg.ServicesCompanion.insert(
               id: 'srv-ap-1',
               name: 'غسيل',
-              pricingType: 'perPiece',
-              price: 8000,
               createdAt: now,
               updatedAt: now,
             ),
@@ -455,8 +451,6 @@ void main() {
             db_pkg.ServicesCompanion.insert(
               id: 'srv-ap-2',
               name: 'غسيل',
-              pricingType: 'perPiece',
-              price: 5000,
               createdAt: now,
               updatedAt: now,
             ),

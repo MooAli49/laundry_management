@@ -846,8 +846,6 @@ class RemoteChangeApplier {
       id: Value(id),
       name: Value(payload['name'] as String? ?? ''),
       description: Value(payload['description'] as String?),
-      pricingType: Value(payload['pricing_type'] as String? ?? 'per_piece'),
-      price: Value((payload['price'] as num?)?.toInt() ?? 0),
       isActive: Value(
         (payload['is_active'] ?? payload['isActive']) as bool? ?? true,
       ),
@@ -865,34 +863,70 @@ class RemoteChangeApplier {
 
     await _db.into(_db.services).insertOnConflictUpdate(companion);
 
-    // Optional supported item type IDs (canonical: supported_item_type_ids, fallback: item_type_ids)
-    if (payload.containsKey('supported_item_type_ids') ||
+    // Ingest complete Service + Item Type pricing configurations
+    List<dynamic>? rawItems;
+    if (payload.containsKey('service_item_types')) {
+      rawItems = payload['service_item_types'] as List<dynamic>?;
+    } else if (payload.containsKey('supported_item_type_ids') ||
         payload.containsKey('item_type_ids')) {
-      final rawIds =
-          (payload['supported_item_type_ids'] ?? payload['item_type_ids'])
-              as List<dynamic>?;
-      if (rawIds != null) {
-        await (_db.delete(
-          _db.serviceItemTypes,
-        )..where((t) => t.serviceId.equals(id))).go();
-        for (final itemTypeId in rawIds) {
-          if (itemTypeId is String) {
-            await _db
-                .into(_db.serviceItemTypes)
-                .insert(
-                  app_db.ServiceItemTypesCompanion(
-                    id: Value(const Uuid().v4()),
-                    serviceId: Value(id),
-                    itemTypeId: Value(itemTypeId),
-                    createdAt: Value(DateTime.now()),
-                  ),
-                  mode: InsertMode.insertOrIgnore,
-                );
+      final legacyIds = (payload['supported_item_type_ids'] ??
+          payload['item_type_ids']) as List<dynamic>?;
+      if (legacyIds != null) {
+        final legacyPricingType = (payload['pricing_type'] ??
+                payload['pricingType']) as String? ??
+            'per_piece';
+        final legacyPrice = (payload['price'] as num?)?.toInt() ?? 1000;
+        rawItems = legacyIds
+            .map((itId) => {
+                  'id': const Uuid().v4(),
+                  'item_type_id': itId.toString(),
+                  'pricing_type': legacyPricingType,
+                  'price': legacyPrice,
+                })
+            .toList();
+      }
+    }
+
+    if (rawItems != null) {
+      await (_db.delete(
+        _db.serviceItemTypes,
+      )..where((t) => t.serviceId.equals(id))).go();
+
+        for (final raw in rawItems) {
+          if (raw is Map<String, dynamic>) {
+            final sitId = raw['id'] as String? ?? const Uuid().v4();
+            final itemTypeId =
+                (raw['item_type_id'] ?? raw['itemTypeId']) as String? ?? '';
+            final pricingType =
+                (raw['pricing_type'] ?? raw['pricingType']) as String? ??
+                'per_piece';
+            final price = (raw['price'] as num?)?.toInt() ?? 0;
+            if (itemTypeId.isNotEmpty && price > 0) {
+              await _db.into(_db.serviceItemTypes).insert(
+                    app_db.ServiceItemTypesCompanion(
+                      id: Value(sitId),
+                      serviceId: Value(id),
+                      itemTypeId: Value(itemTypeId),
+                      pricingType: Value(pricingType),
+                      price: Value(price),
+                      createdAt: Value(
+                        raw['created_at'] != null
+                            ? DateTime.parse(raw['created_at'] as String)
+                            : DateTime.now(),
+                      ),
+                      updatedAt: Value(
+                        raw['updated_at'] != null
+                            ? DateTime.parse(raw['updated_at'] as String)
+                            : DateTime.now(),
+                      ),
+                    ),
+                    mode: InsertMode.insertOrReplace,
+                  );
+            }
           }
         }
       }
     }
-  }
 
   Future<void> _applyItemType(SyncChangeDto change) async {
     final payload = change.payload;

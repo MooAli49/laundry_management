@@ -325,8 +325,6 @@ void main() {
               app_db.ServicesCompanion.insert(
                 id: testServiceId,
                 name: 'خدمة سجاد C4C $runId',
-                pricingType: 'per_square_meter',
-                price: 4000,
                 isActive: const drift.Value(true),
                 createdAt: now,
                 updatedAt: now,
@@ -343,6 +341,20 @@ void main() {
             now.millisecondsSinceEpoch ~/ 1000,
           ],
         );
+
+        await device.db
+            .into(device.db.serviceItemTypes)
+            .insertOnConflictUpdate(
+              app_db.ServiceItemTypesCompanion.insert(
+                id: 'sit-bidirectional-${device.name}',
+                serviceId: testServiceId,
+                itemTypeId: '00000000-0000-0000-0001-000000000003',
+                pricingType: 'per_square_meter',
+                price: 4000,
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
 
         await device.db
             .into(device.db.carpetSizes)

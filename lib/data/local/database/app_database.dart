@@ -57,7 +57,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -123,6 +123,69 @@ class AppDatabase extends _$AppDatabase {
         // Single-row singleton that mirrors the remote license_info state.
         // This table does NOT participate in the SyncEngine or outbox.
         await m.createTable(licenseCache);
+      }
+      if (from < 8) {
+        // Upgrade service_item_types and services to Service + Item Type Pricing Model
+        final serviceCols = await customSelect('PRAGMA table_info(services);').get();
+        final hasLegacyServicePricing =
+            serviceCols.any((r) => r.read<String>('name') == 'pricing_type');
+
+        if (hasLegacyServicePricing) {
+          await customStatement('''
+            CREATE TABLE IF NOT EXISTS service_item_types_new (
+              id TEXT NOT NULL PRIMARY KEY,
+              service_id TEXT NOT NULL REFERENCES services (id) ON DELETE RESTRICT,
+              item_type_id TEXT NOT NULL REFERENCES item_types (id) ON DELETE RESTRICT,
+              pricing_type TEXT NOT NULL CHECK (pricing_type IN ('per_piece', 'per_square_meter')),
+              price INTEGER NOT NULL CHECK (price > 0),
+              created_at INTEGER NOT NULL,
+              updated_at INTEGER NOT NULL,
+              UNIQUE (service_id, item_type_id)
+            );
+          ''');
+
+          await customStatement('''
+            INSERT OR IGNORE INTO service_item_types_new (id, service_id, item_type_id, pricing_type, price, created_at, updated_at)
+            SELECT
+              sit.id,
+              sit.service_id,
+              sit.item_type_id,
+              CASE WHEN s.pricing_type = 'fixed_price' THEN 'per_piece' ELSE s.pricing_type END,
+              s.price,
+              sit.created_at,
+              sit.created_at
+            FROM service_item_types sit
+            JOIN services s ON s.id = sit.service_id
+            WHERE s.price > 0;
+          ''');
+
+          await customStatement('DROP TABLE service_item_types;');
+          await customStatement('ALTER TABLE service_item_types_new RENAME TO service_item_types;');
+
+          await customStatement('''
+            CREATE TABLE IF NOT EXISTS services_new (
+              id TEXT NOT NULL PRIMARY KEY,
+              name TEXT NOT NULL UNIQUE,
+              description TEXT,
+              is_active INTEGER NOT NULL DEFAULT 1,
+              created_at INTEGER NOT NULL,
+              updated_at INTEGER NOT NULL
+            );
+          ''');
+
+          await customStatement('''
+            INSERT OR IGNORE INTO services_new (id, name, description, is_active, created_at, updated_at)
+            SELECT id, name, description, is_active, created_at, updated_at
+            FROM services;
+          ''');
+
+          await customStatement('DROP TABLE services;');
+          await customStatement('ALTER TABLE services_new RENAME TO services;');
+        }
+
+        await customStatement('''
+          UPDATE order_items SET pricing_type = 'per_piece' WHERE pricing_type = 'fixed_price';
+        ''');
       }
     },
     beforeOpen: (OpeningDetails details) async {

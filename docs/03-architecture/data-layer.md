@@ -514,35 +514,33 @@ Service persistence must support:
 - Edit Service
 - Activate Service
 - Deactivate Service
-- Configure Pricing Type
-- Configure Price
-- Configure Supported Item Types
+- Configure Supported Item Types with Pricing Configuration (pricing_type and price per ServiceItemType)
 - List Active Services
 - Load Service details
 
-Current Service configuration belongs to master data.
+The Service entity does NOT own a single default/current price. Pricing configuration belongs to the `ServiceItemType` associative entity.
 
 Historical OrderItem pricing remains independent.
 
 ---
 
-# 27. Service Compatibility Data
+# 27. Service / Item Type Associative & Pricing Data
 
 The Data Layer must support the relationship:
 
     Service
         ↕
-    ServiceItemType
+    ServiceItemType (pricing_type, price)
         ↕
     ItemType
 
 Queries must support:
 
-- Item Types supported by a Service
-- Services supported by an Item Type
-- Adding compatibility
-- Removing compatibility
-- Preventing duplicate compatibility records
+- Item Types and pricing configurations for a Service
+- Services and pricing configurations available for an Item Type
+- Adding or updating ServiceItemType pricing configuration (`pricing_type`, `price`)
+- Removing ServiceItemType configuration
+- Preventing duplicate `(service_id, item_type_id)` combinations
 
 ---
 
@@ -1354,7 +1352,7 @@ The Data Layer must preserve historical transaction values.
 
 Examples:
 
-OrderItem service price snapshot.
+OrderItem Service + Item Type price snapshot (`unit_price`).
 
 Order total.
 

@@ -197,8 +197,6 @@ void main() {
             db_pkg.ServicesCompanion.insert(
               id: 'srv-fallback-1',
               name: 'غسيل',
-              pricingType: 'fixed_price',
-              price: 2000,
               createdAt: DateTime.now(),
               updatedAt: DateTime.now(),
             ),
@@ -257,7 +255,7 @@ void main() {
                 itemTypeNameSnapshot: const Value(''), // Empty snapshot
                 serviceId: const Value('srv-fallback-1'),
                 serviceNameSnapshot: const Value(''), // Empty snapshot
-                pricingType: const Value('fixed_price'),
+                pricingType: const Value('per_piece'),
                 quantity: const Value(1.0),
                 unitPrice: const Value(5000),
                 calculatedTotal: const Value(5000),
@@ -325,7 +323,7 @@ void main() {
               itemTypeNameSnapshot: const Value('بدلة كاملة فاخرة'),
               serviceId: const Value('srv-fallback-1'),
               serviceNameSnapshot: const Value('تنظيف جاف وكي'),
-              pricingType: const Value('fixed_price'),
+              pricingType: const Value('per_piece'),
               quantity: const Value(1.0),
               unitPrice: const Value(7000),
               calculatedTotal: const Value(7000),

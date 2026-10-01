@@ -7,7 +7,6 @@ import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../domain/entities/service.dart';
-import '../../../../domain/enums/pricing_type.dart';
 import '../cubit/services_management_cubit.dart';
 import '../cubit/services_management_state.dart';
 import 'deactivation_confirm_dialog.dart';
@@ -16,17 +15,6 @@ import 'settings_table_components.dart';
 
 class ServicesSection extends StatelessWidget {
   const ServicesSection({super.key});
-
-  String _getPricingTypeLabel(PricingType type) {
-    switch (type) {
-      case PricingType.perPiece:
-        return AppStrings.pricingPerPiece;
-      case PricingType.perSquareMeter:
-        return AppStrings.pricingPerSquareMeter;
-      case PricingType.fixedPrice:
-        return AppStrings.pricingFixedPrice;
-    }
-  }
 
   Future<void> _handleAdd(BuildContext context) async {
     final cubit = context.read<ServicesManagementCubit>();
@@ -38,13 +26,13 @@ class ServicesSection extends StatelessWidget {
 
   Future<void> _handleEdit(BuildContext context, Service service) async {
     final cubit = context.read<ServicesManagementCubit>();
-    final supportedIds = await cubit.getSupportedItemTypeIds(service.id);
+    final configs = await cubit.getServiceItemTypes(service.id);
     if (context.mounted) {
       await ServiceFormDialog.show(
         context,
         service: service,
         availableItemTypes: cubit.state.itemTypes,
-        initialSupportedTypeIds: supportedIds,
+        initialConfigs: configs,
       );
     }
   }
@@ -64,17 +52,6 @@ class ServicesSection extends StatelessWidget {
       }
     } else {
       await cubit.activateService(service.id);
-    }
-  }
-
-  String _getUnitLabel(PricingType type) {
-    switch (type) {
-      case PricingType.perPiece:
-        return 'قطعة';
-      case PricingType.perSquareMeter:
-        return 'م²';
-      case PricingType.fixedPrice:
-        return 'الخدمة';
     }
   }
 
@@ -127,8 +104,9 @@ class ServicesSection extends StatelessWidget {
                     SettingsCard(
                       icon: _getServiceIcon(svc.name),
                       title: svc.name,
-                      subtitle:
-                          '${_getPricingTypeLabel(svc.pricingType)} • ${svc.price.toEgp.toStringAsFixed(2)} ج.م / ${_getUnitLabel(svc.pricingType)}',
+                      subtitle: svc.description?.isNotEmpty == true
+                          ? svc.description!
+                          : 'تسعير مخصص حسب نوع القطعة',
                       isActive: svc.isActive,
                       onEdit: () => _handleEdit(context, svc),
                       onToggleActive: (_) => _handleToggleStatus(context, svc),

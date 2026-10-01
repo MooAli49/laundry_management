@@ -58,8 +58,6 @@ void main() {
             app_db.ServicesCompanion.insert(
               id: testServiceId,
               name: 'تنظيف',
-              pricingType: 'per_piece',
-              price: 2500,
               createdAt: now,
               updatedAt: now,
             ),
@@ -75,6 +73,18 @@ void main() {
           now.millisecondsSinceEpoch ~/ 1000,
         ],
       );
+
+      await db.into(db.serviceItemTypes).insert(
+            app_db.ServiceItemTypesCompanion.insert(
+              id: 'sit-lifecycle-1',
+              serviceId: testServiceId,
+              itemTypeId: testItemTypeId,
+              pricingType: 'per_piece',
+              price: 2500,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
 
       await db
           .into(db.storageLocations)

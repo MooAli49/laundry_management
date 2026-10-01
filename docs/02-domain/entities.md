@@ -712,26 +712,18 @@ Represents an operation performed on an OrderItem.
 |---|---|---:|---|
 | id | UUID | Yes | Unique Service identifier |
 | name | String | Yes | Service name |
-| pricingType | PricingType | Yes | Service pricing type |
-| currentPrice | Money | Yes | Current service price |
+| description | String | No | Optional Service description |
 | isActive | Boolean | Yes | Whether selectable for new transactions |
 | createdAt | DateTime | Yes | Creation timestamp |
 | updatedAt | DateTime | Yes | Last update timestamp |
 
-## Pricing Types
-
-PerPiece
-
-PerSquareMeter
-
-FixedPrice
-
 ## Rules
 
-- Service names and current prices are master data.
-- Service may be configured for one or more ItemTypes.
+- The Service entity must NOT own a single default/current price or pricing type.
+- Pricing configuration belongs to the Service–Item Type relationship (`ServiceItemType`), not directly to Service.
+- Service names are master data.
+- Service may be configured for one or more ItemTypes via `ServiceItemType`.
 - Only active compatible Services may be selected for new OrderItems.
-- Changing the current Service price must not modify existing OrderItems.
 - Historical Service name, pricing type, and unit price are preserved on the OrderItem.
 
 ---
@@ -744,7 +736,7 @@ ServiceItemType
 
 ## Purpose
 
-Represents the compatibility relationship between Services and ItemTypes.
+Associative entity representing both the compatibility relationship and the operational pricing configuration between Services and ItemTypes.
 
 ## Properties
 
@@ -753,7 +745,10 @@ Represents the compatibility relationship between Services and ItemTypes.
 | id | UUID | Yes | Unique relationship identifier |
 | serviceId | UUID | Yes | Service reference |
 | itemTypeId | UUID | Yes | Item Type reference |
+| pricingType | PricingType | Yes | Operational pricing type (`perPiece`, `perSquareMeter`) |
+| price | Money | Yes | Configured price (strictly positive, `price > Money.zero`) |
 | createdAt | DateTime | Yes | Creation timestamp |
+| updatedAt | DateTime | Yes | Last update timestamp |
 
 ## Relationships
 
@@ -767,9 +762,16 @@ ServiceItemType
 
 ## Rules
 
-- A ServiceItemType record means the Service is available for the ItemType.
-- Duplicate ServiceItemType relationships must not exist.
-- Removing a ServiceItemType relationship must not invalidate historical OrderItems.
+- A ServiceItemType record establishes that the Service is available for the ItemType and defines its operational pricing.
+- In this laundry system, the actual price depends on the combination of Service + Item Type.
+- Example:
+  - Washing + Clothing → `perPiece` → 50 EGP
+  - Washing + Blanket  → `perPiece` → 100 EGP
+  - Washing + Carpet   → `perSquareMeter` → 60 EGP
+- Duplicate `(serviceId, itemTypeId)` combinations must not exist.
+- When an OrderItem is created, the configured price is snapshotted into `OrderItem.unitPrice`.
+- Changing a ServiceItemType's pricing configuration later must NOT modify existing OrderItems or historical orders.
+- Deactivating or removing a ServiceItemType relationship must not invalidate historical OrderItems.
 - Historical OrderItems remain valid even if the Service is no longer configured for that ItemType.
 
 ---
@@ -778,17 +780,19 @@ ServiceItemType
 
 ## Values
 
-PerPiece
+PerPiece (`per_piece`)
 
-PerSquareMeter
+PerSquareMeter (`per_square_meter`)
 
-FixedPrice
+*(Note: `FixedPrice` / `fixed_price` is removed from the V1 operational pricing model because under the current OrderItem model, each physical item is represented as its own OrderItem and receives a unit price; fixed price behaves effectively the same as per-piece pricing without distinct business behavior. Per Kilogram pricing remains completely excluded from V1).*
 
 ## Rules
 
-PricingType determines how a Service price is interpreted.
+PricingType determines how an OrderItem's price and quantity are evaluated:
+- `PerPiece`: unit price × 1 (per physical piece).
+- `PerSquareMeter`: unit price × calculated area.
 
-The actual historical pricing information used by an OrderItem is stored on the OrderItem.
+The actual historical pricing information used by an OrderItem is stored on the OrderItem (`unitPrice`, `pricingTypeSnapshot`, `calculatedTotal`).
 
 ---
 
@@ -1782,7 +1786,7 @@ The implementation must preserve the following invariants:
 13. Cancelling an Order deactivates its active StorageRecords.
 14. Changing Completed back to Processing does not reactivate previous StorageRecords.
 15. Payments cannot exceed the Order's remaining amount.
-16. Historical OrderItem prices remain unchanged after Service price changes.
+16. Historical OrderItem prices remain unchanged after Service pricing configuration changes.
 17. Historical carpet dimensions remain unchanged after CarpetSize changes.
 18. Historical Expense category information remains understandable after ExpenseCategory changes.
 19. Master data changes do not overwrite historical transaction snapshots.
@@ -1949,8 +1953,7 @@ Changing:
 - Item Type
 - Item Definition
 - Service name
-- Service price
-- Pricing Type
+- Service–Item Type pricing configuration (pricing type or price)
 - Expense Category name
 - Storage Location status
 - Carpet Size

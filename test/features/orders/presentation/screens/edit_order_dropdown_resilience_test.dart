@@ -6,7 +6,7 @@ import 'package:laundry_management/core/theme/app_theme.dart';
 import 'package:laundry_management/data/local/database/app_database.dart'
     as app_db;
 import 'package:laundry_management/data/local/database/dev_test_data.dart';
-import 'package:laundry_management/domain/entities/service.dart';
+import 'package:laundry_management/domain/models/service_with_pricing.dart';
 import 'package:laundry_management/domain/enums/order_status.dart';
 import 'package:laundry_management/domain/repositories/order_repository.dart';
 import 'package:laundry_management/features/orders/presentation/screens/edit_order_screen.dart';
@@ -69,7 +69,7 @@ void main() {
 
           // Should render form without throwing any exception
           expect(find.text('تعديل بند من الطلب'), findsOneWidget);
-          expect(find.byType(DropdownButtonFormField<Service>), findsOneWidget);
+          expect(find.byType(DropdownButtonFormField<ServiceWithPricing>), findsOneWidget);
         }
       },
     );

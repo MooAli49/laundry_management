@@ -710,7 +710,7 @@ Master-data changes must not rewrite historical transactions.
 
 Examples:
 
-Change Service price
+Change Service + Item Type price
 → Old OrderItem price remains unchanged.
 
 Change Service name

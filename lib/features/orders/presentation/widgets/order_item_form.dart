@@ -9,8 +9,8 @@ import '../../../../core/widgets/app_text_field.dart';
 import '../../../../domain/entities/carpet_size.dart';
 import '../../../../domain/entities/item_definition.dart';
 import '../../../../domain/entities/item_type.dart';
-import '../../../../domain/entities/service.dart';
 import '../../../../domain/enums/pricing_type.dart';
+import '../../../../domain/models/service_with_pricing.dart';
 import '../../../../domain/value_objects/money.dart';
 import '../cubit/create_order_cubit.dart';
 import '../cubit/create_order_state.dart';
@@ -93,7 +93,6 @@ class _OrderItemFormState extends State<OrderItemForm> {
     return switch (type) {
       PricingType.perPiece => 'بالقطعة',
       PricingType.perSquareMeter => 'بالمتر المربع',
-      PricingType.fixedPrice => 'سعر ثابت',
     };
   }
 
@@ -103,7 +102,7 @@ class _OrderItemFormState extends State<OrderItemForm> {
     final cubit = widget.cubit;
 
     final isCarpetPricing =
-        state.draftService?.pricingType == PricingType.perSquareMeter;
+        state.draftPricingType == PricingType.perSquareMeter;
     final hasDefinitions = state.itemDefinitions.isNotEmpty;
     final isTotalOverridden = state.isDraftTotalOverridden;
 
@@ -193,20 +192,22 @@ class _OrderItemFormState extends State<OrderItemForm> {
             children: [
               Text('الخدمة *', style: AppTextStyles.labelLarge),
               AppSpacing.gapXs,
-              DropdownButtonFormField<Service>(
+              DropdownButtonFormField<ServiceWithPricing>(
                 key: ValueKey('service_${state.draftService?.id}'),
-                initialValue: state.draftService,
+                initialValue: state.compatibleServices
+                    .where((s) => s.service.id == state.draftService?.id)
+                    .firstOrNull,
                 isExpanded: true,
                 decoration: InputDecoration(
                   hintText: state.draftItemType == null
                       ? 'اختر نوع القطعة أولاً'
                       : 'اختر الخدمة',
                 ),
-                items: state.compatibleServices.map((service) {
-                  return DropdownMenuItem<Service>(
-                    value: service,
+                items: state.compatibleServices.map((sp) {
+                  return DropdownMenuItem<ServiceWithPricing>(
+                    value: sp,
                     child: Text(
-                      '${service.name} (${service.price.toEgp.toStringAsFixed(2)} ج.م — ${_pricingTypeLabel(service.pricingType)})',
+                      '${sp.service.name} (${sp.price.toEgp.toStringAsFixed(2)} ج.م — ${_pricingTypeLabel(sp.pricingType)})',
                       style: AppTextStyles.bodyMedium,
                     ),
                   );
@@ -292,7 +293,7 @@ class _OrderItemFormState extends State<OrderItemForm> {
                   if (state.draftService != null) ...[
                     AppSpacing.gapHorizontalMd,
                     Text(
-                      '${(state.draftUnitPrice ?? state.draftService!.price).toEgp.toStringAsFixed(2)} ج.م / ${isCarpetPricing ? 'م²' : 'قطعة'}',
+                      '${(state.draftUnitPrice ?? Money.zero).toEgp.toStringAsFixed(2)} ج.م / ${isCarpetPricing ? 'م²' : 'قطعة'}',
                       style: AppTextStyles.bodySmall.copyWith(
                         color: AppColors.textSecondary,
                         fontSize: 13,
@@ -464,7 +465,7 @@ class _OrderItemFormState extends State<OrderItemForm> {
                 Text(
                   isTotalOverridden
                       ? 'تم تعديل إجمالي الخدمة يدوياً — المحسوب افتراضياً: ${state.draftDefaultTotal.toEgp.toStringAsFixed(2)} ج.م'
-                      : 'سعر الوحدة الافتراضي: ${(state.draftUnitPrice ?? state.draftService!.price).toEgp.toStringAsFixed(2)} ج.م / ${isCarpetPricing ? 'م²' : 'قطعة'} — الإجمالي محسوب تلقائياً',
+                      : 'سعر الوحدة الافتراضي: ${(state.draftUnitPrice ?? Money.zero).toEgp.toStringAsFixed(2)} ج.م / ${isCarpetPricing ? 'م²' : 'قطعة'} — الإجمالي محسوب تلقائياً',
                   style: AppTextStyles.labelSmall.copyWith(
                     color: isTotalOverridden
                         ? AppColors.warning

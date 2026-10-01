@@ -313,9 +313,18 @@ void main() {
           data: {
             'id': testServiceId,
             'name': 'خدمة اختبار دفع $runId',
-            'pricing_type': 'fixed_price',
+            'pricing_type': 'per_piece',
             'price': 10000,
             'is_active': true,
+            'service_item_types': [
+              {
+                'id': 'sit-$runId',
+                'service_id': testServiceId,
+                'item_type_id': '00000000-0000-0000-0001-000000000001',
+                'pricing_type': 'per_piece',
+                'price': 10000,
+              },
+            ],
           },
           options: Options(
             headers: {'X-Operation-ID': 'op-step10-seed-srv-$runId'},
@@ -343,7 +352,7 @@ void main() {
                 'item_type_name_snapshot': 'ملابس',
                 'service_id': testServiceId,
                 'service_name_snapshot': 'خدمة اختبار دفع $runId',
-                'pricing_type': 'fixed_price',
+                'pricing_type': 'per_piece',
                 'quantity': 2.0,
                 'unit_price': 10000,
                 'calculated_total': 20000,

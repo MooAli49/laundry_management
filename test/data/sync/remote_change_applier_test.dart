@@ -292,8 +292,6 @@ void main() {
               app_db.ServicesCompanion(
                 id: Value(serviceId),
                 name: const Value('غسيل'),
-                pricingType: const Value('per_square_meter'),
-                price: const Value(5000),
                 createdAt: Value(DateTime.now()),
                 updatedAt: Value(DateTime.now()),
               ),
@@ -406,8 +404,6 @@ void main() {
               app_db.ServicesCompanion(
                 id: Value(serviceId),
                 name: const Value('تنظيف'),
-                pricingType: const Value('per_piece'),
-                price: const Value(2000),
                 createdAt: Value(DateTime.now()),
                 updatedAt: Value(DateTime.now()),
               ),
@@ -769,8 +765,6 @@ void main() {
               app_db.ServicesCompanion(
                 id: Value(serviceId),
                 name: const Value('Service Storage'),
-                pricingType: const Value('per_piece'),
-                price: const Value(5000),
                 createdAt: Value(DateTime.now()),
                 updatedAt: Value(DateTime.now()),
               ),
@@ -1322,10 +1316,23 @@ void main() {
               'id': 'srv-82',
               'name': 'غسيل وكوي ممتاز',
               'description': 'خدمة غسيل وكوي متكاملة للملابس',
-              'pricing_type': 'per_piece',
-              'price': 3500,
               'is_active': true,
-              'item_type_ids': ['it-srv-1', 'it-srv-2'],
+              'service_item_types': [
+                {
+                  'id': '00000000-0000-0082-0001-000000000001',
+                  'service_id': 'srv-82',
+                  'item_type_id': 'it-srv-1',
+                  'pricing_type': 'per_piece',
+                  'price': 3500,
+                },
+                {
+                  'id': '00000000-0000-0082-0001-000000000002',
+                  'service_id': 'srv-82',
+                  'item_type_id': 'it-srv-2',
+                  'pricing_type': 'per_piece',
+                  'price': 3500,
+                },
+              ],
               'created_at': '2026-09-17T21:05:00.000Z',
               'updated_at': '2026-09-17T21:05:00.000Z',
             },
@@ -1341,14 +1348,16 @@ void main() {
             db.services,
           )..where((t) => t.id.equals('srv-82'))).getSingle();
           expect(service.name, equals('غسيل وكوي ممتاز'));
-          expect(service.price, equals(3500));
-          expect(service.pricingType, equals('per_piece'));
 
           // 2. Verify both junction rows exist in service_item_types
           final junctionRows = await (db.select(
             db.serviceItemTypes,
           )..where((t) => t.serviceId.equals('srv-82'))).get();
           expect(junctionRows.length, equals(2));
+          for (final row in junctionRows) {
+            expect(row.pricingType, equals('per_piece'));
+            expect(row.price, equals(3500));
+          }
 
           // 3. Verify each junction row has a non-empty valid UUID id
           for (final row in junctionRows) {
@@ -1577,12 +1586,16 @@ void main() {
               'id': '00000000-0000-0000-0002-000000000001',
               'name': 'غسيل ومكوى',
               'description': 'خدمة تجريبية',
-              'pricing_type': 'per_piece',
-              'price': 2500,
               'is_active': true,
               'server_version': 1,
-              'supported_item_type_ids': [
-                '00000000-0000-0000-0001-000000000001',
+              'service_item_types': [
+                {
+                  'id': 'sit-can-srv-1',
+                  'service_id': '00000000-0000-0000-0002-000000000001',
+                  'item_type_id': '00000000-0000-0000-0001-000000000001',
+                  'pricing_type': 'per_piece',
+                  'price': 2500,
+                },
               ],
               'created_at': '2026-09-19T00:00:00.000Z',
               'updated_at': '2026-09-19T00:00:00.000Z',
@@ -1600,10 +1613,8 @@ void main() {
                   ))
                   .getSingle();
           expect(svc.name, equals('غسيل ومكوى'));
-          expect(svc.price, equals(2500));
-          expect(svc.pricingType, equals('per_piece'));
 
-          // Junction row constructed from supported_item_type_ids
+          // Junction row constructed from service_item_types
           final junctionRows =
               await (db.select(db.serviceItemTypes)..where(
                     (t) => t.serviceId.equals(
@@ -1616,6 +1627,8 @@ void main() {
             junctionRows.first.itemTypeId,
             equals('00000000-0000-0000-0001-000000000001'),
           );
+          expect(junctionRows.first.price, equals(2500));
+          expect(junctionRows.first.pricingType, equals('per_piece'));
 
           // Cursor advanced
           expect(await syncStateDao.getLastAppliedSequence(), equals(91));
@@ -2050,7 +2063,7 @@ void main() {
               createdAt: dt0,
             ),
 
-            // Seq 13..17: services (canonical supported_item_type_ids)
+            // Seq 13..17: services (canonical service_item_types)
             SyncChangeDto(
               sequence: 13,
               operationId: 'op-baseline-013',
@@ -2061,12 +2074,16 @@ void main() {
                 'id': '00000000-0000-0000-0002-000000000001',
                 'name': 'غسيل ومكوى',
                 'description': 'خدمة تجريبية',
-                'pricing_type': 'per_piece',
-                'price': 2500,
                 'is_active': true,
                 'server_version': 1,
-                'supported_item_type_ids': [
-                  '00000000-0000-0000-0001-000000000001',
+                'service_item_types': [
+                  {
+                    'id': '00000000-0000-0000-0008-000000000013',
+                    'service_id': '00000000-0000-0000-0002-000000000001',
+                    'item_type_id': '00000000-0000-0000-0001-000000000001',
+                    'pricing_type': 'per_piece',
+                    'price': 2500,
+                  },
                 ],
                 'created_at': t0,
                 'updated_at': t0,
@@ -2084,12 +2101,16 @@ void main() {
                 'id': '00000000-0000-0000-0002-000000000002',
                 'name': 'دراي كلين',
                 'description': 'خدمة تجريبية',
-                'pricing_type': 'per_piece',
-                'price': 4500,
                 'is_active': true,
                 'server_version': 1,
-                'supported_item_type_ids': [
-                  '00000000-0000-0000-0001-000000000001',
+                'service_item_types': [
+                  {
+                    'id': '00000000-0000-0000-0008-000000000014',
+                    'service_id': '00000000-0000-0000-0002-000000000002',
+                    'item_type_id': '00000000-0000-0000-0001-000000000001',
+                    'pricing_type': 'per_piece',
+                    'price': 4500,
+                  },
                 ],
                 'created_at': t0,
                 'updated_at': t0,
@@ -2107,12 +2128,16 @@ void main() {
                 'id': '00000000-0000-0000-0002-000000000003',
                 'name': 'غسيل سجاد',
                 'description': 'خدمة تجريبية',
-                'pricing_type': 'per_square_meter',
-                'price': 6000,
                 'is_active': true,
                 'server_version': 1,
-                'supported_item_type_ids': [
-                  '00000000-0000-0000-0001-000000000003',
+                'service_item_types': [
+                  {
+                    'id': '00000000-0000-0000-0008-000000000015',
+                    'service_id': '00000000-0000-0000-0002-000000000003',
+                    'item_type_id': '00000000-0000-0000-0001-000000000003',
+                    'pricing_type': 'per_square_meter',
+                    'price': 6000,
+                  },
                 ],
                 'created_at': t0,
                 'updated_at': t0,
@@ -2130,12 +2155,16 @@ void main() {
                 'id': '00000000-0000-0000-0002-000000000004',
                 'name': 'تنظيف بطاطين',
                 'description': 'خدمة تجريبية',
-                'pricing_type': 'fixed_price',
-                'price': 8000,
                 'is_active': true,
                 'server_version': 1,
-                'supported_item_type_ids': [
-                  '00000000-0000-0000-0001-000000000002',
+                'service_item_types': [
+                  {
+                    'id': '00000000-0000-0000-0008-000000000016',
+                    'service_id': '00000000-0000-0000-0002-000000000004',
+                    'item_type_id': '00000000-0000-0000-0001-000000000002',
+                    'pricing_type': 'per_piece',
+                    'price': 8000,
+                  },
                 ],
                 'created_at': t0,
                 'updated_at': t0,
@@ -2153,12 +2182,16 @@ void main() {
                 'id': '00000000-0000-0000-0002-000000000005',
                 'name': 'غسيل أغطية',
                 'description': 'خدمة تجريبية',
-                'pricing_type': 'fixed_price',
-                'price': 3500,
                 'is_active': true,
                 'server_version': 1,
-                'supported_item_type_ids': [
-                  '00000000-0000-0000-0001-000000000004',
+                'service_item_types': [
+                  {
+                    'id': '00000000-0000-0000-0008-000000000017',
+                    'service_id': '00000000-0000-0000-0002-000000000005',
+                    'item_type_id': '00000000-0000-0000-0001-000000000004',
+                    'pricing_type': 'per_piece',
+                    'price': 3500,
+                  },
                 ],
                 'created_at': t0,
                 'updated_at': t0,
@@ -2624,8 +2657,14 @@ void main() {
                   ))
                   .getSingleOrNull();
           expect(carpetWash?.name, equals('غسيل سجاد'));
-          expect(carpetWash?.price, equals(6000));
-          expect(carpetWash?.pricingType, equals('per_square_meter'));
+
+          final carpetWashPricing =
+              await (db.select(db.serviceItemTypes)..where(
+                    (t) => t.serviceId.equals('00000000-0000-0000-0002-000000000003'),
+                  ))
+                  .getSingleOrNull();
+          expect(carpetWashPricing?.price, equals(6000));
+          expect(carpetWashPricing?.pricingType, equals('per_square_meter'));
 
           final carpetSection =
               await (db.select(db.storageLocations)..where(

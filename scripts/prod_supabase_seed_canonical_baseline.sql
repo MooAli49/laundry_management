@@ -203,20 +203,20 @@ INSERT INTO public.expense_categories (id, name, is_active, created_at, updated_
 ('00000000-0000-0000-0002-000000000007', 'أخرى',     true, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz);
 
 -- 1.4 Services (5 canonical rows)
-INSERT INTO public.services (id, name, description, pricing_type, price, is_active, server_version, created_at, updated_at) VALUES
-('00000000-0000-0000-0002-000000000001', 'غسيل ومكوى',   'خدمة تجريبية', 'per_piece',        2500, true, 1, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0002-000000000002', 'دراي كلين',    'خدمة تجريبية', 'per_piece',        4500, true, 1, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0002-000000000003', 'غسيل سجاد',    'خدمة تجريبية', 'per_square_meter', 6000, true, 1, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0002-000000000004', 'تنظيف بطاطين', 'خدمة تجريبية', 'fixed_price',      8000, true, 1, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0002-000000000005', 'غسيل أغطية',   'خدمة تجريبية', 'fixed_price',      3500, true, 1, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz);
+INSERT INTO public.services (id, name, description, is_active, server_version, created_at, updated_at) VALUES
+('00000000-0000-0000-0002-000000000001', 'غسيل ومكوى',   'خدمة تجريبية', true, 1, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
+('00000000-0000-0000-0002-000000000002', 'دراي كلين',    'خدمة تجريبية', true, 1, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
+('00000000-0000-0000-0002-000000000003', 'غسيل سجاد',    'خدمة تجريبية', true, 1, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
+('00000000-0000-0000-0002-000000000004', 'تنظيف بطاطين', 'خدمة تجريبية', true, 1, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
+('00000000-0000-0000-0002-000000000005', 'غسيل أغطية',   'خدمة تجريبية', true, 1, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz);
 
--- 1.5 Service Item Types (Junction Table)
-INSERT INTO public.service_item_types (service_id, item_type_id, created_at) VALUES
-('00000000-0000-0000-0002-000000000001', '00000000-0000-0000-0001-000000000001', current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0002-000000000002', '00000000-0000-0000-0001-000000000001', current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0002-000000000003', '00000000-0000-0000-0001-000000000003', current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0002-000000000004', '00000000-0000-0000-0001-000000000002', current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0002-000000000005', '00000000-0000-0000-0001-000000000004', current_setting('app.seed_ts', true)::timestamptz);
+-- 1.5 Service Item Types (5 canonical configurations)
+INSERT INTO public.service_item_types (id, service_id, item_type_id, pricing_type, price, created_at, updated_at) VALUES
+('00000000-0000-0000-0008-000000000001', '00000000-0000-0000-0002-000000000001', '00000000-0000-0000-0001-000000000001', 'per_piece',        2500, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
+('00000000-0000-0000-0008-000000000002', '00000000-0000-0000-0002-000000000002', '00000000-0000-0000-0001-000000000001', 'per_piece',        4500, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
+('00000000-0000-0000-0008-000000000003', '00000000-0000-0000-0002-000000000003', '00000000-0000-0000-0001-000000000003', 'per_square_meter', 6000, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
+('00000000-0000-0000-0008-000000000004', '00000000-0000-0000-0002-000000000004', '00000000-0000-0000-0001-000000000002', 'per_piece',        8000, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
+('00000000-0000-0000-0008-000000000005', '00000000-0000-0000-0002-000000000005', '00000000-0000-0000-0001-000000000004', 'per_piece',        3500, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz);
 
 -- 1.6 Carpet Sizes (3 canonical rows)
 INSERT INTO public.carpet_sizes (id, name, length, width, area, is_active, created_at, updated_at) VALUES
@@ -430,11 +430,17 @@ VALUES
         'id', '00000000-0000-0000-0002-000000000001',
         'name', 'غسيل ومكوى',
         'description', 'خدمة تجريبية',
-        'pricing_type', 'per_piece',
-        'price', 2500,
         'is_active', true,
         'server_version', 1,
-        'supported_item_type_ids', jsonb_build_array('00000000-0000-0000-0001-000000000001'),
+        'service_item_types', jsonb_build_array(
+            jsonb_build_object(
+                'id', '00000000-0000-0000-0008-000000000001',
+                'service_id', '00000000-0000-0000-0002-000000000001',
+                'item_type_id', '00000000-0000-0000-0001-000000000001',
+                'pricing_type', 'per_piece',
+                'price', 2500
+            )
+        ),
         'created_at', current_setting('app.seed_ts', true),
         'updated_at', current_setting('app.seed_ts', true)
     ),
@@ -450,11 +456,17 @@ VALUES
         'id', '00000000-0000-0000-0002-000000000002',
         'name', 'دراي كلين',
         'description', 'خدمة تجريبية',
-        'pricing_type', 'per_piece',
-        'price', 4500,
         'is_active', true,
         'server_version', 1,
-        'supported_item_type_ids', jsonb_build_array('00000000-0000-0000-0001-000000000001'),
+        'service_item_types', jsonb_build_array(
+            jsonb_build_object(
+                'id', '00000000-0000-0000-0008-000000000002',
+                'service_id', '00000000-0000-0000-0002-000000000002',
+                'item_type_id', '00000000-0000-0000-0001-000000000001',
+                'pricing_type', 'per_piece',
+                'price', 4500
+            )
+        ),
         'created_at', current_setting('app.seed_ts', true),
         'updated_at', current_setting('app.seed_ts', true)
     ),
@@ -470,11 +482,17 @@ VALUES
         'id', '00000000-0000-0000-0002-000000000003',
         'name', 'غسيل سجاد',
         'description', 'خدمة تجريبية',
-        'pricing_type', 'per_square_meter',
-        'price', 6000,
         'is_active', true,
         'server_version', 1,
-        'supported_item_type_ids', jsonb_build_array('00000000-0000-0000-0001-000000000003'),
+        'service_item_types', jsonb_build_array(
+            jsonb_build_object(
+                'id', '00000000-0000-0000-0008-000000000003',
+                'service_id', '00000000-0000-0000-0002-000000000003',
+                'item_type_id', '00000000-0000-0000-0001-000000000003',
+                'pricing_type', 'per_square_meter',
+                'price', 6000
+            )
+        ),
         'created_at', current_setting('app.seed_ts', true),
         'updated_at', current_setting('app.seed_ts', true)
     ),
@@ -490,11 +508,17 @@ VALUES
         'id', '00000000-0000-0000-0002-000000000004',
         'name', 'تنظيف بطاطين',
         'description', 'خدمة تجريبية',
-        'pricing_type', 'fixed_price',
-        'price', 8000,
         'is_active', true,
         'server_version', 1,
-        'supported_item_type_ids', jsonb_build_array('00000000-0000-0000-0001-000000000002'),
+        'service_item_types', jsonb_build_array(
+            jsonb_build_object(
+                'id', '00000000-0000-0000-0008-000000000004',
+                'service_id', '00000000-0000-0000-0002-000000000004',
+                'item_type_id', '00000000-0000-0000-0001-000000000002',
+                'pricing_type', 'per_piece',
+                'price', 8000
+            )
+        ),
         'created_at', current_setting('app.seed_ts', true),
         'updated_at', current_setting('app.seed_ts', true)
     ),
@@ -510,11 +534,17 @@ VALUES
         'id', '00000000-0000-0000-0002-000000000005',
         'name', 'غسيل أغطية',
         'description', 'خدمة تجريبية',
-        'pricing_type', 'fixed_price',
-        'price', 3500,
         'is_active', true,
         'server_version', 1,
-        'supported_item_type_ids', jsonb_build_array('00000000-0000-0000-0001-000000000004'),
+        'service_item_types', jsonb_build_array(
+            jsonb_build_object(
+                'id', '00000000-0000-0000-0008-000000000005',
+                'service_id', '00000000-0000-0000-0002-000000000005',
+                'item_type_id', '00000000-0000-0000-0001-000000000004',
+                'pricing_type', 'per_piece',
+                'price', 3500
+            )
+        ),
         'created_at', current_setting('app.seed_ts', true),
         'updated_at', current_setting('app.seed_ts', true)
     ),

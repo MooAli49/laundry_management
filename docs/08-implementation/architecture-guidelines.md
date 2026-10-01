@@ -998,7 +998,7 @@ Changes to configuration must not silently rewrite historical transactions.
 
 Examples include:
 
-- Service price changes
+- Service–Item Type pricing configuration changes
 - Service name changes
 - Item definition changes
 - Expense category changes

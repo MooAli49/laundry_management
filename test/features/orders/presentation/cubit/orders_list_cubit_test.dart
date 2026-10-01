@@ -112,8 +112,6 @@ void main() {
       db_pkg.ServicesCompanion.insert(
         id: 'srv-$orderId',
         name: 'خدمة $orderId',
-        pricingType: 'perPiece',
-        price: totalPiastres,
         createdAt: now,
         updatedAt: now,
       ),

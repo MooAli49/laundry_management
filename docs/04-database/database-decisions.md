@@ -158,7 +158,7 @@ This means current configuration must never be used to reconstruct historical fi
 
 Examples:
 
-    Current Service Price
+    Current Service + Item Type Price
         ≠
     Historical OrderItem Price
 
@@ -172,21 +172,21 @@ Examples:
 
 ---
 
-## 10. Service Price Decision
+## 10. Service Pricing Decision
 
-Services contain current pricing configuration.
+Service–Item Type combinations (`service_item_types`) contain current pricing configuration. Services themselves do not own a single price.
 
 OrderItems contain the historical transaction-time price.
 
 When an OrderItem is created:
 
-    Current Service Pricing
+    Current Service + Item Type Pricing
         ↓
     Calculate Transaction Price
         ↓
     Store Price on OrderItem
 
-After that, changing the Service price must not change the historical OrderItem price.
+After that, changing the Service + Item Type price must not change the historical OrderItem price.
 
 ---
 
@@ -194,7 +194,7 @@ After that, changing the Service price must not change the historical OrderItem 
 
 V1 allows authorized Order editing to modify the stored transaction price where the approved UI permits it.
 
-The system must not silently reset the price to the current Service price when an existing Order is opened.
+The system must not silently reset the price to the current Service + Item Type price when an existing Order is opened.
 
 The stored OrderItem price is the source of truth for that historical transaction.
 
@@ -377,17 +377,41 @@ Historical OrderItems must remain understandable if the current Item Definition 
 
 ---
 
-## 20. Service and Item Type Compatibility
+## 20. Service and Item Type Compatibility and Pricing Configuration
 
-A Service may support multiple Item Types.
+A Service may support multiple Item Types, and an Item Type may support multiple Services.
 
-An Item Type may support multiple Services.
+In this laundry system, the actual price depends on the combination of:
 
-This is an N:M relationship represented through:
+> **Service + Item Type**
 
-    service_item_types
+The Service entity must NOT own a single default/current price or pricing type.
 
-Duplicate Service/Item Type combinations are not allowed.
+### Architectural Decision: Direct Placement on `service_item_types` vs Dedicated Table
+
+We evaluated two architectural approaches for modeling Service–Item Type pricing:
+
+1. **Approach 1 (Approved): Enrich `service_item_types` Associative Entity**
+   - Place `pricing_type` and `price` (and `updated_at`) directly on `service_item_types`.
+   - `UNIQUE (service_id, item_type_id)` guarantees exactly one active pricing configuration per valid pair.
+   - **Why it fits the existing architecture**:
+     - *Relational Simplicity*: Avoids an unnecessary 1:1 join table (`service_item_type_prices`).
+     - *Offline-First Performance*: Drift generates a single clean `ServiceItemType` data class; reads require zero extra joins when looking up valid services for an item type.
+     - *Sync Integrity*: A single table synchronizes over the PowerSync/Supabase change log. Synchronizing a separate 1:1 table would create FK ordering hazards and double mutation queue payloads for master data.
+     - *Historical Decoupling*: Historical order stability is already achieved via `order_items.unit_price` snapshots. The master pricing table does not need temporal validity ranges in V1.
+
+2. **Approach 2 (Rejected for V1): Dedicated `service_item_type_prices` Table**
+   - Introduce an extra table referencing `service_item_types(id)`.
+   - *Why rejected*: Overengineering for V1. Since V1 does not support scheduled future pricing, customer-group pricing, or multi-tier volume pricing, an extra table introduces boilerplate, joins, and sync complexity with zero functional benefit.
+
+### Operational Pricing Types in V1
+
+The approved V1 operational pricing types are strictly:
+
+- `per_piece`
+- `per_square_meter`
+
+`fixed_price` is removed from the V1 operational model because each physical item is represented as its own individual `OrderItem` and receives a unit price; fixed price behaves identically to per-piece pricing without distinct business behavior. `per_kg` remains completely excluded from V1.
 
 ---
 

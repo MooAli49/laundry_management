@@ -7,6 +7,7 @@ import 'package:laundry_management/data/sync/sync_payload_builder.dart';
 import 'package:laundry_management/domain/entities/order.dart';
 import 'package:laundry_management/domain/entities/order_item.dart';
 import 'package:laundry_management/domain/entities/service.dart';
+import 'package:laundry_management/domain/entities/service_item_type.dart';
 import 'package:laundry_management/domain/enums/order_status.dart';
 import 'package:laundry_management/domain/enums/pricing_type.dart';
 import 'package:laundry_management/domain/value_objects/money.dart';
@@ -15,21 +16,19 @@ import 'package:laundry_management/domain/value_objects/order_date.dart';
 void main() {
   group('Step 9 — Pricing Types & Payload Builder Contract Tests', () {
     test(
-      'PricingType enum contains only approved V1 values without perKilogram',
+      'PricingType enum contains only approved V1 values without perKilogram or fixedPrice',
       () {
         expect(PricingType.values, [
           PricingType.perPiece,
           PricingType.perSquareMeter,
-          PricingType.fixedPrice,
         ]);
 
         expect(PricingType.perPiece.value, equals('per_piece'));
         expect(PricingType.perSquareMeter.value, equals('per_square_meter'));
-        expect(PricingType.fixedPrice.value, equals('fixed_price'));
       },
     );
 
-    test('PricingType.fromValue resolves both snake_case value and name', () {
+    test('PricingType.fromValue resolves both snake_case value and name and throws for removed types', () {
       expect(PricingType.fromValue('per_piece'), equals(PricingType.perPiece));
       expect(PricingType.fromValue('perPiece'), equals(PricingType.perPiece));
       expect(
@@ -40,15 +39,8 @@ void main() {
         PricingType.fromValue('perSquareMeter'),
         equals(PricingType.perSquareMeter),
       );
-      expect(
-        PricingType.fromValue('fixed_price'),
-        equals(PricingType.fixedPrice),
-      );
-      expect(
-        PricingType.fromValue('fixedPrice'),
-        equals(PricingType.fixedPrice),
-      );
-
+      expect(() => PricingType.fromValue('fixed_price'), throwsArgumentError);
+      expect(() => PricingType.fromValue('fixedPrice'), throwsArgumentError);
       expect(() => PricingType.fromValue('per_kilogram'), throwsArgumentError);
     });
 
@@ -59,20 +51,39 @@ void main() {
         final service = Service(
           id: 'srv-test-1',
           name: 'سجاد',
-          pricingType: PricingType.perSquareMeter,
-          price: const Money.fromPiastres(5000),
           isActive: true,
           createdAt: now,
           updatedAt: now,
         );
+        final serviceItemTypes = [
+          ServiceItemType(
+            id: 'sit-test-1',
+            serviceId: 'srv-test-1',
+            itemTypeId: 'it-1',
+            pricingType: PricingType.perSquareMeter,
+            price: const Money.fromPiastres(5000),
+            createdAt: now,
+            updatedAt: now,
+          ),
+        ];
 
         final servicePayloadStr = SyncPayloadBuilder.buildServicePayload(
           service,
-          ['it-1'],
+          serviceItemTypes,
         );
         final servicePayload =
             jsonDecode(servicePayloadStr) as Map<String, dynamic>;
-        expect(servicePayload['pricing_type'], equals('per_square_meter'));
+        expect(servicePayload.containsKey('pricing_type'), isFalse);
+        expect(servicePayload.containsKey('price'), isFalse);
+        final sits = servicePayload['service_item_types'] as List;
+        expect(
+          (sits.first as Map<String, dynamic>)['pricing_type'],
+          equals('per_square_meter'),
+        );
+        expect(
+          (sits.first as Map<String, dynamic>)['price'],
+          equals(5000),
+        );
 
         final orderItem = OrderItem(
           id: 'oi-test-1',

@@ -197,31 +197,35 @@ class CreateOrderUseCase {
         throw const BusinessRuleFailure('Service is inactive');
       }
 
-      final compatibleServices = await _serviceRepository
-          .getServicesForItemType(itemType.id);
-      final isCompatible = compatibleServices.any((s) => s.id == service.id);
-      if (!isCompatible) {
+      final serviceItemType = await _serviceRepository.getServiceItemType(
+        service.id,
+        itemType.id,
+      );
+      if (serviceItemType == null) {
         throw IncompatibleServiceFailure(
           serviceId: service.id,
           itemTypeId: itemType.id,
         );
       }
 
-      final unitPrice = itemInput.customUnitPrice ?? service.price;
+      final configuredPrice = serviceItemType.price;
+      final pricingType = serviceItemType.pricingType;
+
+      final unitPrice = itemInput.customUnitPrice ?? configuredPrice;
       if (unitPrice <= Money.zero) {
         throw const ValidationFailure(
           'Unit price must be strictly greater than zero',
         );
       }
 
-      if (service.pricingType != PricingType.perSquareMeter &&
+      if (pricingType != PricingType.perSquareMeter &&
           itemInput.carpetData != null) {
         throw const ValidationFailure(
           'Carpet data is not allowed for non-carpet pricing types',
         );
       }
 
-      if (service.pricingType == PricingType.perSquareMeter) {
+      if (pricingType == PricingType.perSquareMeter) {
         if (itemInput.carpetData == null) {
           throw const ValidationFailure(
             'Carpet data is required for per-square-meter services',
@@ -277,8 +281,8 @@ class CreateOrderUseCase {
               itemTypeNameSnapshot: itemType.name,
               itemDefinitionNameSnapshot: itemDefinitionName,
               serviceNameSnapshot: service.name,
-              pricingType: service.pricingType,
-              quantity: 1.0,
+              pricingType: pricingType,
+              quantity: area,
               unitPrice: effectiveUnitPrice,
               calculatedTotal: pieceTotal,
               notes: itemInput.notes,
@@ -289,7 +293,7 @@ class CreateOrderUseCase {
           );
         }
       } else {
-        // perPiece or fixedPrice
+        // perPiece
         final totalPiastres = itemInput.customTotal != null
             ? itemInput.customTotal!.piastres
             : (unitPrice.piastres * itemInput.physicalQuantity);
@@ -318,7 +322,7 @@ class CreateOrderUseCase {
               itemTypeNameSnapshot: itemType.name,
               itemDefinitionNameSnapshot: itemDefinitionName,
               serviceNameSnapshot: service.name,
-              pricingType: service.pricingType,
+              pricingType: pricingType,
               quantity: 1.0,
               unitPrice: effectiveUnitPrice,
               calculatedTotal: pieceTotal,

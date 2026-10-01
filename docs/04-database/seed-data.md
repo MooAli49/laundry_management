@@ -334,67 +334,65 @@ If the final business requirements provide a specific Service catalog, the seed 
 
 \---
 
-**## 7.1 Service Pricing**
+**## 7.1 Service Pricing Configuration**
 
-Default Service prices must not be invented.
+The Service entity must NOT own a single default/current price or pricing type.
 
-A Service seed may contain:
+Pricing configuration belongs to the Service–Item Type relationship (`service_item_types`).
 
-    name
+Default Service–Item Type prices must not be invented without approved business configuration.
 
-    pricing\_type
+A Service seed contains:
 
-    is\_active
+    name
+    is_active
 
-but a real business price should be configured by the business unless an approved default price list exists.
+Operational pricing configuration is defined per supported Item Type on `service_item_types`:
 
-The system must not silently assume arbitrary prices.
+    pricing_type
+    price
 
 \---
 
 **## 7.2 Pricing Type**
 
-Every seeded Service must use an approved Pricing Type.
+Every seeded Service–Item Type configuration must use an approved V1 Pricing Type.
 
-Examples:
+Approved V1 values:
 
-    per\_piece
+    per_piece
+    per_square_meter
 
-    per\_kg
-
-    per\_square\_meter
-
-    fixed\_price
+*(Note: fixed_price is removed from V1 operational model, per_kg remains excluded).*
 
 Only pricing types supported by the Domain Model should be seeded.
 
 \---
 
-**# 8. Service / ItemType Compatibility**
+**# 8. Service / ItemType Compatibility & Pricing Configuration**
 
-If default Services are seeded, their compatibility with ItemTypes may also be seeded.
+If default Services are seeded, their compatibility and operational pricing configurations with ItemTypes are also seeded in `service_item_types`.
 
 Example structure:
 
-    Service
+    Washing
+      ├── Clothing → per_piece → 50 EGP
+      ├── Blanket  → per_piece → 100 EGP
+      └── Carpet   → per_square_meter → 60 EGP
 
-        ↓
-
-    ServiceItemType
-
-        ↓
-
-    ItemType
+Each seeded `service_item_types` record must define:
+- `service_id`
+- `item_type_id`
+- `pricing_type` (`per_piece` or `per_square_meter`)
+- `price` (strictly positive minor currency units)
 
 Only explicitly approved combinations should be inserted.
 
 The seed process must not automatically assume:
 
-    Every Service
-
-        +
-
-    Every ItemType
+    Every Service
+        +
+    Every ItemType
 
 is valid.
 
@@ -1226,7 +1224,7 @@ The only financial-looking data present initially should come from approved conf
 
 **# 31. No Arbitrary Prices**
 
-The seed system must not invent production Service prices.
+The seed system must not invent production Service + Item Type prices.
 
 If approved business pricing exists:
 
@@ -1310,7 +1308,7 @@ The initial setup flow may allow the business to configure:
 
     Services
 
-    Service Prices
+    Service + Item Type Prices
 
     Item Types
 

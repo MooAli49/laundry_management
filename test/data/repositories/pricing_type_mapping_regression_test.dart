@@ -7,18 +7,16 @@ import 'package:laundry_management/data/local/daos/services_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_locations_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
-import 'package:laundry_management/data/local/daos/sync_state_dao.dart';
 import 'package:laundry_management/data/local/database/app_database.dart'
     as app_db;
-import 'package:laundry_management/data/remote/dto/sync_change_dto.dart';
 import 'package:laundry_management/data/repositories/order_repository_impl.dart';
 import 'package:laundry_management/data/repositories/service_repository_impl.dart';
 import 'package:laundry_management/data/repositories/storage_repository_impl.dart';
-import 'package:laundry_management/data/sync/remote_change_applier.dart';
 import 'package:laundry_management/domain/entities/carpet_item_data.dart';
 import 'package:laundry_management/domain/entities/order.dart';
 import 'package:laundry_management/domain/entities/order_item.dart';
 import 'package:laundry_management/domain/entities/service.dart';
+import 'package:laundry_management/domain/entities/service_item_type.dart';
 import 'package:laundry_management/domain/enums/order_status.dart';
 import 'package:laundry_management/domain/enums/pricing_type.dart';
 import 'package:laundry_management/domain/value_objects/money.dart';
@@ -32,10 +30,6 @@ void main() {
         PricingType.fromValue('per_square_meter'),
         equals(PricingType.perSquareMeter),
       );
-      expect(
-        PricingType.fromValue('fixed_price'),
-        equals(PricingType.fixedPrice),
-      );
     });
 
     test(
@@ -46,16 +40,20 @@ void main() {
           PricingType.fromValue('perSquareMeter'),
           equals(PricingType.perSquareMeter),
         );
-        expect(
-          PricingType.fromValue('fixedPrice'),
-          equals(PricingType.fixedPrice),
-        );
       },
     );
 
-    test('throws ArgumentError on invalid pricing type value', () {
+    test('throws ArgumentError on invalid pricing type value or removed fixedPrice', () {
       expect(
         () => PricingType.fromValue('invalid_pricing_type'),
+        throwsA(isA<ArgumentError>()),
+      );
+      expect(
+        () => PricingType.fromValue('fixed_price'),
+        throwsA(isA<ArgumentError>()),
+      );
+      expect(
+        () => PricingType.fromValue('fixedPrice'),
         throwsA(isA<ArgumentError>()),
       );
     });
@@ -68,12 +66,10 @@ void main() {
     late StorageLocationsDao storageLocationsDao;
     late ServicesDao servicesDao;
     late SyncOperationsDao syncOperationsDao;
-    late SyncStateDao syncStateDao;
 
     late OrderRepositoryImpl orderRepository;
     late ServiceRepositoryImpl serviceRepository;
     late StorageRepositoryImpl storageRepository;
-    late RemoteChangeApplier remoteChangeApplier;
 
     setUp(() async {
       db = app_db.AppDatabase(NativeDatabase.memory());
@@ -82,7 +78,6 @@ void main() {
       storageLocationsDao = StorageLocationsDao(db);
       servicesDao = ServicesDao(db);
       syncOperationsDao = SyncOperationsDao(db);
-      syncStateDao = SyncStateDao(db);
 
       orderRepository = OrderRepositoryImpl(
         ordersDao: ordersDao,
@@ -104,11 +99,6 @@ void main() {
         syncOperationsDao: syncOperationsDao,
         ordersDao: ordersDao,
         db: db,
-      );
-
-      remoteChangeApplier = RemoteChangeApplier(
-        db: db,
-        syncStateDao: syncStateDao,
       );
 
       // Seed necessary foreign keys
@@ -136,13 +126,23 @@ void main() {
       );
 
       await db.customStatement(
-        'INSERT OR REPLACE INTO services (id, name, pricing_type, price, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT OR REPLACE INTO services (id, name, is_active, created_at, updated_at) VALUES (?, ?, 1, ?, ?)',
         [
           'srv-1',
           'غسيل سجاد',
+          now.millisecondsSinceEpoch ~/ 1000,
+          now.millisecondsSinceEpoch ~/ 1000,
+        ],
+      );
+
+      await db.customStatement(
+        'INSERT OR REPLACE INTO service_item_types (id, service_id, item_type_id, pricing_type, price, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          'sit-srv1-carpet',
+          'srv-1',
+          'type-carpet',
           'per_square_meter',
           3000,
-          1,
           now.millisecondsSinceEpoch ~/ 1000,
           now.millisecondsSinceEpoch ~/ 1000,
         ],
@@ -180,8 +180,8 @@ void main() {
             customerPhoneSnapshot: const drift.Value('01012345678'),
             status: const drift.Value('processing'),
             expectedPickupDate: now,
-            subtotal: 27000,
-            total: 27000,
+            subtotal: 22000,
+            total: 22000,
             createdAt: now,
             updatedAt: now,
           ),
@@ -223,34 +223,14 @@ void main() {
           ),
         );
 
-        // Item 3: fixed_price
-        await ordersDao.insertOrderItem(
-          app_db.OrderItemsCompanion.insert(
-            id: 'item-fixed',
-            orderId: 'ord-snake',
-            itemTypeId: 'type-carpet',
-            serviceId: 'srv-1',
-            itemTypeNameSnapshot: 'سجاد',
-            serviceNameSnapshot: 'غسيل سجاد',
-            pricingType: 'fixed_price',
-            quantity: 1.0,
-            unitPrice: 5000,
-            calculatedTotal: 5000,
-            createdAt: now,
-            updatedAt: now,
-          ),
-        );
-
         final items = await orderRepository.getOrderItems('ord-snake');
-        expect(items.length, equals(3));
+        expect(items.length, equals(2));
 
         final pieceItem = items.firstWhere((i) => i.id == 'item-piece');
         final sqmItem = items.firstWhere((i) => i.id == 'item-sqm');
-        final fixedItem = items.firstWhere((i) => i.id == 'item-fixed');
 
         expect(pieceItem.pricingType, equals(PricingType.perPiece));
         expect(sqmItem.pricingType, equals(PricingType.perSquareMeter));
-        expect(fixedItem.pricingType, equals(PricingType.fixedPrice));
       },
     );
 
@@ -331,7 +311,7 @@ void main() {
             unitPrice: const Money.fromPiastres(3000),
             calculatedTotal: const Money.fromPiastres(18000),
             carpetData: CarpetItemData(
-              id: 'carp-created',
+              id: 'carpet-data-1',
               orderItemId: 'item-created',
               carpetSizeId: 'size-1',
               length: 2.0,
@@ -345,96 +325,18 @@ void main() {
           ),
         ];
 
-        final created = await orderRepository.createOrder(
+        await orderRepository.createOrder(
           order: orderToCreate,
           items: itemsToCreate,
         );
 
-        expect(created.id, equals('ord-create'));
+        final dbRow = await (db.select(db.orderItems)
+              ..where((t) => t.orderId.equals('ord-create')))
+            .get();
+        expect(dbRow.length, equals(1));
+        expect(dbRow.first.pricingType, equals('per_square_meter'));
 
-        // Verify what was stored in the SQLite column
-        final row = await (db.select(
-          db.orderItems,
-        )..where((t) => t.id.equals('item-created'))).getSingle();
-        expect(row.pricingType, equals('per_square_meter'));
-
-        // Re-read items via getOrderItems
-        final retrievedItems = await orderRepository.getOrderItems(
-          'ord-create',
-        );
-        expect(retrievedItems.length, equals(1));
-        expect(
-          retrievedItems.first.pricingType,
-          equals(PricingType.perSquareMeter),
-        );
-      },
-    );
-
-    test(
-      'Remote-synchronized order item data (snake_case) applied via RemoteChangeApplier maps successfully in OrderRepository',
-      () async {
-        final now = DateTime.now().toUtc();
-        final remotePayload = {
-          'id': 'ord-remote',
-          'order_number': 'ORD-REMOTE-01',
-          'customer_id': 'cust-1',
-          'customer_name_snapshot': 'عميل تجريبي',
-          'customer_phone_snapshot': '01012345678',
-          'status': 'processing',
-          'expected_pickup_date': now.toIso8601String(),
-          'subtotal': 18000,
-          'discount': 0,
-          'tax': 0,
-          'total': 18000,
-          'items': [
-            {
-              'id': 'item-remote-sqm',
-              'order_id': 'ord-remote',
-              'item_type_id': 'type-carpet',
-              'service_id': 'srv-1',
-              'item_type_name_snapshot': 'سجاد',
-              'service_name_snapshot': 'غسيل سجاد',
-              'pricing_type':
-                  'per_square_meter', // Serialized snake_case from backend
-              'quantity': 6.0,
-              'unit_price': 3000,
-              'calculated_total': 18000,
-              'carpet_data': {
-                'id': 'carp-remote-1',
-                'order_item_id': 'item-remote-sqm',
-                'carpet_size_id': 'size-1',
-                'length': 2.0,
-                'width': 3.0,
-                'area': 6.0,
-                'created_at': now.toIso8601String(),
-                'updated_at': now.toIso8601String(),
-              },
-              'created_at': now.toIso8601String(),
-              'updated_at': now.toIso8601String(),
-            },
-          ],
-          'created_at': now.toIso8601String(),
-          'updated_at': now.toIso8601String(),
-        };
-
-        // Apply remote change
-        await remoteChangeApplier.applyBatch([
-          SyncChangeDto(
-            sequence: 1,
-            operationId: 'op-1',
-            entityType: 'order',
-            entityId: 'ord-remote',
-            operationType: 'create',
-            payload: remotePayload,
-            createdAt: now,
-          ),
-        ]);
-
-        // Read back via OrderRepositoryImpl
-        final order = await orderRepository.getOrderById('ord-remote');
-        expect(order, isNotNull);
-
-        final items = await orderRepository.getOrderItems('ord-remote');
+        final items = await orderRepository.getOrderItems('ord-create');
         expect(items.length, equals(1));
         expect(items.first.pricingType, equals(PricingType.perSquareMeter));
         expect(items.first.carpetData, isNotNull);
@@ -443,66 +345,44 @@ void main() {
     );
 
     test(
-      'ServiceRepositoryImpl correctly maps snake_case and camelCase pricing_type',
+      'ServiceRepositoryImpl correctly handles service with ServiceItemType pricing',
       () async {
         final now = DateTime.now();
 
-        // Insert service with snake_case
-        await servicesDao.insertService(
-          app_db.ServicesCompanion.insert(
-            id: 'srv-snake',
-            name: 'خدمة تسعير ثابت',
-            pricingType: 'fixed_price',
-            price: 5000,
-            isActive: const drift.Value(true),
-            createdAt: now,
-            updatedAt: now,
-          ),
-        );
-
-        final serviceSnake = await serviceRepository.getServiceById(
-          'srv-snake',
-        );
-        expect(serviceSnake, isNotNull);
-        expect(serviceSnake!.pricingType, equals(PricingType.fixedPrice));
-
-        // Insert service with camelCase
-        await servicesDao.insertService(
-          app_db.ServicesCompanion.insert(
-            id: 'srv-camel',
-            name: 'خدمة بالمتر',
-            pricingType: 'perSquareMeter',
-            price: 4000,
-            isActive: const drift.Value(true),
-            createdAt: now,
-            updatedAt: now,
-          ),
-        );
-
-        final serviceCamel = await serviceRepository.getServiceById(
-          'srv-camel',
-        );
-        expect(serviceCamel, isNotNull);
-        expect(serviceCamel!.pricingType, equals(PricingType.perSquareMeter));
-
-        // Create new service via repository writes canonical value
+        // Create new service via repository writes canonical values
         final created = await serviceRepository.createService(
           Service(
             id: 'srv-new',
             name: 'خدمة بالقطعة جديدة',
             description: null,
-            pricingType: PricingType.perPiece,
-            price: const Money.fromPiastres(1500),
             isActive: true,
             createdAt: now,
             updatedAt: now,
           ),
-          supportedItemTypeIds: ['type-carpet'],
+          serviceItemTypes: [
+            ServiceItemType(
+              id: 'sit-new',
+              serviceId: 'srv-new',
+              itemTypeId: 'type-carpet',
+              pricingType: PricingType.perPiece,
+              price: const Money.fromPiastres(1500),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          ],
         );
 
-        expect(created.pricingType, equals(PricingType.perPiece));
-        final dbRow = await servicesDao.getServiceById('srv-new');
-        expect(dbRow!.pricingType, equals('per_piece'));
+        expect(created.name, equals('خدمة بالقطعة جديدة'));
+        final sits = await serviceRepository.getServiceItemTypes('srv-new');
+        expect(sits.length, equals(1));
+        expect(sits.first.pricingType, equals(PricingType.perPiece));
+        expect(sits.first.price, equals(const Money.fromPiastres(1500)));
+
+        final compatible = await serviceRepository.getServicesForItemType('type-carpet');
+        expect(compatible.any((s) => s.id == 'srv-new'), isTrue);
+        final swp = compatible.firstWhere((s) => s.id == 'srv-new');
+        expect(swp.pricingType, equals(PricingType.perPiece));
+        expect(swp.price, equals(const Money.fromPiastres(1500)));
       },
     );
 

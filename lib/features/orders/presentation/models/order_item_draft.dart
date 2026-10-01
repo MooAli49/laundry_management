@@ -42,7 +42,7 @@ class OrderItemDraft {
       final areaTotalPiastres = (unitPrice.piastres * carpetArea).round();
       return Money.fromPiastres(areaTotalPiastres * physicalQuantity);
     }
-    // perPiece and fixedPrice (fixed price per physical piece)
+    // perPiece (price per physical piece)
     return unitPrice * physicalQuantity;
   }
 

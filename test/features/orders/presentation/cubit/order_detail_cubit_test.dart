@@ -176,8 +176,6 @@ void main() {
       db_pkg.ServicesCompanion.insert(
         id: 'srv-$orderId',
         name: 'غسيل وكي $orderId',
-        pricingType: 'perPiece',
-        price: totalPiastres ~/ 2,
         createdAt: now,
         updatedAt: now,
       ),

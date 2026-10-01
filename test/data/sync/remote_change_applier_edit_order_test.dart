@@ -60,8 +60,6 @@ void main() {
             app_db.ServicesCompanion.insert(
               id: testServiceId,
               name: 'غسيل وكوي',
-              pricingType: 'per_piece',
-              price: 1500,
               createdAt: now,
               updatedAt: now,
             ),
@@ -73,8 +71,6 @@ void main() {
             app_db.ServicesCompanion.insert(
               id: testCarpetServiceId,
               name: 'غسيل سجاد',
-              pricingType: 'per_square_meter',
-              price: 4000,
               createdAt: now,
               updatedAt: now,
             ),
@@ -101,6 +97,30 @@ void main() {
           now.millisecondsSinceEpoch ~/ 1000,
         ],
       );
+
+      await db.into(db.serviceItemTypes).insert(
+            app_db.ServiceItemTypesCompanion.insert(
+              id: 'sit-test-1',
+              serviceId: testServiceId,
+              itemTypeId: testItemTypeId,
+              pricingType: 'per_piece',
+              price: 1500,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+
+      await db.into(db.serviceItemTypes).insert(
+            app_db.ServiceItemTypesCompanion.insert(
+              id: 'sit-test-2',
+              serviceId: testCarpetServiceId,
+              itemTypeId: testCarpetItemTypeId,
+              pricingType: 'per_square_meter',
+              price: 4000,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
 
       // Create initial local order aggregate on device (Item 1 & Item 2)
       await db

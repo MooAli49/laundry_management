@@ -2497,26 +2497,6 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _pricingTypeMeta = const VerificationMeta(
-    'pricingType',
-  );
-  @override
-  late final GeneratedColumn<String> pricingType = GeneratedColumn<String>(
-    'pricing_type',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _priceMeta = const VerificationMeta('price');
-  @override
-  late final GeneratedColumn<int> price = GeneratedColumn<int>(
-    'price',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-  );
   static const VerificationMeta _isActiveMeta = const VerificationMeta(
     'isActive',
   );
@@ -2559,8 +2539,6 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
     id,
     name,
     description,
-    pricingType,
-    price,
     isActive,
     createdAt,
     updatedAt,
@@ -2598,25 +2576,6 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
           _descriptionMeta,
         ),
       );
-    }
-    if (data.containsKey('pricing_type')) {
-      context.handle(
-        _pricingTypeMeta,
-        pricingType.isAcceptableOrUnknown(
-          data['pricing_type']!,
-          _pricingTypeMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_pricingTypeMeta);
-    }
-    if (data.containsKey('price')) {
-      context.handle(
-        _priceMeta,
-        price.isAcceptableOrUnknown(data['price']!, _priceMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_priceMeta);
     }
     if (data.containsKey('is_active')) {
       context.handle(
@@ -2661,14 +2620,6 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
         DriftSqlType.string,
         data['${effectivePrefix}description'],
       ),
-      pricingType: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}pricing_type'],
-      )!,
-      price: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}price'],
-      )!,
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
@@ -2694,8 +2645,6 @@ class Service extends DataClass implements Insertable<Service> {
   final String id;
   final String name;
   final String? description;
-  final String pricingType;
-  final int price;
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -2703,8 +2652,6 @@ class Service extends DataClass implements Insertable<Service> {
     required this.id,
     required this.name,
     this.description,
-    required this.pricingType,
-    required this.price,
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
@@ -2717,8 +2664,6 @@ class Service extends DataClass implements Insertable<Service> {
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
     }
-    map['pricing_type'] = Variable<String>(pricingType);
-    map['price'] = Variable<int>(price);
     map['is_active'] = Variable<bool>(isActive);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -2732,8 +2677,6 @@ class Service extends DataClass implements Insertable<Service> {
       description: description == null && nullToAbsent
           ? const Value.absent()
           : Value(description),
-      pricingType: Value(pricingType),
-      price: Value(price),
       isActive: Value(isActive),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -2749,8 +2692,6 @@ class Service extends DataClass implements Insertable<Service> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       description: serializer.fromJson<String?>(json['description']),
-      pricingType: serializer.fromJson<String>(json['pricingType']),
-      price: serializer.fromJson<int>(json['price']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -2763,8 +2704,6 @@ class Service extends DataClass implements Insertable<Service> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'description': serializer.toJson<String?>(description),
-      'pricingType': serializer.toJson<String>(pricingType),
-      'price': serializer.toJson<int>(price),
       'isActive': serializer.toJson<bool>(isActive),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -2775,8 +2714,6 @@ class Service extends DataClass implements Insertable<Service> {
     String? id,
     String? name,
     Value<String?> description = const Value.absent(),
-    String? pricingType,
-    int? price,
     bool? isActive,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -2784,8 +2721,6 @@ class Service extends DataClass implements Insertable<Service> {
     id: id ?? this.id,
     name: name ?? this.name,
     description: description.present ? description.value : this.description,
-    pricingType: pricingType ?? this.pricingType,
-    price: price ?? this.price,
     isActive: isActive ?? this.isActive,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -2797,10 +2732,6 @@ class Service extends DataClass implements Insertable<Service> {
       description: data.description.present
           ? data.description.value
           : this.description,
-      pricingType: data.pricingType.present
-          ? data.pricingType.value
-          : this.pricingType,
-      price: data.price.present ? data.price.value : this.price,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -2813,8 +2744,6 @@ class Service extends DataClass implements Insertable<Service> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('description: $description, ')
-          ..write('pricingType: $pricingType, ')
-          ..write('price: $price, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -2823,16 +2752,8 @@ class Service extends DataClass implements Insertable<Service> {
   }
 
   @override
-  int get hashCode => Object.hash(
-    id,
-    name,
-    description,
-    pricingType,
-    price,
-    isActive,
-    createdAt,
-    updatedAt,
-  );
+  int get hashCode =>
+      Object.hash(id, name, description, isActive, createdAt, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2840,8 +2761,6 @@ class Service extends DataClass implements Insertable<Service> {
           other.id == this.id &&
           other.name == this.name &&
           other.description == this.description &&
-          other.pricingType == this.pricingType &&
-          other.price == this.price &&
           other.isActive == this.isActive &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -2851,8 +2770,6 @@ class ServicesCompanion extends UpdateCompanion<Service> {
   final Value<String> id;
   final Value<String> name;
   final Value<String?> description;
-  final Value<String> pricingType;
-  final Value<int> price;
   final Value<bool> isActive;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -2861,8 +2778,6 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.description = const Value.absent(),
-    this.pricingType = const Value.absent(),
-    this.price = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -2872,24 +2787,18 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     required String id,
     required String name,
     this.description = const Value.absent(),
-    required String pricingType,
-    required int price,
     this.isActive = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
-       pricingType = Value(pricingType),
-       price = Value(price),
        createdAt = Value(createdAt),
        updatedAt = Value(updatedAt);
   static Insertable<Service> custom({
     Expression<String>? id,
     Expression<String>? name,
     Expression<String>? description,
-    Expression<String>? pricingType,
-    Expression<int>? price,
     Expression<bool>? isActive,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -2899,8 +2808,6 @@ class ServicesCompanion extends UpdateCompanion<Service> {
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (description != null) 'description': description,
-      if (pricingType != null) 'pricing_type': pricingType,
-      if (price != null) 'price': price,
       if (isActive != null) 'is_active': isActive,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -2912,8 +2819,6 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     Value<String>? id,
     Value<String>? name,
     Value<String?>? description,
-    Value<String>? pricingType,
-    Value<int>? price,
     Value<bool>? isActive,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -2923,8 +2828,6 @@ class ServicesCompanion extends UpdateCompanion<Service> {
       id: id ?? this.id,
       name: name ?? this.name,
       description: description ?? this.description,
-      pricingType: pricingType ?? this.pricingType,
-      price: price ?? this.price,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -2943,12 +2846,6 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     }
     if (description.present) {
       map['description'] = Variable<String>(description.value);
-    }
-    if (pricingType.present) {
-      map['pricing_type'] = Variable<String>(pricingType.value);
-    }
-    if (price.present) {
-      map['price'] = Variable<int>(price.value);
     }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
@@ -2971,8 +2868,6 @@ class ServicesCompanion extends UpdateCompanion<Service> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('description: $description, ')
-          ..write('pricingType: $pricingType, ')
-          ..write('price: $price, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -6702,6 +6597,26 @@ class $ServiceItemTypesTable extends ServiceItemTypes
       'REFERENCES item_types (id) ON DELETE RESTRICT',
     ),
   );
+  static const VerificationMeta _pricingTypeMeta = const VerificationMeta(
+    'pricingType',
+  );
+  @override
+  late final GeneratedColumn<String> pricingType = GeneratedColumn<String>(
+    'pricing_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _priceMeta = const VerificationMeta('price');
+  @override
+  late final GeneratedColumn<int> price = GeneratedColumn<int>(
+    'price',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -6713,8 +6628,27 @@ class $ServiceItemTypesTable extends ServiceItemTypes
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, serviceId, itemTypeId, createdAt];
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    serviceId,
+    itemTypeId,
+    pricingType,
+    price,
+    createdAt,
+    updatedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -6751,6 +6685,25 @@ class $ServiceItemTypesTable extends ServiceItemTypes
     } else if (isInserting) {
       context.missing(_itemTypeIdMeta);
     }
+    if (data.containsKey('pricing_type')) {
+      context.handle(
+        _pricingTypeMeta,
+        pricingType.isAcceptableOrUnknown(
+          data['pricing_type']!,
+          _pricingTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_pricingTypeMeta);
+    }
+    if (data.containsKey('price')) {
+      context.handle(
+        _priceMeta,
+        price.isAcceptableOrUnknown(data['price']!, _priceMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_priceMeta);
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -6758,6 +6711,14 @@ class $ServiceItemTypesTable extends ServiceItemTypes
       );
     } else if (isInserting) {
       context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
     }
     return context;
   }
@@ -6784,9 +6745,21 @@ class $ServiceItemTypesTable extends ServiceItemTypes
         DriftSqlType.string,
         data['${effectivePrefix}item_type_id'],
       )!,
+      pricingType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pricing_type'],
+      )!,
+      price: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}price'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
       )!,
     );
   }
@@ -6801,12 +6774,18 @@ class ServiceItemType extends DataClass implements Insertable<ServiceItemType> {
   final String id;
   final String serviceId;
   final String itemTypeId;
+  final String pricingType;
+  final int price;
   final DateTime createdAt;
+  final DateTime updatedAt;
   const ServiceItemType({
     required this.id,
     required this.serviceId,
     required this.itemTypeId,
+    required this.pricingType,
+    required this.price,
     required this.createdAt,
+    required this.updatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -6814,7 +6793,10 @@ class ServiceItemType extends DataClass implements Insertable<ServiceItemType> {
     map['id'] = Variable<String>(id);
     map['service_id'] = Variable<String>(serviceId);
     map['item_type_id'] = Variable<String>(itemTypeId);
+    map['pricing_type'] = Variable<String>(pricingType);
+    map['price'] = Variable<int>(price);
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
 
@@ -6823,7 +6805,10 @@ class ServiceItemType extends DataClass implements Insertable<ServiceItemType> {
       id: Value(id),
       serviceId: Value(serviceId),
       itemTypeId: Value(itemTypeId),
+      pricingType: Value(pricingType),
+      price: Value(price),
       createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
     );
   }
 
@@ -6836,7 +6821,10 @@ class ServiceItemType extends DataClass implements Insertable<ServiceItemType> {
       id: serializer.fromJson<String>(json['id']),
       serviceId: serializer.fromJson<String>(json['serviceId']),
       itemTypeId: serializer.fromJson<String>(json['itemTypeId']),
+      pricingType: serializer.fromJson<String>(json['pricingType']),
+      price: serializer.fromJson<int>(json['price']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
   @override
@@ -6846,7 +6834,10 @@ class ServiceItemType extends DataClass implements Insertable<ServiceItemType> {
       'id': serializer.toJson<String>(id),
       'serviceId': serializer.toJson<String>(serviceId),
       'itemTypeId': serializer.toJson<String>(itemTypeId),
+      'pricingType': serializer.toJson<String>(pricingType),
+      'price': serializer.toJson<int>(price),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
 
@@ -6854,12 +6845,18 @@ class ServiceItemType extends DataClass implements Insertable<ServiceItemType> {
     String? id,
     String? serviceId,
     String? itemTypeId,
+    String? pricingType,
+    int? price,
     DateTime? createdAt,
+    DateTime? updatedAt,
   }) => ServiceItemType(
     id: id ?? this.id,
     serviceId: serviceId ?? this.serviceId,
     itemTypeId: itemTypeId ?? this.itemTypeId,
+    pricingType: pricingType ?? this.pricingType,
+    price: price ?? this.price,
     createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
   );
   ServiceItemType copyWithCompanion(ServiceItemTypesCompanion data) {
     return ServiceItemType(
@@ -6868,7 +6865,12 @@ class ServiceItemType extends DataClass implements Insertable<ServiceItemType> {
       itemTypeId: data.itemTypeId.present
           ? data.itemTypeId.value
           : this.itemTypeId,
+      pricingType: data.pricingType.present
+          ? data.pricingType.value
+          : this.pricingType,
+      price: data.price.present ? data.price.value : this.price,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -6878,13 +6880,24 @@ class ServiceItemType extends DataClass implements Insertable<ServiceItemType> {
           ..write('id: $id, ')
           ..write('serviceId: $serviceId, ')
           ..write('itemTypeId: $itemTypeId, ')
-          ..write('createdAt: $createdAt')
+          ..write('pricingType: $pricingType, ')
+          ..write('price: $price, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, serviceId, itemTypeId, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    serviceId,
+    itemTypeId,
+    pricingType,
+    price,
+    createdAt,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -6892,44 +6905,65 @@ class ServiceItemType extends DataClass implements Insertable<ServiceItemType> {
           other.id == this.id &&
           other.serviceId == this.serviceId &&
           other.itemTypeId == this.itemTypeId &&
-          other.createdAt == this.createdAt);
+          other.pricingType == this.pricingType &&
+          other.price == this.price &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
 }
 
 class ServiceItemTypesCompanion extends UpdateCompanion<ServiceItemType> {
   final Value<String> id;
   final Value<String> serviceId;
   final Value<String> itemTypeId;
+  final Value<String> pricingType;
+  final Value<int> price;
   final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const ServiceItemTypesCompanion({
     this.id = const Value.absent(),
     this.serviceId = const Value.absent(),
     this.itemTypeId = const Value.absent(),
+    this.pricingType = const Value.absent(),
+    this.price = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ServiceItemTypesCompanion.insert({
     required String id,
     required String serviceId,
     required String itemTypeId,
+    required String pricingType,
+    required int price,
     required DateTime createdAt,
+    required DateTime updatedAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        serviceId = Value(serviceId),
        itemTypeId = Value(itemTypeId),
-       createdAt = Value(createdAt);
+       pricingType = Value(pricingType),
+       price = Value(price),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
   static Insertable<ServiceItemType> custom({
     Expression<String>? id,
     Expression<String>? serviceId,
     Expression<String>? itemTypeId,
+    Expression<String>? pricingType,
+    Expression<int>? price,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (serviceId != null) 'service_id': serviceId,
       if (itemTypeId != null) 'item_type_id': itemTypeId,
+      if (pricingType != null) 'pricing_type': pricingType,
+      if (price != null) 'price': price,
       if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -6938,14 +6972,20 @@ class ServiceItemTypesCompanion extends UpdateCompanion<ServiceItemType> {
     Value<String>? id,
     Value<String>? serviceId,
     Value<String>? itemTypeId,
+    Value<String>? pricingType,
+    Value<int>? price,
     Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
     return ServiceItemTypesCompanion(
       id: id ?? this.id,
       serviceId: serviceId ?? this.serviceId,
       itemTypeId: itemTypeId ?? this.itemTypeId,
+      pricingType: pricingType ?? this.pricingType,
+      price: price ?? this.price,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -6962,8 +7002,17 @@ class ServiceItemTypesCompanion extends UpdateCompanion<ServiceItemType> {
     if (itemTypeId.present) {
       map['item_type_id'] = Variable<String>(itemTypeId.value);
     }
+    if (pricingType.present) {
+      map['pricing_type'] = Variable<String>(pricingType.value);
+    }
+    if (price.present) {
+      map['price'] = Variable<int>(price.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -6977,7 +7026,10 @@ class ServiceItemTypesCompanion extends UpdateCompanion<ServiceItemType> {
           ..write('id: $id, ')
           ..write('serviceId: $serviceId, ')
           ..write('itemTypeId: $itemTypeId, ')
+          ..write('pricingType: $pricingType, ')
+          ..write('price: $price, ')
           ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -12730,8 +12782,6 @@ typedef $$ServicesTableCreateCompanionBuilder =
       required String id,
       required String name,
       Value<String?> description,
-      required String pricingType,
-      required int price,
       Value<bool> isActive,
       required DateTime createdAt,
       required DateTime updatedAt,
@@ -12742,8 +12792,6 @@ typedef $$ServicesTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> name,
       Value<String?> description,
-      Value<String> pricingType,
-      Value<int> price,
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -12814,16 +12862,6 @@ class $$ServicesTableFilterComposer
 
   ColumnFilters<String> get description => $composableBuilder(
     column: $table.description,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get pricingType => $composableBuilder(
-    column: $table.pricingType,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get price => $composableBuilder(
-    column: $table.price,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12917,16 +12955,6 @@ class $$ServicesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get pricingType => $composableBuilder(
-    column: $table.pricingType,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get price => $composableBuilder(
-    column: $table.price,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<bool> get isActive => $composableBuilder(
     column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
@@ -12962,14 +12990,6 @@ class $$ServicesTableAnnotationComposer
     column: $table.description,
     builder: (column) => column,
   );
-
-  GeneratedColumn<String> get pricingType => $composableBuilder(
-    column: $table.pricingType,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<int> get price =>
-      $composableBuilder(column: $table.price, builder: (column) => column);
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
@@ -13065,8 +13085,6 @@ class $$ServicesTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String?> description = const Value.absent(),
-                Value<String> pricingType = const Value.absent(),
-                Value<int> price = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -13075,8 +13093,6 @@ class $$ServicesTableTableManager
                 id: id,
                 name: name,
                 description: description,
-                pricingType: pricingType,
-                price: price,
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -13087,8 +13103,6 @@ class $$ServicesTableTableManager
                 required String id,
                 required String name,
                 Value<String?> description = const Value.absent(),
-                required String pricingType,
-                required int price,
                 Value<bool> isActive = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
@@ -13097,8 +13111,6 @@ class $$ServicesTableTableManager
                 id: id,
                 name: name,
                 description: description,
-                pricingType: pricingType,
-                price: price,
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -16596,7 +16608,10 @@ typedef $$ServiceItemTypesTableCreateCompanionBuilder =
       required String id,
       required String serviceId,
       required String itemTypeId,
+      required String pricingType,
+      required int price,
       required DateTime createdAt,
+      required DateTime updatedAt,
       Value<int> rowid,
     });
 typedef $$ServiceItemTypesTableUpdateCompanionBuilder =
@@ -16604,7 +16619,10 @@ typedef $$ServiceItemTypesTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> serviceId,
       Value<String> itemTypeId,
+      Value<String> pricingType,
+      Value<int> price,
       Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
       Value<int> rowid,
     });
 
@@ -16666,8 +16684,23 @@ class $$ServiceItemTypesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get pricingType => $composableBuilder(
+    column: $table.pricingType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get price => $composableBuilder(
+    column: $table.price,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -16732,8 +16765,23 @@ class $$ServiceItemTypesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get pricingType => $composableBuilder(
+    column: $table.pricingType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get price => $composableBuilder(
+    column: $table.price,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -16796,8 +16844,19 @@ class $$ServiceItemTypesTableAnnotationComposer
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
+  GeneratedColumn<String> get pricingType => $composableBuilder(
+    column: $table.pricingType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get price =>
+      $composableBuilder(column: $table.price, builder: (column) => column);
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   $$ServicesTableAnnotationComposer get serviceId {
     final $$ServicesTableAnnotationComposer composer = $composerBuilder(
@@ -16879,13 +16938,19 @@ class $$ServiceItemTypesTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> serviceId = const Value.absent(),
                 Value<String> itemTypeId = const Value.absent(),
+                Value<String> pricingType = const Value.absent(),
+                Value<int> price = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ServiceItemTypesCompanion(
                 id: id,
                 serviceId: serviceId,
                 itemTypeId: itemTypeId,
+                pricingType: pricingType,
+                price: price,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -16893,13 +16958,19 @@ class $$ServiceItemTypesTableTableManager
                 required String id,
                 required String serviceId,
                 required String itemTypeId,
+                required String pricingType,
+                required int price,
                 required DateTime createdAt,
+                required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
               }) => ServiceItemTypesCompanion.insert(
                 id: id,
                 serviceId: serviceId,
                 itemTypeId: itemTypeId,
+                pricingType: pricingType,
+                price: price,
                 createdAt: createdAt,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

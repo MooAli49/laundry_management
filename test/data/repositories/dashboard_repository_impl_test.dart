@@ -158,8 +158,6 @@ void main() {
             ServicesCompanion.insert(
               id: 'serv-1',
               name: 'غسيل ومكواة',
-              pricingType: 'per_piece',
-              price: 5000,
               createdAt: now,
               updatedAt: now,
             ),

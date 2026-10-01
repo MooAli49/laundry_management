@@ -396,19 +396,20 @@ relationship.
 
 ---
 
-## 21. Pricing Type
+## 21. Pricing Type & Resolution
 
 Supported V1 Pricing Types are:
 
-    Per Piece
-    Per Kilogram
-    Per Square Meter
-    Fixed Price
+    Per Piece (`per_piece`)
+    Per Square Meter (`per_square_meter`)
 
-The selected Service determines the applicable Pricing Type.
+In this laundry system, the actual price depends on the combination of:
 
-The UI should present the pricing behavior naturally without exposing
-internal implementation details.
+> **Service + Item Type**
+
+The Service entity does NOT own a single default/current price. When the user selects an Item Type and Service for an order item, the application resolves the pricing configuration (`pricing_type` and `price`) from their combination (`ServiceItemType`).
+
+The UI presents the pricing behavior naturally without exposing internal implementation details.
 
 ---
 
@@ -416,46 +417,32 @@ internal implementation details.
 
 For:
 
-    Per Piece
+    Per Piece (`per_piece`)
 
-each physical OrderItem represents one piece.
+each physical OrderItem represents one piece and is assigned the resolved unit price for that Service + Item Type combination.
 
 Example:
 
-    Shirt
-    Service: Wash
-    Price: 40 EGP
+    Item Type: Clothing (قميص)
+    Service: Washing (غسيل)
+    Resolved Price: 50 EGP
 
 If the user enters:
 
-    Shirt × 5
-
-the application creates five physical OrderItems.
-
-The UI may show the grouped entry as:
-
     قميص × 5
 
-for convenience.
+the application creates 5 physical `OrderItem` records, each initialized with:
+
+    unit_price = 50 EGP (5000 piastres)
+    calculated_total = 50 EGP (5000 piastres)
+
+The UI may show the grouped entry as `قميص × 5` for operator convenience.
 
 ---
 
-## 23. Per Kilogram
+## 23. Per Kilogram (Removed from V1)
 
-For:
-
-    Per Kilogram
-
-the UI must collect the required weight/measurement according to the
-approved pricing model.
-
-Example:
-
-    الوزن: 4.5 كجم
-
-The application/domain layer performs the actual financial calculation.
-
-The UI is responsible only for collecting and displaying the value.
+Per Kilogram pricing has been completely removed from the V1 operational model and UI by locked business decision. No weight collection or kilogram calculations are present in V1.
 
 ---
 
@@ -463,34 +450,33 @@ The UI is responsible only for collecting and displaying the value.
 
 For:
 
-    Per Square Meter
+    Per Square Meter (`per_square_meter`)
 
-the UI is primarily used for carpet-related pricing.
+the pricing is used for area-based items, specifically Carpets.
+
+Example:
+
+    Item Type: Carpets (سجاد)
+    Service: Washing (غسيل)
+    Resolved Rate: 60 EGP / m²
 
 The user enters:
 
-    الطول
-    العرض
+    الطول (Length)
+    العرض (Width)
 
 The application calculates:
 
-    المساحة = الطول × العرض
+    المساحة = الطول × العرض (Area = Length × Width)
+    calculated_total = Area × Resolved Rate
 
-The calculated area should be displayed clearly.
-
-The user should not need to manually calculate the area.
+The calculated area and total are displayed clearly. The user should not need to manually calculate the area.
 
 ---
 
-## 25. Fixed Price
+## 25. Fixed Price (Removed from V1)
 
-For:
-
-    Fixed Price
-
-the UI displays the applicable fixed transaction price.
-
-The user should not be presented with unnecessary measurement fields.
+Fixed Price has been removed from the V1 operational pricing model. Under the current `OrderItem` model, each physical item is represented as its own OrderItem and receives a unit price; fixed price behaves effectively the same as per-piece pricing and does not represent a distinct business behavior.
 
 ---
 

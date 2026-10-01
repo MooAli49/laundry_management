@@ -7,9 +7,9 @@ import '../../../../domain/entities/carpet_size.dart';
 import '../../../../domain/entities/customer.dart';
 import '../../../../domain/entities/item_definition.dart';
 import '../../../../domain/entities/item_type.dart';
-import '../../../../domain/entities/service.dart';
 import '../../../../domain/enums/payment_method.dart';
 import '../../../../domain/enums/pricing_type.dart';
+import '../../../../domain/models/service_with_pricing.dart';
 import '../../../../domain/repositories/carpet_size_repository.dart';
 import '../../../../domain/repositories/customer_repository.dart';
 import '../../../../domain/repositories/item_definition_repository.dart';
@@ -164,6 +164,8 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
           clearDraftItemType: true,
           clearDraftItemDefinition: true,
           clearDraftService: true,
+          clearDraftPricingType: true,
+          clearDraftUnitPrice: true,
           compatibleServices: [],
           itemDefinitions: [],
         ),
@@ -176,6 +178,8 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
         draftItemType: itemType,
         clearDraftItemDefinition: true,
         clearDraftService: true,
+        clearDraftPricingType: true,
+        clearDraftUnitPrice: true,
       ),
     );
 
@@ -207,14 +211,22 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
     }
   }
 
-  void selectService(Service? service) {
-    if (service == null) {
-      emit(state.copyWith(clearDraftService: true, clearDraftItemTotal: true));
+  void selectService(ServiceWithPricing? serviceWithPricing) {
+    if (serviceWithPricing == null) {
+      emit(
+        state.copyWith(
+          clearDraftService: true,
+          clearDraftPricingType: true,
+          clearDraftUnitPrice: true,
+          clearDraftItemTotal: true,
+        ),
+      );
     } else {
       emit(
         state.copyWith(
-          draftService: service,
-          draftUnitPrice: service.price,
+          draftService: serviceWithPricing.service,
+          draftPricingType: serviceWithPricing.pricingType,
+          draftUnitPrice: serviceWithPricing.price,
           clearDraftItemTotal: true,
         ),
       );
@@ -275,11 +287,15 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
       emit(state.copyWith(errorMessage: 'يرجى اختيار نوع القطعة أولاً'));
       return;
     }
-    if (state.draftService == null) {
+    if (state.draftService == null || state.draftPricingType == null) {
       emit(state.copyWith(errorMessage: 'يرجى اختيار الخدمة أولاً'));
       return;
     }
-    final price = state.draftUnitPrice ?? state.draftService!.price;
+    if (state.draftUnitPrice == null) {
+      emit(state.copyWith(errorMessage: 'يرجى تحديد السعر أولاً'));
+      return;
+    }
+    final price = state.draftUnitPrice!;
     final total = state.effectiveDraftTotal;
     if (total <= Money.zero) {
       emit(
@@ -292,7 +308,7 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
       return;
     }
 
-    if (state.draftService!.pricingType == PricingType.perSquareMeter) {
+    if (state.draftPricingType == PricingType.perSquareMeter) {
       if (state.draftCarpetLength <= 0 || state.draftCarpetWidth <= 0) {
         emit(
           state.copyWith(
@@ -310,7 +326,7 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
       itemDefinitionName: state.draftItemDefinition?.name,
       serviceId: state.draftService!.id,
       serviceName: state.draftService!.name,
-      pricingType: state.draftService!.pricingType,
+      pricingType: state.draftPricingType!,
       unitPrice: price,
       customTotal: state.isDraftTotalOverridden ? state.draftItemTotal : null,
       physicalQuantity: state.draftQuantity,
@@ -331,6 +347,8 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
           clearDraftItemType: true,
           clearDraftItemDefinition: true,
           clearDraftService: true,
+          clearDraftPricingType: true,
+          clearDraftUnitPrice: true,
           clearDraftItemTotal: true,
           clearDraftCarpetSize: true,
           draftCarpetLength: 0.0,

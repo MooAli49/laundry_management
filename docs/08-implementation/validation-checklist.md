@@ -1432,7 +1432,7 @@ Never silently invent a new rule during implementation.
 - [x] Remote tables `item_types`, `item_definitions`, `carpet_sizes`, `storage_locations`, `storage_location_item_types`, and `business_settings` created with RLS and default-deny policies.
 - [x] Unique constraints enforced: `item_types(name)`, `item_definitions(item_type_id, name)`, `carpet_sizes(length, width)`, `storage_locations(name)`.
 - [x] Foreign key constraints enforced: `item_definitions.item_type_id -> item_types.id`, `storage_location_item_types -> storage_locations.id, item_types.id`.
-- [x] Check constraints enforced: `carpet_sizes` dimensions > 0, `item_definitions` default_price >= 0, `business_settings.tax_rate >= 0 AND <= 1`.
+- [x] Check constraints enforced: `carpet_sizes` dimensions > 0, `business_settings.tax_rate >= 0 AND <= 1`.
 - [x] 9 PostgreSQL RPCs deployed with `SECURITY DEFINER` and ACID transactions with idempotency logging in `sync_idempotency_log`.
 - [x] Replaying operations with identical `X-Operation-ID` returns cached response without duplicate mutations.
 - [x] Edge Function `api` routes `/item-types`, `/item-definitions`, `/carpet-sizes`, `/storage-locations`, `/business-settings` deployed (version 5) and operational.

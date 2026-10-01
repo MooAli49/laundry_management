@@ -6,6 +6,7 @@ import '../../../../domain/entities/item_type.dart';
 import '../../../../domain/entities/order.dart';
 import '../../../../domain/entities/service.dart';
 import '../../../../domain/enums/pricing_type.dart';
+import '../../../../domain/models/service_with_pricing.dart';
 import '../../../../domain/value_objects/money.dart';
 import '../../../../domain/value_objects/order_date.dart';
 import '../models/editable_order_item.dart';
@@ -35,7 +36,7 @@ class EditProcessingOrderState {
 
   // Master Data
   final List<ItemType> itemTypes;
-  final List<Service> compatibleServices;
+  final List<ServiceWithPricing> compatibleServices;
   final List<ItemDefinition> itemDefinitions;
   final List<CarpetSize> carpetSizes;
   final BusinessSettings? settings;
@@ -46,6 +47,7 @@ class EditProcessingOrderState {
   final ItemType? draftItemType;
   final ItemDefinition? draftItemDefinition;
   final Service? draftService;
+  final PricingType? draftPricingType;
   final Money? draftUnitPrice;
   final Money? draftItemTotal;
   final int draftQuantity;
@@ -82,6 +84,7 @@ class EditProcessingOrderState {
     this.draftItemType,
     this.draftItemDefinition,
     this.draftService,
+    this.draftPricingType,
     this.draftUnitPrice,
     this.draftItemTotal,
     this.draftQuantity = 1,
@@ -94,9 +97,11 @@ class EditProcessingOrderState {
   bool get canChangeCustomer => totalPaid == Money.zero;
 
   Money get draftDefaultTotal {
-    if (draftService == null) return Money.zero;
-    final price = draftUnitPrice ?? draftService!.price;
-    if (draftService!.pricingType == PricingType.perSquareMeter) {
+    if (draftService == null || draftPricingType == null || draftUnitPrice == null) {
+      return Money.zero;
+    }
+    final price = draftUnitPrice!;
+    if (draftPricingType == PricingType.perSquareMeter) {
       final area = draftCarpetLength * draftCarpetWidth;
       if (area <= 0) return Money.zero;
       final areaTotalPiastres = (price.piastres * area).round();
@@ -176,7 +181,7 @@ class EditProcessingOrderState {
     Money? discount,
     Order? savedOrder,
     List<ItemType>? itemTypes,
-    List<Service>? compatibleServices,
+    List<ServiceWithPricing>? compatibleServices,
     List<ItemDefinition>? itemDefinitions,
     List<CarpetSize>? carpetSizes,
     BusinessSettings? settings,
@@ -188,6 +193,8 @@ class EditProcessingOrderState {
     bool clearDraftItemDefinition = false,
     Service? draftService,
     bool clearDraftService = false,
+    PricingType? draftPricingType,
+    bool clearDraftPricingType = false,
     Money? draftUnitPrice,
     bool clearDraftUnitPrice = false,
     Money? draftItemTotal,
@@ -243,6 +250,9 @@ class EditProcessingOrderState {
       draftService: clearDraftService
           ? null
           : (draftService ?? this.draftService),
+      draftPricingType: clearDraftPricingType
+          ? null
+          : (draftPricingType ?? this.draftPricingType),
       draftUnitPrice: clearDraftUnitPrice
           ? null
           : (draftUnitPrice ?? this.draftUnitPrice),

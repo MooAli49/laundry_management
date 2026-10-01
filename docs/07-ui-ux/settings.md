@@ -133,62 +133,61 @@ The UI must not introduce fields that are not supported by the Domain.
 
 The approved V1 Pricing Types are:
 
-    Per Piece
-    Per Kilogram
-    Per Square Meter
-    Fixed Price
+    Per Piece (`per_piece`)
+    Per Square Meter (`per_square_meter`)
 
-The Settings UI should present these using clear Arabic terminology.
+*(Note: Fixed Price / `fixed_price` is removed from the V1 operational model because each physical item is represented as its own OrderItem and receives a unit price; fixed price behaves effectively the same as per-piece pricing without distinct business behavior. Per Kilogram pricing remains completely excluded from V1).*
 
-Example:
+The Settings UI should present these using clear Arabic terminology:
 
     بالقطعة
-    بالكيلو
     بالمتر المربع
-    سعر ثابت
 
 The technical enum/value remains an implementation concern.
 
 ---
 
-## 9. Service Pricing
+## 9. Service & Item Type Pricing Configuration
 
-When configuring a Service, the UI should show only the pricing fields
-relevant to its selected Pricing Type.
+The Service entity must NOT own a single default/current price.
 
-Examples:
+In this laundry system, the actual price depends on the combination of:
 
-    Per Piece
-        → Unit Price
+> **Service + Item Type**
 
-    Per Kilogram
-        → Price per Kilogram
+When configuring a Service in Settings, the user configures the supported Item Types and their respective pricing configurations (`ServiceItemType`).
 
-    Per Square Meter
-        → Price per Square Meter
+For each supported Item Type linked to the Service, the UI displays:
 
-    Fixed Price
-        → Fixed Price
+1. Pricing Type selector:
+   - `بالقطعة` (Per Piece)
+   - `بالمتر المربع` (Per Square Meter)
+2. Price input field (EGP, strictly positive amount).
 
-The UI should not show irrelevant pricing fields.
+Example:
+
+Washing
+  ├── Clothing → بالقطعة → 50 EGP
+  ├── Blanket  → بالقطعة → 100 EGP
+  └── Carpet   → بالمتر المربع → 60 EGP
+
+The UI must validate that each configured price is strictly positive (`> 0`) before saving.
 
 ---
 
-## 10. Historical Pricing
+## 10. Historical Pricing Stability
 
-Changing a current Service price must not silently modify historical
-Orders.
+Changing a Service's pricing configuration (the price configured for that Service + Item Type) later must NOT modify existing OrderItems or historical Orders.
 
-Existing Orders preserve their transaction-time pricing information.
+When a Service + Item Type pricing configuration is selected for an OrderItem, the actual price used at that time is snapshotted into `order_items.unit_price`.
 
 Therefore:
 
-    Current Service Configuration
+    Current Service–Item Type Configuration
         ≠
     Historical Order Pricing
 
-The Settings UI should make this behavior clear if the user changes a
-Service price.
+The Settings UI should make this behavior clear when the user edits a pricing configuration.
 
 ---
 
@@ -339,7 +338,7 @@ Changing master data must not rewrite historical Order information.
 Examples:
 
     Changing Service Name
-    Changing Service Price
+    Changing Service + Item Type Price
     Changing Item Type Name
     Disabling a Service
     Disabling a Storage Location

@@ -111,6 +111,8 @@ class RemoteApiDispatcher {
         );
 
       case 'service_item_type':
+        // Deprecated (LOW-02): ServiceItemTypes are synchronized as part of the Service aggregate
+        // (nested in service sync payload). Retained for legacy queue drainage.
         return _dispatchServiceItemType(
           opId,
           entityId,
@@ -358,6 +360,12 @@ class RemoteApiDispatcher {
     }
   }
 
+  /// Deprecated (LOW-02): ServiceItemTypes are synchronized as part of the Service aggregate
+  /// (embedded in /api/v1/services payloads). Retained for backwards compatibility
+  /// if legacy offline queues contain standalone service_item_type operations.
+  @Deprecated(
+    'ServiceItemTypes synchronize as part of the Service aggregate. There is no standalone service_item_type endpoint.',
+  )
   Future<dynamic> _dispatchServiceItemType(
     String opId,
     String entityId,

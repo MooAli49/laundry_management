@@ -142,12 +142,21 @@ void main() {
           ServicesCompanion(
             id: const Value('srv-1'),
             name: const Value('غسيل سجاد'),
-            pricingType: const Value('perSquareMeter'),
-            price: const Value(3000),
             createdAt: Value(now),
             updatedAt: Value(now),
           ),
         );
+        await servicesDao.replaceServiceItemTypes('srv-1', [
+          ServiceItemTypesCompanion.insert(
+            id: 'sit-srv-1',
+            serviceId: 'srv-1',
+            itemTypeId: carpetType.id,
+            pricingType: 'per_square_meter',
+            price: 3000,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        ]);
 
         await ordersDao.insertOrder(
           OrdersCompanion(
@@ -415,12 +424,21 @@ void main() {
           ServicesCompanion(
             id: const Value('srv-1'),
             name: const Value('غسيل'),
-            pricingType: const Value('perPiece'),
-            price: const Value(1000),
             createdAt: Value(now),
             updatedAt: Value(now),
           ),
         );
+        await servicesDao.replaceServiceItemTypes('srv-1', [
+          ServiceItemTypesCompanion.insert(
+            id: 'sit-srv-1-order',
+            serviceId: 'srv-1',
+            itemTypeId: itemTypes.first.id,
+            pricingType: 'per_piece',
+            price: 1000,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        ]);
         await ordersDao.insertOrder(
           OrdersCompanion(
             id: const Value('ord-1'),

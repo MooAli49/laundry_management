@@ -742,23 +742,22 @@ This is required because storage operates at physical OrderItem level.
 
 ## 26. Order Item Pricing
 
-The Orders feature must respect the selected PricingType.
+The Orders feature must respect the selected PricingType configured on the Service + Item Type relationship.
 
 Supported V1 Operational PricingTypes:
 
-- Per Piece
-- Fixed Price
-- Per Square Meter
+- Per Piece (`per_piece`)
+- Per Square Meter (`per_square_meter`)
 
-*(Note: Per Kilogram pricing has been completely removed from V1 operations).*
+*(Note: Fixed Price (`fixed_price`) is removed from the V1 operational pricing model as each item is represented as an OrderItem with a unit price; Per Kilogram (`per_kg`) remains completely excluded from V1).*
 
 The feature must not assume:
 
 price × quantity
 
-for every service.
+for every service without considering item dimensions.
 
-Pricing inputs depend on the selected PricingType.
+Pricing inputs depend on the selected PricingType configured for the Service + Item Type combination.
 
 ---
 
@@ -1193,9 +1192,9 @@ They may be:
 Creating or editing a Service may include:
 
 - Name
-- Price
-- PricingType
-- Supported ItemTypes
+- Supported ItemTypes with their Pricing Configuration (`pricing_type` and `price` per ItemType)
+
+The Service entity itself does not own a single default/current price or pricing type; pricing is configured per Service + Item Type combination (`service_item_types`).
 
 The feature must preserve the compatibility relationship.
 
@@ -1540,7 +1539,7 @@ Master-data changes must always respect the historical transaction principle.
 
 Examples:
 
-Change Service price
+Change Service + Item Type price
 → Old OrderItem price remains unchanged.
 
 Change Service name
@@ -2985,7 +2984,7 @@ The agent must never implement master-data updates that silently modify historic
 
 Examples:
 
-Service price changes
+Service + Item Type price changes
 
 must not update old OrderItem prices.
 

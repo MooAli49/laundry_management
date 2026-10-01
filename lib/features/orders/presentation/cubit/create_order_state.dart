@@ -7,6 +7,7 @@ import '../../../../domain/entities/order.dart';
 import '../../../../domain/entities/service.dart';
 import '../../../../domain/enums/payment_method.dart';
 import '../../../../domain/enums/pricing_type.dart';
+import '../../../../domain/models/service_with_pricing.dart';
 import '../../../../domain/value_objects/money.dart';
 import '../../../../domain/value_objects/order_date.dart';
 import '../models/order_item_draft.dart';
@@ -18,7 +19,7 @@ class CreateOrderState {
   final bool isSearchingCustomer;
 
   final List<ItemType> itemTypes;
-  final List<Service> compatibleServices;
+  final List<ServiceWithPricing> compatibleServices;
   final List<ItemDefinition> itemDefinitions;
   final List<CarpetSize> carpetSizes;
   final BusinessSettings? settings;
@@ -27,6 +28,7 @@ class CreateOrderState {
   final ItemType? draftItemType;
   final ItemDefinition? draftItemDefinition;
   final Service? draftService;
+  final PricingType? draftPricingType;
   final Money? draftUnitPrice;
   final Money? draftItemTotal;
   final int draftQuantity;
@@ -69,6 +71,7 @@ class CreateOrderState {
     this.draftItemType,
     this.draftItemDefinition,
     this.draftService,
+    this.draftPricingType,
     this.draftUnitPrice,
     this.draftItemTotal,
     this.draftQuantity = 1,
@@ -93,9 +96,11 @@ class CreateOrderState {
   });
 
   Money get draftDefaultTotal {
-    if (draftService == null) return Money.zero;
-    final price = draftUnitPrice ?? draftService!.price;
-    if (draftService!.pricingType == PricingType.perSquareMeter) {
+    if (draftService == null || draftPricingType == null || draftUnitPrice == null) {
+      return Money.zero;
+    }
+    final price = draftUnitPrice!;
+    if (draftPricingType == PricingType.perSquareMeter) {
       final area = draftCarpetLength * draftCarpetWidth;
       if (area <= 0) return Money.zero;
       final areaTotalPiastres = (price.piastres * area).round();
@@ -123,34 +128,42 @@ class CreateOrderState {
   Money get effectiveDeliveryFee =>
       customerDeliveryRequested ? customerDeliveryFee : Money.zero;
 
-  Money get totalDeliveryFees => effectivePickupFee + effectiveDeliveryFee;
-
-  /// V1: Tax is always zero — tax is architecturally supported but disabled
-  /// for V1. When tax is re-enabled (future), restore the computation below
-  /// and guard it with [settings.taxEnabled] && [settings.taxRate] > 0.
-  ///
-  /// Future implementation (do NOT activate in V1):
-  ///   if (settings != null && settings!.taxEnabled && settings!.taxRate > 0) {
-  ///     final taxableBase = subtotal - discount;
-  ///     if (taxableBase.isPositive) {
-  ///       return Money.fromPiastres(
-  ///         (taxableBase.piastres * (settings!.taxRate / 100.0)).round(),
-  ///       );
-  ///     }
-  ///   }
-  Money get tax => Money.zero;
-
   Money get total {
-    final base = subtotal - discount;
-    final nonNegativeBase = base.isNegative ? Money.zero : base;
-    return nonNegativeBase + totalDeliveryFees + tax;
+    final sub = subtotal;
+    final afterDiscount = sub - discount;
+    final base = afterDiscount.isNegative ? Money.zero : afterDiscount;
+    final withFees = base + effectivePickupFee + effectiveDeliveryFee;
+
+    if (settings != null && settings!.taxEnabled) {
+      final taxRate = settings!.taxRate;
+      final taxPiastres = (withFees.piastres * (taxRate / 100)).round();
+      return withFees + Money.fromPiastres(taxPiastres);
+    }
+    return withFees;
   }
 
-  Money get remainingAmount {
+  Money get taxAmount {
+    if (settings != null && settings!.taxEnabled) {
+      final sub = subtotal;
+      final afterDiscount = sub - discount;
+      final base = afterDiscount.isNegative ? Money.zero : afterDiscount;
+      final withFees = base + effectivePickupFee + effectiveDeliveryFee;
+      final taxRate = settings!.taxRate;
+      final taxPiastres = (withFees.piastres * (taxRate / 100)).round();
+      return Money.fromPiastres(taxPiastres);
+    }
+    return Money.zero;
+  }
+
+  Money get tax => taxAmount;
+
+  Money get remainingBalance {
     final paid = isInitialPaymentEnabled ? initialPaymentAmount : Money.zero;
     final rem = total - paid;
     return rem.isNegative ? Money.zero : rem;
   }
+
+  Money get remainingAmount => remainingBalance;
 
   CreateOrderState copyWith({
     bool? isInitialLoading,
@@ -159,7 +172,7 @@ class CreateOrderState {
     List<Customer>? customerSearchResults,
     bool? isSearchingCustomer,
     List<ItemType>? itemTypes,
-    List<Service>? compatibleServices,
+    List<ServiceWithPricing>? compatibleServices,
     List<ItemDefinition>? itemDefinitions,
     List<CarpetSize>? carpetSizes,
     BusinessSettings? settings,
@@ -169,7 +182,10 @@ class CreateOrderState {
     bool clearDraftItemDefinition = false,
     Service? draftService,
     bool clearDraftService = false,
+    PricingType? draftPricingType,
+    bool clearDraftPricingType = false,
     Money? draftUnitPrice,
+    bool clearDraftUnitPrice = false,
     Money? draftItemTotal,
     bool clearDraftItemTotal = false,
     int? draftQuantity,
@@ -217,7 +233,12 @@ class CreateOrderState {
       draftService: clearDraftService
           ? null
           : (draftService ?? this.draftService),
-      draftUnitPrice: draftUnitPrice ?? this.draftUnitPrice,
+      draftPricingType: clearDraftPricingType
+          ? null
+          : (draftPricingType ?? this.draftPricingType),
+      draftUnitPrice: clearDraftUnitPrice
+          ? null
+          : (draftUnitPrice ?? this.draftUnitPrice),
       draftItemTotal: clearDraftItemTotal
           ? null
           : (draftItemTotal ?? this.draftItemTotal),

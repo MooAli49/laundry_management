@@ -324,11 +324,12 @@ Rules:
 - Every OrderItem has exactly one Service.
 - A Service may be used by many OrderItems.
 - Service is configurable master data.
+- The Service entity does NOT own a single default/current price.
 - Inactive Services cannot be selected for new transactions.
 - Existing OrderItems remain valid if a Service becomes inactive.
-- Historical OrderItem pricing must not change when the Service master price changes.
+- Historical OrderItem pricing must not change when the Service pricing configuration changes.
 
-The actual transaction price belongs to the OrderItem.
+The actual transaction price belongs to the OrderItem (`order_items.unit_price`).
 
 ---
 
@@ -338,7 +339,7 @@ Relationship:
 
 Service N ──────── N ItemType
 
-Implemented through:
+Implemented through the associative entity:
 
 ServiceItemType
 
@@ -352,28 +353,32 @@ service_item_types.item_type_id
     ↓
 item_types.id
 
+Attributes on `service_item_types`:
+
+    pricing_type (TEXT: per_piece, per_square_meter)
+    price (INTEGER: minor currency units > 0)
+
 Rules:
 
 - A Service may support multiple ItemTypes.
 - An ItemType may support multiple Services.
-- Each Service/ItemType compatibility pair must be unique.
+- Each Service/ItemType pair defines both compatibility and operational pricing configuration.
+- The Service entity does NOT own a single default/current price. Pricing belongs to this relationship.
+- Supported V1 operational pricing types are `per_piece` and `per_square_meter`. (`fixed_price` and `per_kg` are excluded from V1).
+- Each Service/ItemType pair must be unique: `UNIQUE(service_id, item_type_id)`.
 - An OrderItem may only select a Service compatible with its ItemType.
-- Compatibility is master/configuration data.
-- Inactive compatibility records must not be used for new transactions.
+- Modifying a ServiceItemType's price or pricing type later must NOT modify existing OrderItems.
 
 Example:
 
 Service:
 غسيل عادي
 
-Supported ItemTypes:
+Supported ItemTypes & Pricing:
 
-    Clothes
-    Blankets
-
-Another Service may support:
-
-    Carpets
+    Clothing → per_piece → 50 EGP
+    Blankets → per_piece → 100 EGP
+    Carpets  → per_square_meter → 60 EGP
 
 ---
 
