@@ -1162,6 +1162,7 @@ Key architectural requirements for two-device synchronization:
    - Mutable entities: The backend supports entity `server_version` checked against `base_version` (Flutter client propagation of `base_version` is a known deferred V1 limitation).
 5. **Crash Safety**: Applying pulled changes and advancing `sync_state.last_applied_sequence` occur within the **same local transaction**.
 6. **Preservation of Local Pending Operations**: An initial bootstrap or full resync after `CURSOR_TOO_OLD` must NEVER delete locally pending unsynced records in `sync_operations`.
+7. **Single Order-Intake Terminal Deployment**: In the initial deployment, one physical terminal is dedicated to receiving and creating orders at the cashier counter. A second terminal participates bidirectionally for order tracking, fulfillment, storage assignment, and payment processing. Multi-terminal concurrent order creation via station-partitioned numbering is architecturally prepared but intentionally deferred for V1 to eliminate onboarding overhead.
 
 ---
 

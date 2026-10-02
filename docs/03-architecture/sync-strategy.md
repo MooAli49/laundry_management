@@ -66,6 +66,8 @@ Offline-first
 
 The system officially supports **Bidirectional Push + Pull Synchronization** across two terminal devices sharing a single remote Supabase backend.
 
+*Deployment Policy Note: In the initial deployment, one physical device is dedicated to order intake / cashier reception. A second terminal may operate for read-only tracking, storage assignment, fulfillment, and payments. Multi-terminal concurrent order intake is architecturally prepared via station-partitioned numbering, which is intentionally deferred to avoid premature onboarding complexity.*
+
 The local SQLite/Drift database remains the operational source of truth for each device.
 
 ### PUSH Flow:

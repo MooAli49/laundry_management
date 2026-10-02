@@ -98,7 +98,9 @@ void main() {
         ],
       );
 
-      await db.into(db.serviceItemTypes).insert(
+      await db
+          .into(db.serviceItemTypes)
+          .insert(
             app_db.ServiceItemTypesCompanion.insert(
               id: 'sit-test-1',
               serviceId: testServiceId,
@@ -110,7 +112,9 @@ void main() {
             ),
           );
 
-      await db.into(db.serviceItemTypes).insert(
+      await db
+          .into(db.serviceItemTypes)
+          .insert(
             app_db.ServiceItemTypesCompanion.insert(
               id: 'sit-test-2',
               serviceId: testCarpetServiceId,
@@ -739,6 +743,58 @@ void main() {
         // Invariant: Remote changes must NEVER generate local outbox operations on Device B
         final opsAfter = await syncOperationsDao.getPendingOperations();
         expect(opsAfter, isEmpty);
+      },
+    );
+
+    test(
+      'J. Legacy nested update envelope still applies as a full aggregate',
+      () async {
+        final updateChange = SyncChangeDto(
+          sequence: 20,
+          operationId: 'op-edit-nested-010',
+          entityType: 'order',
+          entityId: testOrderId,
+          operationType: 'update',
+          payload: {
+            'order': {
+              'id': testOrderId,
+              'order_number': 'ORD-001',
+              'customer_id': testCustomerId,
+              'status': 'processing',
+              'subtotal': 1500,
+              'discount': 0,
+              'tax': 0,
+              'total': 1500,
+            },
+            'items': [
+              {
+                'id': testItem1Id,
+                'order_id': testOrderId,
+                'item_type_id': testItemTypeId,
+                'service_id': testServiceId,
+                'pricing_type': 'per_piece',
+                'quantity': 1.0,
+                'unit_price': 1500,
+                'calculated_total': 1500,
+              },
+            ],
+          },
+          serverVersion: 3,
+          createdAt: DateTime.now(),
+        );
+
+        await applier.applyBatch([updateChange]);
+
+        final items = await (db.select(
+          db.orderItems,
+        )..where((t) => t.orderId.equals(testOrderId))).get();
+        expect(items.map((item) => item.id), contains(testItem1Id));
+        expect(items.map((item) => item.id), isNot(contains(testItem2Id)));
+        expect(await db.select(db.orderItemCarpets).get(), isEmpty);
+        expect(
+          (await ordersDao.getOrderById(testOrderId))!.total,
+          equals(1500),
+        );
       },
     );
   });

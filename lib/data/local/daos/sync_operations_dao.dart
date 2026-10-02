@@ -74,19 +74,38 @@ class SyncOperationsDao extends DatabaseAccessor<app_db.AppDatabase> {
     int limit = 50,
   }) async {
     final effectiveAsOf = asOf ?? DateTime.now();
-    return (select(db.syncOperations)
-          ..where(
-            (t) =>
-                (t.status.equals('pending') &
-                    (t.nextRetryAt.isNull() |
-                        t.nextRetryAt.isSmallerOrEqualValue(effectiveAsOf))) |
-                (t.status.equals('failed') &
-                    t.nextRetryAt.isNotNull() &
-                    t.nextRetryAt.isSmallerOrEqualValue(effectiveAsOf)),
-          )
-          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)])
-          ..limit(limit))
-        .get();
+    if (limit <= 0) return [];
+
+    // The engine dispatches this list sequentially and stops on the first
+    // failure. Keep an older pending/retryable operation as a barrier so a
+    // dependent operation cannot bypass it while it is waiting for retry.
+    final queue =
+        await (select(db.syncOperations)
+              ..where(
+                (t) =>
+                    t.status.equals('pending') |
+                    (t.status.equals('failed') & t.nextRetryAt.isNotNull()),
+              )
+              ..orderBy([
+                (t) => OrderingTerm.asc(t.createdAt),
+                // The UUID is random, so use SQLite insertion order for timestamp
+                // ties. The table has no explicit integer key, but its rowid is
+                // stable for the lifetime of each outbox record.
+                (_) => OrderingTerm.asc(CustomExpression<int>('rowid')),
+              ]))
+            .get();
+
+    final eligible = <app_db.SyncOperation>[];
+    for (final operation in queue) {
+      final retryAt = operation.nextRetryAt;
+      if (retryAt != null && retryAt.isAfter(effectiveAsOf)) {
+        break;
+      }
+
+      eligible.add(operation);
+      if (eligible.length == limit) break;
+    }
+    return eligible;
   }
 
   Future<void> markOperationSynced(String id) async {

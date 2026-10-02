@@ -204,6 +204,17 @@ The exact generation mechanism is an implementation detail, but uniqueness is ma
 - Final Order Number format is `YY-<numeric sequence>` (minimum 3 digits, no maximum length; e.g. `26-001`, `26-999`, `26-1000`, `26-10000`).
 - During order creation, order number collision against the UNIQUE database constraint on `orders.order_number` triggers an immediate rollback and a whole-transaction retry from the beginning (up to 5 attempts), generating a fresh order number.
 
+### Product Deployment Policy — Single-Terminal Order Intake & Multi-Terminal Readiness
+
+- **Initial Deployment Policy**: The primary deployment model uses one physical device/terminal dedicated to receiving and creating orders at the cashier desk. The laundry operates as a single branch with the owner/admin as the primary cashier/operator.
+- **Customer Guidance**: For initial deployment, it is explicitly recommended to use one device for receiving and creating orders. If the business later needs a second order-intake device, the system architecture is prepared to support it.
+- **Deferred Multi-Terminal Numbering**: Station-partitioned order numbers and onboarding Station ID selection are intentionally deferred to avoid premature onboarding and operational complexity.
+- **Preserved Invariants**:
+  - The canonical `YY-<numeric sequence>` format (BR-017) remains strictly unchanged.
+  - Strict immutability of assigned order numbers (BR-018) is maintained; physical receipts, tags, and database records remain permanently consistent.
+  - No reactive renumbering or silent mutation is performed during synchronization.
+  - Multi-terminal concurrent order creation via station partitioning is designated as the future architectural path when additional intake terminals are deployed.
+
 ---
 
 # 6. Order Status Rules

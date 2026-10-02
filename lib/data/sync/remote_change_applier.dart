@@ -145,7 +145,14 @@ class RemoteChangeApplier {
   // Order Ingestion (Aggregate Creation vs Subsequent Updates)
   // ---------------------------------------------------------------------------
   Future<void> _applyOrder(SyncChangeDto change) async {
-    final payload = change.payload;
+    final rawPayload = change.payload;
+    final nestedOrder = rawPayload['order'];
+    final payload = nestedOrder is Map<String, dynamic>
+        ? <String, dynamic>{
+            ...nestedOrder,
+            'items': rawPayload['items'] ?? nestedOrder['items'],
+          }
+        : rawPayload;
     final orderId = payload['id'] as String? ?? change.entityId;
 
     if (change.operationType == 'create') {
@@ -280,8 +287,9 @@ class RemoteChangeApplier {
               .insertOnConflictUpdate(carpetCompanion);
         }
       }
-    } else if (change.operationType == 'edit') {
-      await _applyOrderEdit(change);
+    } else if (change.operationType == 'edit' ||
+        (change.operationType == 'update' && payload['items'] is List)) {
+      await _applyOrderEdit(change, payloadOverride: payload);
     } else {
       // Subsequent Order updates (e.g. status transition, notes, cancellation)
       // Read existing local order before applying updates to accurately capture previous status
@@ -397,8 +405,11 @@ class RemoteChangeApplier {
   ///   - Surviving & new items: upserts item data and reconciles carpet metadata
   /// - Executes atomically inside a single Drift transaction
   /// - Never enqueues outbox operations
-  Future<void> _applyOrderEdit(SyncChangeDto change) async {
-    final payload = change.payload;
+  Future<void> _applyOrderEdit(
+    SyncChangeDto change, {
+    Map<String, dynamic>? payloadOverride,
+  }) async {
+    final payload = payloadOverride ?? change.payload;
     final orderId = payload['id'] as String? ?? change.entityId;
 
     await _db.transaction(() async {
@@ -869,20 +880,23 @@ class RemoteChangeApplier {
       rawItems = payload['service_item_types'] as List<dynamic>?;
     } else if (payload.containsKey('supported_item_type_ids') ||
         payload.containsKey('item_type_ids')) {
-      final legacyIds = (payload['supported_item_type_ids'] ??
-          payload['item_type_ids']) as List<dynamic>?;
+      final legacyIds =
+          (payload['supported_item_type_ids'] ?? payload['item_type_ids'])
+              as List<dynamic>?;
       if (legacyIds != null) {
-        final legacyPricingType = (payload['pricing_type'] ??
-                payload['pricingType']) as String? ??
+        final legacyPricingType =
+            (payload['pricing_type'] ?? payload['pricingType']) as String? ??
             'per_piece';
         final legacyPrice = (payload['price'] as num?)?.toInt() ?? 1000;
         rawItems = legacyIds
-            .map((itId) => {
-                  'id': const Uuid().v4(),
-                  'item_type_id': itId.toString(),
-                  'pricing_type': legacyPricingType,
-                  'price': legacyPrice,
-                })
+            .map(
+              (itId) => {
+                'id': const Uuid().v4(),
+                'item_type_id': itId.toString(),
+                'pricing_type': legacyPricingType,
+                'price': legacyPrice,
+              },
+            )
             .toList();
       }
     }
@@ -892,41 +906,43 @@ class RemoteChangeApplier {
         _db.serviceItemTypes,
       )..where((t) => t.serviceId.equals(id))).go();
 
-        for (final raw in rawItems) {
-          if (raw is Map<String, dynamic>) {
-            final sitId = raw['id'] as String? ?? const Uuid().v4();
-            final itemTypeId =
-                (raw['item_type_id'] ?? raw['itemTypeId']) as String? ?? '';
-            final pricingType =
-                (raw['pricing_type'] ?? raw['pricingType']) as String? ??
-                'per_piece';
-            final price = (raw['price'] as num?)?.toInt() ?? 0;
-            if (itemTypeId.isNotEmpty && price > 0) {
-              await _db.into(_db.serviceItemTypes).insert(
-                    app_db.ServiceItemTypesCompanion(
-                      id: Value(sitId),
-                      serviceId: Value(id),
-                      itemTypeId: Value(itemTypeId),
-                      pricingType: Value(pricingType),
-                      price: Value(price),
-                      createdAt: Value(
-                        raw['created_at'] != null
-                            ? DateTime.parse(raw['created_at'] as String)
-                            : DateTime.now(),
-                      ),
-                      updatedAt: Value(
-                        raw['updated_at'] != null
-                            ? DateTime.parse(raw['updated_at'] as String)
-                            : DateTime.now(),
-                      ),
+      for (final raw in rawItems) {
+        if (raw is Map<String, dynamic>) {
+          final sitId = raw['id'] as String? ?? const Uuid().v4();
+          final itemTypeId =
+              (raw['item_type_id'] ?? raw['itemTypeId']) as String? ?? '';
+          final pricingType =
+              (raw['pricing_type'] ?? raw['pricingType']) as String? ??
+              'per_piece';
+          final price = (raw['price'] as num?)?.toInt() ?? 0;
+          if (itemTypeId.isNotEmpty && price > 0) {
+            await _db
+                .into(_db.serviceItemTypes)
+                .insert(
+                  app_db.ServiceItemTypesCompanion(
+                    id: Value(sitId),
+                    serviceId: Value(id),
+                    itemTypeId: Value(itemTypeId),
+                    pricingType: Value(pricingType),
+                    price: Value(price),
+                    createdAt: Value(
+                      raw['created_at'] != null
+                          ? DateTime.parse(raw['created_at'] as String)
+                          : DateTime.now(),
                     ),
-                    mode: InsertMode.insertOrReplace,
-                  );
-            }
+                    updatedAt: Value(
+                      raw['updated_at'] != null
+                          ? DateTime.parse(raw['updated_at'] as String)
+                          : DateTime.now(),
+                    ),
+                  ),
+                  mode: InsertMode.insertOrReplace,
+                );
           }
         }
       }
     }
+  }
 
   Future<void> _applyItemType(SyncChangeDto change) async {
     final payload = change.payload;
