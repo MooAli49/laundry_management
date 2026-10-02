@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:laundry_management/core/config/supabase_config.dart';
 import 'package:laundry_management/core/network/dio_client.dart';
 
 void main() {
   group('Step 11 — Live Supabase Expense & Expense Category Integration Tests', () {
     late DioClient client;
     late Dio dio;
-    bool isNetworkAvailable = true;
 
     // Unique per-run UUID generator to guarantee test idempotency and isolation
     final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
@@ -23,7 +23,8 @@ void main() {
     final categoryName = 'مستلزمات تشغيل $runId';
 
     setUpAll(() async {
-      client = DioClient();
+      final config = SupabaseConfig.resolve();
+      client = DioClient(baseUrl: '${config.apiUrl}/api/v1');
       dio = client.dio;
 
       testCategoryId = 'c1100000-0000-4000-8000-$runId';
@@ -39,17 +40,20 @@ void main() {
           queryParameters: {'limit': 1},
         );
         if (res.statusCode != 200) {
-          isNetworkAvailable = false;
+          fail(
+            'Live Supabase expense integration test failed: backend returned status ${res.statusCode}',
+          );
         }
-      } catch (_) {
-        isNetworkAvailable = false;
+      } catch (e) {
+        fail(
+          'Live Supabase integration test requires reachability to the Supabase backend (${config.apiUrl}/api/v1). Error: $e',
+        );
       }
     });
 
     test(
       '1. Valid category creation: returns 201 Created and persists category',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await dio.post(
           '/expense-categories',
@@ -70,7 +74,6 @@ void main() {
     test(
       '2. Category Idempotency: exact duplicate replay returns cached 201 response',
       () async {
-        if (!isNetworkAvailable) return;
 
         final replayRes = await dio.post(
           '/expense-categories',
@@ -90,7 +93,6 @@ void main() {
     test(
       '3. Category update/rename: returns 200 OK with updated name',
       () async {
-        if (!isNetworkAvailable) return;
 
         final updatedName = '$categoryName (محدث)';
         final res = await dio.patch(
@@ -109,7 +111,6 @@ void main() {
     );
 
     test('4. Category deactivation & reactivation: returns 200 OK', () async {
-      if (!isNetworkAvailable) return;
 
       // Deactivate
       final deactRes = await dio.patch(
@@ -139,7 +140,6 @@ void main() {
     test(
       '5. Duplicate normalized category name: rejected with 409 CONFLICT',
       () async {
-        if (!isNetworkAvailable) return;
 
         // Attempt to create another category with exact same name (with whitespace)
         final duplicateRes = await dio.post(
@@ -166,7 +166,6 @@ void main() {
     test(
       '6. GET /expense-categories and GET /expense-categories/:id',
       () async {
-        if (!isNetworkAvailable) return;
 
         // GET list
         final listRes = await dio.get('/expense-categories');
@@ -195,7 +194,6 @@ void main() {
     test(
       '7. Category deletion prohibition: DELETE returns 404 NOT_FOUND',
       () async {
-        if (!isNetworkAvailable) return;
 
         final delRes = await dio.delete(
           '/expense-categories/$testCategoryId',
@@ -208,7 +206,6 @@ void main() {
     test(
       '8. Valid expense creation: returns 201 Created and persists expense',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await dio.post(
           '/expenses',
@@ -242,7 +239,6 @@ void main() {
     test(
       '9. Expense Idempotency: exact duplicate replay returns cached 201 response',
       () async {
-        if (!isNetworkAvailable) return;
 
         final replayRes = await dio.post(
           '/expenses',
@@ -270,7 +266,6 @@ void main() {
     test(
       '10. Invalid expense amount (zero or negative): rejected with 422 VALIDATION_ERROR',
       () async {
-        if (!isNetworkAvailable) return;
 
         final zeroRes = await dio.post(
           '/expenses',
@@ -317,7 +312,6 @@ void main() {
     test(
       '11. Missing category: rejected with 400 FOREIGN_KEY_VIOLATION',
       () async {
-        if (!isNetworkAvailable) return;
 
         final missingCatRes = await dio.post(
           '/expenses',
@@ -345,7 +339,6 @@ void main() {
     test(
       '12. Category "أخرى" validation: empty custom name rejected with 422, non-empty accepted',
       () async {
-        if (!isNetworkAvailable) return;
 
         // Seed "أخرى" category if not present
         await dio.post(
@@ -406,7 +399,6 @@ void main() {
     test(
       '13. Expense update: returns 200 OK with updated amount and notes',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await dio.patch(
           '/expenses/$testExpenseId',
@@ -425,7 +417,6 @@ void main() {
     );
 
     test('14. GET /expenses with category and date filtering', () async {
-      if (!isNetworkAvailable) return;
 
       // GET all
       final allRes = await dio.get('/expenses');
@@ -469,7 +460,6 @@ void main() {
     test(
       '15. Expense deletion prohibition: DELETE returns 404 NOT_FOUND',
       () async {
-        if (!isNetworkAvailable) return;
 
         final delRes = await dio.delete(
           '/expenses/$testExpenseId',

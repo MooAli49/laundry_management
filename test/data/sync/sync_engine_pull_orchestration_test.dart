@@ -77,6 +77,20 @@ class FakeSyncRemoteDataSource implements SyncRemoteDataSource {
       latestSequence: after,
     );
   }
+
+  int getSnapshotCallCount = 0;
+  Future<PullChangesResponseDto> Function()? onGetSnapshot;
+
+  @override
+  Future<PullChangesResponseDto> getSnapshot() async {
+    getSnapshotCallCount++;
+    if (onGetSnapshot != null) {
+      return await onGetSnapshot!();
+    }
+    throw const CursorTooOldException(
+      message: 'Snapshot endpoint unavailable in test mock',
+    );
+  }
 }
 
 class FakeRealtimeSyncAdapter implements RealtimeSyncAdapter {

@@ -659,6 +659,14 @@ The Storage screen should not become a master-data management screen.
 
 ---
 
+### 36.1 Storage Item Assignment vs Order Item Creation
+
+The Storage workflow allows the operator to store and assign locations directly to existing unstored order items (`عناصر تحتاج إلى تخزين`) without navigating back to the Order Details screen.
+
+However, registering brand-new order items from scratch onto an order remains strictly confined to the Order creation and Order editing workflows in order to preserve Aggregate boundaries and avoid master data management drift in the operational storage view.
+
+---
+
 ## 37. Inactive Storage Locations
 
 Inactive Storage Locations should not normally be available for new

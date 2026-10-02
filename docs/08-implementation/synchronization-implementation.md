@@ -1623,6 +1623,8 @@ Atomic ACID Transaction (validation, mutation, sync_idempotency_log)
 - **Update Payload**:
   ```json
   {
+    "expense_category_id": "<UUID>",
+    "category_name_snapshot": "<string>",
     "amount": 15000,
     "expense_name": "<nullable string>",
     "expense_date": "2026-09-16",
@@ -1630,7 +1632,7 @@ Atomic ACID Transaction (validation, mutation, sync_idempotency_log)
     "updated_at": "<ISO-8601 UTC>"
   }
   ```
-  *(Note: `expense_category_id` is immutable once created and cannot be modified via update).*
+  *(Note: `expense_category_id` and `category_name_snapshot` are updated via `sync_update_expense` while preserving foreign key integrity).*
 
 ### 64.3 Remote API & Edge Function Contracts
 
@@ -1679,7 +1681,7 @@ All mutations run via `SECURITY DEFINER` RPCs within a single ACID transaction l
    - Idempotency check on `p_op_id`: returns existing payload if duplicate.
    - Verifies expense exists (`P0002` / `HTTP 404 NOT_FOUND` if missing).
    - Validates `amount > 0` if amount is being updated.
-   - Updates `amount`, `expense_name`, `expense_date`, `notes`, and `updated_at`. Protects `expense_category_id` from mutation.
+   - Updates `amount`, `expense_name`, `expense_date`, `notes`, `updated_at`, and optionally `expense_category_id` / `category_name_snapshot` (validating category foreign key and 'أخرى' rule).
    - Logs operation and returns updated entity JSON.
 
 #### Security & Access Control
@@ -1991,7 +1993,7 @@ The remote PostgreSQL database maintains a durable, append-only synchronization 
 
 ### 68.4 Recovery & Bootstrap Invariant
 - If a client cursor falls behind retained history in `sync_changes`, the server returns HTTP 410 `CURSOR_TOO_OLD`, detected locally as `CursorTooOldException`.
-- *Known Deferred Limitation*: Full automated bootstrap resync is deferred in V1.
+- **Automated Snapshot Recovery (SUSP-01)**: When `CursorTooOldException` occurs, `SyncEngine` initiates an authoritative full snapshot recovery (`GET /sync/snapshot` backed by PostgreSQL RPC `get_sync_snapshot()`). `RemoteChangeApplier.applySnapshot()` applies all 13 tiers in strict foreign-key dependency order within a single local SQLite transaction, preserves locally pending mutations in `sync_operations`, advances `sync_state.last_applied_sequence` to `snapshot.latestSequence`, and immediately drains pending outbox operations. Full resync can also be triggered administratively via `SyncEngine.fullResync()`.
 - **CRITICAL INVARIANT**: Any resync or recovery must **NEVER delete or overwrite locally pending unsynced business data** stored in `sync_operations`. Pending local changes remain queued and are pushed after baseline synchronization.
 
 ---
@@ -2122,7 +2124,7 @@ Standard codes:
 ## 74. Known Deferred Limitations
 
 1. **Flutter Client Optimistic Concurrency Propagation**: While the backend RPCs support integer `server_version` checks, the Flutter client currently does NOT maintain local `server_version` columns and does NOT propagate `base_version` through `SyncOperation`.
-2. **Automated CURSOR_TOO_OLD Bootstrap / Resync Recovery**: When `CursorTooOldException` occurs, automatic snapshot reconstruction is deferred in V1. Local pending operations in `sync_operations` are strictly protected and never deleted.
+2. **Automated CURSOR_TOO_OLD Bootstrap / Resync Recovery**: Fully implemented in V1 via `GET /sync/snapshot` and `RemoteChangeApplier.applySnapshot()`. When `CursorTooOldException` occurs, `SyncEngine` reconstructs the 13-tier authoritative baseline, preserves local pending `sync_operations`, establishes the new sequence cursor, and triggers an immediate push drain.
 3. **Automatic Sync Operation Purge**: Automated deletion of expired `synced` operations is deferred.
 4. **OS-Level Platform Background Sync**: Platform-specific background execution (e.g. WorkManager) is deferred; foreground triggers provide reliable coverage.
 5. **Multi-Tenant / Multi-Branch SaaS Administration**: Deferred from V1.
@@ -2149,3 +2151,12 @@ Standard codes:
 - **Context**: Repeated integration test runs contaminated development Supabase sequences with ephemeral test data.
 - **Resolution**: Created a guarded, single-transaction safe reset script to purge test records in reverse-dependency order, followed by a canonical seed script that generates sequences 1..35 representing the pristine baseline master data catalog. Fresh client bootstrap from cursor 0 was tested and verified to apply all 35 records cleanly without errors.
 - **Status**: Completed, verified, and locked in Phase 3C.
+
+### 75.4 Final E2E Sync Validation Milestone
+- **Test Suite**: `test/data/sync/final_e2e_sync_validation_test.dart`
+- **Scope**: Comprehensive end-to-end validation of the complete sync pipeline against live Supabase backend `dyhfgnbhijukbdptreto`. Covers Scenarios A through K (Customer -> Order -> OrderItem, Storage Move with `previous_storage_location_id`, Multi-installment Payments with idempotent replay, Expense Category -> Expense FK dependency ordering, Service price change with historical OrderItem price immutability, Offline cold restart outbox survival, Live idempotency, Full chain Device A -> Supabase -> Device B convergence, Optimistic Concurrency Control 409 conflict detection, Snapshot bootstrap & CURSOR_TOO_OLD outbox preservation, and Safety Invariants including BR-018 order number immutability and zero active duplicate storage records).
+- **Production Defect Hardening During Validation**:
+  1. `RemoteChangeApplier._applyOrder`: Fixed order update path to unconditionally preserve existing order numbers, upholding BR-018 immutability across all update types.
+  2. `RemoteChangeApplier.applySnapshot`: Enforced topological foreign-key dependency ranking across all 13 tiers before applying snapshot batches to prevent SQLite foreign key constraint failures on empty databases.
+  3. `RemoteChangeApplier._applyService`: Normalized legacy pricing types and added price synchronization for existing `service_item_types` when a service's root price is updated without an explicit nested types array.
+- **Status**: Completed, verified, and locked (11/11 passed in final E2E suite, 0 analyzer issues, zero regression across all existing suites).

@@ -45,7 +45,18 @@ function mapPostgresError(error: { code?: string; message: string }, requestId: 
 
   // 2. Cursor Too Old (P0005 or CURSOR_TOO_OLD message)
   if (code === "P0005" || msg.includes("CURSOR_TOO_OLD")) {
-    return errorResponse("CURSOR_TOO_OLD", msg, requestId, 410);
+    const match = msg.match(/oldest available sequence (\d+)/);
+    const oldestSeq = match ? parseInt(match[1], 10) : undefined;
+    return jsonResponse(
+      {
+        error: "CURSOR_TOO_OLD",
+        code: "CURSOR_TOO_OLD",
+        message: msg,
+        oldest_available_sequence: oldestSeq,
+        requestId,
+      },
+      410,
+    );
   }
 
   // 3. Refund Balance Exceeded / Payment Balance Exceeded
@@ -209,7 +220,7 @@ Deno.serve(async (req: Request) => {
     // -------------------------------------------------------------------------
     // License Info API (read-only, admin-controlled)
     // Returns the singleton license status so the client can enforce license
-    // gating. Write operations are intentionally not exposed here — the owner
+    // gating. Write operations are intentionally not exposed here � the owner
     // manages license state directly via the Supabase dashboard or service-role
     // tooling. The client is strictly a consumer of this endpoint.
     // -------------------------------------------------------------------------
@@ -237,7 +248,7 @@ Deno.serve(async (req: Request) => {
         return jsonResponse(data, 200);
       }
 
-      // Block all write methods — license is owner-controlled only
+      // Block all write methods � license is owner-controlled only
       return errorResponse(
         "METHOD_NOT_ALLOWED",
         "License write operations are not permitted from the client",
@@ -263,6 +274,17 @@ Deno.serve(async (req: Request) => {
           p_limit: limit,
         });
 
+        if (error) return mapPostgresError(error, operationId);
+        return jsonResponse(data, 200);
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Sync Snapshot API (Full Resync / Bootstrap Hydration)
+    // -------------------------------------------------------------------------
+    if (path === "/sync/snapshot") {
+      if (method === "GET") {
+        const { data, error } = await supabase.rpc("get_sync_snapshot");
         if (error) return mapPostgresError(error, operationId);
         return jsonResponse(data, 200);
       }
@@ -354,6 +376,10 @@ Deno.serve(async (req: Request) => {
         if (parts[2] === "edit-aggregate") {
           const body = await req.json();
           const items = body.items || [];
+          const baseVersion = getBaseVersion(req, body);
+          if (baseVersion !== null) {
+            body.base_version = baseVersion;
+          }
           const result = await supabase.rpc("sync_update_order_aggregate", {
             p_op_id: operationId,
             p_order_id: orderId,
@@ -406,18 +432,18 @@ Deno.serve(async (req: Request) => {
 
       if (method === "POST") {
         const body = await req.json();
-        const serviceItemTypes = body.service_item_types || null;
+        const itemTypeIds = body.supported_item_type_ids || body.item_type_ids || null;
         const result = await supabase.rpc("sync_create_service", {
           p_op_id: operationId,
           p_service: body,
-          p_service_item_types: serviceItemTypes,
+          p_item_type_ids: itemTypeIds,
         });
         return handleMutation(result, 201);
       }
 
       if (method === "PATCH" && serviceId) {
         const body = await req.json();
-        const serviceItemTypes = body.service_item_types || null;
+        const itemTypeIds = body.supported_item_type_ids || body.item_type_ids || null;
         const baseVersion = getBaseVersion(req, body);
         if (baseVersion !== null) {
           body.base_version = baseVersion;
@@ -426,7 +452,7 @@ Deno.serve(async (req: Request) => {
           p_op_id: operationId,
           p_service_id: serviceId,
           p_service: body,
-          p_service_item_types: serviceItemTypes,
+          p_item_type_ids: itemTypeIds,
         });
         return handleMutation(result, 200);
       }
@@ -534,7 +560,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // -------------------------------------------------------------------------
-    // Refunds API (Append-only & Idempotent in V1 — Phase 1: POST only)
+    // Refunds API (Append-only & Idempotent in V1 � Phase 1: POST only)
     // -------------------------------------------------------------------------
     if (path === "/refunds") {
       if (method === "POST") {

@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:laundry_management/core/config/supabase_config.dart';
 import 'package:laundry_management/core/network/dio_client.dart';
 
 void main() {
   group('Completed -> Processing Backend Lifecycle RPC Integration Tests', () {
     late DioClient client;
     late Dio dio;
-    bool isNetworkAvailable = true;
 
     final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
         .toRadixString(16)
@@ -28,7 +28,9 @@ void main() {
     int baseSeq = 0;
 
     setUpAll(() async {
+      final config = SupabaseConfig.resolve();
       client = DioClient(
+        baseUrl: '${config.apiUrl}/api/v1',
         receiveTimeout: const Duration(seconds: 30),
         connectTimeout: const Duration(seconds: 30),
       );
@@ -37,13 +39,11 @@ void main() {
       try {
         final res = await dio.get('/customers', queryParameters: {'limit': 1});
         if (res.statusCode != 200) {
-          isNetworkAvailable = false;
+          fail('Backend /customers probe returned ${res.statusCode}');
         }
-      } catch (_) {
-        isNetworkAvailable = false;
+      } catch (e) {
+        fail('Backend probe failed: $e. Configure live Supabase before running integration tests.');
       }
-
-      if (!isNetworkAvailable) return;
 
       final syncRes = await dio.get(
         '/sync/changes',
@@ -202,7 +202,6 @@ void main() {
     test(
       'A. Completed -> Processing SUCCESS: clears completed_at, preserves payment & storage, increments version, exactly 1 sync_changes',
       () async {
-        if (!isNetworkAvailable) return;
 
         // Verify order 1 is currently completed
         final beforeRes = await dio.get('/orders/$order1Id');
@@ -260,7 +259,6 @@ void main() {
     test(
       'F. Duplicate operation ID returns idempotent result without duplicate sync_changes',
       () async {
-        if (!isNetworkAvailable) return;
 
         final correctOpId = 'op-correct-ord1-$runId';
         final repeatRes = await dio.patch(
@@ -292,7 +290,6 @@ void main() {
     test(
       'C. Completed -> Ready is rejected with INVALID_LIFECYCLE_TRANSITION',
       () async {
-        if (!isNetworkAvailable) return;
 
         // Re-complete order 1 for negative tests
         final recompTime = DateTime.now().toIso8601String();
@@ -330,7 +327,6 @@ void main() {
     test(
       'D. Completed -> Cancelled is rejected with INVALID_LIFECYCLE_TRANSITION',
       () async {
-        if (!isNetworkAvailable) return;
 
         try {
           await dio.patch(
@@ -357,7 +353,6 @@ void main() {
     test(
       'E. Cancelled -> Processing is rejected with INVALID_LIFECYCLE_TRANSITION',
       () async {
-        if (!isNetworkAvailable) return;
 
         try {
           await dio.patch(

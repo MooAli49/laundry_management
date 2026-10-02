@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:laundry_management/core/config/supabase_config.dart';
 import 'package:laundry_management/core/errors/failures.dart';
 import 'package:laundry_management/core/network/dio_client.dart';
 import 'package:laundry_management/core/network/network_info.dart';
@@ -222,7 +223,6 @@ void main() {
     late String supabaseAnonKey;
     late TestDevice deviceA;
     late TestDevice deviceB;
-    bool isLiveBackendAvailable = true;
 
     final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
         .toRadixString(16)
@@ -262,7 +262,9 @@ void main() {
     }
 
     setUpAll(() async {
+      final config = SupabaseConfig.resolve();
       dioClient = DioClient(
+        baseUrl: '${config.apiUrl}/api/v1',
         receiveTimeout: const Duration(seconds: 30),
         connectTimeout: const Duration(seconds: 30),
       );
@@ -283,13 +285,11 @@ void main() {
       try {
         final res = await dio.get('/customers', queryParameters: {'limit': 1});
         if (res.statusCode != 200) {
-          isLiveBackendAvailable = false;
+          fail('Backend /customers probe returned ${res.statusCode}');
         }
-      } catch (_) {
-        isLiveBackendAvailable = false;
+      } catch (e) {
+        fail('Backend probe failed: $e. Configure live Supabase before running integration tests.');
       }
-
-      if (!isLiveBackendAvailable) return;
 
       testCustomerId = 'c3000001-0001-4001-8001-$runId';
       testCustomerPhone =
@@ -307,7 +307,6 @@ void main() {
     int testBaseSeq = 0;
 
     setUp(() async {
-      if (!isLiveBackendAvailable) return;
 
       final probe = await dio.get(
         '/sync/changes',
@@ -384,7 +383,6 @@ void main() {
     });
 
     tearDown(() async {
-      if (!isLiveBackendAvailable) return;
       await deviceA.dispose();
       await deviceB.dispose();
     });
@@ -452,8 +450,7 @@ void main() {
     test(
       'PART H: End-to-End Two-Device Refund Sync (Device A creates → Syncs → Backend → Device B applies)',
       () async {
-        if (!isLiveBackendAvailable) return;
-
+  
         final orderId = await seedCancelledOrderWithPayment(
           orderSuffix: '0101',
         );
@@ -587,8 +584,7 @@ void main() {
     test(
       'PART I: Partial, Multiple, and Full Refunds Sync Correctly (30 + 20 + 50 = 100 max)',
       () async {
-        if (!isLiveBackendAvailable) return;
-
+  
         // Paid: 10000 piastres (100 EGP)
         final orderId = await seedCancelledOrderWithPayment(
           orderSuffix: '0201',
@@ -701,8 +697,7 @@ void main() {
     test(
       'PART J: Dispatcher Retry & Idempotency (Retried operation ID does not duplicate refund)',
       () async {
-        if (!isLiveBackendAvailable) return;
-
+  
         final orderId = await seedCancelledOrderWithPayment(
           orderSuffix: '0301',
           total: 6000,

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:laundry_management/core/config/supabase_config.dart';
 import 'package:laundry_management/core/network/dio_client.dart';
 import 'package:laundry_management/data/sync/sync_payload_builder.dart';
 import 'package:laundry_management/domain/entities/order.dart';
@@ -162,7 +163,6 @@ void main() {
   group('Step 9 — Live Supabase Edge Function & PostgreSQL Integration Tests', () {
     late DioClient client;
     late Dio dio;
-    bool isNetworkAvailable = true;
 
     // Unique per-run hex ID to guarantee test idempotency and isolation across repeated runs
     final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
@@ -198,9 +198,14 @@ void main() {
     late final String smConflictOpId;
     late final String smSuccessOpId;
     late final String orderStatusUpdateOpId;
+    late final String occConcurrentAOpId;
+    late final String occConcurrentBOpId;
+    late final String editAggregateStaleOpId;
+    late final String editAggregateValidOpId;
 
     setUpAll(() async {
-      client = DioClient();
+      final config = SupabaseConfig.resolve();
+      client = DioClient(baseUrl: '${config.apiUrl}/api/v1');
       dio = client.dio;
 
       rejectServiceId = 'b8888888-8888-4888-8888-$runId';
@@ -233,21 +238,26 @@ void main() {
       smConflictOpId = 'op-step9-sm-conflict-$runId';
       smSuccessOpId = 'op-step9-sm-success-$runId';
       orderStatusUpdateOpId = 'op-step9-order-status-update-$runId';
+      occConcurrentAOpId = 'op-step9-occ-conc-a-$runId';
+      occConcurrentBOpId = 'op-step9-occ-conc-b-$runId';
+      editAggregateStaleOpId = 'op-step9-edit-stale-$runId';
+      editAggregateValidOpId = 'op-step9-edit-valid-$runId';
 
       try {
         final res = await dio.get('/customers', queryParameters: {'limit': 1});
         if (res.statusCode != 200) {
-          isNetworkAvailable = false;
+          fail('Live Supabase integration test failed: backend returned status ${res.statusCode}');
         }
-      } catch (_) {
-        isNetworkAvailable = false;
+      } catch (e) {
+        fail(
+          'Live Supabase integration test requires reachability to the Supabase backend (${config.apiUrl}/api/v1). Error: $e',
+        );
       }
     });
 
     test(
       'Remote API rejects per_kilogram pricing type with 422 VALIDATION_ERROR',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await dio.post(
           '/services',
@@ -275,7 +285,6 @@ void main() {
     test(
       'Customer lifecycle: create, update, and idempotent retry preserves exactly 1 record',
       () async {
-        if (!isNetworkAvailable) return;
 
         // 1. Create
         final createRes = await dio.post(
@@ -331,7 +340,6 @@ void main() {
     test(
       'Order Aggregate Remote Atomicity: persist Order + Items + Carpet data or rollback on failure',
       () async {
-        if (!isNetworkAvailable) return;
 
         // Ensure service exists first
         await dio.post(
@@ -342,6 +350,7 @@ void main() {
             'pricing_type': 'per_square_meter',
             'price': 4000,
             'is_active': true,
+            'supported_item_type_ids': ['00000000-0000-0000-0001-000000000003'],
           },
           options: Options(
             headers: {'X-Operation-ID': srvOpId},
@@ -441,7 +450,6 @@ void main() {
     test(
       'Storage invariant: store, move, unstore enforces at most 1 active storage record',
       () async {
-        if (!isNetworkAvailable) return;
 
         // 1. Store at Rack 1
         final storeRes = await dio.post(
@@ -492,7 +500,6 @@ void main() {
     test(
       'Optimistic Concurrency Control: valid base_version increments server_version, stale base_version returns 409 CONCURRENCY_CONFLICT',
       () async {
-        if (!isNetworkAvailable) return;
 
         // 1. Fetch current customer to get server_version
         final getRes = await dio.get('/customers/$custId');
@@ -544,9 +551,162 @@ void main() {
     );
 
     test(
+      'Live Supabase Phase 11: Two-client concurrency test on same entity version allows exactly one winner and rejects stale write with 409 CONCURRENCY_CONFLICT',
+      () async {
+        // 1. Identify test entity and read its server_version = N
+        final getRes = await dio.get('/customers/$custId');
+        expect(getRes.statusCode, equals(200));
+        final baseVersion = getRes.data['server_version'] as int;
+
+        // 2. Prepare Device A and Device B mutations with the exact same base_version N
+        final futureA = dio.patch(
+          '/customers/$custId',
+          data: {
+            'name': 'Device A Winning Customer Name',
+            'base_version': baseVersion,
+          },
+          options: Options(
+            headers: {'X-Operation-ID': occConcurrentAOpId},
+            validateStatus: (_) => true,
+          ),
+        );
+
+        final futureB = dio.patch(
+          '/customers/$custId',
+          data: {
+            'name': 'Device B Stale Customer Name',
+            'base_version': baseVersion,
+          },
+          options: Options(
+            headers: {'X-Operation-ID': occConcurrentBOpId},
+            validateStatus: (_) => true,
+          ),
+        );
+
+        // 3. Submit both concurrently
+        final results = await Future.wait([futureA, futureB]);
+        final resA = results[0];
+        final resB = results[1];
+
+        // 4. Verify exactly one succeeds (200) and the other is rejected (409)
+        final successRes = resA.statusCode == 200 ? resA : resB;
+        final conflictRes = resA.statusCode == 409 ? resA : resB;
+
+        expect(successRes.statusCode, equals(200), reason: 'Exactly one concurrent mutation must succeed');
+        expect(conflictRes.statusCode, equals(409), reason: 'The concurrent mutation with stale base_version must receive 409');
+        expect(conflictRes.data['code'], equals('CONCURRENCY_CONFLICT'));
+
+        // 5. Read the server row
+        final verifyRes = await dio.get('/customers/$custId');
+        expect(verifyRes.statusCode, equals(200));
+        final newVersion = verifyRes.data['server_version'] as int;
+
+        // 6. Verify server_version advanced exactly once
+        expect(newVersion, equals(baseVersion + 1));
+
+        // 7. Verify the winning mutation is the authoritative server state
+        final winningName = successRes == resA ? 'Device A Winning Customer Name' : 'Device B Stale Customer Name';
+        expect(verifyRes.data['name'], equals(winningName));
+
+        // 8. Verify the rejected mutation did NOT overwrite server state
+        final losingName = successRes == resA ? 'Device B Stale Customer Name' : 'Device A Winning Customer Name';
+        expect(verifyRes.data['name'], isNot(equals(losingName)));
+
+        // 9. Verify idempotency behavior if the rejected operation is retried
+        final rejectedOpId = conflictRes == resA ? occConcurrentAOpId : occConcurrentBOpId;
+        final replayConflictRes = await dio.patch(
+          '/customers/$custId',
+          data: {
+            'name': losingName,
+            'base_version': baseVersion,
+          },
+          options: Options(
+            headers: {'X-Operation-ID': rejectedOpId},
+            validateStatus: (_) => true,
+          ),
+        );
+        expect(replayConflictRes.statusCode, equals(409));
+        expect(replayConflictRes.data['code'], equals('CONCURRENCY_CONFLICT'));
+      },
+    );
+
+    test(
+      'Live Supabase Phase 11: /orders/:id/edit-aggregate validates base_version and returns 409 CONCURRENCY_CONFLICT on stale edit',
+      () async {
+        // 1. Fetch current order to get server_version
+        final getRes = await dio.get('/orders/$orderId');
+        expect(getRes.statusCode, equals(200));
+        final currentOrderVersion = getRes.data['server_version'] as int;
+
+        // 2. Attempt stale edit-aggregate with base_version = currentOrderVersion - 1
+        final staleRes = await dio.patch(
+          '/orders/$orderId/edit-aggregate',
+          data: {
+            'subtotal': 1500,
+            'total': 1500,
+            'items': [
+              {
+                'id': itemId,
+                'service_id': srvId,
+                'quantity': 1,
+                'unit_price': 1500,
+                'subtotal': 1500,
+                'total': 1500,
+              }
+            ],
+            'base_version': currentOrderVersion - 1,
+          },
+          options: Options(
+            headers: {'X-Operation-ID': editAggregateStaleOpId},
+            validateStatus: (_) => true,
+          ),
+        );
+
+        expect(staleRes.statusCode, equals(409));
+        expect(staleRes.data['code'], equals('CONCURRENCY_CONFLICT'));
+
+        // 3. Valid edit-aggregate with base_version = currentOrderVersion
+        final validRes = await dio.patch(
+          '/orders/$orderId/edit-aggregate',
+          data: {
+            'expected_pickup_date': '2026-09-25T00:00:00.000',
+            'subtotal': 24000,
+            'total': 24000,
+            'items': [
+              {
+                'id': itemId,
+                'item_type_id': '00000000-0000-0000-0001-000000000003',
+                'service_id': srvId,
+                'pricing_type': 'per_square_meter',
+                'quantity': 6.0,
+                'unit_price': 4000,
+                'calculated_total': 24000,
+                'carpet_data': {
+                  'id': carpetId,
+                  'order_item_id': itemId,
+                  'carpet_size_id': '00000000-0000-0000-0007-000000000001',
+                  'length': 3.0,
+                  'width': 2.0,
+                  'area': 6.0,
+                },
+              },
+            ],
+            'base_version': currentOrderVersion,
+          },
+          options: Options(
+            headers: {'X-Operation-ID': editAggregateValidOpId},
+            validateStatus: (_) => true,
+          ),
+        );
+
+        expect(validRes.statusCode, equals(200));
+        expect(validRes.data['server_version'], equals(currentOrderVersion + 1));
+      },
+    );
+
+    test(
       'Storage Move Concurrency: mismatched previous_storage_location_id returns 409 CONCURRENCY_CONFLICT, matching moves atomically',
       () async {
-        if (!isNetworkAvailable) return;
 
         // 1. Store at Rack 1
         final storeRes = await dio.post(
@@ -619,7 +779,6 @@ void main() {
     test(
       'Pull API: returns changes in strict ascending sequence order with pagination metadata',
       () async {
-        if (!isNetworkAvailable) return;
 
         // 1. Fetch first batch of changes
         final pullRes = await dio.get(
@@ -664,7 +823,6 @@ void main() {
     test(
       'Order Creation logs single aggregate entry, subsequent mutation logs single entity update',
       () async {
-        if (!isNetworkAvailable) return;
 
         // Fetch changes paging until orderCreateChange is found
         dynamic orderCreateChange;
@@ -749,7 +907,6 @@ void main() {
     test(
       'CURSOR_TOO_OLD: requesting sequence older than retention floor returns 410 CURSOR_TOO_OLD',
       () async {
-        if (!isNetworkAvailable) return;
 
         // Query the oldest available sequence currently retained in sync_changes
         final baselineRes = await dio.get(
@@ -788,8 +945,8 @@ void main() {
 
     test(
       'Exactly-once sync_changes creation: idempotent replay does not create duplicate sync_changes records',
+      timeout: const Timeout(Duration(seconds: 90)),
       () async {
-        if (!isNetworkAvailable) return;
 
         // 1. Locate the initial sync_changes record for this run's customer creation
         dynamic initialChange;
@@ -864,6 +1021,29 @@ void main() {
           reason:
               'Idempotent replay must NOT create duplicate sync_changes records for $custCreateOpId',
         );
+      },
+    );
+
+    test(
+      'Live Supabase Snapshot: GET /sync/snapshot returns authoritative baseline and latestSequence',
+      () async {
+        final res = await dio.get(
+          '/sync/snapshot',
+          options: Options(validateStatus: (_) => true),
+        );
+
+        expect(res.statusCode, equals(200));
+        final data = res.data as Map<String, dynamic>;
+        expect(data.containsKey('latest_sequence'), isTrue);
+        expect(data['latest_sequence'] as num, greaterThan(0));
+        expect(data.containsKey('changes'), isTrue);
+        final changes = data['changes'] as List;
+        expect(changes, isNotEmpty);
+
+        final entityTypes = changes.map((c) => c['entity_type'] as String).toSet();
+        expect(entityTypes.contains('business_settings'), isTrue);
+        expect(entityTypes.contains('service'), isTrue);
+        expect(entityTypes.contains('item_type'), isTrue);
       },
     );
   });

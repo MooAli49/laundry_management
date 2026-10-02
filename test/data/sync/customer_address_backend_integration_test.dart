@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:laundry_management/core/config/supabase_config.dart';
 import 'package:laundry_management/core/network/dio_client.dart';
 
 void main() {
   group('Customer Address Backend RPC Integration Tests', () {
     late DioClient client;
     late Dio dio;
-    bool isNetworkAvailable = true;
 
     final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
         .toRadixString(16)
@@ -19,7 +19,9 @@ void main() {
     int baseSeq = 0;
 
     setUpAll(() async {
+      final config = SupabaseConfig.resolve();
       client = DioClient(
+        baseUrl: '${config.apiUrl}/api/v1',
         receiveTimeout: const Duration(seconds: 30),
         connectTimeout: const Duration(seconds: 30),
       );
@@ -28,13 +30,11 @@ void main() {
       try {
         final res = await dio.get('/customers', queryParameters: {'limit': 1});
         if (res.statusCode != 200) {
-          isNetworkAvailable = false;
+          fail('Backend /customers probe returned ${res.statusCode}');
         }
-      } catch (_) {
-        isNetworkAvailable = false;
+      } catch (e) {
+        fail('Backend probe failed: $e. Configure live Supabase before running integration tests.');
       }
-
-      if (!isNetworkAvailable) return;
 
       final syncRes = await dio.get(
         '/sync/changes',
@@ -56,7 +56,6 @@ void main() {
     test(
       '15. Create customer with address persists address and reflects in sync_changes',
       () async {
-        if (!isNetworkAvailable) return;
 
         final opId = 'op-addr-create-$runId';
         final res = await dio.post(
@@ -103,7 +102,6 @@ void main() {
     test(
       '16. Update customer address replaces existing address and reflects in sync_changes',
       () async {
-        if (!isNetworkAvailable) return;
 
         final opId = 'op-addr-update-$runId';
         final res = await dio.patch(
@@ -141,7 +139,6 @@ void main() {
     test(
       '17. Clear address remotely by passing null sets address to NULL',
       () async {
-        if (!isNetworkAvailable) return;
 
         final opId = 'op-addr-clear-$runId';
         final res = await dio.patch(
@@ -176,7 +173,6 @@ void main() {
     test(
       '18. Existing customer behavior: absent address on create defaults to null; absent address on update preserves existing',
       () async {
-        if (!isNetworkAvailable) return;
 
         // A. Create customer without address key
         final createOpId = 'op-addr-legacy-$runId';

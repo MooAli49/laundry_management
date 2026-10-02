@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:laundry_management/core/config/supabase_config.dart';
 import 'package:laundry_management/core/network/dio_client.dart';
 
 void main() {
   group('Refund Feature Phase 1 — Backend Integration & Business Rules Tests', () {
     late DioClient client;
     late Dio dio;
-    bool isNetworkAvailable = true;
 
     final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
         .toRadixString(16)
@@ -53,7 +53,9 @@ void main() {
     }
 
     setUpAll(() async {
+      final config = SupabaseConfig.resolve();
       client = DioClient(
+        baseUrl: '${config.apiUrl}/api/v1',
         receiveTimeout: const Duration(seconds: 30),
         connectTimeout: const Duration(seconds: 30),
       );
@@ -62,13 +64,11 @@ void main() {
       try {
         final res = await dio.get('/customers', queryParameters: {'limit': 1});
         if (res.statusCode != 200) {
-          isNetworkAvailable = false;
+          fail('Backend /customers probe returned ${res.statusCode}');
         }
-      } catch (_) {
-        isNetworkAvailable = false;
+      } catch (e) {
+        fail('Backend probe failed: $e. Configure live Supabase before running integration tests.');
       }
-
-      if (!isNetworkAvailable) return;
 
       final syncRes = await dio.get(
         '/sync/changes',
@@ -204,7 +204,6 @@ void main() {
     // 1. Refund succeeds for cancelled order
     // =========================================================================
     test('1. Refund succeeds for cancelled order', () async {
-      if (!isNetworkAvailable) return;
 
       final orderId = await createCancelledOrder(
         orderSuffix: '0101',
@@ -234,7 +233,6 @@ void main() {
     // 2. Refund rejected for processing order
     // =========================================================================
     test('2. Refund rejected for processing order', () async {
-      if (!isNetworkAvailable) return;
 
       final orderId = await seedOrder(
         orderSuffix: '0201',
@@ -259,7 +257,6 @@ void main() {
     // 3. Refund rejected for ready order
     // =========================================================================
     test('3. Refund rejected for ready order', () async {
-      if (!isNetworkAvailable) return;
 
       final orderId = await seedOrder(
         orderSuffix: '0301',
@@ -284,7 +281,6 @@ void main() {
     // 4. Refund rejected for completed order
     // =========================================================================
     test('4. Refund rejected for completed order', () async {
-      if (!isNetworkAvailable) return;
 
       final orderId = await seedOrder(
         orderSuffix: '0401',
@@ -309,7 +305,6 @@ void main() {
     // 5. Refund amount <= 0 rejected
     // =========================================================================
     test('5. Refund amount <= 0 rejected', () async {
-      if (!isNetworkAvailable) return;
 
       final orderId = await createCancelledOrder(
         orderSuffix: '0501',
@@ -346,7 +341,6 @@ void main() {
     // 6. Refund greater than total paid rejected
     // =========================================================================
     test('6. Refund greater than total paid rejected', () async {
-      if (!isNetworkAvailable) return;
 
       // Order paid 1000, attempt refund 1500
       final orderId = await createCancelledOrder(
@@ -372,7 +366,6 @@ void main() {
     // =========================================================================
     late String partialOrderId;
     test('7. Partial refund succeeds', () async {
-      if (!isNetworkAvailable) return;
 
       partialOrderId = await createCancelledOrder(
         orderSuffix: '0701',
@@ -395,7 +388,6 @@ void main() {
     // 8. Multiple partial refunds succeed until total paid
     // =========================================================================
     test('8. Multiple partial refunds succeed until total paid', () async {
-      if (!isNetworkAvailable) return;
 
       // Order total paid is 3000. 1000 already refunded in test 7.
       // Second partial refund: 1000
@@ -423,7 +415,6 @@ void main() {
     // 9. Refund exceeding remaining refundable rejected
     // =========================================================================
     test('9. Refund exceeding remaining refundable rejected', () async {
-      if (!isNetworkAvailable) return;
 
       // partialOrderId now has 3000 paid and 3000 refunded (refundable = 0)
       final excessRes = await postSafe('/refunds', {
@@ -444,7 +435,6 @@ void main() {
     late String fullRefundOrderId;
     late String fullRefundId;
     test('10. Full refund succeeds', () async {
-      if (!isNetworkAvailable) return;
 
       fullRefundOrderId = await createCancelledOrder(
         orderSuffix: '1001',
@@ -469,7 +459,6 @@ void main() {
     // 11. Refund after full refund rejected
     // =========================================================================
     test('11. Refund after full refund rejected', () async {
-      if (!isNetworkAvailable) return;
 
       final res = await postSafe('/refunds', {
         'id': 'f6001101-0001-4001-8001-$runId',
@@ -487,7 +476,6 @@ void main() {
     // 12. Original payment remains unchanged
     // =========================================================================
     test('12. Original payment remains unchanged', () async {
-      if (!isNetworkAvailable) return;
 
       // Query payments for fullRefundOrderId
       final payRes = await dio.get(
@@ -505,7 +493,6 @@ void main() {
     // 13. Cancelled order remains cancelled
     // =========================================================================
     test('13. Cancelled order remains cancelled', () async {
-      if (!isNetworkAvailable) return;
 
       final ordRes = await dio.get('/orders/$fullRefundOrderId');
       expect(ordRes.statusCode, equals(200));
@@ -517,7 +504,6 @@ void main() {
     // 14. Retry with same operation_id is idempotent
     // =========================================================================
     test('14. Retry with same operation_id is idempotent', () async {
-      if (!isNetworkAvailable) return;
 
       // Re-send the exact request from test 10 with op-ref-1001-$runId
       final retryRes = await postSafe('/refunds', {
@@ -536,7 +522,6 @@ void main() {
     // 15. Concurrent refunds cannot exceed total paid
     // =========================================================================
     test('15. Concurrent refunds cannot exceed total paid', () async {
-      if (!isNetworkAvailable) return;
 
       final concurOrderId = await createCancelledOrder(
         orderSuffix: '1501',
@@ -573,8 +558,7 @@ void main() {
     test(
       '16. Exactly one sync_changes row is created per successful refund',
       () async {
-        if (!isNetworkAvailable) return;
-
+  
         final syncRes = await dio.get(
           '/sync/changes',
           queryParameters: {'after': baseSeq, 'limit': 500},
@@ -604,7 +588,6 @@ void main() {
     // 17. No sync_changes row is created for rejected refund
     // =========================================================================
     test('17. No sync_changes row is created for rejected refund', () async {
-      if (!isNetworkAvailable) return;
 
       final failedRefundId = 'f6000601-0001-4001-8001-$runId'; // from test 6
 
@@ -630,7 +613,6 @@ void main() {
     // 18. Refund method validation
     // =========================================================================
     test('18. Refund method validation', () async {
-      if (!isNetworkAvailable) return;
 
       final orderId = await createCancelledOrder(
         orderSuffix: '1801',
@@ -667,8 +649,7 @@ void main() {
     test(
       '19. Refund with no payment is rejected because refundable amount = 0',
       () async {
-        if (!isNetworkAvailable) return;
-
+  
         // Seed order directly cancelled with 0 payments
         final orderId = await createCancelledOrder(
           orderSuffix: '1901',
@@ -692,7 +673,6 @@ void main() {
     // 20. Refund history remains preserved
     // =========================================================================
     test('20. Refund history remains preserved', () async {
-      if (!isNetworkAvailable) return;
 
       // Verify the refund records created in test 7 and 8 still exist in sync_changes
       final syncRes = await dio.get(

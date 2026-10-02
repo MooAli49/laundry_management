@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:laundry_management/core/config/supabase_config.dart';
 import 'package:laundry_management/core/network/dio_client.dart';
 
 void main() {
   group('Step 12 — Live Supabase Master Data Integration Tests', () {
     late DioClient client;
     late Dio dio;
-    bool isNetworkAvailable = true;
 
     // Unique per-run UUID generator to guarantee test idempotency and isolation
     final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
@@ -30,7 +30,8 @@ void main() {
     late final double updatedCarpetArea;
 
     setUpAll(() async {
-      client = DioClient();
+      final config = SupabaseConfig.resolve();
+      client = DioClient(baseUrl: '${config.apiUrl}/api/v1');
       dio = client.dio;
 
       testItemTypeId = 'a1200000-0000-4000-8000-$runId';
@@ -63,10 +64,12 @@ void main() {
       try {
         final res = await dio.get('/item-types');
         if (res.statusCode != 200) {
-          isNetworkAvailable = false;
+          fail('Live Supabase master data integration test failed: backend returned status ${res.statusCode}');
         }
-      } catch (_) {
-        isNetworkAvailable = false;
+      } catch (e) {
+        fail(
+          'Live Supabase integration test requires reachability to the Supabase backend (${config.apiUrl}/api/v1). Error: $e',
+        );
       }
     });
 
@@ -77,7 +80,6 @@ void main() {
     test(
       '1. Valid ItemType creation: returns 201 Created and persists entity',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await dio.post(
           '/item-types',
@@ -98,7 +100,6 @@ void main() {
     test(
       '2. ItemType Idempotency: exact duplicate replay returns cached 201 response',
       () async {
-        if (!isNetworkAvailable) return;
 
         final replayRes = await dio.post(
           '/item-types',
@@ -116,7 +117,6 @@ void main() {
     );
 
     test('3. ItemType Duplicate Name: returns 409 Conflict', () async {
-      if (!isNetworkAvailable) return;
 
       final res = await dio.post(
         '/item-types',
@@ -137,7 +137,6 @@ void main() {
     test(
       '4. ItemType Update / Rename: returns 200 OK with updated name',
       () async {
-        if (!isNetworkAvailable) return;
 
         final updatedName = '$itemTypeName (محدث)';
         final res = await dio.patch(
@@ -158,7 +157,6 @@ void main() {
     test(
       '5. ItemType Deactivation & Activation: updates is_active correctly',
       () async {
-        if (!isNetworkAvailable) return;
 
         // Deactivate
         final deactRes = await dio.patch(
@@ -187,7 +185,6 @@ void main() {
     );
 
     test('6. ItemType GET by ID & List: returns correct records', () async {
-      if (!isNetworkAvailable) return;
 
       final getRes = await dio.get('/item-types/$testItemTypeId');
       expect(getRes.statusCode, equals(200));
@@ -200,7 +197,6 @@ void main() {
     });
 
     test('7. ItemType DELETE is forbidden: returns 404', () async {
-      if (!isNetworkAvailable) return;
 
       final res = await dio.delete(
         '/item-types/$testItemTypeId',
@@ -216,7 +212,6 @@ void main() {
     test(
       '8. ItemDefinition creation: succeeds and references ItemType',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await dio.post(
           '/item-definitions',
@@ -242,7 +237,6 @@ void main() {
     test(
       '9. ItemDefinition Idempotency: exact replay returns cached response',
       () async {
-        if (!isNetworkAvailable) return;
 
         final replayRes = await dio.post(
           '/item-definitions',
@@ -265,7 +259,6 @@ void main() {
     test(
       '10. ItemDefinition Duplicate Name for Same ItemType: returns 409 Conflict',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await dio.post(
           '/item-definitions',
@@ -287,7 +280,6 @@ void main() {
     test(
       '11. ItemDefinition Invalid ItemType FK: returns error (400, 404, or 422)',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await dio.post(
           '/item-definitions',
@@ -307,7 +299,6 @@ void main() {
     );
 
     test('12. ItemDefinition Update / Rename & GET: returns 200 OK', () async {
-      if (!isNetworkAvailable) return;
 
       final updatedDefName = '$itemDefName (محدث)';
       final patchRes = await dio.patch(
@@ -328,7 +319,6 @@ void main() {
     });
 
     test('13. ItemDefinition DELETE is forbidden: returns 404', () async {
-      if (!isNetworkAvailable) return;
 
       final res = await dio.delete(
         '/item-definitions/$testItemDefId',
@@ -344,7 +334,6 @@ void main() {
     test(
       '14. Valid CarpetSize creation: returns 201 and persists dimensions',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await dio.post(
           '/carpet-sizes',
@@ -373,7 +362,6 @@ void main() {
     test(
       '15. CarpetSize Idempotency: exact replay returns cached response',
       () async {
-        if (!isNetworkAvailable) return;
 
         final replayRes = await dio.post(
           '/carpet-sizes',
@@ -397,7 +385,6 @@ void main() {
     test(
       '16. CarpetSize Dimension Validation: rejects non-positive values (422)',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await dio.post(
           '/carpet-sizes',
@@ -418,7 +405,6 @@ void main() {
     );
 
     test('17. CarpetSize Duplicate Dimensions: returns 409 Conflict', () async {
-      if (!isNetworkAvailable) return;
 
       final res = await dio.post(
         '/carpet-sizes',
@@ -438,7 +424,6 @@ void main() {
     });
 
     test('18. CarpetSize Update & GET: returns 200 OK', () async {
-      if (!isNetworkAvailable) return;
 
       final patchRes = await dio.patch(
         '/carpet-sizes/$testCarpetSizeId',
@@ -463,7 +448,6 @@ void main() {
     });
 
     test('19. CarpetSize DELETE is forbidden: returns 404', () async {
-      if (!isNetworkAvailable) return;
 
       final res = await dio.delete(
         '/carpet-sizes/$testCarpetSizeId',
@@ -479,7 +463,6 @@ void main() {
     test(
       '20. Valid StorageLocation creation with supported item types: returns 201',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await dio.post(
           '/storage-locations',
@@ -505,7 +488,6 @@ void main() {
     test(
       '21. StorageLocation Idempotency: exact replay returns cached response',
       () async {
-        if (!isNetworkAvailable) return;
 
         final replayRes = await dio.post(
           '/storage-locations',
@@ -526,7 +508,6 @@ void main() {
     );
 
     test('22. StorageLocation Duplicate Name: returns 409 Conflict', () async {
-      if (!isNetworkAvailable) return;
 
       final res = await dio.post(
         '/storage-locations',
@@ -546,7 +527,6 @@ void main() {
     test(
       '23. StorageLocation Update supported types & name: returns 200',
       () async {
-        if (!isNetworkAvailable) return;
 
         // Create a second item type to add to supported types
         await dio.post(
@@ -586,7 +566,6 @@ void main() {
     test(
       '24. StorageLocation GET by ID & List: includes supported_item_type_ids',
       () async {
-        if (!isNetworkAvailable) return;
 
         final getRes = await dio.get(
           '/storage-locations/$testStorageLocationId',
@@ -605,7 +584,6 @@ void main() {
     test(
       '25. StorageLocation Deactivation: updates is_active to false',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await dio.patch(
           '/storage-locations/$testStorageLocationId',
@@ -622,7 +600,6 @@ void main() {
     );
 
     test('26. StorageLocation DELETE is forbidden: returns 404', () async {
-      if (!isNetworkAvailable) return;
 
       final res = await dio.delete(
         '/storage-locations/$testStorageLocationId',
@@ -636,7 +613,6 @@ void main() {
     // =========================================================================
 
     test('27. BusinessSettings GET returns settings record', () async {
-      if (!isNetworkAvailable) return;
 
       final res = await dio.get('/business-settings');
       expect(res.statusCode, equals(200));
@@ -644,7 +620,6 @@ void main() {
     });
 
     test('28. BusinessSettings PATCH updates business settings', () async {
-      if (!isNetworkAvailable) return;
 
       final businessName = 'مغسلة التميز $runId';
       final res = await dio.patch(
@@ -671,7 +646,6 @@ void main() {
     test(
       '29. BusinessSettings Idempotency: exact replay returns cached response',
       () async {
-        if (!isNetworkAvailable) return;
 
         final businessName = 'مغسلة التميز $runId';
         final replayRes = await dio.patch(
@@ -696,7 +670,6 @@ void main() {
     test(
       '30. BusinessSettings negative tax_rate validation: returns 422',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await dio.patch(
           '/business-settings',
@@ -712,7 +685,6 @@ void main() {
     );
 
     test('31. BusinessSettings DELETE is forbidden: returns 404', () async {
-      if (!isNetworkAvailable) return;
 
       final res = await dio.delete(
         '/business-settings',

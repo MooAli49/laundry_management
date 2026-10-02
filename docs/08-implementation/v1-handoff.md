@@ -105,7 +105,7 @@ The Laundry Management System V1 has successfully completed all development task
 
 The following items are intentionally deferred from V1 and are documented as out of scope:
 1. **Client-side `server_version` / `base_version` propagation**: Backend RPCs support integer OCC, but client does not track or propagate base version.
-2. **Automatic `CURSOR_TOO_OLD` bootstrap recovery**: HTTP 410 triggers error state; automatic snapshot resync is deferred.
+2. **Automatic `CURSOR_TOO_OLD` bootstrap recovery**: Fully implemented in V1 via `GET /sync/snapshot` and `RemoteChangeApplier.applySnapshot()` (SUSP-01). Reconstructs 13 tiers and preserves outbox.
 3. **Automatic sync operation retention purge**: Synced operations retained for audit; automated background cleanup is deferred.
 4. **OS-level platform background sync**: No platform WorkManager / BGTaskScheduler; sync relies on foreground lifecycle triggers (`onResume`, network recovery, timer).
 5. **Raw WebSocket data streaming**: WebSockets used purely for lightweight wake-up signals; data travels via HTTP pull.

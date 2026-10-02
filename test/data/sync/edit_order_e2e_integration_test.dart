@@ -222,7 +222,6 @@ void main() {
     late String supabaseAnonKey;
     late TestDevice deviceA;
     late TestDevice deviceB;
-    bool isLiveBackendAvailable = true;
 
     final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
         .toRadixString(16)
@@ -271,17 +270,16 @@ void main() {
       drift.driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
 
       try {
-        final res = await dio.get('/customers', queryParameters: {'limit': 1});
+        final res = await dio.get('/api/v1/customers', queryParameters: {'limit': 1});
         if (res.statusCode != 200) {
-          isLiveBackendAvailable = false;
+          fail('Backend /api/v1/customers probe returned ${res.statusCode}');
         }
-      } catch (_) {
-        isLiveBackendAvailable = false;
+      } catch (e) {
+        fail('Backend probe failed: $e. Configure live Supabase before running integration tests.');
       }
     });
 
     setUp(() async {
-      if (!isLiveBackendAvailable) return;
 
       deviceA = await TestDevice.create(
         name: 'Device A',
@@ -400,7 +398,6 @@ void main() {
     });
 
     tearDown(() async {
-      if (!isLiveBackendAvailable) return;
       await deviceA.dispose();
       await deviceB.dispose();
     });
@@ -408,7 +405,6 @@ void main() {
     test(
       'Two-Device Full Edit Order Flow: Device A local edit -> remote push -> Device B pull -> authoritative aggregate & zero outbox on Device B',
       () async {
-        if (!isLiveBackendAvailable) return;
 
         // ---------------------------------------------------------------------
         // STEP 1: Create and replicate Customer to Device A and Device B

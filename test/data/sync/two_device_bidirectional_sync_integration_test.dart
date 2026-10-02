@@ -227,8 +227,6 @@ void main() {
     late String supabaseAnonKey;
     late TestDevice deviceA;
     late TestDevice deviceB;
-    bool isLiveBackendAvailable = true;
-
     final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
         .toRadixString(16)
         .padLeft(12, '0');
@@ -273,19 +271,17 @@ void main() {
       drift.driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
 
       try {
-        final res = await dio.get('/customers', queryParameters: {'limit': 1});
+        final res = await dio.get('/api/v1/customers', queryParameters: {'limit': 1});
         if (res.statusCode != 200) {
-          isLiveBackendAvailable = false;
+          fail('Backend /api/v1/customers probe returned ${res.statusCode}');
         }
-      } catch (_) {
-        isLiveBackendAvailable = false;
+      } catch (e) {
+        fail('Backend probe failed: $e. Configure live Supabase before running integration tests.');
       }
-
-      if (!isLiveBackendAvailable) return;
 
       // Provision a run-scoped test service on remote Supabase before devices start
       final srvRes = await dio.post(
-        '/services',
+        '/api/v1/services',
         data: {
           'id': testServiceId,
           'name': 'خدمة سجاد C4C $runId',
@@ -302,7 +298,6 @@ void main() {
     });
 
     setUp(() async {
-      if (!isLiveBackendAvailable) return;
 
       deviceA = await TestDevice.create(
         name: 'Device A',
@@ -408,7 +403,6 @@ void main() {
     });
 
     tearDown(() async {
-      if (!isLiveBackendAvailable) return;
       await deviceA.dispose();
       await deviceB.dispose();
     });
@@ -457,8 +451,7 @@ void main() {
     test(
       'Full Bidirectional E2E Sync: A -> B Order, B -> A Payment & Storage with Zero-Echo, Realtime Signals, and Cursor Independence',
       () async {
-        if (!isLiveBackendAvailable) return;
-
+  
         final headCursor = await deviceA.syncStateDao.getLastAppliedSequence();
 
         // =====================================================================

@@ -46,7 +46,6 @@ void main() {
     late SyncRemoteDataSource remoteDataSource;
     late SupabaseRealtimeSyncAdapter realtimeAdapter;
     late SyncEngine syncEngine;
-    bool isLiveBackendAvailable = true;
 
     final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
         .toRadixString(16)
@@ -85,12 +84,12 @@ void main() {
           '013${(DateTime.now().microsecondsSinceEpoch % 100000000).toString().padLeft(8, '0')}';
 
       try {
-        final res = await dio.get('/customers', queryParameters: {'limit': 1});
+        final res = await dio.get('/api/v1/customers', queryParameters: {'limit': 1});
         if (res.statusCode != 200) {
-          isLiveBackendAvailable = false;
+          fail('Backend /api/v1/customers probe returned ${res.statusCode}');
         }
-      } catch (_) {
-        isLiveBackendAvailable = false;
+      } catch (e) {
+        fail('Backend probe failed: $e. Configure live Supabase before running integration tests.');
       }
     });
 
@@ -124,8 +123,6 @@ void main() {
     test(
       '1. Live subscription check: SupabaseRealtimeSyncAdapter subscribes to laundry:sync broadcast topic',
       () async {
-        if (!isLiveBackendAvailable) return;
-
         // Verify the realtime adapter subscribes without throwing
         await realtimeAdapter.subscribe();
 
@@ -144,8 +141,6 @@ void main() {
     test(
       '2. Remote mutation emits real Supabase Broadcast wake-up signal which triggers authoritative Pull, applies locally, advances cursor, and creates zero echo SyncOperations',
       () async {
-        if (!isLiveBackendAvailable) return;
-
         // Fast-forward local cursor to current latest remote sequence before subscribing
         final currentMaxSeq = await fastForwardCursor();
 
@@ -171,7 +166,7 @@ void main() {
         try {
           // e. Perform a real remote mutation through the existing Edge Function API
           final postRes = await dio.post(
-            '/customers',
+            '/api/v1/customers',
             data: {
               'id': testCustomerId,
               'name': testCustomerName,
@@ -227,8 +222,6 @@ void main() {
     test(
       '3. Authoritative Pull works independently without any Realtime signal (adapter unsubscribed/offline)',
       () async {
-        if (!isLiveBackendAvailable) return;
-
         // Fast-forward local cursor to current latest remote sequence before pull
         final currentMaxSeq = await fastForwardCursor();
 
@@ -240,7 +233,7 @@ void main() {
 
         // Perform remote mutation with no realtime listener
         final postRes = await dio.post(
-          '/customers',
+          '/api/v1/customers',
           data: {
             'id': noSignalCustomerId,
             'name': noSignalCustomerName,
@@ -285,7 +278,6 @@ void main() {
     test(
       '4. Full sync cycle: Push then Pull executes sequentially with single-flight guard',
       () async {
-        if (!isLiveBackendAvailable) return;
 
         // Fast-forward local cursor to current latest remote sequence
         await fastForwardCursor();

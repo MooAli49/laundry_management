@@ -250,7 +250,7 @@ The architecture officially supports **Bidirectional Push + Pull Synchronization
 - **Conflict Handling**: Domain-aware conflict resolution (no generic LWW). Payments are append-oriented and idempotent; Storage enforces at most one active record per `OrderItem` and rejects stale moves via server concurrency checks; Order status transitions follow lifecycle rules.
 - **Known Deferred Limitations**:
   - *Optimistic Concurrency Propagation*: Remote backend supports `server_version`, but Flutter client currently does NOT maintain local `server_version` columns and does NOT propagate `base_version` through `SyncOperation` (Deferred V1 Limitation).
-  - *Recovery & Bootstrap*: `CURSOR_TOO_OLD` is detected (`CursorTooOldException`). Full automatic resync / initial bootstrap recovery is deferred; current implementation guarantees locally pending operations in `sync_operations` are never deleted.
+  - *Recovery & Bootstrap*: `CURSOR_TOO_OLD` (HTTP 410) automated snapshot recovery is fully implemented (SUSP-01) via `GET /sync/snapshot` and `RemoteChangeApplier.applySnapshot()`. Reconstructs 13 tiers and guarantees locally pending operations in `sync_operations` are never deleted.
   - *Retention*: Synced operations retained for 90 days; automatic background purge is deferred (manual maintenance).
 
 ---
@@ -433,4 +433,13 @@ Task #15  Offline / Sync Integration       ✅ LOCKED (C1–C4-C Bidirectional S
 Task #16  Full Integration / QA / Hardening ✅ LOCKED (Phase 3A-C Hardening, Fresh Bootstrap & Manual QA Complete)
 ```
 
-**V1 Status**: All Tasks #01 through #16 are Completed and Locked. Current V1 implementation is complete.
+**Post-V1 Hardening & Validation Milestones**:
+- **BUG-04**: Single-Terminal Order Numbering & Immutability (`single_terminal_order_sync_test.dart`) ✅ LOCKED
+- **BUG-05**: Expense Category Update Sync (`expense_update_sync_test.dart`) ✅ LOCKED
+- **BUG-06**: Integration Test Runner Skipping & Assertion Hardening ✅ LOCKED
+- **SUSP-01**: CURSOR_TOO_OLD Recovery & 13-Tier Full Resync (`cursor_too_old_recovery_test.dart`) ✅ LOCKED
+- **SUSP-02**: Optimistic Concurrency & Base Version Control (`optimistic_concurrency_test.dart`) ✅ LOCKED
+- **FINAL-E2E**: Comprehensive Live Supabase E2E Sync Validation (`final_e2e_sync_validation_test.dart`) ✅ LOCKED
+- **AUDIT-V1**: Comprehensive V1 Product & Business Rules Audit (`v1-product-audit.md`), Standalone `/expenses` Screen & Documentation Alignment ✅ LOCKED (PASS / V1 READY)
+
+**V1 Status**: All Tasks #01 through #16, post-V1 hardening/validation milestones, and V1 Product Audit gap closures (including standalone `/expenses` screen) are Completed and Locked. Current implementation is PASS / V1 READY.

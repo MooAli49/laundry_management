@@ -7,6 +7,7 @@ import '../../domain/license/license_status.dart';
 import '../../features/customers/presentation/screens/customer_detail_screen.dart';
 import '../../features/customers/presentation/screens/customers_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
+import '../../features/expenses/presentation/screens/expenses_screen.dart';
 import '../../features/license/presentation/screens/license_lock_screen.dart';
 import '../../features/orders/presentation/screens/create_order_screen.dart';
 import '../../features/orders/presentation/screens/edit_order_screen.dart';
@@ -125,6 +126,10 @@ class AppRouter {
           GoRoute(
             path: AppRoutes.reports,
             builder: (context, state) => const ReportsScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.expenses,
+            builder: (context, state) => const ExpensesScreen(),
           ),
           GoRoute(
             path: AppRoutes.settings,

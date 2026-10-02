@@ -251,15 +251,22 @@ class SyncPayloadBuilder {
   // ===========================================================================
 
   /// Builds a self-contained payload for storage record creation and relocation.
-  static String buildStorageRecordPayload(StorageRecord record) {
-    return jsonEncode(<String, dynamic>{
+  static String buildStorageRecordPayload(
+    StorageRecord record, {
+    String? previousStorageLocationId,
+  }) {
+    final map = <String, dynamic>{
       'id': record.id,
       'order_item_id': record.orderItemId,
       'storage_location_id': record.storageLocationId,
       'is_active': record.isActive,
       'created_at': record.createdAt.toIso8601String(),
       'updated_at': record.updatedAt.toIso8601String(),
-    });
+    };
+    if (previousStorageLocationId != null) {
+      map['previous_storage_location_id'] = previousStorageLocationId;
+    }
+    return jsonEncode(map);
   }
 
   /// Builds a payload for storage record status update (e.g. unstore / release).
@@ -361,6 +368,8 @@ class SyncPayloadBuilder {
   /// Builds a payload for expense update (PATCH contract).
   static String buildExpenseUpdatePayload(Expense expense) {
     return jsonEncode(<String, dynamic>{
+      'expense_category_id': expense.expenseCategoryId,
+      'category_name_snapshot': expense.categoryNameSnapshot,
       'amount': expense.amount.piastres,
       'expense_name': expense.expenseName,
       'expense_date': expense.expenseDate.toString(),

@@ -290,6 +290,21 @@ class AppStrings {
       'سيتم تعطيل تصنيف المصروفات ولن يظهر في تسجيل المصروفات الجديدة.';
   static const String noExpenseCategories = 'لا توجد تصنيفات مصروفات مضافة';
 
+  // Expenses Screen
+  static const String expenses = 'المصروفات';
+  static const String expensesSubtitle = 'إدارة وسجل مصروفات المغسلة التشغيلية';
+  static const String addExpense = 'إضافة مصروف';
+  static const String noExpenses = 'لا توجد مصروفات';
+  static const String noExpensesPrompt = 'لم يتم تسجيل أي مصروفات للفترة المحددة.';
+  static const String totalExpensesAmount = 'إجمالي المصروفات';
+  static const String expensesCount = 'عدد المصروفات';
+  static const String topCategory = 'أعلى تصنيف';
+  static const String allCategories = 'جميع التصنيفات';
+  static const String searchExpensesPlaceholder =
+      'بحث باسم المصروف أو الملاحظات...';
+  static const String failedToLoadExpenses = 'تعذر تحميل المصروفات';
+  static const String viewAllExpenses = 'عرض كل المصروفات';
+
   // Settings — Shared Table & Status
   static const String statusActive = 'مُفعّلة';
   static const String statusInactive = 'معطّلة';

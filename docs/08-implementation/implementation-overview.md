@@ -130,13 +130,12 @@ The following synchronization architecture is completed and verified:
 - **Pull Pipeline & Ingestion**: Cursor-based pull API (`GET /sync/changes?after=<sequence>&limit=<limit>`), local infrastructure `sync_state` (`last_applied_sequence`), and `RemoteChangeApplier` writing directly to DAOs without creating outgoing sync operations (zero echo).
 - **Realtime Signal**: Supabase Realtime wake-up notification adapter (`laundry:sync` / `sync_available`) triggering `SyncEngine.pull()` with single-flight concurrency protection.
 - **Conflict Handling**: Domain-aware conflict handling (no generic LWW). Payments append-oriented and idempotent; Storage enforces at most one active record per `OrderItem` and rejects stale moves via server concurrency checks.
-- **Recovery & Replay Safety**: Detection of `CURSOR_TOO_OLD` (`CursorTooOldException`). Transactional rollback safety on remote apply. Pending local operations in `sync_operations` are strictly protected.
+- **Recovery & Replay Safety**: Automated snapshot recovery from `CURSOR_TOO_OLD` via `GET /sync/snapshot` (SUSP-01). Transactional rollback safety on remote apply. Pending local operations in `sync_operations` are strictly protected.
 
 The following remain intentionally deferred:
 
 - Complex distributed merge algorithms & CRDTs.
 - Raw WebSocket / full real-time collaborative document editing (note: Realtime Broadcast wake-up signal adapter is approved & implemented).
-- Full automatic CURSOR_TOO_OLD bootstrap / resync recovery.
 - Flutter client OCC (server_version/base_version) propagation.
 - Automatic background sync operations purge (retention is 90 days, manual maintenance).
 - Multi-tenant / SaaS / multi-branch administration.
@@ -640,7 +639,6 @@ Do not implement:
 
 - Complex distributed merge algorithms & CRDTs
 - Raw WebSocket / full real-time collaborative editing
-- Full automatic CURSOR_TOO_OLD bootstrap resync
 - Flutter client OCC (server_version/base_version) propagation
 - Automatic background sync operations purge
 - Multi-tenant / SaaS / multi-branch administration

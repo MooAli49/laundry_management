@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/localization/app_strings.dart';
+import '../../../../core/routing/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -41,12 +44,33 @@ class FinancialReportView extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text('الملخص المالي', style: AppTextStyles.titleLarge),
-            AppButton(
-              key: const ValueKey('add_expense_quick_action_button'),
-              label: 'إضافة مصروف',
-              icon: Icons.add,
-              variant: AppButtonVariant.secondary,
-              onPressed: () => _openAddExpenseDialog(context),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => context.push(AppRoutes.expenses),
+                  icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                  label: const Text('عرض المصروفات'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textPrimary,
+                    side: const BorderSide(color: AppColors.border),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    ),
+                  ),
+                ),
+                AppSpacing.gapHorizontalSm,
+                AppButton(
+                  key: const ValueKey('add_expense_quick_action_button'),
+                  label: 'إضافة مصروف',
+                  icon: Icons.add,
+                  variant: AppButtonVariant.secondary,
+                  onPressed: () => _openAddExpenseDialog(context),
+                ),
+              ],
             ),
           ],
         ),
@@ -180,7 +204,7 @@ class FinancialReportView extends StatelessWidget {
         // ==========================================
         // SECTION 5: سجل المصروفات (Expense History)
         // ==========================================
-        _buildExpenseTransactionsSection(),
+        _buildExpenseTransactionsSection(context),
         AppSpacing.gapXxl,
 
         // ==========================================
@@ -915,7 +939,7 @@ class FinancialReportView extends StatelessWidget {
     );
   }
 
-  Widget _buildExpenseTransactionsSection() {
+  Widget _buildExpenseTransactionsSection(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -960,6 +984,18 @@ class FinancialReportView extends StatelessWidget {
                   style: AppTextStyles.labelSmall.copyWith(
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              AppSpacing.gapHorizontalSm,
+              TextButton.icon(
+                onPressed: () => context.push(AppRoutes.expenses),
+                icon: const Icon(Icons.arrow_forward, size: 16),
+                label: const Text(AppStrings.viewAllExpenses),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  textStyle: AppTextStyles.labelMedium.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),

@@ -14,9 +14,9 @@ import '../../application/use_cases/store_order_items_use_case.dart';
 import '../../application/use_cases/unstore_item_use_case.dart';
 import '../../core/license/license_guard.dart';
 import '../../data/datasources/remote/customer_remote_api.dart';
+import '../../data/datasources/remote/expense_remote_api.dart';
 import '../../data/datasources/remote/license_remote_api.dart';
 import '../../data/datasources/remote/license_remote_data_source.dart';
-import '../../data/datasources/remote/expense_remote_api.dart';
 import '../../data/datasources/remote/master_data_remote_api.dart';
 import '../../data/datasources/remote/order_remote_api.dart';
 import '../../data/datasources/remote/payment_remote_api.dart';
@@ -32,8 +32,8 @@ import '../../data/local/daos/customers_dao.dart';
 import '../../data/local/daos/expense_categories_dao.dart';
 import '../../data/local/daos/expenses_dao.dart';
 import '../../data/local/daos/item_definitions_dao.dart';
-import '../../data/local/daos/license_cache_dao.dart';
 import '../../data/local/daos/item_types_dao.dart';
+import '../../data/local/daos/license_cache_dao.dart';
 import '../../data/local/daos/orders_dao.dart';
 import '../../data/local/daos/payments_dao.dart';
 import '../../data/local/daos/refunds_dao.dart';
@@ -83,6 +83,7 @@ import '../../features/customers/presentation/cubit/customers_list_cubit.dart';
 import '../../features/dashboard/presentation/cubit/dashboard_cubit.dart';
 import '../../features/dashboard/presentation/cubit/record_payment_cubit.dart';
 import '../../features/expenses/presentation/cubit/add_expense_cubit.dart';
+import '../../features/expenses/presentation/cubit/expenses_list_cubit.dart';
 import '../../features/orders/presentation/cubit/bluetooth_printer_cubit.dart';
 import '../../features/orders/presentation/cubit/create_order_cubit.dart';
 import '../../features/orders/presentation/cubit/edit_processing_order_cubit.dart';
@@ -308,6 +309,7 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
       () => RemoteChangeApplier(
         db: getIt<AppDatabase>(),
         syncStateDao: getIt<SyncStateDao>(),
+        syncOperationsDao: getIt<SyncOperationsDao>(),
       ),
     );
   }
@@ -676,6 +678,14 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
       () => AddExpenseCubit(
         categoryRepository: getIt<ExpenseCategoryRepository>(),
         expenseRepository: getIt<ExpenseRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<ExpensesListCubit>()) {
+    getIt.registerFactory<ExpensesListCubit>(
+      () => ExpensesListCubit(
+        expenseRepository: getIt<ExpenseRepository>(),
+        categoryRepository: getIt<ExpenseCategoryRepository>(),
       ),
     );
   }

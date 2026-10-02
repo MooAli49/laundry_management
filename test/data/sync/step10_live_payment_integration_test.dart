@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:laundry_management/core/config/supabase_config.dart';
 import 'package:laundry_management/core/errors/failures.dart';
 import 'package:laundry_management/core/network/dio_client.dart';
 import 'package:laundry_management/data/local/daos/orders_dao.dart';
@@ -256,7 +257,6 @@ void main() {
   group('Step 10 — Live Supabase Payment Backend Integration Tests', () {
     late DioClient client;
     late Dio dio;
-    bool isNetworkAvailable = true;
 
     // Unique per-run UUID generator to guarantee test idempotency and isolation
     final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
@@ -270,7 +270,8 @@ void main() {
     late final String testOpId;
 
     setUpAll(() async {
-      client = DioClient();
+      final config = SupabaseConfig.resolve();
+      client = DioClient(baseUrl: '${config.apiUrl}/api/v1');
       dio = client.dio;
 
       testCustomerId = 'c1000000-0000-4000-8000-$runId';
@@ -283,29 +284,30 @@ void main() {
       try {
         final res = await dio.get('/customers', queryParameters: {'limit': 1});
         if (res.statusCode != 200) {
-          isNetworkAvailable = false;
+          fail('Live Supabase integration test failed: backend returned status ${res.statusCode}');
         }
-      } catch (_) {
-        isNetworkAvailable = false;
+      } catch (e) {
+        fail(
+          'Live Supabase integration test requires reachability to the Supabase backend (${config.apiUrl}/api/v1). Error: $e',
+        );
       }
 
-      if (isNetworkAvailable) {
-        final phone =
-            '011${(DateTime.now().microsecondsSinceEpoch % 100000000).toString().padLeft(8, '0')}';
-        // Seed customer
-        await dio.post(
-          '/customers',
-          data: {
-            'id': testCustomerId,
-            'name': 'Step 10 Live Payment Tester $runId',
-            'phone': phone,
-            'notes': 'Test customer for Step 10 live payment verification',
-          },
-          options: Options(
-            headers: {'X-Operation-ID': 'op-step10-seed-cust-$runId'},
-            validateStatus: (_) => true,
-          ),
-        );
+      final phone =
+          '011${(DateTime.now().microsecondsSinceEpoch % 100000000).toString().padLeft(8, '0')}';
+      // Seed customer
+      await dio.post(
+        '/customers',
+        data: {
+          'id': testCustomerId,
+          'name': 'Step 10 Live Payment Tester $runId',
+          'phone': phone,
+          'notes': 'Test customer for Step 10 live payment verification',
+        },
+        options: Options(
+          headers: {'X-Operation-ID': 'op-step10-seed-cust-$runId'},
+          validateStatus: (_) => true,
+        ),
+      );
 
         // Seed service
         await dio.post(
@@ -418,13 +420,11 @@ void main() {
             'Status=${patchCancelRes.statusCode} body=${patchCancelRes.data}',
           );
         }
-      }
     });
 
     test(
       '1. Valid payment creation: returns 201, records payment, and increments order paid_amount atomically',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await dio.post(
           '/payments',
@@ -457,7 +457,6 @@ void main() {
     test(
       '2. Idempotency: exact duplicate replay returns cached response without duplicate payment or balance increment',
       () async {
-        if (!isNetworkAvailable) return;
 
         final replayRes = await dio.post(
           '/payments',
@@ -487,7 +486,6 @@ void main() {
     test(
       '3. Overpayment rejection: payment exceeding remaining balance is rejected with 409 CONFLICT',
       () async {
-        if (!isNetworkAvailable) return;
 
         // Order total = 20000, paid_amount = 8000, remaining = 12000.
         // Attempting to pay 15000 -> exceeds 12000 remaining.
@@ -524,7 +522,6 @@ void main() {
     test(
       '4. Cancelled order rejection: payment on cancelled order is rejected with 409 CONFLICT',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await dio.post(
           '/payments',
@@ -552,7 +549,6 @@ void main() {
     test(
       '5. Zero and negative amount rejection: rejected with 422 VALIDATION_ERROR',
       () async {
-        if (!isNetworkAvailable) return;
 
         // Zero
         final zeroRes = await dio.post(
@@ -599,7 +595,6 @@ void main() {
     test(
       '6. Invalid payment method rejection: rejected with 422 VALIDATION_ERROR',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await dio.post(
           '/payments',
@@ -624,7 +619,6 @@ void main() {
     );
 
     test('7. Missing order rejection: returns 404 NOT_FOUND', () async {
-      if (!isNetworkAvailable) return;
 
       final res = await dio.post(
         '/payments',
@@ -647,7 +641,6 @@ void main() {
     test(
       '8. GET /payments/:id and GET /payments?order_id=... return persisted payments',
       () async {
-        if (!isNetworkAvailable) return;
 
         // GET by ID
         final getByIdRes = await dio.get('/payments/$testPaymentId');
@@ -671,7 +664,6 @@ void main() {
     test(
       '9. Immutability: PATCH/DELETE /payments returns 404 NOT_FOUND',
       () async {
-        if (!isNetworkAvailable) return;
 
         final patchRes = await dio.patch(
           '/payments/$testPaymentId',

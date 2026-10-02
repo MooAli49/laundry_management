@@ -597,7 +597,6 @@ The following remain deferred:
 - Complex distributed merge algorithms
 - CRDTs
 - Raw WebSocket / full real-time collaborative document editing
-- Full automatic CURSOR_TOO_OLD resync/bootstrap recovery
 - Flutter client OCC (server_version/base_version) propagation
 - Distributed locking
 - Multi-tenant / SaaS conflict administration
@@ -1507,7 +1506,6 @@ The following are intentionally deferred from V1:
 
     Complex Distributed Merge Algorithms & CRDTs
     Raw WebSocket / Full Real-time Collaborative Document Sync
-    Full Automatic CURSOR_TOO_OLD Bootstrap / Resync Recovery
     Flutter Client OCC (server_version/base_version) Propagation
     Automatic Background Sync Operations Purge (retention is 90 days, manual purge)
     Multi-tenant / SaaS / Multi-branch Administration
@@ -1517,7 +1515,7 @@ The following are intentionally deferred from V1:
     Advanced Caching Architecture
     File/Image Storage Architecture when not required by V1
 
-*Note: 2-device bidirectional synchronization, cursor-based pull synchronization, and Realtime wake-up signal adapter are Approved for V1 and are no longer deferred.*
+*Note: 2-device bidirectional synchronization, cursor-based pull synchronization, Realtime wake-up signal adapter, and CURSOR_TOO_OLD snapshot recovery (SUSP-01) are Approved for V1 and are no longer deferred.*
 
 These should not be implemented unless requirements change.
 

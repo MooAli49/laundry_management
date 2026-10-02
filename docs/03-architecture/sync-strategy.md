@@ -2158,8 +2158,8 @@ If a device cursor falls behind the retained change history in `sync_changes`:
 3. **CRITICAL INVARIANT**: A full resync or bootstrap must **NEVER delete or overwrite locally pending unsynced business data** stored in `sync_operations`.
 4. Locally pending operations remain preserved in `sync_operations` and are drained through normal push after the baseline is refreshed.
 
-> **Known Deferred Limitation (Automatic Resync / Bootstrap)**:
-> Full automatic device bootstrap and automated `CURSOR_TOO_OLD` resync recovery are **deferred** in V1. The detection and safety contracts exist, but automatic reconciliation is not implemented in this phase.
+> **Automated Recovery Contract (SUSP-01 Implementation)**:
+> Automatic recovery from `CURSOR_TOO_OLD` (HTTP 410) is fully implemented. When `CursorTooOldException` occurs, `SyncEngine` initiates an authoritative full snapshot fetch (`GET /sync/snapshot` backed by PostgreSQL RPC `get_sync_snapshot()`). `RemoteChangeApplier.applySnapshot()` applies all 13 tiers in strict foreign-key dependency order within a single local SQLite transaction, preserves locally pending mutations in `sync_operations`, advances `sync_state.last_applied_sequence` to `snapshot.latestSequence`, and immediately drains pending outbox operations. Full resync can also be triggered administratively via `SyncEngine.fullResync()`.
 
 ---
 

@@ -170,6 +170,10 @@ class StorageRepositoryImpl implements StorageRepository {
         }
 
         final now = DateTime.now();
+        final oldRecord = await _storageRecordsDao
+            .getActiveRecordForOrderItem(orderItemId);
+        final previousLocationId = oldRecord?.storageLocationId;
+
         // Deactivate old active record
         await _storageRecordsDao.deactivateActiveRecord(orderItemId, now);
 
@@ -199,7 +203,10 @@ class StorageRepositoryImpl implements StorageRepository {
           entityType: 'storage_record',
           entityId: newId,
           operationType: 'move',
-          payload: SyncPayloadBuilder.buildStorageRecordPayload(record),
+          payload: SyncPayloadBuilder.buildStorageRecordPayload(
+            record,
+            previousStorageLocationId: previousLocationId,
+          ),
         );
 
         return record;

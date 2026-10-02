@@ -221,7 +221,6 @@ void main() {
     late String supabaseAnonKey;
     late TestDevice deviceA;
     late TestDevice deviceB;
-    bool isLiveBackendAvailable = true;
 
     final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
         .toRadixString(16)
@@ -271,17 +270,16 @@ void main() {
       drift.driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
 
       try {
-        final res = await dio.get('/customers', queryParameters: {'limit': 1});
+        final res = await dio.get('/api/v1/customers', queryParameters: {'limit': 1});
         if (res.statusCode != 200) {
-          isLiveBackendAvailable = false;
+          fail('Backend /api/v1/customers probe returned ${res.statusCode}');
         }
-      } catch (_) {
-        isLiveBackendAvailable = false;
+      } catch (e) {
+        fail('Backend probe failed: $e. Configure live Supabase before running integration tests.');
       }
     });
 
     setUp(() async {
-      if (!isLiveBackendAvailable) return;
 
       deviceA = await TestDevice.create(
         name: 'Device A',
@@ -372,15 +370,14 @@ void main() {
     });
 
     tearDown(() async {
-      if (!isLiveBackendAvailable) return;
       await deviceA.dispose();
       await deviceB.dispose();
     });
 
     test(
       'Two-Device Full Lifecycle: Scenario 1 (Ready preservation), Scenario 2 (Ready->Processing deactivation), Scenario 3 (Complete), Scenario 4 (Cancel)',
+      timeout: const Timeout(Duration(minutes: 2)),
       () async {
-        if (!isLiveBackendAvailable) return;
 
         // ---------------------------------------------------------------------
         // STEP 0: Create Customer on Device A and replicate to Device B

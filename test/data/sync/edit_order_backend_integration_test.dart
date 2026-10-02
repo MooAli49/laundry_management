@@ -1,13 +1,13 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:laundry_management/core/config/supabase_config.dart';
 import 'package:laundry_management/core/network/dio_client.dart';
 
 void main() {
   group('Edit Processing Order V1 — Backend Integration Tests (25 Points)', () {
     late DioClient client;
     late Dio dio;
-    bool isNetworkAvailable = true;
 
     final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
         .toRadixString(16)
@@ -37,19 +37,22 @@ void main() {
     late Map<String, dynamic> initialEditPayload;
 
     setUpAll(() async {
-      client = DioClient();
+      final config = SupabaseConfig.resolve();
+      client = DioClient(
+        baseUrl: '${config.apiUrl}/api/v1',
+        receiveTimeout: const Duration(seconds: 30),
+        connectTimeout: const Duration(seconds: 30),
+      );
       dio = client.dio;
 
       try {
         final res = await dio.get('/customers', queryParameters: {'limit': 1});
         if (res.statusCode != 200) {
-          isNetworkAvailable = false;
+          fail('Backend /customers probe returned ${res.statusCode}');
         }
-      } catch (_) {
-        isNetworkAvailable = false;
+      } catch (e) {
+        fail('Backend probe failed: $e. Configure live Supabase before running integration tests.');
       }
-
-      if (!isNetworkAvailable) return;
 
       // Get latest sequence
       final syncRes = await dio.get(
@@ -190,7 +193,6 @@ void main() {
     test(
       '1, 2, 3, 4, 23: Successful aggregate edit, item update, new item insertion, item deletion, server_version increment',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await dio.patch(
           '/orders/$order1Id/edit-aggregate',
@@ -226,7 +228,6 @@ void main() {
     test(
       '24, 25: Idempotency replay returns cached result and does not create duplicate sync_changes',
       () async {
-        if (!isNetworkAvailable) return;
 
         final replayRes = await dio.patch(
           '/orders/$order1Id/edit-aggregate',
@@ -261,7 +262,6 @@ void main() {
     );
 
     test('5: Carpet metadata insert/update/delete', () async {
-      if (!isNetworkAvailable) return;
 
       final carpetItemId = 'e0000004-0004-4004-8004-$runId';
       final carpetDataId = 'f0000002-0002-4002-8002-$runId';
@@ -329,7 +329,6 @@ void main() {
     });
 
     test('6: order_number is immutable', () async {
-      if (!isNetworkAvailable) return;
 
       final payload = clonePayload(initialEditPayload);
       payload['order_number'] = '99-99999';
@@ -349,7 +348,6 @@ void main() {
     test(
       '7: terminal/protected state rejection (cancelled and completed)',
       () async {
-        if (!isNetworkAvailable) return;
 
         final termOrderId = 'd0000007-0007-4007-8007-$runId';
         final termOrderNum =
@@ -474,7 +472,6 @@ void main() {
     test(
       'Ready order edit rejection: strictly processing-only, zero side effects',
       () async {
-        if (!isNetworkAvailable) return;
 
         final readyOrderId = 'd0000009-0009-4009-8009-$runId';
         final readyOrderNum =
@@ -634,7 +631,6 @@ void main() {
     );
 
     test('8: customer change with paid_amount = 0 is permitted', () async {
-      if (!isNetworkAvailable) return;
 
       final payload = clonePayload(initialEditPayload);
       payload['customer_id'] = cust2Id;
@@ -653,7 +649,6 @@ void main() {
     test(
       '9, 10: customer change with paid_amount > 0 and total < paid_amount rejected',
       () async {
-        if (!isNetworkAvailable) return;
 
         // Add payment of 2000
         final payRes = await dio.post(
@@ -715,7 +710,6 @@ void main() {
     );
 
     test('11: unit_price <= 0 rejected', () async {
-      if (!isNetworkAvailable) return;
 
       final payload = clonePayload(initialEditPayload);
       payload['customer_id'] = cust2Id;
@@ -734,7 +728,6 @@ void main() {
     });
 
     test('12: invalid item_type rejected', () async {
-      if (!isNetworkAvailable) return;
 
       final payload = clonePayload(initialEditPayload);
       payload['customer_id'] = cust2Id;
@@ -753,7 +746,6 @@ void main() {
     });
 
     test('13: invalid item_definition rejected', () async {
-      if (!isNetworkAvailable) return;
 
       final payload = clonePayload(initialEditPayload);
       payload['customer_id'] = cust2Id;
@@ -772,7 +764,6 @@ void main() {
     });
 
     test('14: incompatible service/item_type rejected', () async {
-      if (!isNetworkAvailable) return;
 
       final payload = clonePayload(initialEditPayload);
       payload['customer_id'] = cust2Id;
@@ -790,7 +781,6 @@ void main() {
     });
 
     test('15: invalid pricing_type rejected', () async {
-      if (!isNetworkAvailable) return;
 
       final payload = clonePayload(initialEditPayload);
       payload['customer_id'] = cust2Id;
@@ -808,7 +798,6 @@ void main() {
     });
 
     test('16: existing item_type mutation rejected', () async {
-      if (!isNetworkAvailable) return;
 
       final payload = clonePayload(initialEditPayload);
       payload['customer_id'] = cust2Id;
@@ -826,7 +815,6 @@ void main() {
     });
 
     test('17: invalid carpet dimensions rejected', () async {
-      if (!isNetworkAvailable) return;
 
       final carpetPayload = clonePayload(initialEditPayload);
       carpetPayload['customer_id'] = cust2Id;
@@ -861,7 +849,6 @@ void main() {
     test(
       '18, 19, 20: deletion blocked when storage_records exists, P0006 raised, maps to HTTP 409',
       () async {
-        if (!isNetworkAvailable) return;
 
         // Create storage record for item3Id
         final storRes = await dio.post(

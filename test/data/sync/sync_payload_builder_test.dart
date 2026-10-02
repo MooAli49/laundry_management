@@ -172,10 +172,10 @@ void main() {
       final map = jsonDecode(jsonString) as Map<String, dynamic>;
 
       expect(map.containsKey('id'), isFalse);
-      expect(map.containsKey('expense_category_id'), isFalse);
-      expect(map.containsKey('category_name_snapshot'), isFalse);
       expect(map.containsKey('created_at'), isFalse);
 
+      expect(map['expense_category_id'], 'cat-test-water');
+      expect(map['category_name_snapshot'], 'مياه');
       expect(map['amount'], 4200);
       expect(map['expense_name'], 'فاتورة مياه معدلة');
       expect(map['expense_date'], '2026-09-01');

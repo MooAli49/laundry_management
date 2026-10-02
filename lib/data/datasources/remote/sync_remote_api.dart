@@ -15,4 +15,7 @@ abstract class SyncRemoteApi {
     @Query('after') required int after,
     @Query('limit') int? limit,
   });
+
+  @GET('/api/v1/sync/snapshot')
+  Future<dynamic> getSnapshot();
 }
