@@ -1163,6 +1163,7 @@ Key architectural requirements for two-device synchronization:
 5. **Crash Safety**: Applying pulled changes and advancing `sync_state.last_applied_sequence` occur within the **same local transaction**.
 6. **Preservation of Local Pending Operations**: An initial bootstrap or full resync after `CURSOR_TOO_OLD` must NEVER delete locally pending unsynced records in `sync_operations`.
 7. **Single Order-Intake Terminal Deployment**: In the initial deployment, one physical terminal is dedicated to receiving and creating orders at the cashier counter. A second terminal participates bidirectionally for order tracking, fulfillment, storage assignment, and payment processing. Multi-terminal concurrent order creation via station-partitioned numbering is architecturally prepared but intentionally deferred for V1 to eliminate onboarding overhead.
+8. **Primary Terminal Replacement / Reinstallation Bootstrap**: Any replacement or reinstalled primary cashier device must connect to the internet and complete an initial synchronization before creating new customer orders. This hydrates local SQLite with all remote historical orders so that `OrdersDao.generateNextOrderNumber()` continues from the correct sequence without collision risk.
 
 ---
 

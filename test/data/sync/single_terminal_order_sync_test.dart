@@ -303,5 +303,265 @@ void main() {
       expect(firstHist?.id, 'hist-1');
       expect(lastHist?.id, 'hist-22');
     });
+
+    test(
+      '7. BUG-04 Invariant: Different UUID with duplicate order_number is rejected by UNIQUE constraint and does not advance cursor',
+      () async {
+        // 1. Local terminal creates order 26-001 with UUID-A
+        final localOrder = await orderRepository.createOrder(
+          order: createDraftOrder(id: 'ord-uuid-A'),
+          items: [createOrderItem(id: 'item-uuid-A', orderId: 'ord-uuid-A')],
+        );
+        expect(localOrder.orderNumber, '$yearPrefix-001');
+
+        final initialCursor = await syncStateDao.getLastAppliedSequence();
+        expect(initialCursor, 0);
+
+        // 2. Incoming remote change arrives with different UUID-B but identical order_number '26-001'
+        final collidingRemoteChange = SyncChangeDto(
+          sequence: 42,
+          operationId: 'op-colliding-1',
+          entityType: 'order',
+          entityId: 'ord-uuid-B',
+          operationType: 'create',
+          payload: {
+            'id': 'ord-uuid-B',
+            'order_number': '$yearPrefix-001',
+            'customer_id': 'cust-terminal-1',
+            'customer_name_snapshot': 'عميل محطة أخرى',
+            'customer_phone_snapshot': '01099998888',
+            'status': 'processing',
+            'expected_pickup_date': now.toIso8601String(),
+            'subtotal': 2500,
+            'discount': 0,
+            'tax': 0,
+            'total': 2500,
+            'created_at': now.toIso8601String(),
+            'updated_at': now.toIso8601String(),
+            'items': [
+              {
+                'id': 'item-uuid-B',
+                'item_type_id': '00000000-0000-0000-0001-000000000001',
+                'service_id': 'srv-wash',
+                'item_type_name_snapshot': 'قميص',
+                'service_name_snapshot': 'غسيل وكوي',
+                'pricing_type': 'per_piece',
+                'quantity': 1,
+                'unit_price': 2500,
+                'calculated_total': 2500,
+                'created_at': now.toIso8601String(),
+                'updated_at': now.toIso8601String(),
+              }
+            ],
+          },
+          createdAt: now,
+        );
+
+        // 3. Applying the colliding change MUST fail due to SQLite UNIQUE constraint
+        expect(
+          () => remoteChangeApplier.applyBatch([collidingRemoteChange]),
+          throwsA(isA<Exception>()),
+        );
+
+        // 4. Verify invariants after the failed transaction:
+        // A. Local order remains completely intact and was not overwritten
+        final localStored = await ordersDao.getOrderById('ord-uuid-A');
+        expect(localStored, isNotNull);
+        expect(localStored!.orderNumber, '$yearPrefix-001');
+
+        // B. Colliding remote order was NOT inserted
+        final remoteStored = await ordersDao.getOrderById('ord-uuid-B');
+        expect(remoteStored, isNull);
+
+        // C. Sync cursor did NOT advance past the failed change
+        final cursorAfterFailure = await syncStateDao.getLastAppliedSequence();
+        expect(cursorAfterFailure, initialCursor);
+      },
+    );
+
+    test(
+      '8. Multi-Change Lifecycle Replication: Create, Edit, Payment on Terminal 1 replicate to Terminal 2 with stable order_number',
+      () async {
+        // Simulate Terminal 2 receiving full sequence from Terminal 1:
+        // Change 1: Order Create
+        final change1 = SyncChangeDto(
+          sequence: 10,
+          operationId: 'op-create-10',
+          entityType: 'order',
+          entityId: 'ord-multi-1',
+          operationType: 'create',
+          payload: {
+            'id': 'ord-multi-1',
+            'order_number': '$yearPrefix-001',
+            'customer_id': 'cust-terminal-1',
+            'customer_name_snapshot': 'عميل المحل',
+            'customer_phone_snapshot': '01011112222',
+            'status': 'processing',
+            'expected_pickup_date': now.toIso8601String(),
+            'subtotal': 2500,
+            'discount': 0,
+            'tax': 0,
+            'total': 2500,
+            'created_at': now.toIso8601String(),
+            'updated_at': now.toIso8601String(),
+            'items': [
+              {
+                'id': 'item-m-1',
+                'item_type_id': '00000000-0000-0000-0001-000000000001',
+                'service_id': 'srv-wash',
+                'item_type_name_snapshot': 'قميص',
+                'service_name_snapshot': 'غسيل وكوي',
+                'pricing_type': 'per_piece',
+                'quantity': 1,
+                'unit_price': 2500,
+                'calculated_total': 2500,
+                'created_at': now.toIso8601String(),
+                'updated_at': now.toIso8601String(),
+              }
+            ],
+          },
+          createdAt: now,
+        );
+
+        // Change 2: Order Edit (notes modified, price updated to 5000)
+        final change2 = SyncChangeDto(
+          sequence: 11,
+          operationId: 'op-edit-11',
+          entityType: 'order',
+          entityId: 'ord-multi-1',
+          operationType: 'edit',
+          payload: {
+            'id': 'ord-multi-1',
+            'order_number': '$yearPrefix-001',
+            'customer_id': 'cust-terminal-1',
+            'status': 'processing',
+            'expected_pickup_date': now.toIso8601String(),
+            'notes': 'ملاحظة بعد التعديل',
+            'subtotal': 5000,
+            'discount': 0,
+            'tax': 0,
+            'total': 5000,
+            'updated_at': now.add(const Duration(minutes: 5)).toIso8601String(),
+            'items': [
+              {
+                'id': 'item-m-1',
+                'item_type_id': '00000000-0000-0000-0001-000000000001',
+                'service_id': 'srv-wash',
+                'item_type_name_snapshot': 'قميص',
+                'service_name_snapshot': 'غسيل وكوي',
+                'pricing_type': 'per_piece',
+                'quantity': 2,
+                'unit_price': 2500,
+                'calculated_total': 5000,
+                'created_at': now.toIso8601String(),
+                'updated_at': now.add(const Duration(minutes: 5)).toIso8601String(),
+              }
+            ],
+          },
+          createdAt: now.add(const Duration(minutes: 5)),
+        );
+
+        // Change 3: Payment Create
+        final change3 = SyncChangeDto(
+          sequence: 12,
+          operationId: 'op-pay-12',
+          entityType: 'payment',
+          entityId: 'pay-multi-1',
+          operationType: 'create',
+          payload: {
+            'id': 'pay-multi-1',
+            'order_id': 'ord-multi-1',
+            'amount': 5000,
+            'payment_method': 'cash',
+            'paid_at': now.add(const Duration(minutes: 6)).toIso8601String(),
+            'created_at': now.add(const Duration(minutes: 6)).toIso8601String(),
+            'updated_at': now.add(const Duration(minutes: 6)).toIso8601String(),
+          },
+          createdAt: now.add(const Duration(minutes: 6)),
+        );
+
+        // Apply changes in batch to simulate Terminal 2 pull
+        await remoteChangeApplier.applyBatch([change1, change2, change3]);
+
+        // Verify Terminal 2 local state
+        final orderOnT2 = await ordersDao.getOrderById('ord-multi-1');
+        expect(orderOnT2, isNotNull);
+        expect(orderOnT2!.orderNumber, '$yearPrefix-001'); // Immutable
+        expect(orderOnT2.total, 5000);
+        expect(orderOnT2.notes, 'ملاحظة بعد التعديل');
+
+        // Verify payment stored
+        final paymentsOnT2 = await paymentsDao.getPaymentsForOrder('ord-multi-1');
+        expect(paymentsOnT2.length, 1);
+        expect(paymentsOnT2.first.id, 'pay-multi-1');
+        expect(paymentsOnT2.first.amount, 5000);
+        expect(paymentsOnT2.first.orderId, 'ord-multi-1');
+
+        // Verify cursor advanced to 12
+        final cursor = await syncStateDao.getLastAppliedSequence();
+        expect(cursor, 12);
+      },
+    );
+
+    test(
+      '9. Replacement Terminal Bootstrap: Fresh device hydrates remote orders and continues sequence correctly',
+      () async {
+        // Fresh terminal starts with 0 orders and cursor at 0
+        final initialRows = await ordersDao.getOrders();
+        expect(initialRows, isEmpty);
+        expect(await syncStateDao.getLastAppliedSequence(), 0);
+
+        // Scenario 10 invariant: An un-hydrated fresh device generates 26-001
+        final unhydratedCandidate = await ordersDao.generateNextOrderNumber();
+        expect(unhydratedCandidate, '$yearPrefix-001');
+
+        // Perform initial sync/bootstrap: hydrate remote historical orders (e.g. 26-001 through 26-005)
+        final bootstrapChanges = List.generate(5, (index) {
+          final seq = index + 1;
+          final padded = seq.toString().padLeft(3, '0');
+          return SyncChangeDto(
+            sequence: seq,
+            operationId: 'op-boot-$seq',
+            entityType: 'order',
+            entityId: 'ord-boot-$seq',
+            operationType: 'create',
+            payload: {
+              'id': 'ord-boot-$seq',
+              'order_number': '$yearPrefix-$padded',
+              'customer_id': 'cust-terminal-1',
+              'customer_name_snapshot': 'عميل المحل',
+              'customer_phone_snapshot': '01011112222',
+              'status': 'processing',
+              'expected_pickup_date': now.toIso8601String(),
+              'subtotal': 2500,
+              'discount': 0,
+              'tax': 0,
+              'total': 2500,
+              'created_at': now.toIso8601String(),
+              'updated_at': now.toIso8601String(),
+              'items': [],
+            },
+            createdAt: now,
+          );
+        });
+
+        await remoteChangeApplier.applyBatch(bootstrapChanges);
+
+        // Verify all 5 orders are hydrated
+        expect(await syncStateDao.getLastAppliedSequence(), 5);
+        final fifthOrder = await ordersDao.getOrderByNumber('$yearPrefix-005');
+        expect(fifthOrder, isNotNull);
+
+        // Now that initial sync has completed, the replacement device generates 26-006!
+        final hydratedCandidate = await ordersDao.generateNextOrderNumber();
+        expect(hydratedCandidate, '$yearPrefix-006');
+
+        final newOrder = await orderRepository.createOrder(
+          order: createDraftOrder(id: 'ord-boot-6'),
+          items: [createOrderItem(id: 'item-boot-6', orderId: 'ord-boot-6')],
+        );
+        expect(newOrder.orderNumber, '$yearPrefix-006');
+      },
+    );
   });
 }

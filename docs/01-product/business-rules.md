@@ -214,6 +214,7 @@ The exact generation mechanism is an implementation detail, but uniqueness is ma
   - Strict immutability of assigned order numbers (BR-018) is maintained; physical receipts, tags, and database records remain permanently consistent.
   - No reactive renumbering or silent mutation is performed during synchronization.
   - Multi-terminal concurrent order creation via station partitioning is designated as the future architectural path when additional intake terminals are deployed.
+- **Replacement / Reinstalled Device Operational Requirement**: Any replacement or reinstalled primary cashier device must connect to the internet and complete an initial synchronization before creating new customer orders. This guarantees that local sequence generation is hydrated with the latest historical order numbers from the remote database and prevents sequence resets to `26-001`.
 
 ---
 
