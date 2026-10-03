@@ -107,6 +107,49 @@ DELETE FROM public.sync_changes;
 ALTER SEQUENCE public.sync_changes_sequence_seq RESTART WITH 1;
 
 -- -----------------------------------------------------------------------------
+-- 4. CANONICAL SINGLETON INITIALIZATION
+-- Ensure canonical business_settings singleton exists for fresh/empty databases.
+-- -----------------------------------------------------------------------------
+INSERT INTO public.business_settings (
+    id,
+    business_name,
+    address,
+    phone,
+    logo_reference,
+    invoice_footer_text,
+    tax_enabled,
+    tax_rate,
+    server_version,
+    created_at,
+    updated_at
+) VALUES (
+    '00000000-0000-0000-0000-000000000001',
+    '',
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    false,
+    0.0,
+    1,
+    now(),
+    now()
+)
+ON CONFLICT (id) DO UPDATE SET
+    business_name = '',
+    address = NULL,
+    phone = NULL,
+    logo_reference = NULL,
+    invoice_footer_text = NULL,
+    tax_enabled = false,
+    tax_rate = 0.0,
+    server_version = 1,
+    updated_at = now();
+
+DELETE FROM public.business_settings
+WHERE id <> '00000000-0000-0000-0000-000000000001';
+
+-- -----------------------------------------------------------------------------
 -- 5. POST-CLEANUP ASSERTIONS
 -- Verify that all destructive targets are empty and the business-settings
 -- singleton remains available for the canonical seed update.
