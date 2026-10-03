@@ -26,7 +26,7 @@ void main() {
     late RemoteChangeApplier applier;
 
     setUp(() async {
-      db = app_db.AppDatabase(NativeDatabase.memory(), true);
+      db = app_db.AppDatabase(NativeDatabase.memory(), false);
       syncStateDao = SyncStateDao(db);
       syncOperationsDao = SyncOperationsDao(db);
       customersDao = CustomersDao(db);
@@ -36,6 +36,45 @@ void main() {
       storageRecordsDao = StorageRecordsDao(db);
 
       applier = RemoteChangeApplier(db: db, syncStateDao: syncStateDao);
+
+      final nowTimestamp =
+          DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+      await db.customStatement(
+        'INSERT INTO item_types (id, name, is_active, created_at, updated_at) '
+        'VALUES (?, ?, ?, ?, ?)',
+        [
+          '00000000-0000-0000-0001-000000000003',
+          'سجاد',
+          1,
+          nowTimestamp,
+          nowTimestamp,
+        ],
+      );
+      await db.customStatement(
+        'INSERT INTO item_types (id, name, is_active, created_at, updated_at) '
+        'VALUES (?, ?, ?, ?, ?)',
+        [
+          '00000000-0000-0000-0001-000000000001',
+          'ملابس',
+          1,
+          nowTimestamp,
+          nowTimestamp,
+        ],
+      );
+      await db.customStatement(
+        'INSERT INTO carpet_sizes '
+        '(id, length, width, area, is_active, created_at, updated_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          '00000000-0000-0000-0007-000000000001',
+          3.0,
+          2.0,
+          6.0,
+          1,
+          nowTimestamp,
+          nowTimestamp,
+        ],
+      );
 
       // Verify clean initial state
       final initialSeq = await syncStateDao.getLastAppliedSequence();
@@ -2660,7 +2699,9 @@ void main() {
 
           final carpetWashPricing =
               await (db.select(db.serviceItemTypes)..where(
-                    (t) => t.serviceId.equals('00000000-0000-0000-0002-000000000003'),
+                    (t) => t.serviceId.equals(
+                      '00000000-0000-0000-0002-000000000003',
+                    ),
                   ))
                   .getSingleOrNull();
           expect(carpetWashPricing?.price, equals(6000));

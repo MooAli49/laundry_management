@@ -20,7 +20,7 @@ class SyncConflictsDao extends DatabaseAccessor<app_db.AppDatabase> {
     required Map<String, dynamic> payload,
     required DateTime detectedAt,
   }) async {
-    final conflictId = 'order:$entityId:$remoteSequence';
+    final conflictId = '$remoteSequence:order:$entityId:$conflictType';
     await into(db.syncConflicts).insertOnConflictUpdate(
       app_db.SyncConflictsCompanion(
         id: Value(conflictId),

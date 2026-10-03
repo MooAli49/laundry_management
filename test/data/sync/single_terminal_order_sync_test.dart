@@ -37,7 +37,7 @@ void main() {
     final yearPrefix = (now.year % 100).toString().padLeft(2, '0');
 
     setUp(() async {
-      db = AppDatabase(NativeDatabase.memory(), true);
+      db = AppDatabase(NativeDatabase.memory(), false);
       ordersDao = OrdersDao(db);
       paymentsDao = PaymentsDao(db);
       storageRecordsDao = StorageRecordsDao(db);
@@ -59,6 +59,10 @@ void main() {
 
       // Foreign key dependencies
       final nowTimestamp = now.toUtc().millisecondsSinceEpoch ~/ 1000;
+      await db.customStatement(
+        'INSERT INTO item_types (id, name, is_active, created_at, updated_at) VALUES (?, ?, 1, ?, ?);',
+        ['00000000-0000-0000-0001-000000000001', 'ملابس', nowTimestamp, nowTimestamp],
+      );
       await db.customStatement(
         'INSERT INTO customers (id, name, phone, created_at, updated_at) VALUES (?, ?, ?, ?, ?);',
         ['cust-terminal-1', 'عميل المحل', '01011112222', nowTimestamp, nowTimestamp],

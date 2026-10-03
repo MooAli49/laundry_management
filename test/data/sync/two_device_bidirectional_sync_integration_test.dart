@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -285,9 +286,16 @@ void main() {
         data: {
           'id': testServiceId,
           'name': 'خدمة سجاد C4C $runId',
-          'pricing_type': 'per_square_meter',
-          'price': 4000,
           'is_active': true,
+          'service_item_types': [
+            {
+              'id': const Uuid().v4(),
+              'service_id': testServiceId,
+              'item_type_id': '00000000-0000-0000-0001-000000000003',
+              'pricing_type': 'per_square_meter',
+              'price': 4000,
+            }
+          ],
         },
         options: Options(
           headers: {'X-Operation-ID': 'op-c4c-srv-$runId'},

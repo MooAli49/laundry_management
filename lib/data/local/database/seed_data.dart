@@ -17,6 +17,13 @@ import 'package:drift/drift.dart';
 /// `flutter run --dart-define=ENABLE_CANONICAL_SEED=true`
 /// (independent of `ENABLE_DEV_TEST_DATA`).
 class SeedData {
+  /// Last sequence emitted by the canonical remote master-data baseline.
+  ///
+  /// The baseline contains 35 sync changes: aggregate service and storage
+  /// changes include their junction rows. A canonical local database starts
+  /// at this cursor so it does not replay its own bootstrap history.
+  static const int canonicalBaselineSequence = 35;
+
   /// Compile-time opt-in flag for canonical seeding. Defaults to `false`.
   static const bool isEnabled = bool.fromEnvironment(
     'ENABLE_CANONICAL_SEED',
@@ -217,16 +224,8 @@ class SeedData {
       'item_type_id': typeCarpetsId,
       'name': 'سجادة صوف',
     },
-    {
-      'id': idefRunnerCarpetId,
-      'item_type_id': typeCarpetsId,
-      'name': 'مشاية',
-    },
-    {
-      'id': idefDuvetCoverId,
-      'item_type_id': typeCoversId,
-      'name': 'غطاء لحاف',
-    },
+    {'id': idefRunnerCarpetId, 'item_type_id': typeCarpetsId, 'name': 'مشاية'},
+    {'id': idefDuvetCoverId, 'item_type_id': typeCoversId, 'name': 'غطاء لحاف'},
     {'id': idefBedspreadId, 'item_type_id': typeCoversId, 'name': 'كوفرتة'},
     {
       'id': idefSilkCarpetId,
@@ -266,12 +265,13 @@ class SeedData {
       );
     }
 
-    // 4. Seed SyncState (exactly 1 record with sequence 0, idempotent)
+    // 4. Seed SyncState at the canonical remote baseline. This row is local
+    // metadata and must not create an outbox operation.
     await db.customStatement(
       'INSERT OR IGNORE INTO sync_state '
       '(id, last_applied_sequence, updated_at) '
       'VALUES (?, ?, ?);',
-      ['singleton', 0, nowTimestamp],
+      ['singleton', canonicalBaselineSequence, nowTimestamp],
     );
 
     // 5. Seed Services (5 canonical services, idempotent)

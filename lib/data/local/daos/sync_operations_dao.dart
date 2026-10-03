@@ -80,38 +80,42 @@ class SyncOperationsDao extends DatabaseAccessor<app_db.AppDatabase> {
     final effectiveAsOf = asOf ?? DateTime.now();
     if (limit <= 0) return [];
 
-    final queue = await (select(db.syncOperations)
-          ..where((t) => t.status.isIn(['pending', 'failed']))
-          ..orderBy([
-            (t) => OrderingTerm.asc(t.createdAt),
-            (_) => OrderingTerm.asc(CustomExpression<int>('rowid')),
-          ]))
-        .get();
+    final queue =
+        await (select(db.syncOperations)
+              ..where((t) => t.status.isIn(['pending', 'failed']))
+              ..orderBy([
+                (t) => OrderingTerm.asc(t.createdAt),
+                (_) => OrderingTerm.asc(CustomExpression<int>('rowid')),
+              ]))
+            .get();
 
     if (queue.isEmpty) return [];
 
     Map<String, String>? orderItemToOrderMap;
-    final hasStorageRecord =
-        queue.any((op) => op.entityType == 'storage_record');
+    final hasStorageRecord = queue.any(
+      (op) => op.entityType == 'storage_record',
+    );
     if (hasStorageRecord) {
       final items = await select(db.orderItems).get();
       orderItemToOrderMap = {for (final item in items) item.id: item.orderId};
     }
 
     final eligible = <app_db.SyncOperation>[];
-    final failedEntities = <EntityDependency>{};
+    final permanentlyFailedEntities = <EntityDependency>{
+      for (final operation in queue)
+        if (operation.status == 'failed' && operation.nextRetryAt == null)
+          EntityDependency(
+            entityType: operation.entityType,
+            entityId: operation.entityId,
+          ),
+    };
 
-    for (final operation in queue) {
-      final opEntity = EntityDependency(
-        entityType: operation.entityType,
-        entityId: operation.entityId,
-      );
-
+    for (var i = 0; i < queue.length; i++) {
+      final operation = queue[i];
       // 1. Permanent failure check for this operation
       final isPermanentlyFailed =
           operation.status == 'failed' && operation.nextRetryAt == null;
       if (isPermanentlyFailed) {
-        failedEntities.add(opEntity);
         continue;
       }
 
@@ -119,7 +123,7 @@ class SyncOperationsDao extends DatabaseAccessor<app_db.AppDatabase> {
       // pause FIFO traversal so operations behind it do not bypass it.
       final retryAt = operation.nextRetryAt;
       if (retryAt != null && retryAt.isAfter(effectiveAsOf)) {
-        break;
+        continue;
       }
 
       // 3. Inspect dependencies of this operation
@@ -128,14 +132,32 @@ class SyncOperationsDao extends DatabaseAccessor<app_db.AppDatabase> {
         orderItemToOrderMap: orderItemToOrderMap,
       );
 
-      // If any required parent dependency has permanently failed, block this operation
-      final isBlockedByFailedParent =
-          deps.any((d) => failedEntities.contains(d));
-      if (isBlockedByFailedParent) {
-        // Cascade failure state to this entity so downstream dependents are also blocked
-        failedEntities.add(opEntity);
+      if (deps.any(
+        (dependency) =>
+            dependency.entityType ==
+            SyncDependencyResolver.malformedPayloadEntityType,
+      )) {
         continue;
       }
+
+      // If any required parent dependency has permanently failed, block this operation
+      final isBlockedByFailedParent = deps.any(
+        permanentlyFailedEntities.contains,
+      );
+      if (isBlockedByFailedParent) {
+        continue;
+      }
+
+      // Synced operations are not in [queue]. An earlier unsynced parent
+      // operation therefore remains a lifecycle barrier for this operation.
+      final hasUnsyncedParent = deps.any(
+        (dependency) => queue.take(i).any(
+          (parent) =>
+              parent.entityType == dependency.entityType &&
+              parent.entityId == dependency.entityId,
+        ),
+      );
+      if (hasUnsyncedParent) continue;
 
       eligible.add(operation);
       if (eligible.length == limit) break;
@@ -162,13 +184,15 @@ class SyncOperationsDao extends DatabaseAccessor<app_db.AppDatabase> {
     if (deps.isEmpty) return false;
 
     for (final dep in deps) {
-      final failedOp = await (select(db.syncOperations)
-            ..where((t) =>
-                t.entityType.equals(dep.entityType) &
-                t.entityId.equals(dep.entityId) &
-                t.status.equals('failed') &
-                t.nextRetryAt.isNull()))
-          .getSingleOrNull();
+      final failedOp =
+          await (select(db.syncOperations)..where(
+                (t) =>
+                    t.entityType.equals(dep.entityType) &
+                    t.entityId.equals(dep.entityId) &
+                    t.status.equals('failed') &
+                    t.nextRetryAt.isNull(),
+              ))
+              .getSingleOrNull();
 
       if (failedOp != null) {
         return true;
@@ -209,6 +233,22 @@ class SyncOperationsDao extends DatabaseAccessor<app_db.AppDatabase> {
         lastError: Value(error),
         lastAttemptAt: Value(now),
         nextRetryAt: Value(nextRetryAt),
+        updatedAt: Value(now),
+      ),
+    );
+  }
+
+  /// Explicitly reopens a permanently failed operation for user-initiated
+  /// recovery. Automatic synchronization never performs this transition.
+  Future<void> retryOperation(String id) async {
+    final now = DateTime.now();
+    await (update(db.syncOperations)..where((t) => t.id.equals(id))).write(
+      app_db.SyncOperationsCompanion(
+        status: const Value('pending'),
+        retryCount: const Value(0),
+        nextRetryAt: const Value(null),
+        lastError: const Value(null),
+        lastAttemptAt: const Value(null),
         updatedAt: Value(now),
       ),
     );

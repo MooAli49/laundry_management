@@ -42,54 +42,65 @@ void main() {
       expect(DevTestData.isEnabled, isFalse);
     });
 
-    test('default AppDatabase is completely empty (SeedData not executed)',
-        () async {
-      final db = AppDatabase(NativeDatabase.memory());
-      addTearDown(db.close);
+    test(
+      'default AppDatabase is completely empty (SeedData not executed)',
+      () async {
+        final db = AppDatabase(NativeDatabase.memory());
+        addTearDown(db.close);
 
-      final counts = await _rowCounts(db);
-      expect(counts.values.every((c) => c == 0), isTrue, reason: '$counts');
-    });
+        final counts = await _rowCounts(db);
+        expect(counts.values.every((c) => c == 0), isTrue, reason: '$counts');
+      },
+    );
 
-    test('explicit opt-in executes canonical seed with zero outbox rows',
-        () async {
-      final db = AppDatabase(NativeDatabase.memory(), true);
-      addTearDown(db.close);
+    test(
+      'explicit opt-in executes canonical seed with zero outbox rows',
+      () async {
+        final db = AppDatabase(NativeDatabase.memory(), true);
+        addTearDown(db.close);
 
-      final counts = await _rowCounts(db);
-      expect(counts['business_settings'], 1);
-      expect(counts['item_types'], 4);
-      expect(counts['expense_categories'], 7);
-      expect(counts['services'], 5);
-      expect(counts['service_item_types'], 5);
-      expect(counts['carpet_sizes'], 3);
-      expect(counts['storage_locations'], 5);
-      expect(counts['storage_location_item_types'], 9);
-      expect(counts['item_definitions'], 10);
+        final counts = await _rowCounts(db);
+        expect(counts['business_settings'], 1);
+        expect(counts['item_types'], 4);
+        expect(counts['expense_categories'], 7);
+        expect(counts['services'], 5);
+        expect(counts['service_item_types'], 5);
+        expect(counts['carpet_sizes'], 3);
+        expect(counts['storage_locations'], 5);
+        expect(counts['storage_location_item_types'], 9);
+        expect(counts['item_definitions'], 10);
+        final syncState = await db.select(db.syncStates).getSingle();
+        expect(
+          syncState.lastAppliedSequence,
+          SeedData.canonicalBaselineSequence,
+        );
 
-      // Never seeded, even when canonical seed is enabled.
-      for (final t in [
-        'customers',
-        'orders',
-        'order_items',
-        'payments',
-        'refunds',
-        'expenses',
-        'storage_records',
-        'sync_operations',
-      ]) {
-        expect(counts[t], 0, reason: '$t must remain empty');
-      }
-    });
+        // Never seeded, even when canonical seed is enabled.
+        for (final t in [
+          'customers',
+          'orders',
+          'order_items',
+          'payments',
+          'refunds',
+          'expenses',
+          'storage_records',
+          'sync_operations',
+        ]) {
+          expect(counts[t], 0, reason: '$t must remain empty');
+        }
+      },
+    );
 
-    test('explicit opt-out stays empty regardless of the compile-time flag',
-        () async {
-      final db = AppDatabase(NativeDatabase.memory(), false);
-      addTearDown(db.close);
+    test(
+      'explicit opt-out stays empty regardless of the compile-time flag',
+      () async {
+        final db = AppDatabase(NativeDatabase.memory(), false);
+        addTearDown(db.close);
 
-      final counts = await _rowCounts(db);
-      expect(counts.values.every((c) => c == 0), isTrue, reason: '$counts');
-    });
+        final counts = await _rowCounts(db);
+        expect(counts.values.every((c) => c == 0), isTrue, reason: '$counts');
+      },
+    );
 
     test('DevTestData is independent: running it does not require or trigger '
         'canonical seed, and creates no outbox rows', () async {

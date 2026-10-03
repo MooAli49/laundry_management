@@ -176,6 +176,27 @@ void main() {
     },
   );
 
+  test('retrying the exact conflict does not duplicate diagnostics', () async {
+    await applier.applyBatch([
+      change(sequence: 1, id: 'order-1', orderNumber: '26-001'),
+    ]);
+
+    final duplicate = change(sequence: 2, id: 'order-2', orderNumber: '26-001');
+    await expectLater(
+      applier.applyBatch([duplicate]),
+      throwsA(isA<SyncConflictException>()),
+    );
+    await expectLater(
+      applier.applyBatch([duplicate]),
+      throwsA(isA<SyncConflictException>()),
+    );
+
+    final conflicts = await db.select(db.syncConflicts).get();
+    expect(conflicts, hasLength(1));
+    expect(conflicts.single.id, '2:order:order-2:duplicate_order_number');
+    expect(await syncStateDao.getLastAppliedSequence(), 1);
+  });
+
   test('conflict detection does not corrupt unrelated local data', () async {
     await db
         .into(db.customers)

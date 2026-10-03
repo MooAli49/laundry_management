@@ -320,7 +320,7 @@ void main() {
             'is_active': true,
             'service_item_types': [
               {
-                'id': 'sit-$runId',
+                'id': 'e2000000-0000-4000-8000-$runId',
                 'service_id': testServiceId,
                 'item_type_id': '00000000-0000-0000-0001-000000000001',
                 'pricing_type': 'per_piece',

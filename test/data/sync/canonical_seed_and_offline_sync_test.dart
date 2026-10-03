@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,7 +19,9 @@ import 'package:laundry_management/data/datasources/remote/sync_remote_data_sour
 import 'package:laundry_management/data/local/daos/customers_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_state_dao.dart';
-import 'package:laundry_management/data/local/database/app_database.dart' hide Customer;
+import 'package:laundry_management/data/local/database/app_database.dart'
+    hide Customer;
+import 'package:laundry_management/data/local/database/seed_data.dart';
 import 'package:laundry_management/data/repositories/customer_repository_impl.dart';
 import 'package:laundry_management/data/sync/remote_change_applier.dart';
 import 'package:laundry_management/data/sync/sync_engine.dart';
@@ -31,7 +34,7 @@ class MockableNetworkInfo implements NetworkInfo {
   final StreamController<bool> _controller = StreamController<bool>.broadcast();
 
   MockableNetworkInfo({bool initialConnected = true})
-      : _isConnected = initialConnected;
+    : _isConnected = initialConnected;
 
   @override
   Future<bool> get isConnected async => _isConnected;
@@ -85,7 +88,9 @@ void main() {
           queryParameters: {'limit': 1},
         );
         if (probeRes.statusCode != 200) {
-          fail('Development Supabase probe returned status ${probeRes.statusCode}');
+          fail(
+            'Development Supabase probe returned status ${probeRes.statusCode}',
+          );
         }
       } catch (e) {
         fail(
@@ -165,8 +170,9 @@ void main() {
         final serviceItemTypes = await db.select(db.serviceItemTypes).get();
         final carpetSizes = await db.select(db.carpetSizes).get();
         final storageLocations = await db.select(db.storageLocations).get();
-        final storageLocationItemTypes =
-            await db.select(db.storageLocationItemTypes).get();
+        final storageLocationItemTypes = await db
+            .select(db.storageLocationItemTypes)
+            .get();
         final itemDefinitions = await db.select(db.itemDefinitions).get();
         final businessSettings = await db.select(db.businessSettings).get();
 
@@ -226,6 +232,11 @@ void main() {
           reason:
               'No sync_operations table rows must exist after canonical seed',
         );
+        expect(
+          await syncStateDao.getLastAppliedSequence(),
+          SeedData.canonicalBaselineSequence,
+          reason: 'Canonical seed must start at the remote baseline cursor',
+        );
 
         // ---------------------------------------------------------------------
         // Step 4: Connect to development Supabase
@@ -242,7 +253,8 @@ void main() {
           reason:
               'Development Supabase should have at least the 35 canonical baseline changes',
         );
-        final latestSeq = (probeResponse.data['latest_sequence'] as num).toInt();
+        final latestSeq = (probeResponse.data['latest_sequence'] as num)
+            .toInt();
         expect(
           latestSeq,
           greaterThanOrEqualTo(35),
@@ -259,10 +271,8 @@ void main() {
         // ---------------------------------------------------------------------
         final itemTypesAfterPull = await db.select(db.itemTypes).get();
         final servicesAfterPull = await db.select(db.services).get();
-        final categoriesAfterPull =
-            await db.select(db.expenseCategories).get();
-        final definitionsAfterPull =
-            await db.select(db.itemDefinitions).get();
+        final categoriesAfterPull = await db.select(db.expenseCategories).get();
+        final definitionsAfterPull = await db.select(db.itemDefinitions).get();
 
         // Master data should NOT be duplicated upon convergence
         expect(
@@ -319,8 +329,9 @@ void main() {
           updatedAt: now,
         );
 
-        final createdCustomer =
-            await customerRepository.createCustomer(newCustomer);
+        final createdCustomer = await customerRepository.createCustomer(
+          newCustomer,
+        );
         expect(
           createdCustomer.id,
           equals(testCustomerId),
@@ -330,8 +341,8 @@ void main() {
         // ---------------------------------------------------------------------
         // Step 8: Confirm exactly the expected outbox operation exists
         // ---------------------------------------------------------------------
-        final pendingAfterMutation =
-            await syncOperationsDao.getPendingOperations();
+        final pendingAfterMutation = await syncOperationsDao
+            .getPendingOperations();
         expect(
           pendingAfterMutation.length,
           equals(1),
@@ -356,8 +367,9 @@ void main() {
         // ---------------------------------------------------------------------
         // Step 10: Confirm the mutation remains locally persisted and pending
         // ---------------------------------------------------------------------
-        final localCustomer =
-            await customersDao.getCustomerById(testCustomerId);
+        final localCustomer = await customersDao.getCustomerById(
+          testCustomerId,
+        );
         expect(
           localCustomer,
           isNotNull,
@@ -365,12 +377,13 @@ void main() {
         );
         expect(localCustomer!.name, equals(newCustomer.name));
 
-        final pendingDuringOffline =
-            await syncOperationsDao.getPendingOperations();
+        final pendingDuringOffline = await syncOperationsDao
+            .getPendingOperations();
         expect(
           pendingDuringOffline.length,
           equals(1),
-          reason: 'Mutation outbox operation must remain pending during network outage',
+          reason:
+              'Mutation outbox operation must remain pending during network outage',
         );
         expect(pendingDuringOffline.first.id, equals(mutationOp.id));
 
@@ -404,12 +417,12 @@ void main() {
         // ---------------------------------------------------------------------
         // Step 13: Confirm the server receives it exactly once
         // ---------------------------------------------------------------------
-        final pendingAfterPush =
-            await syncOperationsDao.getPendingOperations();
+        final pendingAfterPush = await syncOperationsDao.getPendingOperations();
         expect(
           pendingAfterPush,
           isEmpty,
-          reason: 'Outbox operation must be completed/cleared after successful push',
+          reason:
+              'Outbox operation must be completed/cleared after successful push',
         );
 
         final remoteCheckAfterPush = await probeDio.get(
@@ -429,8 +442,9 @@ void main() {
         // Step 14: Confirm no duplicate record is created
         // ---------------------------------------------------------------------
         // A) Confirm local table has exactly 1 record
-        final localCustomersWithId =
-            await (db.select(db.customers)..where((t) => t.id.equals(testCustomerId))).get();
+        final localCustomersWithId = await (db.select(
+          db.customers,
+        )..where((t) => t.id.equals(testCustomerId))).get();
         expect(
           localCustomersWithId.length,
           equals(1),
@@ -439,8 +453,8 @@ void main() {
 
         // B) Run another sync cycle to verify idempotency
         await syncEngine.sync();
-        final pendingAfterSecondSync =
-            await syncOperationsDao.getPendingOperations();
+        final pendingAfterSecondSync = await syncOperationsDao
+            .getPendingOperations();
         expect(pendingAfterSecondSync, isEmpty);
 
         final remoteCheckSecondSync = await probeDio.get(
@@ -452,7 +466,8 @@ void main() {
         expect(
           customerSecondSync['id'],
           equals(testCustomerId),
-          reason: 'Server must still have the customer record after second sync',
+          reason:
+              'Server must still have the customer record after second sync',
         );
 
         // C) Verify canonical seed records were never treated as mutations

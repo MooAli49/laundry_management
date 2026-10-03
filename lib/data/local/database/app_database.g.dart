@@ -6772,6 +6772,15 @@ class $ServiceItemTypesTable extends ServiceItemTypes
 
 class ServiceItemType extends DataClass implements Insertable<ServiceItemType> {
   final String id;
+
+  /// Foreign key to [Services].
+  ///
+  /// Architectural Decision (LOW-03):
+  /// - Local (Drift/SQLite): Uses `KeyAction.restrict` as defense-in-depth on client devices
+  ///   to prevent accidental cascading deletion of catalog pricing mappings if a service row
+  ///   is targeted by an errant delete command. Services in the app are soft-deactivated (`isActive = false`).
+  /// - Remote (Supabase/PostgreSQL): Uses `ON DELETE CASCADE` to facilitate server-side
+  ///   administrative purges and database cleanup scripts without manual child row orchestration.
   final String serviceId;
   final String itemTypeId;
   final String pricingType;

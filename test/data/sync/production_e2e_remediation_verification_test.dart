@@ -1,6 +1,5 @@
 // ignore_for_file: avoid_print
 
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -69,6 +68,15 @@ class _E2ETestNetworkInfo implements NetworkInfo {
   Stream<bool> get onConnectivityChanged => Stream.value(isConnectedValue);
 }
 
+String? _mutationE2eSkipReason() {
+  final url = Platform.environment['SUPABASE_E2E_URL']?.trim();
+  final key = Platform.environment['SUPABASE_E2E_ANON_KEY']?.trim();
+  if (url == null || url.isEmpty || key == null || key.isEmpty) {
+    return 'Set SUPABASE_E2E_URL and SUPABASE_E2E_ANON_KEY for mutation E2E';
+  }
+  return null;
+}
+
 Future<void> seedHighestOrderNumber(
   Dio prodDio,
   CustomersDao customersDao,
@@ -134,42 +142,50 @@ Future<void> seedHighestOrderNumber(
 void main() {
   group('Production E2E Sync Remediation Verification', () {
     const uuid = Uuid();
-    late SupabaseConfig prodConfig;
-    late Dio prodDio;
+    late SupabaseConfig e2eConfig;
+    late Dio e2eDio;
+    var e2eConfigured = false;
     // Records every HTTP exchange (method, path, status, error message) so the
     // causal dispatch order and any 42883 / uuid = text / 422 failures are
     // asserted explicitly. Never records headers (no secrets).
     final httpLog = <Map<String, dynamic>>[];
 
     setUpAll(() {
-      String? prodUrl;
-      String? prodAnonKey;
+      final e2eUrl = Platform.environment['SUPABASE_E2E_URL']?.trim();
+      final e2eAnonKey = Platform.environment['SUPABASE_E2E_ANON_KEY']?.trim();
+      final allowProductionMutation =
+          Platform.environment['ALLOW_PRODUCTION_E2E_MUTATION'] == 'true';
 
-      final envFile = File('release_env.json');
-      if (envFile.existsSync()) {
-        try {
-          final content = envFile.readAsStringSync();
-          final data = jsonDecode(content) as Map<String, dynamic>;
-          prodUrl = data['SUPABASE_URL_ROOT'] as String?;
-          prodAnonKey = data['SUPABASE_ANON_KEY'] as String?;
-        } catch (_) {}
+      if (e2eUrl == null ||
+          e2eUrl.isEmpty ||
+          e2eAnonKey == null ||
+          e2eAnonKey.isEmpty) {
+        markTestSkipped(
+          'Mutation E2E tests require SUPABASE_E2E_URL and '
+          'SUPABASE_E2E_ANON_KEY for a dedicated test/dev project. '
+          'They never read release_env.json or fall back to production.',
+        );
+        return;
       }
 
-      prodConfig = SupabaseConfig.resolve(
-        customUrlRoot: prodUrl,
-        customAnonKey: prodAnonKey,
-        isRelease: true,
+      e2eConfig = SupabaseConfig.resolve(
+        customUrlRoot: e2eUrl,
+        customAnonKey: e2eAnonKey,
+        isRelease: false,
       );
+      e2eConfigured = true;
 
-      expect(
-        prodConfig.urlRoot,
-        equals('https://rvrskluqfbrkvvlxtxfp.supabase.co'),
-        reason: 'Must target Production Supabase project rvrskluqfbrkvvlxtxfp',
-      );
+      if (e2eConfig.urlRoot.contains(SupabaseConfig.prodProjectRef) &&
+          !allowProductionMutation) {
+        throw StateError(
+          'Refusing mutation E2E against the production project. Set '
+          'ALLOW_PRODUCTION_E2E_MUTATION=true only for an explicit dangerous run.',
+        );
+      }
 
-      final client = DioClient(baseUrl: prodConfig.apiUrl);
-      prodDio = client.dio;
-      prodDio.interceptors.add(
+      final client = DioClient(baseUrl: e2eConfig.apiUrl);
+      e2eDio = client.dio;
+      e2eDio.interceptors.add(
         InterceptorsWrapper(
           onResponse: (res, handler) {
             httpLog.add({
@@ -190,6 +206,14 @@ void main() {
           },
         ),
       );
+    });
+
+    setUp(() {
+      if (!e2eConfigured) {
+        markTestSkipped(
+          'Dedicated mutation E2E credentials are not configured.',
+        );
+      }
     });
 
     test(
@@ -247,16 +271,16 @@ void main() {
 
         final fakeNetwork = _E2ETestNetworkInfo(isConnectedValue: true);
         final remoteDispatcher = RemoteApiDispatcher(
-          customerApi: CustomerRemoteApi(prodDio),
-          orderApi: OrderRemoteApi(prodDio),
-          paymentApi: PaymentRemoteApi(prodDio),
-          refundApi: RefundRemoteApi(prodDio),
-          storageApi: StorageRemoteApi(prodDio),
-          expenseApi: ExpenseRemoteApi(prodDio),
-          masterDataApi: MasterDataRemoteApi(prodDio),
+          customerApi: CustomerRemoteApi(e2eDio),
+          orderApi: OrderRemoteApi(e2eDio),
+          paymentApi: PaymentRemoteApi(e2eDio),
+          refundApi: RefundRemoteApi(e2eDio),
+          storageApi: StorageRemoteApi(e2eDio),
+          expenseApi: ExpenseRemoteApi(e2eDio),
+          masterDataApi: MasterDataRemoteApi(e2eDio),
         );
         final remoteDataSource = SyncRemoteDataSourceImpl(
-          SyncRemoteApi(prodDio),
+          SyncRemoteApi(e2eDio),
         );
         final changeApplier = RemoteChangeApplier(
           db: db,
@@ -274,8 +298,8 @@ void main() {
           syncStateDao: syncStateDao,
         );
 
-        await seedHighestOrderNumber(prodDio, customersDao, ordersDao);
-        final baseRes = await prodDio.get(
+        await seedHighestOrderNumber(e2eDio, customersDao, ordersDao);
+        final baseRes = await e2eDio.get(
           '/api/v1/sync/changes?after=0&limit=1',
         );
         final baselineSeq =
@@ -453,7 +477,7 @@ void main() {
         );
 
         // A. Verify remote item type.
-        final itRes = await prodDio.get('/api/v1/item-types/$itemTypeId');
+        final itRes = await e2eDio.get('/api/v1/item-types/$itemTypeId');
         expect(itRes.statusCode, equals(200));
         expect(itRes.data['id'], equals(itemTypeId));
         expect(itRes.data['name'], equals('بطانية زوجى $runId'));
@@ -465,7 +489,7 @@ void main() {
         );
 
         // Verify Customer on Production
-        final custRes = await prodDio.get('/api/v1/customers/$customerId');
+        final custRes = await e2eDio.get('/api/v1/customers/$customerId');
         expect(custRes.statusCode, equals(200));
         expect(custRes.data['id'], equals(customerId));
         expect(custRes.data['name'], equals(customerName));
@@ -475,7 +499,7 @@ void main() {
         );
 
         // Verify Service and ServiceItemPricing relation on Production
-        final srvRes = await prodDio.get('/api/v1/services/$serviceId');
+        final srvRes = await e2eDio.get('/api/v1/services/$serviceId');
         expect(srvRes.statusCode, equals(200));
         expect(srvRes.data['id'], equals(serviceId));
         expect(srvRes.data['name'], equals('غسيل $runId'));
@@ -496,7 +520,7 @@ void main() {
         );
 
         // Verify Order on Production (including order_items aggregate)
-        final orderRes = await prodDio.get('/api/v1/orders/${order.id}');
+        final orderRes = await e2eDio.get('/api/v1/orders/${order.id}');
         expect(orderRes.statusCode, equals(200));
         expect(orderRes.data['id'], equals(order.id));
         expect(orderRes.data['customer_id'], equals(customerId));
@@ -525,7 +549,7 @@ void main() {
         expect(payments, isNotEmpty);
         final paymentId = payments.first.id;
 
-        final payRes = await prodDio.get('/api/v1/payments/$paymentId');
+        final payRes = await e2eDio.get('/api/v1/payments/$paymentId');
         expect(payRes.statusCode, equals(200));
         expect(payRes.data['id'], equals(paymentId));
         expect(payRes.data['order_id'], equals(order.id));
@@ -537,7 +561,7 @@ void main() {
 
         // Verify Sync Changes on Production
         // Read from the pre-test baseline so growth of the feed cannot hide entries.
-        final changesRes = await prodDio.get(
+        final changesRes = await e2eDio.get(
           '/api/v1/sync/changes?after=$baselineSeq&limit=100',
         );
         expect(changesRes.statusCode, equals(200));
@@ -613,16 +637,16 @@ void main() {
         // 1. START OFFLINE
         final fakeNetwork = _E2ETestNetworkInfo(isConnectedValue: false);
         final remoteDispatcher = RemoteApiDispatcher(
-          customerApi: CustomerRemoteApi(prodDio),
-          orderApi: OrderRemoteApi(prodDio),
-          paymentApi: PaymentRemoteApi(prodDio),
-          refundApi: RefundRemoteApi(prodDio),
-          storageApi: StorageRemoteApi(prodDio),
-          expenseApi: ExpenseRemoteApi(prodDio),
-          masterDataApi: MasterDataRemoteApi(prodDio),
+          customerApi: CustomerRemoteApi(e2eDio),
+          orderApi: OrderRemoteApi(e2eDio),
+          paymentApi: PaymentRemoteApi(e2eDio),
+          refundApi: RefundRemoteApi(e2eDio),
+          storageApi: StorageRemoteApi(e2eDio),
+          expenseApi: ExpenseRemoteApi(e2eDio),
+          masterDataApi: MasterDataRemoteApi(e2eDio),
         );
         final remoteDataSource = SyncRemoteDataSourceImpl(
-          SyncRemoteApi(prodDio),
+          SyncRemoteApi(e2eDio),
         );
         final changeApplier = RemoteChangeApplier(
           db: db,
@@ -639,13 +663,13 @@ void main() {
           remoteChangeApplier: changeApplier,
           syncStateDao: syncStateDao,
         );
-        final changesBaseline = await prodDio.get(
+        final changesBaseline = await e2eDio.get(
           '/api/v1/sync/changes?after=0&limit=1',
         );
         final latestSeq =
             (changesBaseline.data['latest_sequence'] as num?)?.toInt() ?? 0;
         await syncStateDao.updateLastAppliedSequence(latestSeq);
-        await seedHighestOrderNumber(prodDio, customersDao, ordersDao);
+        await seedHighestOrderNumber(e2eDio, customersDao, ordersDao);
 
         final now = DateTime.now();
 
@@ -746,7 +770,7 @@ void main() {
         );
 
         // Confirm remote records in Production
-        final remoteOrder = await prodDio.get('/api/v1/orders/${order.id}');
+        final remoteOrder = await e2eDio.get('/api/v1/orders/${order.id}');
         expect(remoteOrder.statusCode, equals(200));
         expect(remoteOrder.data['id'], equals(order.id));
         print(
@@ -810,20 +834,18 @@ void main() {
         final syncEngine = SyncEngine(
           syncOperationsDao: syncOpsDao,
           remoteApiDispatcher: RemoteApiDispatcher(
-            customerApi: CustomerRemoteApi(prodDio),
-            orderApi: OrderRemoteApi(prodDio),
-            paymentApi: PaymentRemoteApi(prodDio),
-            refundApi: RefundRemoteApi(prodDio),
-            storageApi: StorageRemoteApi(prodDio),
-            expenseApi: ExpenseRemoteApi(prodDio),
-            masterDataApi: MasterDataRemoteApi(prodDio),
+            customerApi: CustomerRemoteApi(e2eDio),
+            orderApi: OrderRemoteApi(e2eDio),
+            paymentApi: PaymentRemoteApi(e2eDio),
+            refundApi: RefundRemoteApi(e2eDio),
+            storageApi: StorageRemoteApi(e2eDio),
+            expenseApi: ExpenseRemoteApi(e2eDio),
+            masterDataApi: MasterDataRemoteApi(e2eDio),
           ),
           networkInfo: _E2ETestNetworkInfo(isConnectedValue: true),
           retryPolicy: SyncRetryPolicy(),
           errorClassifier: const SyncErrorClassifier(),
-          syncRemoteDataSource: SyncRemoteDataSourceImpl(
-            SyncRemoteApi(prodDio),
-          ),
+          syncRemoteDataSource: SyncRemoteDataSourceImpl(SyncRemoteApi(e2eDio)),
           remoteChangeApplier: RemoteChangeApplier(
             db: db,
             syncStateDao: syncStateDao,
@@ -831,13 +853,13 @@ void main() {
           syncStateDao: syncStateDao,
         );
 
-        final baseline = await prodDio.get(
+        final baseline = await e2eDio.get(
           '/api/v1/sync/changes?after=0&limit=1',
         );
         await syncStateDao.updateLastAppliedSequence(
           (baseline.data['latest_sequence'] as num?)?.toInt() ?? 0,
         );
-        await seedHighestOrderNumber(prodDio, customersDao, ordersDao);
+        await seedHighestOrderNumber(e2eDio, customersDao, ordersDao);
 
         final now = DateTime.now();
         final itemTypeId = uuid.v4();
@@ -993,7 +1015,7 @@ void main() {
           '/api/v1/payments/$paymentId',
           '/api/v1/orders/${order.id}',
         ]) {
-          final res = await prodDio.get(
+          final res = await e2eDio.get(
             path,
             options: Options(validateStatus: (_) => true),
           );
@@ -1003,7 +1025,7 @@ void main() {
             reason: '$path must not exist remotely',
           );
         }
-        final indep = await prodDio.get(
+        final indep = await e2eDio.get(
           '/api/v1/customers/$independentCustomerId',
         );
         expect(indep.statusCode, equals(200));
@@ -1011,5 +1033,5 @@ void main() {
         await db.close();
       },
     );
-  });
+  }, skip: _mutationE2eSkipReason());
 }

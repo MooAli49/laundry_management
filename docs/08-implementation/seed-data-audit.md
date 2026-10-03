@@ -6,6 +6,7 @@
 **Branch**: `temp`  
 **Target Commit**: `760afac88a2bd6c2f52bc456f9e46509589fda49`  
 **Environments Evaluated**:
+
 - Local SQLite (Drift `AppDatabase`)
 - Development Supabase (`dyhfgnbhijukbdptreto` / West EU)
 - Production Supabase Reference (`rvrskluqfbrkvvlxtxfp` / West EU)
@@ -17,6 +18,7 @@
 A forensic audit was performed to investigate the observed discrepancy where seeded data visible in the Flutter application appeared to be missing from the live Supabase database, while remote tables contained unexpected records with `server_version` values.
 
 ### Key Audit Findings:
+
 1. **The App Displays Local Synthetic Data That Is Never Pushed to Supabase**:
    In `lib/main.dart` (line 75), dependencies are initialized with `enableDevTestData: kDebugMode`. In any debug build, `DevTestData.seedDevData` runs and inserts **12 synthetic customers** ('أحمد محمود', etc.) and **18 synthetic orders** (`ORD-DEV-001` .. `ORD-DEV-018`) directly into local SQLite using raw `db.customStatement` without writing to the outbox (`sync_operations`). By design, this synthetic data exists **strictly in local SQLite** and is **never sent to Supabase**.
 2. **The 4 Canonical Item Types DO Exist in Supabase**:
@@ -39,12 +41,12 @@ A forensic audit was performed to investigate the observed discrepancy where see
 
 The codebase defines four distinct seed mechanisms:
 
-| Source | File / Location | Target DB | Entities Seeded | Gating Condition | Outbox Entry Created? |
-|---|---|---|---|---|---|
-| **Production SeedData** | `lib/data/local/database/seed_data.dart` | Local SQLite | `business_settings` (1), `item_types` (4), `expense_categories` (7), `sync_state` (1) | Unconditional on every database open in `AppDatabase.beforeOpen` | **NO** (Raw SQL `INSERT OR IGNORE`) |
-| **Development DevTestData** | `lib/data/local/database/dev_test_data.dart` | Local SQLite | `customers` (12), `orders` (18), `services` (5), `service_item_types` (5), `storage_locations` (5), `carpet_sizes` (3), `item_definitions` (10) | Gated by `enableDevTestData: kDebugMode` in `lib/main.dart` | **NO** (Raw SQL `INSERT OR IGNORE`) |
-| **Dev Canonical Baseline Script** | `scripts/dev_supabase_seed_canonical_baseline.sql` | Supabase Dev (`dyhfgnbhijukbdptreto`) | 35 canonical master records + 35 `sync_changes` rows (sequences 1..35) | Manual, single-use DBA script guarded by environment token | N/A (Direct SQL in PostgreSQL) |
-| **Prod Canonical Baseline Script** | `scripts/prod_supabase_seed_canonical_baseline.sql` | Supabase Prod (`rvrskluqfbrkvvlxtxfp`) | 35 canonical master records + 35 `sync_changes` rows (sequences 1..35) | Manual, single-use DBA script guarded by environment token | N/A (Direct SQL in PostgreSQL) |
+| Source                             | File / Location                                     | Target DB                              | Entities Seeded                                                                                                                                                                                                                          | Gating Condition                                            | Outbox Entry Created?               |
+| ---------------------------------- | --------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ----------------------------------- |
+| **Canonical SeedData**             | `lib/data/local/database/seed_data.dart`            | Local SQLite                           | `business_settings` (1), `item_types` (4), `expense_categories` (7), `services` (5), `service_item_types` (5), `carpet_sizes` (3), `storage_locations` (5), `storage_location_item_types` (9), `item_definitions` (10), `sync_state` (1) | Explicit `ENABLE_CANONICAL_SEED=true` opt-in                | **NO** (Raw SQL `INSERT OR IGNORE`) |
+| **Development DevTestData**        | `lib/data/local/database/dev_test_data.dart`        | Local SQLite                           | `customers` (12), `orders` (18), `services` (5), `service_item_types` (5), `storage_locations` (5), `carpet_sizes` (3), `item_definitions` (10)                                                                                          | Gated by `enableDevTestData: kDebugMode` in `lib/main.dart` | **NO** (Raw SQL `INSERT OR IGNORE`) |
+| **Dev Canonical Baseline Script**  | `scripts/dev_supabase_seed_canonical_baseline.sql`  | Supabase Dev (`dyhfgnbhijukbdptreto`)  | 49 canonical relational master rows represented by 35 aggregate `sync_changes` rows (sequences 1..35)                                                                                                                                    | Manual, single-use DBA script guarded by environment token  | N/A (Direct SQL in PostgreSQL)      |
+| **Prod Canonical Baseline Script** | `scripts/prod_supabase_seed_canonical_baseline.sql` | Supabase Prod (`rvrskluqfbrkvvlxtxfp`) | 49 canonical relational master rows represented by 35 aggregate `sync_changes` rows (sequences 1..35)                                                                                                                                    | Manual, single-use DBA script guarded by environment token  | N/A (Direct SQL in PostgreSQL)      |
 
 ---
 
@@ -55,13 +57,13 @@ flowchart TD
     A[App Launch] --> B{AppDatabase.beforeOpen}
     B --> C[SeedData.seedInitialData]
     C -->|Raw SQL INSERT OR IGNORE| D[(Local SQLite: 4 ItemTypes, 7 ExpenseCategories)]
-    
+
     A --> E{initDependencies}
     E --> F{kDebugMode == true?}
     F -->|Yes: Debug Mode| G[DevTestData.seedDevData]
     G -->|Raw SQL INSERT OR IGNORE| H[(Local SQLite: 12 Customers, 18 Orders, 5 Services, etc.)]
     F -->|No: Release Mode| I[Skip DevTestData]
-    
+
     A --> J[SyncEngine.initialize]
     J --> K[Pull from Supabase sync_changes]
     K --> L[(Supabase dyhfgnbhijukbdptreto)]
@@ -70,6 +72,7 @@ flowchart TD
 ```
 
 ### Critical Observations:
+
 1. **Seed IDs are 100% Deterministic**:
    All seed definitions share identical canonical UUID prefixes:
    - `business_settings`: `00000000-0000-0000-0000-000000000001`
@@ -90,28 +93,29 @@ flowchart TD
 
 Below is the forensic inventory comparing what is defined locally versus what exists in the development Supabase database (`dyhfgnbhijukbdptreto`):
 
-| Table | Local SeedData (Prod) | Local DevTestData (Debug) | Remote Supabase Actual | Canonical IDs Present Remotely? | Forensic Analysis |
-|---|---|---|---|---|---|
-| **`business_settings`** | 1 row | 1 row | 1 row | **YES** (`00000000-...-0001`) | Synchronized. Server version is 60 due to test updates. |
-| **`item_types`** | 4 rows | 4 rows | 122 rows | **YES** (All 4 canonical rows exist) | 118 extra rows are test noise (`a1200000-...`) created by `step12_live_master_data_integration_test.dart`. |
-| **`expense_categories`** | 7 rows | 7 rows | 128 rows | **YES** (All 7 canonical rows exist) | 121 extra rows are test noise (`c1100000-...`, `c1200000-...`) created by integration tests. |
-| **`services`** | 0 rows | 5 rows | 215 rows | **YES** (All 5 canonical rows exist) | Prod `SeedData` omits services, expecting remote pull. Dev database has 210 test services. |
-| **`service_item_types`**| 0 rows | 5 rows | 17 rows | **YES** (All 5 canonical rows exist) | 12 test rows from integration suites. |
-| **`storage_locations`** | 0 rows | 5 rows | 64 rows | **YES** (All 5 canonical rows exist) | 59 test rows from integration suites. |
-| **`carpet_sizes`** | 0 rows | 3 rows | 62 rows | **YES** (All 3 canonical rows exist) | 59 test rows from integration suites. |
-| **`item_definitions`** | 0 rows | 10 rows | 69 rows | **YES** (All 10 canonical rows exist) | 59 test rows from integration suites. |
-| **`customers`** | 0 rows | 12 rows | 685 rows | **NO (0 canonical)** | Local 12 customers exist ONLY in local SQLite in debug mode. Remote 685 are test-created. |
-| **`orders`** | 0 rows | 18 rows | 1,025 rows | **NO (0 canonical)** | Local 18 orders (`ORD-DEV-001`..`018`) exist ONLY in local SQLite in debug mode. Remote 1,025 are test-created. |
-| **`order_items`** | 0 rows | 42 rows | 1,022 rows | **NO (0 canonical)** | All remote 1,022 order items reference canonical item types (`ملابس`, etc.). |
-| **`payments`** | 0 rows | 18 rows | 695 rows | **NO (0 canonical)** | Remote payments are test-created. |
-| **`storage_records`** | 0 rows | 12 rows | 530 rows | **NO (0 canonical)** | Remote storage records are test-created. |
-| **`expenses`** | 0 rows | 0 rows | 122 rows | **NO (0 canonical)** | Remote expenses are test-created. |
+| Table                    | Local SeedData (Prod) | Local DevTestData (Debug) | Remote Supabase Actual | Canonical IDs Present Remotely?       | Forensic Analysis                                                                                               |
+| ------------------------ | --------------------- | ------------------------- | ---------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **`business_settings`**  | 1 row                 | 1 row                     | 1 row                  | **YES** (`00000000-...-0001`)         | Synchronized. Server version is 60 due to test updates.                                                         |
+| **`item_types`**         | 4 rows                | 4 rows                    | 122 rows               | **YES** (All 4 canonical rows exist)  | 118 extra rows are test noise (`a1200000-...`) created by `step12_live_master_data_integration_test.dart`.      |
+| **`expense_categories`** | 7 rows                | 7 rows                    | 128 rows               | **YES** (All 7 canonical rows exist)  | 121 extra rows are test noise (`c1100000-...`, `c1200000-...`) created by integration tests.                    |
+| **`services`**           | 0 rows                | 5 rows                    | 215 rows               | **YES** (All 5 canonical rows exist)  | Prod `SeedData` omits services, expecting remote pull. Dev database has 210 test services.                      |
+| **`service_item_types`** | 0 rows                | 5 rows                    | 17 rows                | **YES** (All 5 canonical rows exist)  | 12 test rows from integration suites.                                                                           |
+| **`storage_locations`**  | 0 rows                | 5 rows                    | 64 rows                | **YES** (All 5 canonical rows exist)  | 59 test rows from integration suites.                                                                           |
+| **`carpet_sizes`**       | 0 rows                | 3 rows                    | 62 rows                | **YES** (All 3 canonical rows exist)  | 59 test rows from integration suites.                                                                           |
+| **`item_definitions`**   | 0 rows                | 10 rows                   | 69 rows                | **YES** (All 10 canonical rows exist) | 59 test rows from integration suites.                                                                           |
+| **`customers`**          | 0 rows                | 12 rows                   | 685 rows               | **NO (0 canonical)**                  | Local 12 customers exist ONLY in local SQLite in debug mode. Remote 685 are test-created.                       |
+| **`orders`**             | 0 rows                | 18 rows                   | 1,025 rows             | **NO (0 canonical)**                  | Local 18 orders (`ORD-DEV-001`..`018`) exist ONLY in local SQLite in debug mode. Remote 1,025 are test-created. |
+| **`order_items`**        | 0 rows                | 42 rows                   | 1,022 rows             | **NO (0 canonical)**                  | All remote 1,022 order items reference canonical item types (`ملابس`, etc.).                                    |
+| **`payments`**           | 0 rows                | 18 rows                   | 695 rows               | **NO (0 canonical)**                  | Remote payments are test-created.                                                                               |
+| **`storage_records`**    | 0 rows                | 12 rows                   | 530 rows               | **NO (0 canonical)**                  | Remote storage records are test-created.                                                                        |
+| **`expenses`**           | 0 rows                | 0 rows                    | 122 rows               | **NO (0 canonical)**                  | Remote expenses are test-created.                                                                               |
 
 ---
 
 ## 5. Sync Participation Analysis
 
 ### Why Seed Data Does NOT Participate in Outbox Push:
+
 1. **Architectural Safety**:
    If client application seeds created `sync_operations` outbox records:
    - Every newly installed cashier terminal would attempt to push `create` operations for `ملابس`, `بطاطين`, `سجاد`, etc.
@@ -167,18 +171,20 @@ pie title Data Classification in Laundry Management System
 
 ## 8. Root Cause Summary
 
-| Observation | Root Cause |
-|---|---|
-| **App displays orders/customers not in Supabase** | `lib/main.dart` enables `DevTestData` whenever `kDebugMode` is true. `DevTestData` seeds SQLite directly without creating outbox operations. |
-| **Supabase item_types contains unexpected records with server_version** | Automated integration tests (`step12_live_master_data_integration_test.dart`) run repeatedly against the dev backend, creating 118 test item types with incrementing `server_version`. |
-| **Expected master data (services, storage locations) missing on fresh offline DB** | `SeedData` only seeds `item_types` and `expense_categories`; the remaining master data was designed to be hydrated from Supabase sequences 1..35 on first sync. |
+| Observation                                                                        | Root Cause                                                                                                                                                                             |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **App displays orders/customers not in Supabase**                                  | `lib/main.dart` enables `DevTestData` whenever `kDebugMode` is true. `DevTestData` seeds SQLite directly without creating outbox operations.                                           |
+| **Supabase item_types contains unexpected records with server_version**            | Automated integration tests (`step12_live_master_data_integration_test.dart`) run repeatedly against the dev backend, creating 118 test item types with incrementing `server_version`. |
+| **Expected master data (services, storage locations) missing on fresh offline DB** | `SeedData` only seeds `item_types` and `expense_categories`; the remaining master data was designed to be hydrated from Supabase sequences 1..35 on first sync.                        |
 
 ---
 
 ## 9. Recommended Remediation Plan
 
 ### Recommendation 1: Gated Dev Test Data (Do Not Seed Automatically in Debug)
+
 In `lib/main.dart`, decouple synthetic test data seeding from `kDebugMode`:
+
 ```dart
 // Before:
 await initDependencies(enableDevTestData: kDebugMode);
@@ -187,17 +193,21 @@ await initDependencies(enableDevTestData: kDebugMode);
 const bool enableDevSeeds = bool.fromEnvironment('ENABLE_DEV_TEST_DATA', defaultValue: false);
 await initDependencies(enableDevTestData: enableDevSeeds);
 ```
-*Rationale*: Prevents developer devices from populating SQLite with 18 ghost orders and 12 ghost customers unless explicitly instructed via `--dart-define=ENABLE_DEV_TEST_DATA=true`.
+
+_Rationale_: Prevents developer devices from populating SQLite with 18 ghost orders and 12 ghost customers unless explicitly instructed via `--dart-define=ENABLE_DEV_TEST_DATA=true`.
 
 ### Recommendation 2: Complete Offline Production Catalog in `SeedData`
-Expand `SeedData.seedInitialData` to include all 35 canonical baseline records (5 services, 5 service_item_types, 5 storage locations, 3 carpet sizes, 10 item definitions) using the identical canonical UUIDs already present in Supabase sequences 1..35.
-*Rationale*: Guarantees that a cashier terminal deployed in a brand-new facility without internet connectivity has access to services, prices, and storage locations on Day 1.
+
+Expand `SeedData.seedInitialData` to include all 35 canonical baseline records (5 services, 5 service*item_types, 5 storage locations, 3 carpet sizes, 10 item definitions) using the identical canonical UUIDs already present in Supabase sequences 1..35.
+\_Rationale*: Guarantees that a cashier terminal deployed in a brand-new facility without internet connectivity has access to services, prices, and storage locations on Day 1.
 
 ### Recommendation 3: Controlled Development Database Reset (Optional / On Demand)
+
 If the development database's 6,400+ test records and 118 test item types become distracting during manual QA:
+
 - Execute the existing, guarded script: [`scripts/dev_supabase_safe_reset.sql`](file:///d:/projects/laundry_management/scripts/dev_supabase_safe_reset.sql)
 - Followed by: [`scripts/dev_supabase_seed_canonical_baseline.sql`](file:///d:/projects/laundry_management/scripts/dev_supabase_seed_canonical_baseline.sql)
-- *Precaution*: This script is guarded by `app.confirm_canonical_seed` and cannot run on production.
+- _Precaution_: This script is guarded by `app.confirm_canonical_seed` and cannot run on production.
 
 ---
 
@@ -211,6 +221,7 @@ If the development database's 6,400+ test records and 118 test item types become
 ## 11. Exact Supabase Changes Required
 
 **ZERO Supabase Schema or Data Changes Required**.
+
 - The remote PostgreSQL schema is 100% correct.
 - The 35 canonical baseline records already exist on Supabase with sequences 1..35.
 - The production database (`rvrskluqfbrkvvlxtxfp`) is already pristine with 0 transactional records and exactly 35 canonical master rows.
@@ -219,8 +230,8 @@ If the development database's 6,400+ test records and 118 test item types become
 
 ## 12. Risks
 
-- **Destructive Reset Risk**: If an operator were to accidentally run reset scripts on a live database, business orders would be purged. *Mitigation*: Both reset scripts (`dev_supabase_safe_reset.sql` and `prod_supabase_safe_clean.sql`) fail closed unless explicit project reference tokens and confirmation strings are asserted in the SQL session.
-- **Foreign Key Violation Risk**: Any manual deletion of canonical item types (`ملابس`, etc.) would cascade-fail against existing orders. *Mitigation*: Master data deletion is strictly prevented by PostgreSQL `ON DELETE RESTRICT` constraints.
+- **Destructive Reset Risk**: If an operator were to accidentally run reset scripts on a live database, business orders would be purged. _Mitigation_: Both reset scripts (`dev_supabase_safe_reset.sql` and `prod_supabase_safe_clean.sql`) fail closed unless explicit project reference tokens and confirmation strings are asserted in the SQL session.
+- **Foreign Key Violation Risk**: Any manual deletion of canonical item types (`ملابس`, etc.) would cascade-fail against existing orders. _Mitigation_: Master data deletion is strictly prevented by PostgreSQL `ON DELETE RESTRICT` constraints.
 
 ---
 

@@ -34,7 +34,30 @@ BEGIN
 END $$;
 
 -- -----------------------------------------------------------------------------
--- 2. REVERSE-DEPENDENCY DELETION
+-- 2. PRE-DELETION COUNTS
+-- These notices are the required operator record of the exact destructive
+-- scope. Review them against the approved handover plan before committing.
+DO $$
+DECLARE
+    v_table TEXT;
+    v_count BIGINT;
+    v_tables TEXT[] := ARRAY[
+        'customers', 'orders', 'order_items', 'order_item_carpets', 'payments',
+        'refunds', 'storage_records', 'expenses', 'item_types',
+        'item_definitions', 'services', 'service_item_types', 'carpet_sizes',
+        'storage_locations', 'storage_location_item_types', 'sync_changes',
+        'sync_idempotency_log'
+    ];
+BEGIN
+    FOREACH v_table IN ARRAY v_tables LOOP
+        EXECUTE format('SELECT count(*) FROM public.%I', v_table) INTO v_count;
+        RAISE NOTICE 'PRE-CLEANUP COUNT public.%: %', v_table, v_count;
+    END LOOP;
+    SELECT count(*) INTO v_count FROM public.business_settings;
+    RAISE NOTICE 'PRESERVED COUNT public.business_settings: %', v_count;
+END $$;
+
+-- 3. REVERSE-DEPENDENCY DELETION
 -- -----------------------------------------------------------------------------
 
 -- Step 2.1: Independent synchronization tracking log
@@ -74,10 +97,7 @@ DELETE FROM public.services;
 DELETE FROM public.expense_categories;
 DELETE FROM public.item_types;
 
--- Step 2.11: Business settings (singleton)
-DELETE FROM public.business_settings;
-
--- Step 2.12: Synchronization change log
+-- Step 3.11: Synchronization change log
 DELETE FROM public.sync_changes;
 
 -- -----------------------------------------------------------------------------
@@ -87,15 +107,19 @@ DELETE FROM public.sync_changes;
 ALTER SEQUENCE public.sync_changes_sequence_seq RESTART WITH 1;
 
 -- -----------------------------------------------------------------------------
--- 4. POST-CLEANUP ASSERTIONS
--- Verify that all 19 public tables are empty before committing.
+-- 5. POST-CLEANUP ASSERTIONS
+-- Verify that all destructive targets are empty and the business-settings
+-- singleton remains available for the canonical seed update.
 -- -----------------------------------------------------------------------------
 DO $$
 DECLARE
     v_total_rows BIGINT := 0;
     v_count BIGINT;
 BEGIN
-    SELECT count(*) INTO v_count FROM public.business_settings; v_total_rows := v_total_rows + v_count;
+    SELECT count(*) INTO v_count FROM public.business_settings;
+    IF v_count <> 1 THEN
+        RAISE EXCEPTION 'POSTCONDITION FAILED: Expected exactly 1 business_settings singleton, found %', v_count;
+    END IF;
     SELECT count(*) INTO v_count FROM public.carpet_sizes; v_total_rows := v_total_rows + v_count;
     SELECT count(*) INTO v_count FROM public.customers; v_total_rows := v_total_rows + v_count;
     SELECT count(*) INTO v_count FROM public.expense_categories; v_total_rows := v_total_rows + v_count;
@@ -116,10 +140,10 @@ BEGIN
     SELECT count(*) INTO v_count FROM public.sync_idempotency_log; v_total_rows := v_total_rows + v_count;
 
     IF v_total_rows > 0 THEN
-        RAISE EXCEPTION 'POSTCONDITION FAILED: Expected 0 total rows across all 19 public tables, found %', v_total_rows;
+        RAISE EXCEPTION 'POSTCONDITION FAILED: Expected 0 rows across all destructive targets, found %', v_total_rows;
     END IF;
     
-    RAISE NOTICE 'POSTCONDITION PASSED: All 19 public tables verified completely empty.';
+    RAISE NOTICE 'POSTCONDITION PASSED: Destructive targets are empty; business_settings singleton preserved.';
 END $$;
 
 COMMIT;

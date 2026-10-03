@@ -41,22 +41,25 @@ void main() {
         );
   }
 
-  test('retrying older operation blocks newer pending operation', () async {
-    await insertOperation(
-      id: 'op-1',
-      createdAt: now,
-      status: 'failed',
-      nextRetryAt: now.add(const Duration(minutes: 5)),
-    );
-    await insertOperation(
-      id: 'op-2',
-      createdAt: now.add(const Duration(seconds: 1)),
-    );
+  test(
+    'retrying older operation does not block unrelated pending operation',
+    () async {
+      await insertOperation(
+        id: 'op-1',
+        createdAt: now,
+        status: 'failed',
+        nextRetryAt: now.add(const Duration(minutes: 5)),
+      );
+      await insertOperation(
+        id: 'op-2',
+        createdAt: now.add(const Duration(seconds: 1)),
+      );
 
-    final eligible = await dao.getEligibleOperations(asOf: now);
+      final eligible = await dao.getEligibleOperations(asOf: now);
 
-    expect(eligible, isEmpty);
-  });
+      expect(eligible.map((operation) => operation.id), ['op-2']);
+    },
+  );
 
   test('eligible retry is selected before newer pending operation', () async {
     await insertOperation(

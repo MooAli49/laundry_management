@@ -48,6 +48,15 @@ void main() {
       ['srv-test', 'غسيل تجريبي', nowTimestamp, nowTimestamp],
     );
     await db.customStatement(
+      'INSERT INTO item_types (id, name, is_active, created_at, updated_at) VALUES (?, ?, 1, ?, ?);',
+      [
+        '00000000-0000-0000-0001-000000000001',
+        'ملابس',
+        nowTimestamp,
+        nowTimestamp,
+      ],
+    );
+    await db.customStatement(
       'INSERT INTO service_item_types (id, service_id, item_type_id, pricing_type, price, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?);',
       [
         'sit-test',

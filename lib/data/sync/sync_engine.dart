@@ -527,6 +527,7 @@ class SyncEngine {
         ),
       );
 
+      var canRequestTrailingPass = true;
       for (var i = 0; i < operations.length; i++) {
         if (_isDisposed) {
           break;
@@ -536,6 +537,7 @@ class SyncEngine {
 
         final stillConnected = await _networkInfo.isConnected;
         if (!stillConnected || _isDisposed) {
+          canRequestTrailingPass = false;
           break;
         }
 
@@ -608,6 +610,12 @@ class SyncEngine {
       final remainingOps = await _syncOperationsDao.getEligibleOperations(
         asOf: _clock(),
       );
+      if (canRequestTrailingPass && remainingOps.isNotEmpty) {
+        // A dependent operation may become eligible after its parent is marked
+        // synced. Request one coordinated trailing pass instead of dispatching
+        // in parallel or treating the initial queue snapshot as authoritative.
+        _pendingNeedsPush = true;
+      }
       final finishTime = _clock();
       _updateState(
         SyncEngineState.completed(
@@ -686,10 +694,7 @@ class SyncEngine {
             msg = data.toString();
           }
         }
-        return SyncErrorDetails.http(
-          statusCode,
-          message: msg,
-        );
+        return SyncErrorDetails.http(statusCode, message: msg);
       }
       switch (error.type) {
         case DioExceptionType.connectionTimeout:

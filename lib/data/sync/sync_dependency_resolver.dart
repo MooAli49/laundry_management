@@ -29,6 +29,8 @@ class EntityDependency {
 class SyncDependencyResolver {
   SyncDependencyResolver._();
 
+  static const String malformedPayloadEntityType = '__malformed_payload__';
+
   static const Map<String, String> _foreignKeyToEntityType = {
     'customer_id': 'customer',
     'order_id': 'order',
@@ -58,28 +60,42 @@ class SyncDependencyResolver {
 
     // 1. Non-create operations depend on their own entity's creation
     if (operation.operationType != 'create') {
-      deps.add(EntityDependency(
-        entityType: operation.entityType,
-        entityId: operation.entityId,
-      ));
+      deps.add(
+        EntityDependency(
+          entityType: operation.entityType,
+          entityId: operation.entityId,
+        ),
+      );
     }
 
     // 2. Extract references from payload
     if (operation.payload != null && operation.payload!.isNotEmpty) {
       try {
         final dynamic decoded = jsonDecode(operation.payload!);
+        if (decoded is! Map && decoded is! List) {
+          throw const FormatException(
+            'Sync payload must be a JSON object or list',
+          );
+        }
         _extractFromJson(decoded, deps, orderItemToOrderMap);
       } catch (_) {
-        // Safe fallback if payload is malformed
+        deps.add(
+          EntityDependency(
+            entityType: malformedPayloadEntityType,
+            entityId: operation.id,
+          ),
+        );
       }
     }
 
     // A create operation never depends on its own entity ID
     if (operation.operationType == 'create') {
-      deps.remove(EntityDependency(
-        entityType: operation.entityType,
-        entityId: operation.entityId,
-      ));
+      deps.remove(
+        EntityDependency(
+          entityType: operation.entityType,
+          entityId: operation.entityId,
+        ),
+      );
     }
 
     return deps;
@@ -98,18 +114,19 @@ class SyncDependencyResolver {
         if (key == 'order_item_id' && value is String && value.isNotEmpty) {
           if (orderItemToOrderMap != null &&
               orderItemToOrderMap.containsKey(value)) {
-            deps.add(EntityDependency(
-              entityType: 'order',
-              entityId: orderItemToOrderMap[value]!,
-            ));
+            deps.add(
+              EntityDependency(
+                entityType: 'order',
+                entityId: orderItemToOrderMap[value]!,
+              ),
+            );
           }
         } else if (_foreignKeyToEntityType.containsKey(key)) {
           final targetEntityType = _foreignKeyToEntityType[key]!;
           if (value is String && value.isNotEmpty) {
-            deps.add(EntityDependency(
-              entityType: targetEntityType,
-              entityId: value,
-            ));
+            deps.add(
+              EntityDependency(entityType: targetEntityType, entityId: value),
+            );
           }
         }
 
