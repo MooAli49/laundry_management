@@ -102,6 +102,24 @@ class DevTestData {
     GeneratedDatabase db,
     int nowTimestamp,
   ) async {
+    // Item Types required by the dev data below (FK targets).
+    // DevTestData is independent of the opt-in canonical [SeedData], so it
+    // must not assume these rows already exist.
+    const itemTypes = [
+      {'id': typeClothingId, 'name': 'ملابس'},
+      {'id': typeBlanketsId, 'name': 'بطاطين'},
+      {'id': typeCarpetsId, 'name': 'سجاد'},
+      {'id': typeCoversId, 'name': 'أغطية'},
+    ];
+
+    for (final t in itemTypes) {
+      await db.customStatement(
+        'INSERT OR IGNORE INTO item_types (id, name, is_active, created_at, updated_at) '
+        'VALUES (?, ?, 1, ?, ?);',
+        [t['id'], t['name'], nowTimestamp, nowTimestamp],
+      );
+    }
+
     // Services
     final services = [
       {

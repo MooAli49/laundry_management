@@ -52,7 +52,7 @@ void main() {
   late CreateOrderCubit cubit;
 
   setUp(() async {
-    db = db_pkg.AppDatabase(NativeDatabase.memory());
+    db = db_pkg.AppDatabase(NativeDatabase.memory(), true);
     customersDao = CustomersDao(db);
     ordersDao = OrdersDao(db);
     storageRecordsDao = StorageRecordsDao(db);

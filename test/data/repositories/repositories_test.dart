@@ -48,7 +48,7 @@ void main() {
   late SettingsRepositoryImpl settingsRepository;
 
   setUp(() {
-    db = db_pkg.AppDatabase(NativeDatabase.memory());
+    db = db_pkg.AppDatabase(NativeDatabase.memory(), true);
     customersDao = CustomersDao(db);
     ordersDao = OrdersDao(db);
     paymentsDao = PaymentsDao(db);

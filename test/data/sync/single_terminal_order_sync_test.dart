@@ -37,7 +37,7 @@ void main() {
     final yearPrefix = (now.year % 100).toString().padLeft(2, '0');
 
     setUp(() async {
-      db = AppDatabase(NativeDatabase.memory());
+      db = AppDatabase(NativeDatabase.memory(), true);
       ordersDao = OrdersDao(db);
       paymentsDao = PaymentsDao(db);
       storageRecordsDao = StorageRecordsDao(db);

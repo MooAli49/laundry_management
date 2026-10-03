@@ -41,7 +41,7 @@ void main() {
   const testServiceId2 = 'srv-dry-clean';
 
   setUp(() async {
-    db = db_pkg.AppDatabase(NativeDatabase.memory());
+    db = db_pkg.AppDatabase(NativeDatabase.memory(), true);
     customersDao = CustomersDao(db);
     ordersDao = OrdersDao(db);
     paymentsDao = PaymentsDao(db);

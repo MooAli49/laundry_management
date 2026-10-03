@@ -8,8 +8,10 @@ void main() {
   late AppDatabase db;
 
   setUp(() {
-    // In-memory database for fast, isolated testing
-    db = AppDatabase(NativeDatabase.memory());
+    // In-memory database for fast, isolated testing.
+    // Canonical seeding is opt-in (disabled by default); most tests in this
+    // file rely on the canonical catalog, so enable it explicitly here.
+    db = AppDatabase(NativeDatabase.memory(), true);
   });
 
   tearDown(() async {
@@ -101,7 +103,7 @@ void main() {
             .insert(
               ServicesCompanion.insert(
                 id: 'serv-1',
-                name: 'غسيل سجاد',
+                name: 'غسيل سجاد تجريبي',
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -119,7 +121,7 @@ void main() {
                 itemTypeId: carpetItemTypeId,
                 serviceId: 'serv-1',
                 itemTypeNameSnapshot: 'سجاد',
-                serviceNameSnapshot: 'غسيل سجاد',
+                serviceNameSnapshot: 'غسيل سجاد تجريبي',
                 pricingType: 'per_square_meter',
                 quantity: 6.0,
                 unitPrice: 5000,
@@ -625,7 +627,7 @@ void main() {
               ItemDefinitionsCompanion.insert(
                 id: 'def-1',
                 itemTypeId: itemTypeId,
-                name: 'قميص',
+                name: 'قميص تجريبي',
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -639,7 +641,7 @@ void main() {
                 ItemDefinitionsCompanion.insert(
                   id: 'def-2',
                   itemTypeId: itemTypeId,
-                  name: 'قميص',
+                  name: 'قميص تجريبي',
                   createdAt: now,
                   updatedAt: now,
                 ),
@@ -806,8 +808,42 @@ void main() {
 
   group('9. Seed Data Idempotency & Safety', () {
     test(
-      'seeds initial settings, 4 item types, and 7 expense categories',
+      'fresh database is completely empty by default (no canonical seed)',
       () async {
+        expect(SeedData.isEnabled, isFalse);
+        final db = AppDatabase(NativeDatabase.memory());
+        addTearDown(db.close);
+
+        expect((await db.select(db.businessSettings).get()).isEmpty, isTrue);
+        expect((await db.select(db.itemTypes).get()).isEmpty, isTrue);
+        expect((await db.select(db.expenseCategories).get()).isEmpty, isTrue);
+        expect((await db.select(db.services).get()).isEmpty, isTrue);
+        expect((await db.select(db.serviceItemTypes).get()).isEmpty, isTrue);
+        expect((await db.select(db.carpetSizes).get()).isEmpty, isTrue);
+        expect((await db.select(db.storageLocations).get()).isEmpty, isTrue);
+        expect(
+          (await db.select(db.storageLocationItemTypes).get()).isEmpty,
+          isTrue,
+        );
+        expect((await db.select(db.itemDefinitions).get()).isEmpty, isTrue);
+        expect((await db.select(db.customers).get()).isEmpty, isTrue);
+        expect((await db.select(db.orders).get()).isEmpty, isTrue);
+        expect((await db.select(db.orderItems).get()).isEmpty, isTrue);
+        expect((await db.select(db.payments).get()).isEmpty, isTrue);
+        expect((await db.select(db.refunds).get()).isEmpty, isTrue);
+        expect((await db.select(db.expenses).get()).isEmpty, isTrue);
+        expect((await db.select(db.storageRecords).get()).isEmpty, isTrue);
+        expect((await db.select(db.syncStates).get()).isEmpty, isTrue);
+        expect((await db.select(db.syncOperations).get()).isEmpty, isTrue);
+      },
+    );
+
+    test(
+      'explicit opt-in seeds initial settings, 4 item types, 7 expense categories, and complete master catalog',
+      () async {
+        final db = AppDatabase(NativeDatabase.memory(), true);
+        addTearDown(db.close);
+
         // Check BusinessSettings
         final settings = await db.select(db.businessSettings).get();
         expect(settings.length, equals(1));
@@ -836,11 +872,45 @@ void main() {
           }),
         );
 
+        // Check Services (5 canonical services)
+        final services = await db.select(db.services).get();
+        expect(services.length, equals(5));
+
+        // Check ServiceItemTypes (5 canonical pricing configs)
+        final serviceItemTypes = await db.select(db.serviceItemTypes).get();
+        expect(serviceItemTypes.length, equals(5));
+
+        // Check CarpetSizes (3 canonical carpet sizes)
+        final carpetSizes = await db.select(db.carpetSizes).get();
+        expect(carpetSizes.length, equals(3));
+
+        // Check StorageLocations (5 canonical storage locations)
+        final storageLocations = await db.select(db.storageLocations).get();
+        expect(storageLocations.length, equals(5));
+
+        // Check StorageLocationItemTypes (9 junction associations)
+        final locItemTypes = await db.select(db.storageLocationItemTypes).get();
+        expect(locItemTypes.length, equals(9));
+
+        // Check ItemDefinitions (10 canonical item definitions)
+        final itemDefinitions = await db.select(db.itemDefinitions).get();
+        expect(itemDefinitions.length, equals(10));
+
+        // Check SyncState singleton
+        final syncState = await db.select(db.syncStates).get();
+        expect(syncState.length, equals(1));
+        expect(syncState.first.lastAppliedSequence, equals(0));
+
+        // Invariant: ZERO sync operations generated by canonical seed
+        final syncOps = await db.select(db.syncOperations).get();
+        expect(syncOps.isEmpty, isTrue);
+
         // Invariant: Transactional tables MUST be empty!
         expect((await db.select(db.customers).get()).isEmpty, isTrue);
         expect((await db.select(db.orders).get()).isEmpty, isTrue);
         expect((await db.select(db.orderItems).get()).isEmpty, isTrue);
         expect((await db.select(db.payments).get()).isEmpty, isTrue);
+        expect((await db.select(db.refunds).get()).isEmpty, isTrue);
         expect((await db.select(db.expenses).get()).isEmpty, isTrue);
         expect((await db.select(db.storageRecords).get()).isEmpty, isTrue);
       },
@@ -849,6 +919,9 @@ void main() {
     test(
       're-running seed data is idempotent and does not overwrite modifications',
       () async {
+        final db = AppDatabase(NativeDatabase.memory(), true);
+        addTearDown(db.close);
+
         // Modify an expense category name
         await (db.update(db.expenseCategories)..where(
               (t) => t.id.equals('00000000-0000-0000-0002-000000000001'),

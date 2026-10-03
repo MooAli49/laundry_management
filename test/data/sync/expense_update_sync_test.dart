@@ -35,7 +35,7 @@ void main() {
 
   setUp(() async {
     // Terminal 1 setup
-    dbTerminal1 = app_db.AppDatabase(NativeDatabase.memory());
+    dbTerminal1 = app_db.AppDatabase(NativeDatabase.memory(), true);
     expensesDaoT1 = ExpensesDao(dbTerminal1);
     syncOperationsDaoT1 = SyncOperationsDao(dbTerminal1);
 
@@ -46,7 +46,7 @@ void main() {
     );
 
     // Terminal 2 setup
-    dbTerminal2 = app_db.AppDatabase(NativeDatabase.memory());
+    dbTerminal2 = app_db.AppDatabase(NativeDatabase.memory(), true);
     expensesDaoT2 = ExpensesDao(dbTerminal2);
     syncStateDaoT2 = SyncStateDao(dbTerminal2);
     applierT2 = RemoteChangeApplier(

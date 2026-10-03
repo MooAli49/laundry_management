@@ -26,7 +26,7 @@ void main() {
     late RemoteChangeApplier applier;
 
     setUp(() async {
-      db = app_db.AppDatabase(NativeDatabase.memory());
+      db = app_db.AppDatabase(NativeDatabase.memory(), true);
       syncStateDao = SyncStateDao(db);
       syncOperationsDao = SyncOperationsDao(db);
       customersDao = CustomersDao(db);

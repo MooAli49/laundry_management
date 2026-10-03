@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../sync/sync_dependency_resolver.dart';
 import '../database/app_database.dart' as app_db;
 
 class SyncOperationsDao extends DatabaseAccessor<app_db.AppDatabase> {
@@ -64,11 +65,14 @@ class SyncOperationsDao extends DatabaseAccessor<app_db.AppDatabase> {
 
   /// Returns operations eligible for synchronization at [asOf] timestamp.
   ///
-  /// Eligible operations are:
-  /// 1. Status 'pending' with no retry scheduled or retry timestamp <= [asOf].
-  /// 2. Status 'failed' with a scheduled retry timestamp <= [asOf].
-  ///
-  /// Results are ordered chronologically by [createdAt] ascending.
+  /// Implements dependency-aware synchronization:
+  /// 1. A downstream operation is NOT eligible if any of its parent dependencies
+  ///    has permanently failed (status 'failed' with nextRetryAt IS NULL).
+  /// 2. If an operation is waiting for retry in the future (nextRetryAt > asOf),
+  ///    FIFO queue ordering pauses at that operation so dependent items cannot bypass it.
+  /// 3. Unrelated operations are NOT blocked by a permanent failure in an independent entity.
+  /// 4. Blocked operations remain in 'pending' status so they can be dispatched once
+  ///    their parent dependency is repaired and synced.
   Future<List<app_db.SyncOperation>> getEligibleOperations({
     DateTime? asOf,
     int limit = 50,
@@ -76,36 +80,102 @@ class SyncOperationsDao extends DatabaseAccessor<app_db.AppDatabase> {
     final effectiveAsOf = asOf ?? DateTime.now();
     if (limit <= 0) return [];
 
-    // The engine dispatches this list sequentially and stops on the first
-    // failure. Keep an older pending/retryable operation as a barrier so a
-    // dependent operation cannot bypass it while it is waiting for retry.
-    final queue =
-        await (select(db.syncOperations)
-              ..where(
-                (t) =>
-                    t.status.equals('pending') |
-                    (t.status.equals('failed') & t.nextRetryAt.isNotNull()),
-              )
-              ..orderBy([
-                (t) => OrderingTerm.asc(t.createdAt),
-                // The UUID is random, so use SQLite insertion order for timestamp
-                // ties. The table has no explicit integer key, but its rowid is
-                // stable for the lifetime of each outbox record.
-                (_) => OrderingTerm.asc(CustomExpression<int>('rowid')),
-              ]))
-            .get();
+    final queue = await (select(db.syncOperations)
+          ..where((t) => t.status.isIn(['pending', 'failed']))
+          ..orderBy([
+            (t) => OrderingTerm.asc(t.createdAt),
+            (_) => OrderingTerm.asc(CustomExpression<int>('rowid')),
+          ]))
+        .get();
+
+    if (queue.isEmpty) return [];
+
+    Map<String, String>? orderItemToOrderMap;
+    final hasStorageRecord =
+        queue.any((op) => op.entityType == 'storage_record');
+    if (hasStorageRecord) {
+      final items = await select(db.orderItems).get();
+      orderItemToOrderMap = {for (final item in items) item.id: item.orderId};
+    }
 
     final eligible = <app_db.SyncOperation>[];
+    final failedEntities = <EntityDependency>{};
+
     for (final operation in queue) {
+      final opEntity = EntityDependency(
+        entityType: operation.entityType,
+        entityId: operation.entityId,
+      );
+
+      // 1. Permanent failure check for this operation
+      final isPermanentlyFailed =
+          operation.status == 'failed' && operation.nextRetryAt == null;
+      if (isPermanentlyFailed) {
+        failedEntities.add(opEntity);
+        continue;
+      }
+
+      // 2. Future retry barrier: if this operation is waiting for a retry in the future,
+      // pause FIFO traversal so operations behind it do not bypass it.
       final retryAt = operation.nextRetryAt;
       if (retryAt != null && retryAt.isAfter(effectiveAsOf)) {
         break;
       }
 
+      // 3. Inspect dependencies of this operation
+      final deps = SyncDependencyResolver.extractDependencies(
+        operation,
+        orderItemToOrderMap: orderItemToOrderMap,
+      );
+
+      // If any required parent dependency has permanently failed, block this operation
+      final isBlockedByFailedParent =
+          deps.any((d) => failedEntities.contains(d));
+      if (isBlockedByFailedParent) {
+        // Cascade failure state to this entity so downstream dependents are also blocked
+        failedEntities.add(opEntity);
+        continue;
+      }
+
       eligible.add(operation);
       if (eligible.length == limit) break;
     }
+
     return eligible;
+  }
+
+  /// Checks whether any parent dependency of [operation] has permanently failed.
+  Future<bool> hasPermanentlyFailedDependency(
+    app_db.SyncOperation operation,
+  ) async {
+    Map<String, String>? orderItemToOrderMap;
+    if (operation.entityType == 'storage_record') {
+      final items = await select(db.orderItems).get();
+      orderItemToOrderMap = {for (final item in items) item.id: item.orderId};
+    }
+
+    final deps = SyncDependencyResolver.extractDependencies(
+      operation,
+      orderItemToOrderMap: orderItemToOrderMap,
+    );
+
+    if (deps.isEmpty) return false;
+
+    for (final dep in deps) {
+      final failedOp = await (select(db.syncOperations)
+            ..where((t) =>
+                t.entityType.equals(dep.entityType) &
+                t.entityId.equals(dep.entityId) &
+                t.status.equals('failed') &
+                t.nextRetryAt.isNull()))
+          .getSingleOrNull();
+
+      if (failedOp != null) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   Future<void> markOperationSynced(String id) async {

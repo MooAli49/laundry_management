@@ -1,11 +1,37 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../domain/sync/sync_conflict_exception.dart';
+import '../local/daos/sync_conflicts_dao.dart';
 import '../local/daos/sync_operations_dao.dart';
 import '../local/daos/sync_state_dao.dart';
 import '../local/database/app_database.dart' as app_db;
 import '../remote/dto/pull_changes_response_dto.dart';
 import '../remote/dto/sync_change_dto.dart';
+
+class _OrderNumberConflict {
+  final String entityId;
+  final String conflictType;
+  final String? localEntityId;
+  final String orderNumber;
+  final SyncChangeDto change;
+  final Map<String, dynamic> payload;
+
+  const _OrderNumberConflict({
+    required this.entityId,
+    required this.conflictType,
+    required this.localEntityId,
+    required this.orderNumber,
+    required this.change,
+    required this.payload,
+  });
+}
+
+class _SnapshotConflict implements Exception {
+  final _OrderNumberConflict conflict;
+
+  const _SnapshotConflict(this.conflict);
+}
 
 /// Infrastructure service responsible for applying pulled remote changes directly
 /// to local Drift storage and atomically advancing the sync cursor.
@@ -22,13 +48,15 @@ import '../remote/dto/sync_change_dto.dart';
 class RemoteChangeApplier {
   final app_db.AppDatabase _db;
   final SyncStateDao _syncStateDao;
+  final SyncConflictsDao _syncConflictsDao;
 
   RemoteChangeApplier({
     required app_db.AppDatabase db,
     required SyncStateDao syncStateDao,
     SyncOperationsDao? syncOperationsDao,
   }) : _db = db,
-       _syncStateDao = syncStateDao;
+       _syncStateDao = syncStateDao,
+       _syncConflictsDao = SyncConflictsDao(db);
 
   /// Applies a full database snapshot for CURSOR_TOO_OLD recovery or initial bootstrap.
   ///
@@ -41,51 +69,63 @@ class RemoteChangeApplier {
   /// 4. **Safe Cursor Establishment**: `sync_state.last_applied_sequence` is set to `snapshot.latestSequence`
   ///    only after all non-skipped snapshot changes have been committed.
   Future<void> applySnapshot(PullChangesResponseDto snapshot) async {
-    await _db.transaction(() async {
-      // 1. Gather keys of all entities that currently have unsynced local outbox operations.
-      // Format: '${entityType}:${entityId}'
-      final unsyncedEntityKeys = <String>{};
-      final unsyncedOps = await (_db.select(_db.syncOperations)
-            ..where((t) => t.status.isNotValue('synced')))
-          .get();
-      for (final op in unsyncedOps) {
-        unsyncedEntityKeys.add('${op.entityType}:${op.entityId}');
-      }
+    const entityRank = {
+      'business_settings': 1,
+      'item_type': 2,
+      'storage_location': 3,
+      'item_definition': 4,
+      'carpet_size': 5,
+      'service': 6,
+      'expense_category': 7,
+      'expense': 8,
+      'customer': 9,
+      'order': 10,
+      'storage_record': 11,
+      'payment': 12,
+      'refund': 13,
+    };
 
-      // 2. Ingest snapshot changes in strict dependency order, preserving pending local mutations
-      const entityRank = {
-        'business_settings': 1,
-        'item_type': 2,
-        'storage_location': 3,
-        'item_definition': 4,
-        'carpet_size': 5,
-        'service': 6,
-        'expense_category': 7,
-        'expense': 8,
-        'customer': 9,
-        'order': 10,
-        'storage_record': 11,
-        'payment': 12,
-        'refund': 13,
-      };
+    final sortedChanges = List<SyncChangeDto>.from(snapshot.changes)
+      ..sort(
+        (a, b) => (entityRank[a.entityType] ?? 99).compareTo(
+          entityRank[b.entityType] ?? 99,
+        ),
+      );
 
-      final sortedChanges = List<SyncChangeDto>.from(snapshot.changes)
-        ..sort((a, b) =>
-            (entityRank[a.entityType] ?? 99).compareTo(entityRank[b.entityType] ?? 99));
-
-      for (final change in sortedChanges) {
-        final key = '${change.entityType}:${change.entityId}';
-        if (unsyncedEntityKeys.contains(key)) {
-          // Do NOT overwrite local record with pending unpushed mutations
-          continue;
+    try {
+      await _db.transaction(() async {
+        final unsyncedEntityKeys = <String>{};
+        final unsyncedOps = await (_db.select(
+          _db.syncOperations,
+        )..where((t) => t.status.isNotValue('synced'))).get();
+        for (final op in unsyncedOps) {
+          unsyncedEntityKeys.add('${op.entityType}:${op.entityId}');
         }
 
-        await _applySingleChange(change);
-      }
+        final conflict = await _findOrderNumberConflict(
+          sortedChanges,
+          skippedEntityKeys: unsyncedEntityKeys,
+        );
+        if (conflict != null) {
+          throw _SnapshotConflict(conflict);
+        }
 
-      // 3. Atomically establish the new sequence baseline
-      await _syncStateDao.updateLastAppliedSequence(snapshot.latestSequence);
-    });
+        for (final change in sortedChanges) {
+          final key = '${change.entityType}:${change.entityId}';
+          if (unsyncedEntityKeys.contains(key)) {
+            // Do NOT overwrite local record with pending unpushed mutations
+            continue;
+          }
+
+          await _applySingleChange(change);
+        }
+
+        // 3. Atomically establish the new sequence baseline
+        await _syncStateDao.updateLastAppliedSequence(snapshot.latestSequence);
+      });
+    } on _SnapshotConflict catch (error) {
+      await _persistConflictAndThrow(error.conflict);
+    }
   }
 
   /// Applies a full page response from the Pull API.
@@ -112,6 +152,11 @@ class RemoteChangeApplier {
       }
     }
 
+    final conflict = await _findOrderNumberConflict(changes);
+    if (conflict != null) {
+      await _persistConflictAndThrow(conflict);
+    }
+
     await _db.transaction(() async {
       for (final change in changes) {
         await _applySingleChange(change);
@@ -120,6 +165,92 @@ class RemoteChangeApplier {
       // Cursor advances only after all changes in the batch succeed
       await _syncStateDao.updateLastAppliedSequence(changes.last.sequence);
     });
+  }
+
+  Future<_OrderNumberConflict?> _findOrderNumberConflict(
+    Iterable<SyncChangeDto> changes, {
+    Set<String> skippedEntityKeys = const <String>{},
+  }) async {
+    final orders = await _db.select(_db.orders).get();
+    final orderNumbersById = <String, String>{
+      for (final order in orders) order.id: order.orderNumber,
+    };
+    final orderIdsByNumber = <String, String>{
+      for (final order in orders) order.orderNumber: order.id,
+    };
+
+    for (final change in changes) {
+      if (change.entityType != 'order') continue;
+      if (skippedEntityKeys.contains(
+        '${change.entityType}:${change.entityId}',
+      )) {
+        continue;
+      }
+
+      final rawPayload = change.payload;
+      final nestedOrder = rawPayload['order'];
+      final payload = nestedOrder is Map<String, dynamic>
+          ? <String, dynamic>{...nestedOrder, ...rawPayload}
+          : rawPayload;
+      if (!payload.containsKey('order_number')) continue;
+
+      final orderId = payload['id'] as String? ?? change.entityId;
+      final orderNumber = payload['order_number'] as String?;
+      if (orderNumber == null || orderNumber.isEmpty) continue;
+
+      String? conflictType;
+      String? localEntityId;
+      final existingOrderNumber = orderNumbersById[orderId];
+      final existingOwnerId = orderIdsByNumber[orderNumber];
+      if (existingOrderNumber != null &&
+          existingOrderNumber.isNotEmpty &&
+          existingOrderNumber != orderNumber) {
+        conflictType = 'order_number_changed';
+        localEntityId = orderId;
+      } else if (existingOwnerId != null && existingOwnerId != orderId) {
+        conflictType = 'duplicate_order_number';
+        localEntityId = existingOwnerId;
+      }
+
+      if (conflictType != null) {
+        return _OrderNumberConflict(
+          entityId: orderId,
+          conflictType: conflictType,
+          localEntityId: localEntityId,
+          orderNumber: orderNumber,
+          change: change,
+          payload: payload,
+        );
+      }
+
+      orderNumbersById[orderId] = orderNumber;
+      orderIdsByNumber[orderNumber] = orderId;
+    }
+
+    return null;
+  }
+
+  Future<Never> _persistConflictAndThrow(_OrderNumberConflict conflict) async {
+    await _syncConflictsDao.recordOrderNumberConflict(
+      entityId: conflict.entityId,
+      conflictType: conflict.conflictType,
+      localEntityId: conflict.localEntityId,
+      orderNumber: conflict.orderNumber,
+      remoteSequence: conflict.change.sequence,
+      operationId: conflict.change.operationId,
+      operationType: conflict.change.operationType,
+      payload: conflict.payload,
+      detectedAt: DateTime.now(),
+    );
+
+    throw SyncConflictException(
+      conflictType: conflict.conflictType,
+      entityId: conflict.entityId,
+      message:
+          'Remote order ${conflict.entityId} cannot use order_number '
+          '${conflict.orderNumber}; local order ${conflict.localEntityId} '
+          'already owns that business number.',
+    );
   }
 
   /// Dispatches and applies a single remote change by entity type and operation type.
@@ -364,10 +495,10 @@ class RemoteChangeApplier {
         id: Value(orderId),
         orderNumber:
             (existingOrder != null && existingOrder.orderNumber.isNotEmpty)
-                ? const Value.absent()
-                : (payload.containsKey('order_number')
-                    ? Value(payload['order_number'] as String)
-                    : const Value.absent()),
+            ? const Value.absent()
+            : (payload.containsKey('order_number')
+                  ? Value(payload['order_number'] as String)
+                  : const Value.absent()),
         customerId: payload.containsKey('customer_id')
             ? Value(payload['customer_id'] as String)
             : const Value.absent(),
@@ -970,7 +1101,8 @@ class RemoteChangeApplier {
       if (legacyIds != null) {
         final rawLegacyPricingType =
             (payload['pricing_type'] ?? payload['pricingType']) as String?;
-        final legacyPricingType = (rawLegacyPricingType == 'per_square_meter' ||
+        final legacyPricingType =
+            (rawLegacyPricingType == 'per_square_meter' ||
                 rawLegacyPricingType == 'perSquareMeter')
             ? 'per_square_meter'
             : 'per_piece';
@@ -1000,7 +1132,8 @@ class RemoteChangeApplier {
               (raw['item_type_id'] ?? raw['itemTypeId']) as String? ?? '';
           final rawPricingType =
               (raw['pricing_type'] ?? raw['pricingType']) as String?;
-          final pricingType = (rawPricingType == 'per_square_meter' ||
+          final pricingType =
+              (rawPricingType == 'per_square_meter' ||
                   rawPricingType == 'perSquareMeter')
               ? 'per_square_meter'
               : 'per_piece';
@@ -1034,20 +1167,21 @@ class RemoteChangeApplier {
     } else if (payload.containsKey('price')) {
       final newPrice = (payload['price'] as num?)?.toInt() ?? 0;
       if (newPrice > 0) {
-        final existingSits = await (_db.select(_db.serviceItemTypes)
-              ..where((t) => t.serviceId.equals(id)))
-            .get();
+        final existingSits = await (_db.select(
+          _db.serviceItemTypes,
+        )..where((t) => t.serviceId.equals(id))).get();
         if (existingSits.isNotEmpty) {
           final rawPricingType =
               (payload['pricing_type'] ?? payload['pricingType']) as String?;
-          final pricingType = (rawPricingType == 'per_square_meter' ||
+          final pricingType =
+              (rawPricingType == 'per_square_meter' ||
                   rawPricingType == 'perSquareMeter')
               ? 'per_square_meter'
               : 'per_piece';
           for (final sit in existingSits) {
-            await (_db.update(_db.serviceItemTypes)
-                  ..where((t) => t.id.equals(sit.id)))
-                .write(
+            await (_db.update(
+              _db.serviceItemTypes,
+            )..where((t) => t.id.equals(sit.id))).write(
               app_db.ServiceItemTypesCompanion(
                 price: Value(newPrice),
                 pricingType: Value(pricingType),

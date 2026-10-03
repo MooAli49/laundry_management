@@ -108,7 +108,10 @@ import '../widgets/sync_status_cubit.dart';
 
 final getIt = GetIt.instance;
 
-Future<void> initDependencies({bool? enableDevTestData}) async {
+Future<void> initDependencies({
+  bool? enableDevTestData,
+  bool? enableCanonicalSeed,
+}) async {
   // 0. Supabase Configuration
   if (!getIt.isRegistered<SupabaseConfig>()) {
     getIt.registerLazySingleton<SupabaseConfig>(() => SupabaseConfig.resolve());
@@ -116,7 +119,9 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
 
   // 1. Core Local Database
   if (!getIt.isRegistered<AppDatabase>()) {
-    getIt.registerLazySingleton<AppDatabase>(() => AppDatabase());
+    getIt.registerLazySingleton<AppDatabase>(
+      () => AppDatabase(null, enableCanonicalSeed),
+    );
   }
 
   // Core Networking Infrastructure

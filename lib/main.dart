@@ -72,7 +72,19 @@ void main() async {
     };
   }
 
-  await initDependencies(enableDevTestData: kDebugMode);
+  const bool enableCanonicalSeed = bool.fromEnvironment(
+    'ENABLE_CANONICAL_SEED',
+    defaultValue: false,
+  );
+  const bool enableDevSeeds = bool.fromEnvironment(
+    'ENABLE_DEV_TEST_DATA',
+    defaultValue: false,
+  );
+
+  await initDependencies(
+    enableCanonicalSeed: enableCanonicalSeed,
+    enableDevTestData: enableDevSeeds,
+  );
 
   // Initialize license service BEFORE runApp so GoRouter's initial redirect
   // has the correct license status on the first frame.

@@ -12,6 +12,7 @@ import '../tables/expense_categories_table.dart';
 import '../tables/expenses_table.dart';
 import '../tables/item_definitions_table.dart';
 import '../tables/item_types_table.dart';
+import '../tables/license_cache_table.dart';
 import '../tables/order_item_carpets_table.dart';
 import '../tables/order_items_table.dart';
 import '../tables/orders_table.dart';
@@ -22,7 +23,7 @@ import '../tables/services_table.dart';
 import '../tables/storage_location_item_types_table.dart';
 import '../tables/storage_locations_table.dart';
 import '../tables/storage_records_table.dart';
-import '../tables/license_cache_table.dart';
+import '../tables/sync_conflicts_table.dart';
 import '../tables/sync_operations_table.dart';
 import '../tables/sync_states_table.dart';
 import 'seed_data.dart';
@@ -49,15 +50,25 @@ part 'app_database.g.dart';
     Expenses,
     BusinessSettings,
     SyncOperations,
+    SyncConflicts,
     SyncStates,
     LicenseCache,
   ],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
+  /// Creates the application database.
+  ///
+  /// [enableCanonicalSeed] controls whether [SeedData.seedInitialData] runs on
+  /// open. It defaults to [SeedData.isEnabled] (`ENABLE_CANONICAL_SEED`,
+  /// default `false`), so a fresh database is EMPTY unless explicitly opted in.
+  AppDatabase([QueryExecutor? e, bool? enableCanonicalSeed])
+    : _enableCanonicalSeed = enableCanonicalSeed ?? SeedData.isEnabled,
+      super(e ?? _openConnection());
+
+  final bool _enableCanonicalSeed;
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -126,9 +137,12 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 8) {
         // Upgrade service_item_types and services to Service + Item Type Pricing Model
-        final serviceCols = await customSelect('PRAGMA table_info(services);').get();
-        final hasLegacyServicePricing =
-            serviceCols.any((r) => r.read<String>('name') == 'pricing_type');
+        final serviceCols = await customSelect(
+          'PRAGMA table_info(services);',
+        ).get();
+        final hasLegacyServicePricing = serviceCols.any(
+          (r) => r.read<String>('name') == 'pricing_type',
+        );
 
         if (hasLegacyServicePricing) {
           await customStatement('''
@@ -160,7 +174,9 @@ class AppDatabase extends _$AppDatabase {
           ''');
 
           await customStatement('DROP TABLE service_item_types;');
-          await customStatement('ALTER TABLE service_item_types_new RENAME TO service_item_types;');
+          await customStatement(
+            'ALTER TABLE service_item_types_new RENAME TO service_item_types;',
+          );
 
           await customStatement('''
             CREATE TABLE IF NOT EXISTS services_new (
@@ -187,11 +203,16 @@ class AppDatabase extends _$AppDatabase {
           UPDATE order_items SET pricing_type = 'per_piece' WHERE pricing_type = 'fixed_price';
         ''');
       }
+      if (from < 9) {
+        await m.createTable(syncConflicts);
+      }
     },
     beforeOpen: (OpeningDetails details) async {
       await customStatement('PRAGMA foreign_keys = ON;');
       await _createIndexes();
-      await SeedData.seedInitialData(this);
+      if (_enableCanonicalSeed) {
+        await SeedData.seedInitialData(this);
+      }
     },
   );
 

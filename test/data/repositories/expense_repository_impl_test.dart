@@ -25,7 +25,7 @@ void main() {
   late ExpenseCategoryRepositoryImpl expenseCategoryRepository;
 
   setUp(() async {
-    db = db_pkg.AppDatabase(NativeDatabase.memory());
+    db = db_pkg.AppDatabase(NativeDatabase.memory(), true);
     expensesDao = ExpensesDao(db);
     expenseCategoriesDao = ExpenseCategoriesDao(db);
     syncOperationsDao = SyncOperationsDao(db);

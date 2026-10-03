@@ -31,7 +31,7 @@ void main() {
   late ReportsRepositoryImpl reportsRepository;
 
   setUp(() async {
-    db = db_pkg.AppDatabase(NativeDatabase.memory());
+    db = db_pkg.AppDatabase(NativeDatabase.memory(), true);
     customersDao = CustomersDao(db);
     ordersDao = OrdersDao(db);
     paymentsDao = PaymentsDao(db);

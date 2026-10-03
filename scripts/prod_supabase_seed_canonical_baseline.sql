@@ -5,8 +5,8 @@
 -- Phase: 3A (Canonical Master Baseline)
 --
 -- PURPOSE:
--- Seeds the 35 canonical master records and their authoritative sync_changes
--- (Sequences 1..35) into the freshly-reset development Supabase database.
+-- Seeds the canonical master records and their authoritative sync_changes
+-- (Sequences 1..32) into the freshly-reset production Supabase database.
 --
 -- USAGE — SINGLE-USE ONLY:
 -- This script is intentionally single-use. It must be run exactly once
@@ -15,7 +15,7 @@
 --
 -- WHAT IS AND IS NOT IDEMPOTENT:
 -- * This script itself is NOT idempotent. It is a one-time seeding operation.
--- * The sync_changes rows it produces (sequences 1..35) contain canonical
+-- * The sync_changes rows it produces (sequences 1..32) contain canonical
 --   UUIDs and stable payloads. Any Flutter client starting from cursor 0
 --   can deterministically replay those changes to reconstruct master state.
 --   That client-side replay is idempotent and safe.
@@ -26,7 +26,7 @@
 -- 1. Atomic: Executes inside a single transaction (BEGIN ... COMMIT).
 -- 2. Guarded: Fails closed unless app.project_ref, app.environment, and
 --    app.confirm_canonical_seed are explicitly asserted by the operator.
--- 3. Strict Cursor Continuity: Generates sequences 1..35 with no gaps.
+-- 3. Strict Cursor Continuity: Generates sequences 1..32 with no gaps.
 -- 4. Timestamp Consistency: A single deterministic timestamp (app.seed_ts) is
 --    captured once per transaction via transaction_timestamp() and used for
 --    every relational row AND its embedded payload snapshot, so
@@ -188,9 +188,9 @@ ON CONFLICT (id) DO UPDATE SET
 -- 1.2 Item Types (4 canonical rows)
 INSERT INTO public.item_types (id, name, is_active, created_at, updated_at) VALUES
 ('00000000-0000-0000-0001-000000000001', 'ملابس',  true, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0001-000000000002', 'بطاطين', true, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0001-000000000003', 'سجاد',   true, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0001-000000000004', 'أغطية',  true, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz);
+('00000000-0000-0000-0001-000000000002', 'بطانية', true, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
+('00000000-0000-0000-0001-000000000003', 'سجادة',  true, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
+('00000000-0000-0000-0001-000000000004', 'لحاف',   true, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz);
 
 -- 1.3 Expense Categories (7 canonical rows)
 INSERT INTO public.expense_categories (id, name, is_active, created_at, updated_at) VALUES
@@ -202,21 +202,15 @@ INSERT INTO public.expense_categories (id, name, is_active, created_at, updated_
 ('00000000-0000-0000-0002-000000000006', 'نقل',      true, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
 ('00000000-0000-0000-0002-000000000007', 'أخرى',     true, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz);
 
--- 1.4 Services (5 canonical rows)
+-- 1.4 Services (2 canonical rows)
 INSERT INTO public.services (id, name, description, is_active, server_version, created_at, updated_at) VALUES
-('00000000-0000-0000-0002-000000000001', 'غسيل ومكوى',   'خدمة تجريبية', true, 1, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0002-000000000002', 'دراي كلين',    'خدمة تجريبية', true, 1, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0002-000000000003', 'غسيل سجاد',    'خدمة تجريبية', true, 1, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0002-000000000004', 'تنظيف بطاطين', 'خدمة تجريبية', true, 1, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0002-000000000005', 'غسيل أغطية',   'خدمة تجريبية', true, 1, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz);
+('00000000-0000-0000-0002-000000000001', 'غسيل ومكوى', 'خدمة تجريبية', true, 1, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
+('00000000-0000-0000-0002-000000000002', 'غسيل',       'خدمة تجريبية', true, 1, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz);
 
--- 1.5 Service Item Types (5 canonical configurations)
+-- 1.5 Service Item Types (2 canonical configurations)
 INSERT INTO public.service_item_types (id, service_id, item_type_id, pricing_type, price, created_at, updated_at) VALUES
-('00000000-0000-0000-0008-000000000001', '00000000-0000-0000-0002-000000000001', '00000000-0000-0000-0001-000000000001', 'per_piece',        2500, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0008-000000000002', '00000000-0000-0000-0002-000000000002', '00000000-0000-0000-0001-000000000001', 'per_piece',        4500, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0008-000000000003', '00000000-0000-0000-0002-000000000003', '00000000-0000-0000-0001-000000000003', 'per_square_meter', 6000, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0008-000000000004', '00000000-0000-0000-0002-000000000004', '00000000-0000-0000-0001-000000000002', 'per_piece',        8000, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
-('00000000-0000-0000-0008-000000000005', '00000000-0000-0000-0002-000000000005', '00000000-0000-0000-0001-000000000004', 'per_piece',        3500, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz);
+('00000000-0000-0000-0008-000000000001', '00000000-0000-0000-0002-000000000001', '00000000-0000-0000-0001-000000000001', 'per_piece', 2500, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz),
+('00000000-0000-0000-0008-000000000002', '00000000-0000-0000-0002-000000000002', '00000000-0000-0000-0001-000000000001', 'per_piece', 4500, current_setting('app.seed_ts', true)::timestamptz, current_setting('app.seed_ts', true)::timestamptz);
 
 -- 1.6 Carpet Sizes (3 canonical rows)
 INSERT INTO public.carpet_sizes (id, name, length, width, area, is_active, created_at, updated_at) VALUES
@@ -312,7 +306,7 @@ VALUES
     'create',
     jsonb_build_object(
         'id', '00000000-0000-0000-0001-000000000002',
-        'name', 'بطاطين',
+        'name', 'بطانية',
         'is_active', true,
         'created_at', current_setting('app.seed_ts', true),
         'updated_at', current_setting('app.seed_ts', true)
@@ -327,7 +321,7 @@ VALUES
     'create',
     jsonb_build_object(
         'id', '00000000-0000-0000-0001-000000000003',
-        'name', 'سجاد',
+        'name', 'سجادة',
         'is_active', true,
         'created_at', current_setting('app.seed_ts', true),
         'updated_at', current_setting('app.seed_ts', true)
@@ -342,7 +336,7 @@ VALUES
     'create',
     jsonb_build_object(
         'id', '00000000-0000-0000-0001-000000000004',
-        'name', 'أغطية',
+        'name', 'لحاف',
         'is_active', true,
         'created_at', current_setting('app.seed_ts', true),
         'updated_at', current_setting('app.seed_ts', true)
@@ -418,7 +412,7 @@ VALUES
     current_setting('app.seed_ts', true)::timestamptz
 );
 
--- Sequences 13..17: Services (5 changes, canonical supported_item_type_ids embedded)
+-- Sequences 13..14: Services (2 changes, canonical service_item_types embedded)
 INSERT INTO public.sync_changes (operation_id, entity_type, entity_id, operation_type, payload, server_version, created_at)
 VALUES
 (
@@ -454,7 +448,7 @@ VALUES
     'create',
     jsonb_build_object(
         'id', '00000000-0000-0000-0002-000000000002',
-        'name', 'دراي كلين',
+        'name', 'غسيل',
         'description', 'خدمة تجريبية',
         'is_active', true,
         'server_version', 1,
@@ -472,87 +466,9 @@ VALUES
     ),
     1,
     current_setting('app.seed_ts', true)::timestamptz
-),
-(
-    'op-baseline-015',
-    'service',
-    '00000000-0000-0000-0002-000000000003',
-    'create',
-    jsonb_build_object(
-        'id', '00000000-0000-0000-0002-000000000003',
-        'name', 'غسيل سجاد',
-        'description', 'خدمة تجريبية',
-        'is_active', true,
-        'server_version', 1,
-        'service_item_types', jsonb_build_array(
-            jsonb_build_object(
-                'id', '00000000-0000-0000-0008-000000000003',
-                'service_id', '00000000-0000-0000-0002-000000000003',
-                'item_type_id', '00000000-0000-0000-0001-000000000003',
-                'pricing_type', 'per_square_meter',
-                'price', 6000
-            )
-        ),
-        'created_at', current_setting('app.seed_ts', true),
-        'updated_at', current_setting('app.seed_ts', true)
-    ),
-    1,
-    current_setting('app.seed_ts', true)::timestamptz
-),
-(
-    'op-baseline-016',
-    'service',
-    '00000000-0000-0000-0002-000000000004',
-    'create',
-    jsonb_build_object(
-        'id', '00000000-0000-0000-0002-000000000004',
-        'name', 'تنظيف بطاطين',
-        'description', 'خدمة تجريبية',
-        'is_active', true,
-        'server_version', 1,
-        'service_item_types', jsonb_build_array(
-            jsonb_build_object(
-                'id', '00000000-0000-0000-0008-000000000004',
-                'service_id', '00000000-0000-0000-0002-000000000004',
-                'item_type_id', '00000000-0000-0000-0001-000000000002',
-                'pricing_type', 'per_piece',
-                'price', 8000
-            )
-        ),
-        'created_at', current_setting('app.seed_ts', true),
-        'updated_at', current_setting('app.seed_ts', true)
-    ),
-    1,
-    current_setting('app.seed_ts', true)::timestamptz
-),
-(
-    'op-baseline-017',
-    'service',
-    '00000000-0000-0000-0002-000000000005',
-    'create',
-    jsonb_build_object(
-        'id', '00000000-0000-0000-0002-000000000005',
-        'name', 'غسيل أغطية',
-        'description', 'خدمة تجريبية',
-        'is_active', true,
-        'server_version', 1,
-        'service_item_types', jsonb_build_array(
-            jsonb_build_object(
-                'id', '00000000-0000-0000-0008-000000000005',
-                'service_id', '00000000-0000-0000-0002-000000000005',
-                'item_type_id', '00000000-0000-0000-0001-000000000004',
-                'pricing_type', 'per_piece',
-                'price', 3500
-            )
-        ),
-        'created_at', current_setting('app.seed_ts', true),
-        'updated_at', current_setting('app.seed_ts', true)
-    ),
-    1,
-    current_setting('app.seed_ts', true)::timestamptz
 );
 
--- Sequences 18..20: Carpet Sizes (3 changes)
+-- Sequences 15..17: Carpet Sizes (3 changes)
 INSERT INTO public.sync_changes (operation_id, entity_type, entity_id, operation_type, payload, server_version, created_at)
 VALUES
 (
@@ -583,7 +499,7 @@ VALUES
     current_setting('app.seed_ts', true)::timestamptz
 );
 
--- Sequences 21..25: Storage Locations (5 changes, canonical supported_item_type_ids embedded)
+-- Sequences 18..22: Storage Locations (5 changes, canonical supported_item_type_ids embedded)
 INSERT INTO public.sync_changes (operation_id, entity_type, entity_id, operation_type, payload, server_version, created_at)
 VALUES
 (
@@ -672,7 +588,7 @@ VALUES
     current_setting('app.seed_ts', true)::timestamptz
 );
 
--- Sequences 26..35: Item Definitions (10 changes)
+-- Sequences 23..32: Item Definitions (10 changes)
 INSERT INTO public.sync_changes (operation_id, entity_type, entity_id, operation_type, payload, server_version, created_at)
 VALUES
 (
@@ -783,20 +699,20 @@ BEGIN
     INTO v_total_changes, v_min_seq, v_max_seq, v_distinct_seq
     FROM public.sync_changes;
 
-    IF v_total_changes <> 35 THEN
-        RAISE EXCEPTION 'POST-SEED ASSERTION FAILED: sync_changes has % rows, expected 35.', v_total_changes;
+    IF v_total_changes <> 32 THEN
+        RAISE EXCEPTION 'POST-SEED ASSERTION FAILED: sync_changes has % rows, expected 32.', v_total_changes;
     END IF;
 
     IF v_min_seq <> 1 THEN
         RAISE EXCEPTION 'POST-SEED ASSERTION FAILED: min(sequence) is %, expected 1.', v_min_seq;
     END IF;
 
-    IF v_max_seq <> 35 THEN
-        RAISE EXCEPTION 'POST-SEED ASSERTION FAILED: max(sequence) is %, expected 35.', v_max_seq;
+    IF v_max_seq <> 32 THEN
+        RAISE EXCEPTION 'POST-SEED ASSERTION FAILED: max(sequence) is %, expected 32.', v_max_seq;
     END IF;
 
-    IF v_distinct_seq <> 35 THEN
-        RAISE EXCEPTION 'POST-SEED ASSERTION FAILED: count(DISTINCT sequence) is %, expected 35 (gaps detected).', v_distinct_seq;
+    IF v_distinct_seq <> 32 THEN
+        RAISE EXCEPTION 'POST-SEED ASSERTION FAILED: count(DISTINCT sequence) is %, expected 32 (gaps detected).', v_distinct_seq;
     END IF;
 
     -- 2. Assert Relational Table Counts
@@ -810,10 +726,10 @@ BEGIN
     IF v_count <> 7 THEN RAISE EXCEPTION 'POST-SEED ASSERTION FAILED: expense_categories count % <> 7.', v_count; END IF;
 
     SELECT count(*) INTO v_count FROM public.services;
-    IF v_count <> 5 THEN RAISE EXCEPTION 'POST-SEED ASSERTION FAILED: services count % <> 5.', v_count; END IF;
+    IF v_count <> 2 THEN RAISE EXCEPTION 'POST-SEED ASSERTION FAILED: services count % <> 2.', v_count; END IF;
 
     SELECT count(*) INTO v_count FROM public.service_item_types;
-    IF v_count <> 5 THEN RAISE EXCEPTION 'POST-SEED ASSERTION FAILED: service_item_types count % <> 5.', v_count; END IF;
+    IF v_count <> 2 THEN RAISE EXCEPTION 'POST-SEED ASSERTION FAILED: service_item_types count % <> 2.', v_count; END IF;
 
     SELECT count(*) INTO v_count FROM public.carpet_sizes;
     IF v_count <> 3 THEN RAISE EXCEPTION 'POST-SEED ASSERTION FAILED: carpet_sizes count % <> 3.', v_count; END IF;
@@ -829,12 +745,12 @@ BEGIN
 
     RAISE NOTICE '=============================================================';
     RAISE NOTICE 'SUCCESS: CANONICAL BASELINE SEEDED AND VERIFIED.';
-    RAISE NOTICE 'sync_changes:             35 rows (sequences 1..35, no gaps)';
+    RAISE NOTICE 'sync_changes:             32 rows (sequences 1..32, no gaps)';
     RAISE NOTICE 'business_settings:        1 row (singleton)';
     RAISE NOTICE 'item_types:               4 rows';
     RAISE NOTICE 'expense_categories:       7 rows';
-    RAISE NOTICE 'services:                 5 rows';
-    RAISE NOTICE 'service_item_types:       5 rows';
+    RAISE NOTICE 'services:                 2 rows';
+    RAISE NOTICE 'service_item_types:       2 rows';
     RAISE NOTICE 'carpet_sizes:             3 rows';
     RAISE NOTICE 'storage_locations:        5 rows';
     RAISE NOTICE 'storage_location_item_types: 9 rows';

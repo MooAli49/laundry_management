@@ -25,7 +25,7 @@ void main() {
   late ChangeOrderStatusUseCase changeOrderStatusUseCase;
 
   setUp(() async {
-    db = AppDatabase(NativeDatabase.memory());
+    db = AppDatabase(NativeDatabase.memory(), true);
     ordersDao = OrdersDao(db);
     storageRecordsDao = StorageRecordsDao(db);
     syncOperationsDao = SyncOperationsDao(db);

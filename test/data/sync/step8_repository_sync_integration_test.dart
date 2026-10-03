@@ -238,6 +238,32 @@ void main() {
     storageLocationsDao = StorageLocationsDao(db);
     syncOperationsDao = InterceptableSyncOperationsDao(db);
 
+    final now = DateTime.now();
+    await db.into(db.itemTypes).insert(
+      app_db.ItemTypesCompanion.insert(
+        id: '00000000-0000-0000-0001-000000000001',
+        name: 'ملابس',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await db.into(db.itemTypes).insert(
+      app_db.ItemTypesCompanion.insert(
+        id: '00000000-0000-0000-0001-000000000002',
+        name: 'بطاطين',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await db.into(db.itemTypes).insert(
+      app_db.ItemTypesCompanion.insert(
+        id: '00000000-0000-0000-0001-000000000003',
+        name: 'سجاد',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
     customerRepo = CustomerRepositoryImpl(
       customersDao: customersDao,
       syncOperationsDao: syncOperationsDao,

@@ -34,7 +34,7 @@ void main() {
   late DashboardRepositoryImpl dashboardRepository;
 
   setUp(() async {
-    db = AppDatabase(NativeDatabase.memory());
+    db = AppDatabase(NativeDatabase.memory(), true);
     ordersDao = OrdersDao(db);
     paymentsDao = PaymentsDao(db);
     storageRecordsDao = StorageRecordsDao(db);

@@ -32,7 +32,7 @@ void main() {
   late BusinessSettingsDao businessSettingsDao;
   late SyncOperationsDao syncOperationsDao;
 
-  setUp(() {
+  setUp(() async {
     db = AppDatabase(NativeDatabase.memory());
     customersDao = CustomersDao(db);
     ordersDao = OrdersDao(db);
@@ -47,6 +47,33 @@ void main() {
     expensesDao = ExpensesDao(db);
     businessSettingsDao = BusinessSettingsDao(db);
     syncOperationsDao = SyncOperationsDao(db);
+
+    // Seed minimal prerequisites for DAO tests without enabling canonical seed
+    final now = DateTime.now();
+    await itemTypesDao.insertItemType(
+      ItemTypesCompanion(
+        id: const Value('00000000-0000-0000-0001-000000000001'),
+        name: const Value('ملابس'),
+        createdAt: Value(now),
+        updatedAt: Value(now),
+      ),
+    );
+    await itemTypesDao.insertItemType(
+      ItemTypesCompanion(
+        id: const Value('00000000-0000-0000-0001-000000000003'),
+        name: const Value('سجاد'),
+        createdAt: Value(now),
+        updatedAt: Value(now),
+      ),
+    );
+    await expenseCategoriesDao.insertCategory(
+      ExpenseCategoriesCompanion(
+        id: const Value('00000000-0000-0000-0002-000000000001'),
+        name: const Value('كهرباء'),
+        createdAt: Value(now),
+        updatedAt: Value(now),
+      ),
+    );
   });
 
   tearDown(() async {

@@ -63,7 +63,7 @@ void main() {
   late CreateOrderCubit cubit;
 
   setUp(() async {
-    db = db_pkg.AppDatabase(NativeDatabase.memory());
+    db = db_pkg.AppDatabase(NativeDatabase.memory(), true);
     customersDao = CustomersDao(db);
     ordersDao = OrdersDao(db);
     storageRecordsDao = StorageRecordsDao(db);
@@ -319,7 +319,7 @@ void main() {
       final now = DateTime.now();
       final carpetService = Service(
         id: 'srv-carpet-regression-test',
-        name: 'غسيل سجاد',
+        name: 'غسيل سجاد للاختبار',
         isActive: true,
         createdAt: now,
         updatedAt: now,

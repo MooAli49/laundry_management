@@ -539,6 +539,14 @@ class SyncEngine {
           break;
         }
 
+        // Barrier: Do not dispatch if a parent dependency has permanently failed
+        if (await _syncOperationsDao.hasPermanentlyFailedDependency(op)) {
+          _log(
+            'Skipping dispatch of ${op.entityType}:${op.entityId} because a parent dependency has permanently failed.',
+          );
+          continue;
+        }
+
         try {
           await _remoteApiDispatcher.dispatch(op);
           await _syncOperationsDao.markOperationSynced(op.id);
@@ -669,9 +677,18 @@ class SyncEngine {
     if (error is DioException) {
       final statusCode = error.response?.statusCode;
       if (statusCode != null) {
+        String msg = error.message ?? error.toString();
+        final data = error.response?.data;
+        if (data != null) {
+          if (data is Map && data['message'] != null) {
+            msg = data['message'].toString();
+          } else {
+            msg = data.toString();
+          }
+        }
         return SyncErrorDetails.http(
           statusCode,
-          message: error.message ?? error.toString(),
+          message: msg,
         );
       }
       switch (error.type) {
