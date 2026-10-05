@@ -8,10 +8,9 @@ import 'reports_state.dart';
 class ReportsCubit extends Cubit<ReportsState> {
   final ReportsRepository _reportsRepository;
 
-  ReportsCubit({
-    required ReportsRepository reportsRepository,
-  })  : _reportsRepository = reportsRepository,
-        super(const ReportsState());
+  ReportsCubit({required ReportsRepository reportsRepository})
+    : _reportsRepository = reportsRepository,
+      super(const ReportsState());
 
   Future<void> loadReports({
     ReportsTab tab = ReportsTab.orders,
@@ -54,10 +53,12 @@ class ReportsCubit extends Cubit<ReportsState> {
     } on Failure catch (e) {
       emit(state.copyWith(isLoading: false, errorMessage: e.message));
     } catch (_) {
-      emit(state.copyWith(
-        isLoading: false,
-        errorMessage: 'تعذر تحميل التقارير، يرجى المحاولة مرة أخرى',
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          errorMessage: 'تعذر تحميل التقارير، يرجى المحاولة مرة أخرى',
+        ),
+      );
     }
   }
 

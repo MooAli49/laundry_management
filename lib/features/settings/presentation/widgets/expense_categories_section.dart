@@ -47,8 +47,10 @@ class ExpenseCategoriesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<ExpenseCategoriesManagementCubit,
-        ExpenseCategoriesManagementState>(
+    return BlocConsumer<
+      ExpenseCategoriesManagementCubit,
+      ExpenseCategoriesManagementState
+    >(
       listener: (context, state) {
         if (state.errorMessage != null) {
           ScaffoldMessenger.of(context).showSnackBar(

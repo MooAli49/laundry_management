@@ -1,7 +1,10 @@
+const _sentinel = Object();
+
 class Customer {
   final String id;
   final String name;
   final String phone;
+  final String? address;
   final String? notes;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -10,6 +13,7 @@ class Customer {
     required this.id,
     required this.name,
     required this.phone,
+    this.address,
     this.notes,
     required this.createdAt,
     required this.updatedAt,
@@ -29,6 +33,8 @@ class Customer {
     String? id,
     String? name,
     String? phone,
+    Object? address = _sentinel,
+    bool clearAddress = false,
     String? notes,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -37,6 +43,9 @@ class Customer {
       id: id ?? this.id,
       name: name ?? this.name,
       phone: phone ?? this.phone,
+      address: clearAddress
+          ? null
+          : (identical(address, _sentinel) ? this.address : address as String?),
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -51,13 +60,16 @@ class Customer {
           id == other.id &&
           name == other.name &&
           phone == other.phone &&
+          address == other.address &&
           notes == other.notes &&
           createdAt == other.createdAt &&
           updatedAt == other.updatedAt;
 
   @override
-  int get hashCode => Object.hash(id, name, phone, notes, createdAt, updatedAt);
+  int get hashCode =>
+      Object.hash(id, name, phone, address, notes, createdAt, updatedAt);
 
   @override
-  String toString() => 'Customer(id: $id, name: $name, phone: $phone)';
+  String toString() =>
+      'Customer(id: $id, name: $name, phone: $phone, address: $address)';
 }

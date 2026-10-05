@@ -29,10 +29,14 @@ import 'package:laundry_management/domain/repositories/storage_location_reposito
 import 'package:laundry_management/domain/repositories/storage_repository.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   setUp(() async {
     await getIt.reset();
     // Register in-memory AppDatabase for testing
-    getIt.registerLazySingleton<AppDatabase>(() => AppDatabase(NativeDatabase.memory()));
+    getIt.registerLazySingleton<AppDatabase>(
+      () => AppDatabase(NativeDatabase.memory()),
+    );
     await initDependencies();
   });
 

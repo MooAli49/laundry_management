@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:laundry_management/core/theme/app_colors.dart';
-import 'package:laundry_management/core/theme/app_spacing.dart';
-import 'package:laundry_management/core/theme/app_text_styles.dart';
+
+import '../theme/app_colors.dart';
+import '../theme/app_spacing.dart';
+import '../theme/app_text_styles.dart';
 
 class LoadingIndicator extends StatelessWidget {
   final String? message;
@@ -24,9 +25,7 @@ class LoadingIndicator extends StatelessWidget {
       width: size,
       child: CircularProgressIndicator(
         strokeWidth: 3,
-        valueColor: AlwaysStoppedAnimation<Color>(
-          color ?? AppColors.primary,
-        ),
+        valueColor: AlwaysStoppedAnimation<Color>(color ?? AppColors.primary),
       ),
     );
 

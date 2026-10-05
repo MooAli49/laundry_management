@@ -47,7 +47,9 @@ class StorageItemCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       borderRadius: AppSpacing.radiusXl,
       borderColor: isSelected ? AppColors.selectionBorder : AppColors.border,
-      backgroundColor: isSelected ? AppColors.selectionBackground : AppColors.surface,
+      backgroundColor: isSelected
+          ? AppColors.selectionBackground
+          : AppColors.surface,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -62,7 +64,9 @@ class StorageItemCard extends StatelessWidget {
                 activeColor: AppColors.primary,
                 checkColor: AppColors.onPrimary,
                 side: BorderSide(
-                  color: isSelected ? AppColors.primary : AppColors.borderStrong,
+                  color: isSelected
+                      ? AppColors.primary
+                      : AppColors.borderStrong,
                   width: 1.5,
                 ),
                 shape: RoundedRectangleBorder(
@@ -130,6 +134,24 @@ class StorageItemCard extends StatelessWidget {
                           ),
                         ),
                       ),
+                    if (orderItem.carpetData != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sm,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.secondary,
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Text(
+                          '${orderItem.carpetData!.length.truncateToDouble() == orderItem.carpetData!.length ? orderItem.carpetData!.length.toStringAsFixed(1) : orderItem.carpetData!.length.toStringAsFixed(2)} × ${orderItem.carpetData!.width.truncateToDouble() == orderItem.carpetData!.width ? orderItem.carpetData!.width.toStringAsFixed(1) : orderItem.carpetData!.width.toStringAsFixed(2)} م = ${orderItem.carpetData!.area.truncateToDouble() == orderItem.carpetData!.area ? orderItem.carpetData!.area.toStringAsFixed(0) : orderItem.carpetData!.area.toStringAsFixed(2)} م²',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
                     Text(
                       '— ${orderItem.serviceNameSnapshot}',
                       style: AppTextStyles.bodySmall.copyWith(
@@ -139,6 +161,7 @@ class StorageItemCard extends StatelessWidget {
                     ),
                     Text(
                       '#${item.orderNumber}',
+                      textDirection: TextDirection.ltr,
                       style: AppTextStyles.bodySmall.copyWith(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
@@ -171,7 +194,10 @@ class StorageItemCard extends StatelessWidget {
               children: [
                 // Location Badge (Figma: rounded-full bg-success-light px-2.5 py-1 text-[12px] font-medium text-success)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.successLight,
                     borderRadius: BorderRadius.circular(100),
@@ -248,7 +274,10 @@ class StorageItemCard extends StatelessWidget {
               children: [
                 // Status Badge (Figma: rounded-full bg-warning-light px-2.5 py-1 text-[12px] font-medium text-warning)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.warningLight,
                     borderRadius: BorderRadius.circular(100),

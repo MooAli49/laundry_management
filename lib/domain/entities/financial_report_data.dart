@@ -7,6 +7,8 @@ import 'payment_method_breakdown_item.dart';
 class FinancialReportData {
   final Money totalSales;
   final Money totalPayments;
+  final Money totalRefunds;
+  final Money netPayments;
   final Money totalOperatingExpenses;
   final Money netProfit;
   final Money outstandingAmount;
@@ -19,6 +21,8 @@ class FinancialReportData {
   const FinancialReportData({
     required this.totalSales,
     required this.totalPayments,
+    this.totalRefunds = Money.zero,
+    this.netPayments = Money.zero,
     required this.totalOperatingExpenses,
     required this.netProfit,
     required this.outstandingAmount,
@@ -32,6 +36,8 @@ class FinancialReportData {
   static const empty = FinancialReportData(
     totalSales: Money.zero,
     totalPayments: Money.zero,
+    totalRefunds: Money.zero,
+    netPayments: Money.zero,
     totalOperatingExpenses: Money.zero,
     netProfit: Money.zero,
     outstandingAmount: Money.zero,

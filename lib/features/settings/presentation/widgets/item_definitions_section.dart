@@ -17,7 +17,10 @@ import 'settings_table_components.dart';
 class ItemDefinitionsSection extends StatelessWidget {
   const ItemDefinitionsSection({super.key});
 
-  Future<void> _handleAdd(BuildContext context, ItemTypesManagementState state) async {
+  Future<void> _handleAdd(
+    BuildContext context,
+    ItemTypesManagementState state,
+  ) async {
     final activeTypes = state.itemTypes.where((t) => t.isActive).toList();
     if (activeTypes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -48,7 +51,10 @@ class ItemDefinitionsSection extends StatelessWidget {
     );
   }
 
-  Future<void> _handleToggleStatus(BuildContext context, ItemDefinition definition) async {
+  Future<void> _handleToggleStatus(
+    BuildContext context,
+    ItemDefinition definition,
+  ) async {
     final cubit = context.read<ItemTypesManagementCubit>();
     if (definition.isActive) {
       final confirmed = await DeactivationConfirmDialog.show(
@@ -141,7 +147,8 @@ class ItemDefinitionsSection extends StatelessWidget {
                             subtitle: '0 طلب',
                             isActive: def.isActive,
                             onEdit: () => _handleEdit(context, def, state),
-                            onToggleActive: (_) => _handleToggleStatus(context, def),
+                            onToggleActive: (_) =>
+                                _handleToggleStatus(context, def),
                           ),
                       ],
                     ),

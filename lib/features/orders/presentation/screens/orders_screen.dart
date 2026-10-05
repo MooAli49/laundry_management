@@ -55,7 +55,8 @@ class _OrdersView extends StatelessWidget {
           children: [
             // Header with "+ إضافة طلب" Action
             BlocBuilder<OrdersListCubit, OrdersListState>(
-              buildWhen: (prev, curr) => prev.orders.length != curr.orders.length,
+              buildWhen: (prev, curr) =>
+                  prev.orders.length != curr.orders.length,
               builder: (context, state) {
                 return PageHeader(
                   title: AppStrings.orders,
@@ -133,11 +134,14 @@ class _OrdersView extends StatelessWidget {
                     child: RefreshIndicator(
                       onRefresh: () => cubit.loadOrders(refresh: true),
                       child: ListView.builder(
-                        itemCount: state.orders.length + (state.isLoadingMore ? 1 : 0),
+                        itemCount:
+                            state.orders.length + (state.isLoadingMore ? 1 : 0),
                         itemBuilder: (context, index) {
                           if (index == state.orders.length) {
                             return const Padding(
-                              padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+                              padding: EdgeInsets.symmetric(
+                                vertical: AppSpacing.md,
+                              ),
                               child: Center(child: LoadingIndicator()),
                             );
                           }
@@ -145,7 +149,9 @@ class _OrdersView extends StatelessWidget {
                           final item = state.orders[index];
                           return OrderCard(
                             item: item,
-                            onTap: () => context.go(AppRoutes.orderDetailPath(item.order.id)),
+                            onTap: () => context.go(
+                              AppRoutes.orderDetailPath(item.order.id),
+                            ),
                           );
                         },
                       ),

@@ -179,19 +179,27 @@ This represents application/business configuration.
 ### Infrastructure Entities
 
     SyncOperation
+    SyncState
 
-Infrastructure entities support synchronization and application behavior but do not represent core business concepts.
+Infrastructure entities support bidirectional synchronization and application behavior but do not represent core business concepts:
+- `SyncOperation` (`sync_operations`): Local durable queue of outgoing local mutations waiting to be pushed to the remote backend.
+- `SyncState` (`sync_state`): Local durable singleton cursor tracking incoming pull synchronization progress (`last_applied_sequence`).
+- *Remote Change Log*: `sync_changes` exists on the remote PostgreSQL backend as the authoritative, append-only change log ordered by monotonically increasing `sequence`. It is not a local table.
+
+> **Note on Optimistic Concurrency**:
+> Remote database tables maintain integer `server_version` for optimistic concurrency control. However, local Drift tables in V1 do not store `server_version`, and propagation of `base_version` from Flutter is a known deferred V1 limitation.
 
 ---
 
 ## 6. Main Database Tables
 
-The V1 logical database consists of the following main tables:
+The V1 logical database consists of the following 17 main business tables:
 
     customers
     orders
     order_items
     payments
+    refunds
     storage_records
     storage_locations
     item_types
@@ -205,11 +213,21 @@ The V1 logical database consists of the following main tables:
     storage_location_item_types
     business_settings
 
-The synchronization mechanism may require additional internal tables such as:
+The bidirectional synchronization mechanism uses internal local infrastructure tables:
 
-    sync_operations
+    sync_operations (local outgoing mutation queue)
+    sync_state (local pull cursor: last_applied_sequence)
 
-These infrastructure tables are part of the Data Layer and do not represent business entities.
+The system licensing mechanism uses an internal local infrastructure table:
+
+    license_cache (local singleton license state & 24h throttle cache)
+
+Together, the local Drift database manages 20 tables at **schema version 7**.
+
+Key entity attributes and rules:
+- `customers`: includes optional `address TEXT NULL` (nullable profile attribute; whitespace normalizes to NULL; no delivery routing in V1).
+- `refunds`: append-only, immutable order-level financial records (`amount > 0`, `order_id` FK to orders, no `payment_id`, method: cash/insta_pay/e_wallet). Refunds do not use `server_version`.
+- Remote change log: `sync_changes` resides exclusively on the remote Supabase PostgreSQL database.
 
 ---
 
@@ -470,7 +488,7 @@ Changes to current master data must not rewrite historical transactions.
 
 Examples:
 
-    Service Price Changes
+    Service + Item Type Price Changes
         ↓
     Existing OrderItems
         ↓
@@ -685,7 +703,8 @@ Partial payments are supported.
 
 Payment history must remain preserved.
 
-There is no V1 refund workflow.
+Refund V1 is supported at the order level for cancelled orders via the `refunds` table and `sync_create_refund` RPC.
+Cancellation does not trigger an automatic refund.
 
 ---
 
@@ -924,13 +943,13 @@ Should enforce appropriate low-level data integrity constraints where practical.
 
 ## 32. Pricing and Historical Prices
 
-Current Service pricing belongs to master data.
+Current Service–Item Type pricing (`service_item_types.price`) belongs to master data.
 
 Historical OrderItem pricing belongs to the transaction.
 
 Therefore:
 
-    Current Service Price
+    Current Service + Item Type Price
 
 must never be used to reconstruct:
 
@@ -938,7 +957,7 @@ must never be used to reconstruct:
 
 An OrderItem must preserve its transaction-time pricing information.
 
-This allows reports and historical orders to remain correct after Service price changes.
+This allows reports and historical orders to remain correct after Service + Item Type price changes.
 
 ---
 
@@ -989,17 +1008,21 @@ This is represented through:
 
     service_item_types
 
-The junction table represents service compatibility.
+The associative table represents service compatibility as well as operational pricing configuration (`pricing_type` and `price`). The Service entity does NOT own a single default/current price.
 
 ---
 
-## 35. Service Compatibility
+## 35. Service Compatibility and Pricing
 
 An OrderItem's selected Service must support its Item Type.
 
-The database stores the relationship.
+In this laundry system, the actual price depends on the combination of:
 
-The Domain/Application layer validates that the selected combination is valid.
+    Service + Item Type
+
+The database stores the relationship and pricing configuration in `service_item_types`.
+
+The Domain/Application layer validates that the selected combination is valid and snapshots the configured price into `order_items.unit_price`.
 
 The database should not allow the application to silently create invalid service/item combinations where the constraint can reasonably be enforced.
 
@@ -1243,7 +1266,7 @@ Examples:
     Historical Expense Amount
     Historical Expense Category Name
 
-Reports must not calculate historical sales using current Service prices.
+Reports must not calculate historical sales using current Service + Item Type prices.
 
 Payment reports must be based on the Payment transaction date when the report is specifically reporting payments.
 
@@ -1860,7 +1883,7 @@ The database must not introduce dedicated V1 business tables for:
     Roles
     Permissions
     Branches
-    Refunds
+    Payment Gateway Refunds and Item-Level Refunds
     Loyalty
     Storage Movement History
     Storage Capacity
@@ -2029,7 +2052,7 @@ Changing current configuration must not rewrite historical financial transaction
 
 Examples:
 
-    Service Price Changed
+    Service + Item Type Price Changed
         ↓
     Existing OrderItem Price Unchanged
 
@@ -2302,7 +2325,7 @@ and:
 
 when the approved Order editing workflow permits it.
 
-The current Service price is not automatically reapplied when opening an existing Order.
+Current Service + Item Type pricing is not automatically reapplied when opening an existing Order.
 
 This ensures that editing an Order is an explicit action rather than an unintended side effect.
 
@@ -2609,6 +2632,7 @@ The high-level relationship structure is:
     BusinessSettings
 
     SyncOperation
+    SyncState
 
 This represents the approved V1 database direction.
 
@@ -2661,6 +2685,20 @@ The approved V1 database direction is:
     Simple V1 Schema
 
 The database must remain simple, reliable, relational, and aligned with the approved Domain Model.
+
+---
+
+## 90A. Local Infrastructure Cache — license_cache
+
+The SQLite database includes a local singleton cache table dedicated to system license enforcement:
+
+- **Table**: `license_cache`
+- **Role**: Infrastructure cache for offline license gating and 24-hour check throttling.
+- **Nature**: Singleton row (`id = 'singleton'`).
+- **Isolation**:
+  - Excluded from synchronization (`SyncEngine` and `sync_operations` outbox).
+  - No foreign keys or relationships to business entities.
+  - Schema migration version 7 in Drift.
 
 ---
 

@@ -467,16 +467,16 @@ Local data must preserve the approved database design.
 
 ## 22. Remote Data Layer
 
-Remote data infrastructure exists for the eventual synchronization architecture.
+Remote data infrastructure exists for synchronization with the backend.
 
 The approved networking technologies are:
 
 Dio
 Retrofit
 
-Remote implementation should not become the primary operational dependency of local workflows.
+Remote implementation must not become the primary operational dependency of local workflows.
 
-Remote API work is deferred until the synchronization phase.
+Remote API communication is active in the Offline / Sync Integration phase, operating behind the Remote Data Source boundary.
 
 ## 23. Data Models
 
@@ -852,26 +852,23 @@ Remote API
 
 Remote synchronization must not be mixed into presentation code.
 
-## 43. Synchronization Deferral
+## 43. Synchronization Phase Boundary
 
-Synchronization execution is deferred until the synchronization phase.
+The project has entered the Offline / Sync Integration phase.
 
-Do not implement advanced synchronization behavior during the initial local Flutter implementation.
+Core synchronization infrastructure (durable Sync Queue, atomic enqueue, Sync Engine, Retrofit + Dio, idempotent remote calls, exponential backoff retries) is now active.
 
-Do not add speculative:
+The following remain deferred from this phase:
 
-- Background sync
-- Conflict resolution
+- Platform-specific background sync
+- Advanced multi-device distributed conflict resolution
 - Real-time synchronization
 - Distributed locking
 - CRDTs
-- Advanced retry orchestration
 
-without an approved implementation phase.
+## 44. Sync-Integrated Architecture
 
-## 44. Sync-Ready Architecture
-
-Although synchronization execution is deferred, local architecture should remain compatible with it.
+Local architecture and remote synchronization integrate through the durable Sync Queue:
 
 Where required:
 
@@ -879,7 +876,7 @@ Business Data
 +
 Sync Operation
 
-should be treated as one logical transaction.
+are persisted atomically in the same database transaction.
 
 The exact synchronization behavior is defined by the synchronization documentation.
 
@@ -1001,7 +998,7 @@ Changes to configuration must not silently rewrite historical transactions.
 
 Examples include:
 
-- Service price changes
+- Service–Item Type pricing configuration changes
 - Service name changes
 - Item definition changes
 - Expense category changes
@@ -1042,9 +1039,18 @@ Do not use auto-increment integers as business entity IDs.
 
 ## 54. Order Number Architecture
 
-The approved Order Number format is:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length:
 
-YY-XXX
+- YY = 2-digit year prefix.
+- Suffix is numeric only with a minimum width of 3 digits (zero-padded below 1000).
+- Suffix has no maximum length (e.g. 26-001, 26-999, 26-1000, 26-10000).
+- Non-numeric or alphanumeric values (e.g. 26-T123) are not valid business order numbers.
+
+Examples:
+
+    26-001
+    26-999
+    26-1000
 
 This must remain separate from the internal UUID.
 
@@ -1229,15 +1235,23 @@ Avoid implementing RTL by manually reversing arbitrary left/right values.
 
 The architecture should allow localization and RTL behavior to be handled globally.
 
-## 67. Tablet-First Architecture
+## 67. Tablet-First & Landscape-Only Architecture
 
-The application is tablet-first.
+The application is a tablet-first, point-of-sale management system.
 
-Feature layouts should be designed to work well on tablet-sized screens.
+1. **Landscape-Only Operation**:
+   - The application operates strictly in landscape orientations (`DeviceOrientation.landscapeLeft` and `DeviceOrientation.landscapeRight`).
+   - Portrait orientation (`portraitUp`, `portraitDown`) is explicitly unsupported across the entire application.
+2. **Centralized Enforcement**:
+   - Device orientation is locked globally at application bootstrap (`lib/main.dart`) via `SystemChrome.setPreferredOrientations` and natively via `android:screenOrientation="sensorLandscape"`.
+   - Orientation logic must never be scattered across feature widgets or screens.
+3. **Responsive Landscape Boundaries**:
+   - Layouts must adapt gracefully across different landscape viewport widths and heights (e.g., varying tablet form factors, landscape terminals).
+   - Reusable widgets should avoid hardcoding narrow portrait assumptions.
+4. **Prohibition of Portrait Workarounds**:
+   - Do NOT introduce portrait-specific layouts, portrait conditional checks, or orientation toggling.
+   - Do NOT patch layout overflows that occur only in unsupported portrait mode with unnecessary wrappers (`SingleChildScrollView`, `Expanded`, `Flexible`, `OrientationBuilder`).
 
-Architecture should not assume a mobile-only layout.
-
-Reusable widgets should avoid hardcoding narrow screen assumptions.
 
 ## 68. Responsive Boundaries
 
@@ -1338,19 +1352,14 @@ Examples:
 
 Do not create redundant mapper classes when direct conversion is clearer and safe.
 
-## 75. Application Layer
+## 75. Application Layer Scope & Boundaries
 
-There is no mandatory separate Application layer in V1.
+The Application layer (`lib/application/`) exists exclusively for two approved purposes:
 
-Do not create:
+1. **Selective Domain Use Cases** (`lib/application/use_cases/`): Complex, multi-step business workflows (order creation, storage, relocation, status transitions, completion, cancellation) where cross-repository orchestration is required.
+2. **Cross-Cutting Orchestration Exception: License Control** (`lib/application/license/license_service.dart`): Orchestrating cross-cutting operational license enforcement across SQLite cache, remote API, connectivity, and router gating.
 
-application/
-services/
-use_cases/
-
-merely because they are common in other architectures.
-
-If future complexity requires such a layer, update the architecture documentation first.
+Do not introduce generic CRUD Use Cases, generic managers, or unnecessary services for simple entity operations. Simple entity operations interact directly with Repository contracts.
 
 ## 76. Testing Architecture
 
@@ -1801,7 +1810,7 @@ Do not create architecture for:
 - Drivers
 - Vehicles
 - Delivery Routes
-- Refunds
+- Automated payment gateway refunds and line-item refunds
 - Loyalty
 - Storage Capacity
 - Storage Movement History
@@ -1826,7 +1835,7 @@ Possible future additions include:
 - Advanced conflict resolution
 - Multi-branch support
 - Delivery management
-- Refund workflows
+- Advanced refund workflows (line-item refunds, store credit, gateway reconciliation)
 - Barcode support
 - Advanced reporting
 - AI capabilities

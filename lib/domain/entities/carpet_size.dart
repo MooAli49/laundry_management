@@ -20,13 +20,25 @@ class CarpetSize {
       throw ArgumentError('CarpetSize id cannot be empty');
     }
     if (length <= 0) {
-      throw ArgumentError.value(length, 'length', 'CarpetSize length must be greater than 0');
+      throw ArgumentError.value(
+        length,
+        'length',
+        'CarpetSize length must be greater than 0',
+      );
     }
     if (width <= 0) {
-      throw ArgumentError.value(width, 'width', 'CarpetSize width must be greater than 0');
+      throw ArgumentError.value(
+        width,
+        'width',
+        'CarpetSize width must be greater than 0',
+      );
     }
     if (area <= 0) {
-      throw ArgumentError.value(area, 'area', 'CarpetSize area must be greater than 0');
+      throw ArgumentError.value(
+        area,
+        'area',
+        'CarpetSize area must be greater than 0',
+      );
     }
   }
 
@@ -64,8 +76,10 @@ class CarpetSize {
           updatedAt == other.updatedAt;
 
   @override
-  int get hashCode => Object.hash(id, length, width, area, isActive, createdAt, updatedAt);
+  int get hashCode =>
+      Object.hash(id, length, width, area, isActive, createdAt, updatedAt);
 
   @override
-  String toString() => 'CarpetSize(id: $id, ${length}m x ${width}m = ${area}m², active: $isActive)';
+  String toString() =>
+      'CarpetSize(id: $id, ${length}m x ${width}m = ${area}m², active: $isActive)';
 }

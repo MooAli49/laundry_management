@@ -129,101 +129,110 @@ void main() {
       );
     });
 
-    test('LOCKED RULE: rejects completion when remaining balance > 0 (unpaid)', () async {
-      // No payments made -> remaining balance = 100 EGP
-      expect(
-        () => useCase.execute(
+    test(
+      'LOCKED RULE: rejects completion when remaining balance > 0 (unpaid)',
+      () async {
+        // No payments made -> remaining balance = 100 EGP
+        expect(
+          () => useCase.execute(
+            const CompleteOrderInput(
+              orderId: 'ord-ready-100',
+              handoverConfirmed: true,
+            ),
+          ),
+          throwsA(isA<OrderNotFullyPaidFailure>()),
+        );
+
+        // Partial payment made -> 40 EGP paid, 60 EGP remaining
+        paymentRepo.paymentsByOrder['ord-ready-100'] = [
+          Payment(
+            id: 'pay-1',
+            orderId: 'ord-ready-100',
+            amount: const Money.fromPiastres(4000), // 40 EGP
+            paymentMethod: PaymentMethod.cash,
+            paidAt: now,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        ];
+
+        expect(
+          () => useCase.execute(
+            const CompleteOrderInput(
+              orderId: 'ord-ready-100',
+              handoverConfirmed: true,
+            ),
+          ),
+          throwsA(isA<OrderNotFullyPaidFailure>()),
+        );
+      },
+    );
+
+    test(
+      'LOCKED RULE: completes order when Ready + Fully Paid + Handover Confirmed',
+      () async {
+        // Full payment recorded: 100 EGP
+        paymentRepo.paymentsByOrder['ord-ready-100'] = [
+          Payment(
+            id: 'pay-1',
+            orderId: 'ord-ready-100',
+            amount: const Money.fromPiastres(10000), // 100 EGP
+            paymentMethod: PaymentMethod.cash,
+            paidAt: now,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        ];
+
+        final result = await useCase.execute(
           const CompleteOrderInput(
             orderId: 'ord-ready-100',
             handoverConfirmed: true,
           ),
-        ),
-        throwsA(isA<OrderNotFullyPaidFailure>()),
-      );
+        );
 
-      // Partial payment made -> 40 EGP paid, 60 EGP remaining
-      paymentRepo.paymentsByOrder['ord-ready-100'] = [
-        Payment(
-          id: 'pay-1',
-          orderId: 'ord-ready-100',
-          amount: const Money.fromPiastres(4000), // 40 EGP
-          paymentMethod: PaymentMethod.cash,
-          paidAt: now,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      ];
+        expect(result.status, OrderStatus.completed);
+        expect(result.completedAt, isNotNull);
+        expect(result.customerHandoverConfirmedAt, isNotNull);
+        expect(orderRepo.completeOrderCalled, true);
+      },
+    );
 
-      expect(
-        () => useCase.execute(
+    test(
+      'completes order when multiple payments sum to total or exceed it',
+      () async {
+        // Two payments: 60 EGP + 40 EGP = 100 EGP
+        paymentRepo.paymentsByOrder['ord-ready-100'] = [
+          Payment(
+            id: 'pay-1',
+            orderId: 'ord-ready-100',
+            amount: const Money.fromPiastres(6000),
+            paymentMethod: PaymentMethod.cash,
+            paidAt: now,
+            createdAt: now,
+            updatedAt: now,
+          ),
+          Payment(
+            id: 'pay-2',
+            orderId: 'ord-ready-100',
+            amount: const Money.fromPiastres(4000),
+            paymentMethod: PaymentMethod.ewallet,
+            paidAt: now,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        ];
+
+        final result = await useCase.execute(
           const CompleteOrderInput(
             orderId: 'ord-ready-100',
             handoverConfirmed: true,
           ),
-        ),
-        throwsA(isA<OrderNotFullyPaidFailure>()),
-      );
-    });
+        );
 
-    test('LOCKED RULE: completes order when Ready + Fully Paid + Handover Confirmed', () async {
-      // Full payment recorded: 100 EGP
-      paymentRepo.paymentsByOrder['ord-ready-100'] = [
-        Payment(
-          id: 'pay-1',
-          orderId: 'ord-ready-100',
-          amount: const Money.fromPiastres(10000), // 100 EGP
-          paymentMethod: PaymentMethod.cash,
-          paidAt: now,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      ];
-
-      final result = await useCase.execute(
-        const CompleteOrderInput(
-          orderId: 'ord-ready-100',
-          handoverConfirmed: true,
-        ),
-      );
-
-      expect(result.status, OrderStatus.completed);
-      expect(result.completedAt, isNotNull);
-      expect(result.customerHandoverConfirmedAt, isNotNull);
-      expect(orderRepo.completeOrderCalled, true);
-    });
-
-    test('completes order when multiple payments sum to total or exceed it', () async {
-      // Two payments: 60 EGP + 40 EGP = 100 EGP
-      paymentRepo.paymentsByOrder['ord-ready-100'] = [
-        Payment(
-          id: 'pay-1',
-          orderId: 'ord-ready-100',
-          amount: const Money.fromPiastres(6000),
-          paymentMethod: PaymentMethod.cash,
-          paidAt: now,
-          createdAt: now,
-          updatedAt: now,
-        ),
-        Payment(
-          id: 'pay-2',
-          orderId: 'ord-ready-100',
-          amount: const Money.fromPiastres(4000),
-          paymentMethod: PaymentMethod.ewallet,
-          paidAt: now,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      ];
-
-      final result = await useCase.execute(
-        const CompleteOrderInput(
-          orderId: 'ord-ready-100',
-          handoverConfirmed: true,
-        ),
-      );
-
-      expect(result.status, OrderStatus.completed);
-      expect(orderRepo.completeOrderCalled, true);
-    });
+        expect(result.status, OrderStatus.completed);
+        expect(orderRepo.completeOrderCalled, true);
+      },
+    );
   });
 }

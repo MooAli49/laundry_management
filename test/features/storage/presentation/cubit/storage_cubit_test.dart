@@ -47,10 +47,17 @@ class FakeStorageRepository implements StorageRepository {
     }
     var result = requiringItems;
     if (query != null && query.isNotEmpty) {
-      result = result.where((i) => i.orderNumber.contains(query) || i.customerName.contains(query)).toList();
+      result = result
+          .where(
+            (i) =>
+                i.orderNumber.contains(query) || i.customerName.contains(query),
+          )
+          .toList();
     }
     if (itemTypeId != null) {
-      result = result.where((i) => i.orderItem.itemTypeId == itemTypeId).toList();
+      result = result
+          .where((i) => i.orderItem.itemTypeId == itemTypeId)
+          .toList();
     }
     return result.skip(offset).take(limit).toList();
   }
@@ -66,10 +73,17 @@ class FakeStorageRepository implements StorageRepository {
   }) async {
     var result = requiringItems;
     if (query != null && query.isNotEmpty) {
-      result = result.where((i) => i.orderNumber.contains(query) || i.customerName.contains(query)).toList();
+      result = result
+          .where(
+            (i) =>
+                i.orderNumber.contains(query) || i.customerName.contains(query),
+          )
+          .toList();
     }
     if (itemTypeId != null) {
-      result = result.where((i) => i.orderItem.itemTypeId == itemTypeId).toList();
+      result = result
+          .where((i) => i.orderItem.itemTypeId == itemTypeId)
+          .toList();
     }
     return result.length;
   }
@@ -88,10 +102,17 @@ class FakeStorageRepository implements StorageRepository {
   }) async {
     var result = currentItems;
     if (query != null && query.isNotEmpty) {
-      result = result.where((i) => i.orderNumber.contains(query) || i.customerName.contains(query)).toList();
+      result = result
+          .where(
+            (i) =>
+                i.orderNumber.contains(query) || i.customerName.contains(query),
+          )
+          .toList();
     }
     if (storageLocationId != null) {
-      result = result.where((i) => i.storageLocation?.id == storageLocationId).toList();
+      result = result
+          .where((i) => i.storageLocation?.id == storageLocationId)
+          .toList();
     }
     return result.skip(offset).take(limit).toList();
   }
@@ -108,10 +129,17 @@ class FakeStorageRepository implements StorageRepository {
   }) async {
     var result = currentItems;
     if (query != null && query.isNotEmpty) {
-      result = result.where((i) => i.orderNumber.contains(query) || i.customerName.contains(query)).toList();
+      result = result
+          .where(
+            (i) =>
+                i.orderNumber.contains(query) || i.customerName.contains(query),
+          )
+          .toList();
     }
     if (storageLocationId != null) {
-      result = result.where((i) => i.storageLocation?.id == storageLocationId).toList();
+      result = result
+          .where((i) => i.storageLocation?.id == storageLocationId)
+          .toList();
     }
     return result.length;
   }
@@ -128,8 +156,9 @@ class FakeStorageLocationRepository implements StorageLocationRepository {
   Future<List<StorageLocation>> getAllLocations() async => locations;
 
   @override
-  Future<List<StorageLocation>> getCompatibleLocationsForItemType(String itemTypeId) async =>
-      compatible[itemTypeId] ?? [];
+  Future<List<StorageLocation>> getCompatibleLocationsForItemType(
+    String itemTypeId,
+  ) async => compatible[itemTypeId] ?? [];
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -235,10 +264,34 @@ void main() {
 
   final now = DateTime.now();
 
-  final loc1 = StorageLocation(id: 'loc-1', name: 'رف A-01', isActive: true, createdAt: now, updatedAt: now);
-  final loc2 = StorageLocation(id: 'loc-2', name: 'رف B-02', isActive: true, createdAt: now, updatedAt: now);
-  final typeClothes = ItemType(id: 'type-clothes', name: 'ملابس', isActive: true, createdAt: now, updatedAt: now);
-  final typeCarpet = ItemType(id: 'type-carpet', name: 'سجاد', isActive: true, createdAt: now, updatedAt: now);
+  final loc1 = StorageLocation(
+    id: 'loc-1',
+    name: 'رف A-01',
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+  );
+  final loc2 = StorageLocation(
+    id: 'loc-2',
+    name: 'رف B-02',
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+  );
+  final typeClothes = ItemType(
+    id: 'type-clothes',
+    name: 'ملابس',
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+  );
+  final typeCarpet = ItemType(
+    id: 'type-carpet',
+    name: 'سجاد',
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+  );
 
   final testItem1 = StorageItem(
     orderItem: OrderItem(
@@ -332,15 +385,18 @@ void main() {
   });
 
   group('StorageCubit — State Handling, Tabs, Selection & Pagination', () {
-    test('28 & 29. initialize loads metadata and items requiring storage', () async {
-      await cubit.initialize();
+    test(
+      '28 & 29. initialize loads metadata and items requiring storage',
+      () async {
+        await cubit.initialize();
 
-      expect(cubit.state.items.length, 1);
-      expect(cubit.state.totalCount, 1);
-      expect(cubit.state.activeTab, StorageTab.requiringStorage);
-      expect(cubit.state.availableLocations.length, 2);
-      expect(cubit.state.itemTypes.length, 2);
-    });
+        expect(cubit.state.items.length, 1);
+        expect(cubit.state.totalCount, 1);
+        expect(cubit.state.activeTab, StorageTab.requiringStorage);
+        expect(cubit.state.availableLocations.length, 2);
+        expect(cubit.state.itemTypes.length, 2);
+      },
+    );
 
     test('30. Empty state when no items exist', () async {
       storageRepo.requiringItems = [];
@@ -376,33 +432,42 @@ void main() {
       expect(cubit.state.items.length, 1);
     });
 
-    test('Switch tab changes between requiring storage and current storage', () async {
-      await cubit.initialize();
-      expect(cubit.state.activeTab, StorageTab.requiringStorage);
-      expect(cubit.state.items.first.orderItem.id, 'item-1');
+    test(
+      'Switch tab changes between requiring storage and current storage',
+      () async {
+        await cubit.initialize();
+        expect(cubit.state.activeTab, StorageTab.requiringStorage);
+        expect(cubit.state.items.first.orderItem.id, 'item-1');
 
-      cubit.switchTab(StorageTab.currentStorage);
-      await Future.delayed(const Duration(milliseconds: 50));
+        cubit.switchTab(StorageTab.currentStorage);
+        await Future.delayed(const Duration(milliseconds: 50));
 
-      expect(cubit.state.activeTab, StorageTab.currentStorage);
-      expect(cubit.state.items.first.orderItem.id, 'item-stored');
-    });
+        expect(cubit.state.activeTab, StorageTab.currentStorage);
+        expect(cubit.state.items.first.orderItem.id, 'item-stored');
+      },
+    );
 
-    test('Bulk selection toggles items and checks intersection compatibility', () async {
-      await cubit.initialize();
+    test(
+      'Bulk selection toggles items and checks intersection compatibility',
+      () async {
+        await cubit.initialize();
 
-      cubit.toggleItemSelection('item-1', true);
-      expect(cubit.state.selectedItemIds, contains('item-1'));
-      expect(cubit.state.selectedItemsCount, 1);
-      expect(cubit.state.isAnyItemSelected, true);
-      // Item 1 is clothing -> compatible with loc1, loc2
-      expect(cubit.state.effectiveBulkLocations.map((l) => l.id), containsAll(['loc-1', 'loc-2']));
-      expect(cubit.state.hasConflictingItemTypes, false);
+        cubit.toggleItemSelection('item-1', true);
+        expect(cubit.state.selectedItemIds, contains('item-1'));
+        expect(cubit.state.selectedItemsCount, 1);
+        expect(cubit.state.isAnyItemSelected, true);
+        // Item 1 is clothing -> compatible with loc1, loc2
+        expect(
+          cubit.state.effectiveBulkLocations.map((l) => l.id),
+          containsAll(['loc-1', 'loc-2']),
+        );
+        expect(cubit.state.hasConflictingItemTypes, false);
 
-      cubit.clearSelection();
-      expect(cubit.state.selectedItemIds, isEmpty);
-      expect(cubit.state.isAnyItemSelected, false);
-    });
+        cubit.clearSelection();
+        expect(cubit.state.selectedItemIds, isEmpty);
+        expect(cubit.state.isAnyItemSelected, false);
+      },
+    );
 
     test('42. Existing data is preserved when loadMore fails', () async {
       // Setup 55 items so hasMore is true
@@ -505,18 +570,21 @@ void main() {
       expect(cubit.state.successMessage, isNotNull);
     });
 
-    test('38 & 43. Bulk store stores all selected items and clears selection', () async {
-      await cubit.initialize();
-      cubit.toggleItemSelection('item-1', true);
-      expect(cubit.state.selectedItemsCount, 1);
+    test(
+      '38 & 43. Bulk store stores all selected items and clears selection',
+      () async {
+        await cubit.initialize();
+        cubit.toggleItemSelection('item-1', true);
+        expect(cubit.state.selectedItemsCount, 1);
 
-      await cubit.bulkStoreSelected(storageLocationId: 'loc-1');
+        await cubit.bulkStoreSelected(storageLocationId: 'loc-1');
 
-      expect(storeUseCase.executed, true);
-      expect(storeUseCase.lastInput?.orderItemIds, ['item-1']);
-      expect(cubit.state.selectedItemIds, isEmpty);
-      expect(cubit.state.successMessage, isNotNull);
-    });
+        expect(storeUseCase.executed, true);
+        expect(storeUseCase.lastInput?.orderItemIds, ['item-1']);
+        expect(cubit.state.selectedItemIds, isEmpty);
+        expect(cubit.state.successMessage, isNotNull);
+      },
+    );
 
     test('39. Move item calls move use case and reloads items', () async {
       await cubit.initialize();

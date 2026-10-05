@@ -20,7 +20,9 @@ class DashboardState {
     return DashboardState(
       data: data ?? this.data,
       isLoading: isLoading ?? this.isLoading,
-      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
     );
   }
 }

@@ -13,55 +13,53 @@ class ExpenseCategoriesManagementCubit
 
   ExpenseCategoriesManagementCubit({
     required ExpenseCategoryRepository expenseCategoryRepository,
-  })  : _expenseCategoryRepository = expenseCategoryRepository,
-        super(const ExpenseCategoriesManagementState());
+  }) : _expenseCategoryRepository = expenseCategoryRepository,
+       super(const ExpenseCategoriesManagementState());
 
   void clearMessages() {
-    emit(state.copyWith(
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(state.copyWith(clearErrorMessage: true, clearSuccessMessage: true));
   }
 
   Future<void> loadCategories() async {
-    emit(state.copyWith(
-      isLoading: true,
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        isLoading: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
 
     try {
       final categories = await _expenseCategoryRepository.getAllCategories();
-      emit(state.copyWith(
-        isLoading: false,
-        categories: categories,
-      ));
+      emit(state.copyWith(isLoading: false, categories: categories));
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isLoading: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isLoading: false, errorMessage: f.message));
     } catch (_) {
-      emit(state.copyWith(
-        isLoading: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 
   Future<bool> createCategory(String name) async {
     final trimmedName = name.trim();
     if (trimmedName.isEmpty) {
-      emit(state.copyWith(
-          errorMessage: AppStrings.expenseCategoryNameRequired));
+      emit(
+        state.copyWith(errorMessage: AppStrings.expenseCategoryNameRequired),
+      );
       return false;
     }
 
-    emit(state.copyWith(
-      isActionInProgress: true,
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        isActionInProgress: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
 
     try {
       final now = DateTime.now();
@@ -75,23 +73,19 @@ class ExpenseCategoriesManagementCubit
 
       await _expenseCategoryRepository.createCategory(category);
       final categories = await _expenseCategoryRepository.getAllCategories();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        categories: categories,
-      ));
+      emit(state.copyWith(isActionInProgress: false, categories: categories));
       return true;
     } on Failure catch (f) {
       final msg = _normalizeError(f.message);
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: msg,
-      ));
+      emit(state.copyWith(isActionInProgress: false, errorMessage: msg));
       return false;
     } catch (_) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
       return false;
     }
   }
@@ -99,16 +93,19 @@ class ExpenseCategoriesManagementCubit
   Future<bool> updateCategory(ExpenseCategory category) async {
     final trimmedName = category.name.trim();
     if (trimmedName.isEmpty) {
-      emit(state.copyWith(
-          errorMessage: AppStrings.expenseCategoryNameRequired));
+      emit(
+        state.copyWith(errorMessage: AppStrings.expenseCategoryNameRequired),
+      );
       return false;
     }
 
-    emit(state.copyWith(
-      isActionInProgress: true,
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        isActionInProgress: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
 
     try {
       final updated = category.copyWith(
@@ -118,23 +115,19 @@ class ExpenseCategoriesManagementCubit
 
       await _expenseCategoryRepository.updateCategory(updated);
       final categories = await _expenseCategoryRepository.getAllCategories();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        categories: categories,
-      ));
+      emit(state.copyWith(isActionInProgress: false, categories: categories));
       return true;
     } on Failure catch (f) {
       final msg = _normalizeError(f.message);
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: msg,
-      ));
+      emit(state.copyWith(isActionInProgress: false, errorMessage: msg));
       return false;
     } catch (_) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
       return false;
     }
   }
@@ -144,20 +137,16 @@ class ExpenseCategoriesManagementCubit
     try {
       await _expenseCategoryRepository.activateCategory(id);
       final categories = await _expenseCategoryRepository.getAllCategories();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        categories: categories,
-      ));
+      emit(state.copyWith(isActionInProgress: false, categories: categories));
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isActionInProgress: false, errorMessage: f.message));
     } catch (_) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 
@@ -166,20 +155,16 @@ class ExpenseCategoriesManagementCubit
     try {
       await _expenseCategoryRepository.deactivateCategory(id);
       final categories = await _expenseCategoryRepository.getAllCategories();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        categories: categories,
-      ));
+      emit(state.copyWith(isActionInProgress: false, categories: categories));
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isActionInProgress: false, errorMessage: f.message));
     } catch (_) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 

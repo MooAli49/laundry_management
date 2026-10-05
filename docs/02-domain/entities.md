@@ -44,6 +44,8 @@ OrderItem
 
 Payment
 
+Refund
+
 Expense
 
 StorageRecord
@@ -173,6 +175,7 @@ Represents a laundry customer.
 | id | UUID | Yes | Unique customer identifier |
 | name | String | Yes | Customer name |
 | phone | String | Yes | Customer phone number |
+| address | String? | No | Optional customer address |
 | createdAt | DateTime | Yes | Creation timestamp |
 | updatedAt | DateTime | Yes | Last update timestamp |
 
@@ -187,6 +190,9 @@ Customer
 - `name` is required.
 - `phone` is required.
 - Phone number should be unique.
+- `address` is optional and nullable. Stored on Customer only (no separate Address entity/table). Whitespace-only values normalize to NULL.
+- No address snapshot is added to Order; no address search in V1.
+- Address is profile/customer information; full delivery routing/dispatch management remains out of scope.
 - A Customer can have zero or more Orders.
 - Customer must not be hard-deleted when historical Orders reference it.
 
@@ -234,6 +240,7 @@ Order
 - customerId → Customer
 - 1:N → OrderItem
 - 1:N → Payment
+- 1:N → Refund
 
 ## Rules
 
@@ -256,6 +263,9 @@ Order
 - Cancelled Orders should have `cancelledAt`.
 - Cancelled Orders require a cancellation reason.
 - Completed and Cancelled Orders are historical/read-only operationally.
+- Completed -> Processing is supported ONLY as an explicit administrative correction (requires non-empty reason, completedAt becomes null, payments unchanged, storage remains inactive, re-store required before becoming Ready again).
+- Completed -> Ready and Completed -> Cancelled remain strictly forbidden.
+- Cancelled status remains strictly terminal.
 
 ---
 
@@ -351,13 +361,21 @@ Only selected delivery fees may be greater than zero.
 
 # 7. Order Number
 
-The final approved Order Number format is:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length:
 
-YY-XXX
+- YY = 2-digit year prefix.
+- The sequence contains digits only.
+- Minimum display width of 3 digits (values below 1000 are zero-padded).
+- No maximum length (sequence is not limited to 999; e.g. 26-1000, 26-10000).
+- Non-numeric or alphanumeric values (e.g. 26-T123) are not valid business order numbers.
+- The sequence generator must ignore non-business test identifiers such as `ORD-TEST-...` when calculating the next sequence number. These synthetic test identifiers must never inflate or distort the business order sequence.
 
-Example:
+Examples:
 
 26-001
+26-999
+26-1000
+26-10000
 
 The Order Number:
 
@@ -694,28 +712,18 @@ Represents an operation performed on an OrderItem.
 |---|---|---:|---|
 | id | UUID | Yes | Unique Service identifier |
 | name | String | Yes | Service name |
-| pricingType | PricingType | Yes | Service pricing type |
-| currentPrice | Money | Yes | Current service price |
+| description | String | No | Optional Service description |
 | isActive | Boolean | Yes | Whether selectable for new transactions |
 | createdAt | DateTime | Yes | Creation timestamp |
 | updatedAt | DateTime | Yes | Last update timestamp |
 
-## Pricing Types
-
-PerPiece
-
-PerKilogram
-
-PerSquareMeter
-
-FixedPrice
-
 ## Rules
 
-- Service names and current prices are master data.
-- Service may be configured for one or more ItemTypes.
+- The Service entity must NOT own a single default/current price or pricing type.
+- Pricing configuration belongs to the Service–Item Type relationship (`ServiceItemType`), not directly to Service.
+- Service names are master data.
+- Service may be configured for one or more ItemTypes via `ServiceItemType`.
 - Only active compatible Services may be selected for new OrderItems.
-- Changing the current Service price must not modify existing OrderItems.
 - Historical Service name, pricing type, and unit price are preserved on the OrderItem.
 
 ---
@@ -728,7 +736,7 @@ ServiceItemType
 
 ## Purpose
 
-Represents the compatibility relationship between Services and ItemTypes.
+Associative entity representing both the compatibility relationship and the operational pricing configuration between Services and ItemTypes.
 
 ## Properties
 
@@ -737,7 +745,10 @@ Represents the compatibility relationship between Services and ItemTypes.
 | id | UUID | Yes | Unique relationship identifier |
 | serviceId | UUID | Yes | Service reference |
 | itemTypeId | UUID | Yes | Item Type reference |
+| pricingType | PricingType | Yes | Operational pricing type (`perPiece`, `perSquareMeter`) |
+| price | Money | Yes | Configured price (strictly positive, `price > Money.zero`) |
 | createdAt | DateTime | Yes | Creation timestamp |
+| updatedAt | DateTime | Yes | Last update timestamp |
 
 ## Relationships
 
@@ -751,9 +762,16 @@ ServiceItemType
 
 ## Rules
 
-- A ServiceItemType record means the Service is available for the ItemType.
-- Duplicate ServiceItemType relationships must not exist.
-- Removing a ServiceItemType relationship must not invalidate historical OrderItems.
+- A ServiceItemType record establishes that the Service is available for the ItemType and defines its operational pricing.
+- In this laundry system, the actual price depends on the combination of Service + Item Type.
+- Example:
+  - Washing + Clothing → `perPiece` → 50 EGP
+  - Washing + Blanket  → `perPiece` → 100 EGP
+  - Washing + Carpet   → `perSquareMeter` → 60 EGP
+- Duplicate `(serviceId, itemTypeId)` combinations must not exist.
+- When an OrderItem is created, the configured price is snapshotted into `OrderItem.unitPrice`.
+- Changing a ServiceItemType's pricing configuration later must NOT modify existing OrderItems or historical orders.
+- Deactivating or removing a ServiceItemType relationship must not invalidate historical OrderItems.
 - Historical OrderItems remain valid even if the Service is no longer configured for that ItemType.
 
 ---
@@ -762,19 +780,19 @@ ServiceItemType
 
 ## Values
 
-PerPiece
+PerPiece (`per_piece`)
 
-PerKilogram
+PerSquareMeter (`per_square_meter`)
 
-PerSquareMeter
-
-FixedPrice
+*(Note: `FixedPrice` / `fixed_price` is removed from the V1 operational pricing model because under the current OrderItem model, each physical item is represented as its own OrderItem and receives a unit price; fixed price behaves effectively the same as per-piece pricing without distinct business behavior. Per Kilogram pricing remains completely excluded from V1).*
 
 ## Rules
 
-PricingType determines how a Service price is interpreted.
+PricingType determines how an OrderItem's price and quantity are evaluated:
+- `PerPiece`: unit price × 1 (per physical piece).
+- `PerSquareMeter`: unit price × calculated area.
 
-The actual historical pricing information used by an OrderItem is stored on the OrderItem.
+The actual historical pricing information used by an OrderItem is stored on the OrderItem (`unitPrice`, `pricingTypeSnapshot`, `calculatedTotal`).
 
 ---
 
@@ -1127,6 +1145,48 @@ Payment validation must prevent total Payments from exceeding the current Order 
 
 ---
 
+# 27A. Refund Entity
+
+## Entity
+
+Refund
+
+## Purpose
+
+Represents an immutable financial refund transaction returned to a customer for a cancelled Order.
+
+## Properties
+
+| Property | Type | Required | Description |
+|---|---|---:|---|
+| id | UUID | Yes | Unique Refund identifier |
+| orderId | UUID | Yes | Related cancelled Order |
+| amount | Money | Yes | Refund amount (positive minor units) |
+| refundMethod | RefundMethod | Yes | Refund method (cash, instaPay, eWallet) |
+| reason | String | No | Optional explanation for refund |
+| refundedAt | DateTime | Yes | Refund timestamp |
+| createdAt | DateTime | Yes | Creation timestamp |
+| updatedAt | DateTime | Yes | Last update timestamp |
+
+## Rules
+
+- Every Refund belongs directly to an Order (order-level, no paymentId).
+- Only Cancelled orders can receive refunds.
+- Processing, Ready, and Completed orders cannot receive refunds.
+- Refund amount must be greater than zero.
+- Refund amount must not exceed the remaining refundable balance (`Total Paid - Total Refunded`).
+- Multiple partial refunds and full refunds are supported up to the total paid amount.
+- Existing Payment records remain immutable and are neither deleted nor updated upon refund.
+- Refunds are not Expenses and do not alter Net Profit directly.
+
+## Relationships
+
+Refund
+
+N:1 → Order
+
+---
+
 # 28. Invoice / Receipt Representation
 
 Invoice / Receipt is a presentation of historical Order information.
@@ -1176,13 +1236,21 @@ Transaction records must preserve enough information to remain understandable af
 
 OrderItem preserves historical:
 
-- Item Type name
-- Item Definition name when applicable
-- Service name
-- Pricing Type
-- Unit price
+- Item Type name (`itemTypeNameSnapshot`)
+- Item Definition name when applicable (`itemDefinitionNameSnapshot`)
+- Service name (`serviceNameSnapshot`)
+- Pricing Type (`pricingTypeSnapshot`)
+- Unit price (`unitPriceSnapshot`)
 - Calculated total
 - Item-specific data
+
+Snapshot invariants:
+- `itemTypeNameSnapshot` is required and non-empty.
+- `serviceNameSnapshot` is required and non-empty.
+- They are historical snapshots captured with the OrderItem.
+- Empty or whitespace-only snapshots are invalid domain data and rejected with a `ValidationFailure`.
+- The application must NOT fabricate fallback names such as `ملابس` or `غسيل`.
+- Test fixtures must always provide valid, non-empty snapshot values.
 
 Order preserves historical:
 
@@ -1375,7 +1443,7 @@ The following remain preserved:
 - Delivery information
 - Cancellation information
 
-Cancellation does not create a Refund entity.
+Cancellation does not automatically create a Refund entity (refunds may be manually created for eligible cancelled orders).
 
 ---
 
@@ -1571,7 +1639,7 @@ The following remain preserved:
 - Delivery information
 - Cancellation information
 
-Cancellation does not create a Refund entity.
+Cancellation does not automatically create a Refund entity (refunds may be manually created for eligible cancelled orders).
 
 ---
 
@@ -1583,9 +1651,21 @@ The following values can be derived from stored entity data.
 
 sum(Order.payments.amount)
 
+## Total Refunded
+
+sum(Order.refunds.amount)
+
+## Refundable Balance
+
+Total Paid - Total Refunded
+
 ## Remaining Amount
 
 Order.total - TotalPaid
+
+## Net Payments
+
+Total Payments - Total Refunds
 
 ## Delivery Fees
 
@@ -1661,11 +1741,15 @@ The Financial Report operates over a selected date range.
 
 For the selected period:
 
-Sales are calculated from applicable Order transaction totals.
+Total Sales are calculated from non-cancelled Order transaction totals (`status != cancelled`) created in the selected period. Cancelled orders contribute 0.
 
-Payments are reported separately.
+Total Payments are reported from historical payment transactions based on `Payment.paidAt`.
 
-Outstanding amounts are reported separately.
+Total Refunds are reported from refund transactions based on `Refund.refundedAt`.
+
+Net Payments is calculated as Total Payments minus Total Refunds.
+
+Outstanding amounts are reported from non-cancelled Orders created within the period where remaining amount > 0. Cancelled orders contribute 0.
 
 Expenses are filtered by Expense.date.
 
@@ -1674,6 +1758,8 @@ Expense category totals are derived from Expenses in the selected period.
 Net Profit is:
 
 Total Sales - Total Operating Expenses
+
+Refunds are distinct financial transactions and are not operating expenses.
 
 The same Expense records shown in the selected period must be represented by the Expense totals and category breakdown.
 
@@ -1700,7 +1786,7 @@ The implementation must preserve the following invariants:
 13. Cancelling an Order deactivates its active StorageRecords.
 14. Changing Completed back to Processing does not reactivate previous StorageRecords.
 15. Payments cannot exceed the Order's remaining amount.
-16. Historical OrderItem prices remain unchanged after Service price changes.
+16. Historical OrderItem prices remain unchanged after Service pricing configuration changes.
 17. Historical carpet dimensions remain unchanged after CarpetSize changes.
 18. Historical Expense category information remains understandable after ExpenseCategory changes.
 19. Master data changes do not overwrite historical transaction snapshots.
@@ -1714,7 +1800,7 @@ The implementation must preserve the following invariants:
 27. Delivery fees contribute to the Order total.
 28. Currency is EGP.
 29. V1 supports one branch.
-30. Refunds are not part of V1.
+30. Refunds are order-level immutable financial transactions permitted only on cancelled orders up to the total paid balance.
 31. Storage location selection must respect ItemType compatibility.
 32. Carpet OrderItems require CarpetItemData.
 33. Non-Carpet OrderItems must not contain CarpetItemData.
@@ -1767,6 +1853,7 @@ Transactional:
 - Order
 - OrderItem
 - Payment
+- Refund
 - Expense
 - StorageRecord
 
@@ -1794,6 +1881,7 @@ Supporting values/enums:
 - OrderStatus
 - PricingType
 - PaymentMethod
+- RefundMethod
 
 ---
 
@@ -1809,7 +1897,7 @@ The following entities must not be introduced in V1 without an approved requirem
 - Role
 - Permission
 - Branch
-- Refund
+- Automated payment gateway refunds and line-item refunds
 - LoyaltyAccount
 - StorageMovement
 - StorageCapacity
@@ -1865,8 +1953,7 @@ Changing:
 - Item Type
 - Item Definition
 - Service name
-- Service price
-- Pricing Type
+- Service–Item Type pricing configuration (pricing type or price)
 - Expense Category name
 - Storage Location status
 - Carpet Size

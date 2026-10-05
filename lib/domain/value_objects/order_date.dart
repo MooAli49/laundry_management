@@ -5,7 +5,11 @@ class OrderDate implements Comparable<OrderDate> {
 
   OrderDate(this.year, this.month, this.day) {
     if (month < 1 || month > 12) {
-      throw ArgumentError.value(month, 'month', 'Month must be between 1 and 12');
+      throw ArgumentError.value(
+        month,
+        'month',
+        'Month must be between 1 and 12',
+      );
     }
     if (day < 1 || day > 31) {
       throw ArgumentError.value(day, 'day', 'Day must be between 1 and 31');
@@ -24,7 +28,10 @@ class OrderDate implements Comparable<OrderDate> {
   factory OrderDate.parse(String isoDateString) {
     final parts = isoDateString.split('-');
     if (parts.length != 3) {
-      throw FormatException('Invalid date format, expected YYYY-MM-DD', isoDateString);
+      throw FormatException(
+        'Invalid date format, expected YYYY-MM-DD',
+        isoDateString,
+      );
     }
     return OrderDate(
       int.parse(parts[0]),

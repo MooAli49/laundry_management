@@ -12,39 +12,34 @@ class CarpetSizesManagementCubit extends Cubit<CarpetSizesManagementState> {
 
   CarpetSizesManagementCubit({
     required CarpetSizeRepository carpetSizeRepository,
-  })  : _carpetSizeRepository = carpetSizeRepository,
-        super(const CarpetSizesManagementState());
+  }) : _carpetSizeRepository = carpetSizeRepository,
+       super(const CarpetSizesManagementState());
 
   void clearMessages() {
-    emit(state.copyWith(
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(state.copyWith(clearErrorMessage: true, clearSuccessMessage: true));
   }
 
   Future<void> loadCarpetSizes() async {
-    emit(state.copyWith(
-      isLoading: true,
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        isLoading: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
 
     try {
       final carpetSizes = await _carpetSizeRepository.getAllCarpetSizes();
-      emit(state.copyWith(
-        isLoading: false,
-        carpetSizes: carpetSizes,
-      ));
+      emit(state.copyWith(isLoading: false, carpetSizes: carpetSizes));
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isLoading: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isLoading: false, errorMessage: f.message));
     } catch (_) {
-      emit(state.copyWith(
-        isLoading: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 
@@ -61,11 +56,13 @@ class CarpetSizesManagementCubit extends Cubit<CarpetSizesManagementState> {
       return false;
     }
 
-    emit(state.copyWith(
-      isActionInProgress: true,
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        isActionInProgress: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
 
     try {
       final now = DateTime.now();
@@ -82,29 +79,23 @@ class CarpetSizesManagementCubit extends Cubit<CarpetSizesManagementState> {
 
       await _carpetSizeRepository.createCarpetSize(carpetSize);
       final carpetSizes = await _carpetSizeRepository.getAllCarpetSizes();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        carpetSizes: carpetSizes,
-      ));
+      emit(state.copyWith(isActionInProgress: false, carpetSizes: carpetSizes));
       return true;
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isActionInProgress: false, errorMessage: f.message));
       return false;
     } catch (_) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
       return false;
     }
   }
 
-  Future<bool> updateCarpetSize({
-    required CarpetSize carpetSize,
-  }) async {
+  Future<bool> updateCarpetSize({required CarpetSize carpetSize}) async {
     if (carpetSize.length <= 0) {
       emit(state.copyWith(errorMessage: AppStrings.carpetLengthRequired));
       return false;
@@ -114,11 +105,13 @@ class CarpetSizesManagementCubit extends Cubit<CarpetSizesManagementState> {
       return false;
     }
 
-    emit(state.copyWith(
-      isActionInProgress: true,
-      clearErrorMessage: true,
-      clearSuccessMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        isActionInProgress: true,
+        clearErrorMessage: true,
+        clearSuccessMessage: true,
+      ),
+    );
 
     try {
       final area = carpetSize.length * carpetSize.width;
@@ -129,22 +122,18 @@ class CarpetSizesManagementCubit extends Cubit<CarpetSizesManagementState> {
 
       await _carpetSizeRepository.updateCarpetSize(updated);
       final carpetSizes = await _carpetSizeRepository.getAllCarpetSizes();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        carpetSizes: carpetSizes,
-      ));
+      emit(state.copyWith(isActionInProgress: false, carpetSizes: carpetSizes));
       return true;
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isActionInProgress: false, errorMessage: f.message));
       return false;
     } catch (_) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
       return false;
     }
   }
@@ -154,20 +143,16 @@ class CarpetSizesManagementCubit extends Cubit<CarpetSizesManagementState> {
     try {
       await _carpetSizeRepository.activateCarpetSize(id);
       final carpetSizes = await _carpetSizeRepository.getAllCarpetSizes();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        carpetSizes: carpetSizes,
-      ));
+      emit(state.copyWith(isActionInProgress: false, carpetSizes: carpetSizes));
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isActionInProgress: false, errorMessage: f.message));
     } catch (_) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 
@@ -176,20 +161,16 @@ class CarpetSizesManagementCubit extends Cubit<CarpetSizesManagementState> {
     try {
       await _carpetSizeRepository.deactivateCarpetSize(id);
       final carpetSizes = await _carpetSizeRepository.getAllCarpetSizes();
-      emit(state.copyWith(
-        isActionInProgress: false,
-        carpetSizes: carpetSizes,
-      ));
+      emit(state.copyWith(isActionInProgress: false, carpetSizes: carpetSizes));
     } on Failure catch (f) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isActionInProgress: false, errorMessage: f.message));
     } catch (_) {
-      emit(state.copyWith(
-        isActionInProgress: false,
-        errorMessage: AppStrings.unexpectedError,
-      ));
+      emit(
+        state.copyWith(
+          isActionInProgress: false,
+          errorMessage: AppStrings.unexpectedError,
+        ),
+      );
     }
   }
 }

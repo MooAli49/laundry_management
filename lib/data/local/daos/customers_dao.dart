@@ -13,15 +13,21 @@ class CustomersDao extends DatabaseAccessor<app_db.AppDatabase> {
   }
 
   Future<void> updateCustomer(app_db.CustomersCompanion companion) async {
-    await (update(db.customers)..where((t) => t.id.equals(companion.id.value))).write(companion);
+    await (update(
+      db.customers,
+    )..where((t) => t.id.equals(companion.id.value))).write(companion);
   }
 
   Future<app_db.Customer?> getCustomerById(String id) async {
-    return (select(db.customers)..where((t) => t.id.equals(id))).getSingleOrNull();
+    return (select(
+      db.customers,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
   Future<app_db.Customer?> getCustomerByPhone(String phone) async {
-    return (select(db.customers)..where((t) => t.phone.equals(phone))).getSingleOrNull();
+    return (select(
+      db.customers,
+    )..where((t) => t.phone.equals(phone))).getSingleOrNull();
   }
 
   Future<List<app_db.Customer>> searchCustomers({
@@ -68,16 +74,21 @@ class CustomersDao extends DatabaseAccessor<app_db.AppDatabase> {
         );
       } else {
         queryBuilder.where(
-          db.customers.name.like('%$sanitized%') | db.customers.phone.like('%$sanitized%'),
+          db.customers.name.like('%$sanitized%') |
+              db.customers.phone.like('%$sanitized%'),
         );
       }
     }
-    final result = await queryBuilder.map((row) => row.read(countExp)).getSingle();
+    final result = await queryBuilder
+        .map((row) => row.read(countExp))
+        .getSingle();
     return result ?? 0;
   }
 
   Stream<List<app_db.Customer>> watchCustomers() {
-    return (select(db.customers)..orderBy([(t) => OrderingTerm.asc(t.name)])).watch();
+    return (select(
+      db.customers,
+    )..orderBy([(t) => OrderingTerm.asc(t.name)])).watch();
   }
 
   Future<bool> hasOrderHistory(String customerId) async {

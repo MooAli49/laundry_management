@@ -56,7 +56,14 @@ class StorageRecord {
           updatedAt == other.updatedAt;
 
   @override
-  int get hashCode => Object.hash(id, orderItemId, storageLocationId, isActive, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    orderItemId,
+    storageLocationId,
+    isActive,
+    createdAt,
+    updatedAt,
+  );
 
   @override
   String toString() =>

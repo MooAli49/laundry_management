@@ -18,11 +18,13 @@ class OrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final order = item.order;
     final customer = item.customer;
-    final customerName = customer?.name ??
+    final customerName =
+        customer?.name ??
         (order.customerNameSnapshot.isNotEmpty
             ? order.customerNameSnapshot
             : 'عميل غير مسجل');
-    final customerPhone = customer?.phone ??
+    final customerPhone =
+        customer?.phone ??
         (order.customerPhoneSnapshot.isNotEmpty
             ? order.customerPhoneSnapshot
             : null);
@@ -62,6 +64,7 @@ class OrderCard extends StatelessWidget {
                   children: [
                     Text(
                       '#${order.orderNumber}',
+                      textDirection: TextDirection.ltr,
                       style: AppTextStyles.titleMedium.copyWith(
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
@@ -140,7 +143,16 @@ class OrderCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                if (item.isFullyPaid)
+                if (item.isCancelled)
+                  Text(
+                    item.cancelledFinancialLabel,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 12,
+                    ),
+                  )
+                else if (item.isFullyPaid)
                   Text(
                     'مدفوع بالكامل',
                     style: AppTextStyles.caption.copyWith(

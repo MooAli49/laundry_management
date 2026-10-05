@@ -6,6 +6,7 @@ class CustomerOrderAggregateQueryResult {
   final int cancelledOrders;
   final int totalPaidPiastres;
   final int totalRemainingPiastres;
+  final int totalRefundsPiastres;
 
   const CustomerOrderAggregateQueryResult({
     required this.totalOrders,
@@ -15,6 +16,7 @@ class CustomerOrderAggregateQueryResult {
     required this.cancelledOrders,
     required this.totalPaidPiastres,
     required this.totalRemainingPiastres,
+    this.totalRefundsPiastres = 0,
   });
 
   static const empty = CustomerOrderAggregateQueryResult(
@@ -25,5 +27,6 @@ class CustomerOrderAggregateQueryResult {
     cancelledOrders: 0,
     totalPaidPiastres: 0,
     totalRemainingPiastres: 0,
+    totalRefundsPiastres: 0,
   );
 }

@@ -7,8 +7,9 @@ import '../../../../domain/entities/carpet_size.dart';
 import '../../../../domain/entities/customer.dart';
 import '../../../../domain/entities/item_definition.dart';
 import '../../../../domain/entities/item_type.dart';
-import '../../../../domain/entities/service.dart';
+import '../../../../domain/enums/payment_method.dart';
 import '../../../../domain/enums/pricing_type.dart';
+import '../../../../domain/models/service_with_pricing.dart';
 import '../../../../domain/repositories/carpet_size_repository.dart';
 import '../../../../domain/repositories/customer_repository.dart';
 import '../../../../domain/repositories/item_definition_repository.dart';
@@ -39,19 +40,21 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
     required SettingsRepository settingsRepository,
     required CreateOrderUseCase createOrderUseCase,
     Uuid? uuid,
-  })  : _customerRepository = customerRepository,
-        _itemTypeRepository = itemTypeRepository,
-        _itemDefinitionRepository = itemDefinitionRepository,
-        _serviceRepository = serviceRepository,
-        _carpetSizeRepository = carpetSizeRepository,
-        _settingsRepository = settingsRepository,
-        _createOrderUseCase = createOrderUseCase,
-        _uuid = uuid ?? const Uuid(),
-        super(CreateOrderState(
-          expectedPickupDate: OrderDate.fromDate(
-            DateTime.now().add(const Duration(days: 7)),
-          ),
-        ));
+  }) : _customerRepository = customerRepository,
+       _itemTypeRepository = itemTypeRepository,
+       _itemDefinitionRepository = itemDefinitionRepository,
+       _serviceRepository = serviceRepository,
+       _carpetSizeRepository = carpetSizeRepository,
+       _settingsRepository = settingsRepository,
+       _createOrderUseCase = createOrderUseCase,
+       _uuid = uuid ?? const Uuid(),
+       super(
+         CreateOrderState(
+           expectedPickupDate: OrderDate.fromDate(
+             DateTime.now().add(const Duration(days: 7)),
+           ),
+         ),
+       );
 
   Future<void> initialize({String? initialCustomerId}) async {
     emit(state.copyWith(isInitialLoading: true, clearErrorMessage: true));
@@ -62,23 +65,24 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
 
       Customer? initialCustomer;
       if (initialCustomerId != null && initialCustomerId.isNotEmpty) {
-        initialCustomer = await _customerRepository.getCustomerById(initialCustomerId);
+        initialCustomer = await _customerRepository.getCustomerById(
+          initialCustomerId,
+        );
       }
 
       if (isClosed) return;
-      emit(state.copyWith(
-        isInitialLoading: false,
-        itemTypes: itemTypes,
-        carpetSizes: carpetSizes,
-        settings: settings,
-        selectedCustomer: initialCustomer,
-      ));
+      emit(
+        state.copyWith(
+          isInitialLoading: false,
+          itemTypes: itemTypes,
+          carpetSizes: carpetSizes,
+          settings: settings,
+          selectedCustomer: initialCustomer,
+        ),
+      );
     } catch (e) {
       if (isClosed) return;
-      emit(state.copyWith(
-        isInitialLoading: false,
-        errorMessage: e.toString(),
-      ));
+      emit(state.copyWith(isInitialLoading: false, errorMessage: e.toString()));
     }
   }
 
@@ -93,10 +97,12 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
     try {
       final results = await _customerRepository.searchCustomers(query: trimmed);
       if (isClosed) return;
-      emit(state.copyWith(
-        customerSearchResults: results,
-        isSearchingCustomer: false,
-      ));
+      emit(
+        state.copyWith(
+          customerSearchResults: results,
+          isSearchingCustomer: false,
+        ),
+      );
     } catch (e) {
       if (isClosed) return;
       emit(state.copyWith(isSearchingCustomer: false));
@@ -114,10 +120,14 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
   Future<Customer> addNewCustomer({
     required String name,
     required String phone,
+    String? address,
     String? notes,
   }) async {
     final trimmedName = name.trim();
     final trimmedPhone = phone.trim();
+    final trimmedAddress = address?.trim().isNotEmpty == true
+        ? address!.trim()
+        : null;
 
     if (trimmedName.isEmpty) {
       throw const ValidationFailure('اسم العميل مطلوب');
@@ -136,6 +146,7 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
       id: _uuid.v4(),
       name: trimmedName,
       phone: trimmedPhone,
+      address: trimmedAddress,
       notes: notes?.trim().isNotEmpty == true ? notes!.trim() : null,
       createdAt: now,
       updatedAt: now,
@@ -148,34 +159,44 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
 
   Future<void> selectItemType(ItemType? itemType) async {
     if (itemType == null) {
-      emit(state.copyWith(
-        clearDraftItemType: true,
-        clearDraftItemDefinition: true,
-        clearDraftService: true,
-        compatibleServices: [],
-        itemDefinitions: [],
-      ));
+      emit(
+        state.copyWith(
+          clearDraftItemType: true,
+          clearDraftItemDefinition: true,
+          clearDraftService: true,
+          clearDraftPricingType: true,
+          clearDraftUnitPrice: true,
+          compatibleServices: [],
+          itemDefinitions: [],
+        ),
+      );
       return;
     }
 
-    emit(state.copyWith(
-      draftItemType: itemType,
-      clearDraftItemDefinition: true,
-      clearDraftService: true,
-    ));
+    emit(
+      state.copyWith(
+        draftItemType: itemType,
+        clearDraftItemDefinition: true,
+        clearDraftService: true,
+        clearDraftPricingType: true,
+        clearDraftUnitPrice: true,
+      ),
+    );
 
     try {
-      final services = await _serviceRepository.getServicesForItemType(itemType.id);
-      final definitions = await _itemDefinitionRepository.getDefinitionsForItemType(
+      final services = await _serviceRepository.getServicesForItemType(
         itemType.id,
-        activeOnly: true,
       );
+      final definitions = await _itemDefinitionRepository
+          .getDefinitionsForItemType(itemType.id, activeOnly: true);
 
       if (isClosed) return;
-      emit(state.copyWith(
-        compatibleServices: services.where((s) => s.isActive).toList(),
-        itemDefinitions: definitions,
-      ));
+      emit(
+        state.copyWith(
+          compatibleServices: services.where((s) => s.isActive).toList(),
+          itemDefinitions: definitions,
+        ),
+      );
     } catch (e) {
       if (isClosed) return;
       emit(state.copyWith(errorMessage: e.toString()));
@@ -190,19 +211,38 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
     }
   }
 
-  void selectService(Service? service) {
-    if (service == null) {
-      emit(state.copyWith(clearDraftService: true));
+  void selectService(ServiceWithPricing? serviceWithPricing) {
+    if (serviceWithPricing == null) {
+      emit(
+        state.copyWith(
+          clearDraftService: true,
+          clearDraftPricingType: true,
+          clearDraftUnitPrice: true,
+          clearDraftItemTotal: true,
+        ),
+      );
     } else {
-      emit(state.copyWith(
-        draftService: service,
-        draftUnitPrice: service.price,
-      ));
+      emit(
+        state.copyWith(
+          draftService: serviceWithPricing.service,
+          draftPricingType: serviceWithPricing.pricingType,
+          draftUnitPrice: serviceWithPricing.price,
+          clearDraftItemTotal: true,
+        ),
+      );
     }
   }
 
   void updateUnitPrice(Money price) {
-    emit(state.copyWith(draftUnitPrice: price));
+    emit(state.copyWith(draftUnitPrice: price, clearDraftItemTotal: true));
+  }
+
+  void updateDraftTotal(Money total) {
+    emit(state.copyWith(draftItemTotal: total));
+  }
+
+  void resetDraftTotal() {
+    emit(state.copyWith(clearDraftItemTotal: true));
   }
 
   void updateQuantity(int quantity) {
@@ -214,20 +254,24 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
     if (size == null) {
       emit(state.copyWith(clearDraftCarpetSize: true));
     } else {
-      emit(state.copyWith(
-        draftCarpetSize: size,
-        draftCarpetLength: size.length,
-        draftCarpetWidth: size.width,
-      ));
+      emit(
+        state.copyWith(
+          draftCarpetSize: size,
+          draftCarpetLength: size.length,
+          draftCarpetWidth: size.width,
+        ),
+      );
     }
   }
 
   void updateCarpetDimensions({double? length, double? width}) {
-    emit(state.copyWith(
-      draftCarpetLength: length ?? state.draftCarpetLength,
-      draftCarpetWidth: width ?? state.draftCarpetWidth,
-      clearDraftCarpetSize: true,
-    ));
+    emit(
+      state.copyWith(
+        draftCarpetLength: length ?? state.draftCarpetLength,
+        draftCarpetWidth: width ?? state.draftCarpetWidth,
+        clearDraftCarpetSize: true,
+      ),
+    );
   }
 
   void updateDraftNotes(String? notes) {
@@ -243,13 +287,20 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
       emit(state.copyWith(errorMessage: 'يرجى اختيار نوع القطعة أولاً'));
       return;
     }
-    if (state.draftService == null) {
+    if (state.draftService == null || state.draftPricingType == null) {
       emit(state.copyWith(errorMessage: 'يرجى اختيار الخدمة أولاً'));
       return;
     }
-    final price = state.draftUnitPrice ?? state.draftService!.price;
-    if (price <= Money.zero) {
-      emit(state.copyWith(errorMessage: 'سعر القطعة يجب أن يكون أكبر من الصفر'));
+    if (state.draftUnitPrice == null) {
+      emit(state.copyWith(errorMessage: 'يرجى تحديد السعر أولاً'));
+      return;
+    }
+    final price = state.draftUnitPrice!;
+    final total = state.effectiveDraftTotal;
+    if (total <= Money.zero) {
+      emit(
+        state.copyWith(errorMessage: 'إجمالي القطعة يجب أن يكون أكبر من الصفر'),
+      );
       return;
     }
     if (state.draftQuantity < 1) {
@@ -257,9 +308,13 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
       return;
     }
 
-    if (state.draftService!.pricingType == PricingType.perSquareMeter) {
+    if (state.draftPricingType == PricingType.perSquareMeter) {
       if (state.draftCarpetLength <= 0 || state.draftCarpetWidth <= 0) {
-        emit(state.copyWith(errorMessage: 'أبعاد السجاد يجب أن تكون أكبر من الصفر'));
+        emit(
+          state.copyWith(
+            errorMessage: 'أبعاد السجاد يجب أن تكون أكبر من الصفر',
+          ),
+        );
         return;
       }
     }
@@ -271,43 +326,56 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
       itemDefinitionName: state.draftItemDefinition?.name,
       serviceId: state.draftService!.id,
       serviceName: state.draftService!.name,
-      pricingType: state.draftService!.pricingType,
+      pricingType: state.draftPricingType!,
       unitPrice: price,
+      customTotal: state.isDraftTotalOverridden ? state.draftItemTotal : null,
       physicalQuantity: state.draftQuantity,
       carpetSizeId: state.draftCarpetSize?.id,
       length: state.draftCarpetLength,
       width: state.draftCarpetWidth,
-      notes: state.draftNotes?.trim().isNotEmpty == true ? state.draftNotes!.trim() : null,
+      notes: state.draftNotes?.trim().isNotEmpty == true
+          ? state.draftNotes!.trim()
+          : null,
     );
 
     final updatedItems = List<OrderItemDraft>.from(state.items)..add(draftItem);
 
-    emit(state.copyWith(
-      items: updatedItems,
-      clearDraftItemType: true,
-      clearDraftItemDefinition: true,
-      clearDraftService: true,
-      clearDraftCarpetSize: true,
-      draftCarpetLength: 0.0,
-      draftCarpetWidth: 0.0,
-      clearDraftNotes: true,
-      draftQuantity: 1,
-      compatibleServices: [],
-      itemDefinitions: [],
-      clearErrorMessage: true,
-    ));
+    emit(
+      _enforcePaymentInvariant(
+        state.copyWith(
+          items: updatedItems,
+          clearDraftItemType: true,
+          clearDraftItemDefinition: true,
+          clearDraftService: true,
+          clearDraftPricingType: true,
+          clearDraftUnitPrice: true,
+          clearDraftItemTotal: true,
+          clearDraftCarpetSize: true,
+          draftCarpetLength: 0.0,
+          draftCarpetWidth: 0.0,
+          clearDraftNotes: true,
+          draftQuantity: 1,
+          compatibleServices: [],
+          itemDefinitions: [],
+          clearErrorMessage: true,
+        ),
+      ),
+    );
   }
 
   void removeItem(int index) {
     if (index >= 0 && index < state.items.length) {
-      final updatedItems = List<OrderItemDraft>.from(state.items)..removeAt(index);
-      emit(state.copyWith(items: updatedItems));
+      final updatedItems = List<OrderItemDraft>.from(state.items)
+        ..removeAt(index);
+      emit(_enforcePaymentInvariant(state.copyWith(items: updatedItems)));
     }
   }
 
   void updateExpectedPickupDate(OrderDate date) {
     if (date.isBeforeToday) {
-      emit(state.copyWith(errorMessage: 'موعد الاستلام لا يمكن أن يكون في الماضي'));
+      emit(
+        state.copyWith(errorMessage: 'موعد الاستلام لا يمكن أن يكون في الماضي'),
+      );
       return;
     }
     emit(state.copyWith(expectedPickupDate: date, clearErrorMessage: true));
@@ -318,7 +386,11 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
       emit(state.copyWith(errorMessage: 'الخصم لا يمكن أن يكون سالباً'));
       return;
     }
-    emit(state.copyWith(discount: discount, clearErrorMessage: true));
+    emit(
+      _enforcePaymentInvariant(
+        state.copyWith(discount: discount, clearErrorMessage: true),
+      ),
+    );
   }
 
   void updateOrderNotes(String? notes) {
@@ -331,12 +403,70 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
     bool? deliveryRequested,
     Money? deliveryFee,
   }) {
-    emit(state.copyWith(
-      customerPickupRequested: pickupRequested ?? state.customerPickupRequested,
-      customerPickupFee: pickupFee ?? state.customerPickupFee,
-      customerDeliveryRequested: deliveryRequested ?? state.customerDeliveryRequested,
-      customerDeliveryFee: deliveryFee ?? state.customerDeliveryFee,
-    ));
+    emit(
+      _enforcePaymentInvariant(
+        state.copyWith(
+          customerPickupRequested:
+              pickupRequested ?? state.customerPickupRequested,
+          customerPickupFee: pickupFee ?? state.customerPickupFee,
+          customerDeliveryRequested:
+              deliveryRequested ?? state.customerDeliveryRequested,
+          customerDeliveryFee: deliveryFee ?? state.customerDeliveryFee,
+        ),
+      ),
+    );
+  }
+
+  void toggleInitialPayment(bool enabled) {
+    emit(
+      state.copyWith(
+        isInitialPaymentEnabled: enabled,
+        initialPaymentAmount: enabled ? state.initialPaymentAmount : Money.zero,
+      ),
+    );
+  }
+
+  void updateInitialPaymentAmount(Money amount) {
+    if (amount.isNegative) {
+      emit(
+        state.copyWith(
+          initialPaymentAmount: Money.zero,
+          errorMessage: 'مبلغ الدفعة لا يمكن أن يكون سالباً',
+        ),
+      );
+      return;
+    }
+    if (amount > state.total) {
+      emit(
+        state.copyWith(
+          initialPaymentAmount: state.total,
+          errorMessage: 'مبلغ الدفعة لا يمكن أن يتجاوز إجمالي الطلب',
+        ),
+      );
+      return;
+    }
+    emit(state.copyWith(initialPaymentAmount: amount, clearErrorMessage: true));
+  }
+
+  void setFullInitialPayment() {
+    emit(
+      state.copyWith(
+        isInitialPaymentEnabled: true,
+        initialPaymentAmount: state.total,
+        clearErrorMessage: true,
+      ),
+    );
+  }
+
+  void updateInitialPaymentMethod(PaymentMethod method) {
+    emit(state.copyWith(initialPaymentMethod: method));
+  }
+
+  CreateOrderState _enforcePaymentInvariant(CreateOrderState s) {
+    if (s.isInitialPaymentEnabled && s.initialPaymentAmount > s.total) {
+      return s.copyWith(initialPaymentAmount: s.total);
+    }
+    return s;
   }
 
   Future<void> submitOrder() async {
@@ -349,11 +479,26 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
       return;
     }
     if (state.expectedPickupDate.isBeforeToday) {
-      emit(state.copyWith(errorMessage: 'موعد الاستلام المتوقع لا يمكن أن يكون في الماضي'));
+      emit(
+        state.copyWith(
+          errorMessage: 'موعد الاستلام المتوقع لا يمكن أن يكون في الماضي',
+        ),
+      );
       return;
     }
     if (state.discount > state.subtotal) {
-      emit(state.copyWith(errorMessage: 'الخصم لا يمكن أن يتجاوز المجموع الفرعي'));
+      emit(
+        state.copyWith(errorMessage: 'الخصم لا يمكن أن يتجاوز المجموع الفرعي'),
+      );
+      return;
+    }
+    if (state.isInitialPaymentEnabled &&
+        state.initialPaymentAmount > state.total) {
+      emit(
+        state.copyWith(
+          errorMessage: 'مبلغ الدفعة المقدمة لا يمكن أن يتجاوز إجمالي الطلب',
+        ),
+      );
       return;
     }
 
@@ -375,43 +520,48 @@ class CreateOrderCubit extends Cubit<CreateOrderState> {
           itemDefinitionId: draft.itemDefinitionId,
           serviceId: draft.serviceId,
           customUnitPrice: draft.unitPrice,
+          customTotal: draft.customTotal,
           physicalQuantity: draft.physicalQuantity,
           notes: draft.notes,
           carpetData: carpetData,
         );
       }).toList();
 
+      InitialPaymentInput? initialPaymentInput;
+      if (state.isInitialPaymentEnabled &&
+          state.initialPaymentAmount > Money.zero) {
+        initialPaymentInput = InitialPaymentInput(
+          amount: state.initialPaymentAmount,
+          paymentMethod: state.initialPaymentMethod,
+        );
+      }
+
       final input = CreateOrderInput(
         customerId: state.selectedCustomer!.id,
         expectedPickupDate: state.expectedPickupDate,
-        notes: state.orderNotes?.trim().isNotEmpty == true ? state.orderNotes!.trim() : null,
+        notes: state.orderNotes?.trim().isNotEmpty == true
+            ? state.orderNotes!.trim()
+            : null,
         customerPickupRequested: state.customerPickupRequested,
         customerPickupFee: state.effectivePickupFee,
         customerDeliveryRequested: state.customerDeliveryRequested,
         customerDeliveryFee: state.effectiveDeliveryFee,
         discount: state.discount,
+        tax: state.tax, // V1: always Money.zero — see CreateOrderState.tax
         items: createOrderItemsInput,
+        initialPayment: initialPaymentInput,
       );
 
       final order = await _createOrderUseCase.execute(input);
 
       if (isClosed) return;
-      emit(state.copyWith(
-        isSubmitting: false,
-        createdOrder: order,
-      ));
+      emit(state.copyWith(isSubmitting: false, createdOrder: order));
     } on Failure catch (f) {
       if (isClosed) return;
-      emit(state.copyWith(
-        isSubmitting: false,
-        errorMessage: f.message,
-      ));
+      emit(state.copyWith(isSubmitting: false, errorMessage: f.message));
     } catch (e) {
       if (isClosed) return;
-      emit(state.copyWith(
-        isSubmitting: false,
-        errorMessage: e.toString(),
-      ));
+      emit(state.copyWith(isSubmitting: false, errorMessage: e.toString()));
     }
   }
 }

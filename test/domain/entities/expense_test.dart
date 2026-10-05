@@ -133,26 +133,28 @@ void main() {
       );
     });
 
-    test('supports copyWith, value equality, and preserve category snapshot', () {
-      final exp1 = Expense(
-        id: 'exp-1',
-        expenseCategoryId: 'cat-1',
-        amount: const Money.fromPiastres(500),
-        expenseDate: OrderDate(2026, 9, 4),
-        categoryNameSnapshot: 'صيانة',
-        createdAt: now,
-        updatedAt: now,
-      );
+    test(
+      'supports copyWith, value equality, and preserve category snapshot',
+      () {
+        final exp1 = Expense(
+          id: 'exp-1',
+          expenseCategoryId: 'cat-1',
+          amount: const Money.fromPiastres(500),
+          expenseDate: OrderDate(2026, 9, 4),
+          categoryNameSnapshot: 'صيانة',
+          createdAt: now,
+          updatedAt: now,
+        );
 
-      final exp2 = exp1.copyWith(amount: const Money.fromPiastres(800));
-      expect(exp2.amount, const Money.fromPiastres(800));
-      expect(exp2.categoryNameSnapshot, 'صيانة');
-      expect(exp1 == exp2, isFalse);
+        final exp2 = exp1.copyWith(amount: const Money.fromPiastres(800));
+        expect(exp2.amount, const Money.fromPiastres(800));
+        expect(exp2.categoryNameSnapshot, 'صيانة');
+        expect(exp1 == exp2, isFalse);
 
-      final exp1Clone = exp1.copyWith();
-      expect(exp1 == exp1Clone, isTrue);
-      expect(exp1.hashCode, exp1Clone.hashCode);
-    });
+        final exp1Clone = exp1.copyWith();
+        expect(exp1 == exp1Clone, isTrue);
+        expect(exp1.hashCode, exp1Clone.hashCode);
+      },
+    );
   });
 }
-

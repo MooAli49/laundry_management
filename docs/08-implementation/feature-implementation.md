@@ -511,9 +511,9 @@ This applies to:
 
 ---
 
-## 18. Future Synchronization Boundary
+## 18. Synchronization Boundary
 
-Synchronization is deferred from the current local implementation phase.
+Synchronization operates as an infrastructure concern behind the Repository/Data boundary.
 
 Feature code must not implement synchronization logic directly.
 
@@ -524,7 +524,7 @@ Do not add:
 - Retry logic inside Screens
 - Connectivity logic inside Widgets
 
-When synchronization is introduced, it remains behind the Repository/Data infrastructure.
+Synchronization remains strictly behind the Repository/Data infrastructure.
 
 ---
 
@@ -742,23 +742,22 @@ This is required because storage operates at physical OrderItem level.
 
 ## 26. Order Item Pricing
 
-The Orders feature must respect the selected PricingType.
+The Orders feature must respect the selected PricingType configured on the Service + Item Type relationship.
 
 Supported V1 Operational PricingTypes:
 
-- Per Piece
-- Fixed Price
-- Per Square Meter
+- Per Piece (`per_piece`)
+- Per Square Meter (`per_square_meter`)
 
-*(Note: Per Kilogram pricing has been completely removed from V1 operations).*
+*(Note: Fixed Price (`fixed_price`) is removed from the V1 operational pricing model as each item is represented as an OrderItem with a unit price; Per Kilogram (`per_kg`) remains completely excluded from V1).*
 
 The feature must not assume:
 
 price × quantity
 
-for every service.
+for every service without considering item dimensions.
 
-Pricing inputs depend on the selected PricingType.
+Pricing inputs depend on the selected PricingType configured for the Service + Item Type combination.
 
 ---
 
@@ -983,7 +982,7 @@ The feature must not allow normal editing of a cancelled Order.
 
 Existing Payment records remain historical.
 
-Cancellation does not automatically create a Refund because Refund is not a V1 Domain entity.
+Cancellation does not automatically create a Refund. Refund is an approved V1 Domain entity, but Cancellation and Refund remain separate operations; manual refunds may be created for eligible cancelled orders.
 
 ---
 
@@ -1193,9 +1192,9 @@ They may be:
 Creating or editing a Service may include:
 
 - Name
-- Price
-- PricingType
-- Supported ItemTypes
+- Supported ItemTypes with their Pricing Configuration (`pricing_type` and `price` per ItemType)
+
+The Service entity itself does not own a single default/current price or pricing type; pricing is configured per Service + Item Type combination (`service_item_types`).
 
 The feature must preserve the compatibility relationship.
 
@@ -1540,7 +1539,7 @@ Master-data changes must always respect the historical transaction principle.
 
 Examples:
 
-Change Service price
+Change Service + Item Type price
 → Old OrderItem price remains unchanged.
 
 Change Service name
@@ -2893,7 +2892,7 @@ The coding agent must not create:
 - Roles
 - Permissions
 - Branches
-- Refunds
+- Automated payment gateway refunds and item-level refunds
 - Loyalty
 - Barcode scanning
 - Advanced laundry stages
@@ -2985,7 +2984,7 @@ The agent must never implement master-data updates that silently modify historic
 
 Examples:
 
-Service price changes
+Service + Item Type price changes
 
 must not update old OrderItem prices.
 
@@ -3250,7 +3249,7 @@ The V1 feature implementation must follow these principles:
 5. Domain rules remain outside Widgets.
 6. V1 uses Cubit rather than requiring Bloc.
 7. Local-first behavior is the default.
-8. Networking and synchronization remain deferred.
+8. Features remain decoupled from networking and synchronization infrastructure.
 9. Physical OrderItems retain independent identity.
 10. Historical transaction values remain stable.
 11. Order lifecycle rules are enforced consistently.

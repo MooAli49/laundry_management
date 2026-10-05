@@ -57,14 +57,18 @@ class _ReportsView extends StatelessWidget {
                   return const Padding(
                     padding: EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
                     child: Center(
-                      child: LoadingIndicator(message: 'جاري تحميل بيانات التقارير...'),
+                      child: LoadingIndicator(
+                        message: 'جاري تحميل بيانات التقارير...',
+                      ),
                     ),
                   );
                 }
 
                 if (state.errorMessage != null && state.startDate == null) {
                   return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.xxxl,
+                    ),
                     child: AppErrorState(
                       title: 'تعذر تحميل التقرير',
                       message: state.errorMessage!,
@@ -91,10 +95,10 @@ class _ReportsView extends StatelessWidget {
                         endDate: state.endDate!,
                         onPeriodChanged: (period, {customStart, customEnd}) {
                           context.read<ReportsCubit>().selectPeriod(
-                                period,
-                                customStart: customStart,
-                                customEnd: customEnd,
-                              );
+                            period,
+                            customStart: customStart,
+                            customEnd: customEnd,
+                          );
                         },
                       ),
                       AppSpacing.gapXxl,
@@ -105,7 +109,8 @@ class _ReportsView extends StatelessWidget {
                       else
                         FinancialReportView(
                           data: state.financialReport,
-                          onRefresh: () => context.read<ReportsCubit>().refresh(),
+                          onRefresh: () =>
+                              context.read<ReportsCubit>().refresh(),
                         ),
                     ],
                   );
@@ -135,14 +140,16 @@ class _ReportsView extends StatelessWidget {
             label: 'تقرير الطلبات',
             icon: Icons.receipt_long_outlined,
             isSelected: activeTab == ReportsTab.orders,
-            onTap: () => context.read<ReportsCubit>().selectTab(ReportsTab.orders),
+            onTap: () =>
+                context.read<ReportsCubit>().selectTab(ReportsTab.orders),
           ),
           _buildTabButton(
             context,
             label: 'التقرير المالي',
             icon: Icons.monetization_on_outlined,
             isSelected: activeTab == ReportsTab.financial,
-            onTap: () => context.read<ReportsCubit>().selectTab(ReportsTab.financial),
+            onTap: () =>
+                context.read<ReportsCubit>().selectTab(ReportsTab.financial),
           ),
         ],
       ),
@@ -188,7 +195,9 @@ class _ReportsView extends StatelessWidget {
             Text(
               label,
               style: AppTextStyles.bodyMedium.copyWith(
-                color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+                color: isSelected
+                    ? AppColors.textPrimary
+                    : AppColors.textSecondary,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             ),

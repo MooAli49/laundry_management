@@ -8,5 +8,7 @@ abstract class PaymentRepository {
   Stream<List<Payment>> watchPaymentsForOrder(String orderId);
   Future<Money> getTotalPaidForOrder(String orderId);
   Future<Money> getRemainingAmountForOrder(String orderId);
-  Future<Map<String, OrderPaymentSummary>> getPaymentSummariesForOrders(List<String> orderIds);
+  Future<Map<String, OrderPaymentSummary>> getPaymentSummariesForOrders(
+    List<String> orderIds,
+  );
 }

@@ -52,7 +52,9 @@ class FakeStorageLocationRepository implements StorageLocationRepository {
   }
 
   @override
-  Future<List<StorageLocation>> getCompatibleLocationsForItemType(String itemTypeId) async {
+  Future<List<StorageLocation>> getCompatibleLocationsForItemType(
+    String itemTypeId,
+  ) async {
     return List.from(locations);
   }
 
@@ -158,33 +160,42 @@ void main() {
       expect(cubit.state.locations.first.name, 'ستاند سجاد A');
     });
 
-    test('updateStorageLocation updates name and supported item types', () async {
-      await cubit.createStorageLocation(
-        name: 'رف 1',
-        supportedItemTypeIds: ['t-1'],
-      );
+    test(
+      'updateStorageLocation updates name and supported item types',
+      () async {
+        await cubit.createStorageLocation(
+          name: 'رف 1',
+          supportedItemTypeIds: ['t-1'],
+        );
 
-      final loc = cubit.state.locations.first;
-      final updateRes = await cubit.updateStorageLocation(
-        location: loc.copyWith(name: 'رف A-1'),
-        supportedItemTypeIds: ['t-1'],
-      );
-      expect(updateRes, isTrue);
-      expect(cubit.state.locations.first.name, 'رف A-1');
-    });
+        final loc = cubit.state.locations.first;
+        final updateRes = await cubit.updateStorageLocation(
+          location: loc.copyWith(name: 'رف A-1'),
+          supportedItemTypeIds: ['t-1'],
+        );
+        expect(updateRes, isTrue);
+        expect(cubit.state.locations.first.name, 'رف A-1');
+      },
+    );
 
-    test('deactivation failure when items are stored shows specific error', () async {
-      await cubit.createStorageLocation(
-        name: 'موقع به قطع',
-        supportedItemTypeIds: ['t-1'],
-      );
-      final id = cubit.state.locations.first.id;
+    test(
+      'deactivation failure when items are stored shows specific error',
+      () async {
+        await cubit.createStorageLocation(
+          name: 'موقع به قطع',
+          supportedItemTypeIds: ['t-1'],
+        );
+        final id = cubit.state.locations.first.id;
 
-      storageRepo.failDeactivationWithItems = true;
-      await cubit.deactivateStorageLocation(id);
+        storageRepo.failDeactivationWithItems = true;
+        await cubit.deactivateStorageLocation(id);
 
-      expect(cubit.state.errorMessage, AppStrings.storageLocationCannotDeactivateWithItems);
-      expect(cubit.state.locations.first.isActive, isTrue);
-    });
+        expect(
+          cubit.state.errorMessage,
+          AppStrings.storageLocationCannotDeactivateWithItems,
+        );
+        expect(cubit.state.locations.first.isActive, isTrue);
+      },
+    );
   });
 }

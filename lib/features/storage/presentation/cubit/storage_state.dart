@@ -121,8 +121,12 @@ class StorageState {
       isLoading: isLoading ?? this.isLoading,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       isActionInProgress: isActionInProgress ?? this.isActionInProgress,
-      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
-      successMessage: clearSuccessMessage ? null : (successMessage ?? this.successMessage),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
+      successMessage: clearSuccessMessage
+          ? null
+          : (successMessage ?? this.successMessage),
       searchQuery: searchQuery ?? this.searchQuery,
       filter: filter ?? this.filter,
       selectedItemIds: selectedItemIds ?? this.selectedItemIds,
@@ -131,7 +135,9 @@ class StorageState {
           compatibleLocationsByItemType ?? this.compatibleLocationsByItemType,
       itemTypes: itemTypes ?? this.itemTypes,
       services: services ?? this.services,
-      orderFilterId: clearOrderFilterId ? null : (orderFilterId ?? this.orderFilterId),
+      orderFilterId: clearOrderFilterId
+          ? null
+          : (orderFilterId ?? this.orderFilterId),
     );
   }
 }

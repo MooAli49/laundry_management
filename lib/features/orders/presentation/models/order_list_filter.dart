@@ -5,7 +5,7 @@ enum OrderListFilter {
   today('طلبات اليوم'),
   processing('قيد التجهيز'),
   ready('جاهز'),
-  todayPickup('استلام اليوم'),
+  todayPickup('تسليمات اليوم'),
   overdue('طلبات متأخرة'),
   hasRemaining('يوجد مبلغ متبقي'),
   completed('مكتمل'),
@@ -37,7 +37,7 @@ enum OrderListFilter {
   static OrderListFilter fromString(String? val) {
     if (val == null) return OrderListFilter.all;
     for (final f in OrderListFilter.values) {
-      if (f.name == val) return f;
+      if (f.name == val || f.label == val) return f;
     }
     return OrderListFilter.all;
   }

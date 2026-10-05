@@ -27,6 +27,7 @@ class MockOrderRepository implements OrderRepository {
     List<OrderStatus>? excludedStatuses,
     OrderDate? expectedPickupDate,
     bool? isOverdue,
+    DateTime? referenceDate,
     DateTime? createdFrom,
     DateTime? createdTo,
     String? customerId,
@@ -39,11 +40,14 @@ class MockOrderRepository implements OrderRepository {
     lastHasRemaining = hasRemaining;
     if (query != null && query.trim().isNotEmpty) {
       final q = query.trim();
-      return ordersToReturn.where((o) =>
-        o.orderNumber.contains(q) ||
-        o.customerNameSnapshot.contains(q) ||
-        o.customerPhoneSnapshot.contains(q)
-      ).toList();
+      return ordersToReturn
+          .where(
+            (o) =>
+                o.orderNumber.contains(q) ||
+                o.customerNameSnapshot.contains(q) ||
+                o.customerPhoneSnapshot.contains(q),
+          )
+          .toList();
     }
     return ordersToReturn;
   }
@@ -65,7 +69,9 @@ class MockPaymentRepository implements PaymentRepository {
   }
 
   @override
-  Future<Map<String, OrderPaymentSummary>> getPaymentSummariesForOrders(List<String> orderIds) async {
+  Future<Map<String, OrderPaymentSummary>> getPaymentSummariesForOrders(
+    List<String> orderIds,
+  ) async {
     return summariesToReturn;
   }
 }
@@ -140,79 +146,100 @@ void main() {
     expect(cubit.state.isPaymentSuccess, isFalse);
   });
 
-  test('empty query forwards hasRemaining=true and loads all outstanding non-cancelled orders', () async {
-    orderRepo.ordersToReturn = [order1, order2, cancelledOrder];
-    paymentRepo.summariesToReturn = {
-      'ord-1': const OrderPaymentSummary(
-        totalPaid: Money.fromPiastres(4000),
-        remaining: Money.fromPiastres(6000),
-      ),
-      'ord-2': const OrderPaymentSummary(
-        totalPaid: Money.zero,
-        remaining: Money.fromPiastres(8000),
-      ),
-      'ord-cancelled': const OrderPaymentSummary(
-        totalPaid: Money.zero,
-        remaining: Money.fromPiastres(5000),
-      ),
-    };
+  test(
+    'empty query forwards hasRemaining=true and loads all outstanding non-cancelled orders',
+    () async {
+      orderRepo.ordersToReturn = [order1, order2, cancelledOrder];
+      paymentRepo.summariesToReturn = {
+        'ord-1': const OrderPaymentSummary(
+          totalPaid: Money.fromPiastres(4000),
+          remaining: Money.fromPiastres(6000),
+        ),
+        'ord-2': const OrderPaymentSummary(
+          totalPaid: Money.zero,
+          remaining: Money.fromPiastres(8000),
+        ),
+        'ord-cancelled': const OrderPaymentSummary(
+          totalPaid: Money.zero,
+          remaining: Money.fromPiastres(5000),
+        ),
+      };
 
-    await cubit.searchOrders('');
+      await cubit.searchOrders('');
 
-    expect(orderRepo.lastHasRemaining, isTrue);
-    expect(orderRepo.lastQuery, isNull);
-    expect(cubit.state.orders.length, 2);
-    expect(cubit.state.orders.any((i) => i.order.id == 'ord-cancelled'), isFalse);
-  });
+      expect(orderRepo.lastHasRemaining, isTrue);
+      expect(orderRepo.lastQuery, isNull);
+      expect(cubit.state.orders.length, 2);
+      expect(
+        cubit.state.orders.any((i) => i.order.id == 'ord-cancelled'),
+        isFalse,
+      );
+    },
+  );
 
-  test('search by order number forwards query and returns matched order', () async {
-    orderRepo.ordersToReturn = [order1, order2];
-    paymentRepo.summariesToReturn = {
-      'ord-1': const OrderPaymentSummary(
-        totalPaid: Money.fromPiastres(4000),
-        remaining: Money.fromPiastres(6000),
-      ),
-    };
+  test(
+    'search by order number forwards query and returns matched order',
+    () async {
+      orderRepo.ordersToReturn = [order1, order2];
+      paymentRepo.summariesToReturn = {
+        'ord-1': const OrderPaymentSummary(
+          totalPaid: Money.fromPiastres(4000),
+          remaining: Money.fromPiastres(6000),
+        ),
+      };
 
-    await cubit.searchOrders('26-001');
+      await cubit.searchOrders('26-001');
 
-    expect(orderRepo.lastQuery, '26-001');
-    expect(orderRepo.lastHasRemaining, isTrue);
-    expect(cubit.state.orders.length, 1);
-    expect(cubit.state.orders.first.order.id, 'ord-1');
-  });
+      expect(orderRepo.lastQuery, '26-001');
+      expect(orderRepo.lastHasRemaining, isTrue);
+      expect(cubit.state.orders.length, 1);
+      expect(cubit.state.orders.first.order.id, 'ord-1');
+    },
+  );
 
-  test('search by customer name forwards query and returns matched order', () async {
-    orderRepo.ordersToReturn = [order1, order2];
-    paymentRepo.summariesToReturn = {
-      'ord-2': const OrderPaymentSummary(
-        totalPaid: Money.zero,
-        remaining: Money.fromPiastres(8000),
-      ),
-    };
+  test(
+    'search by customer name forwards query and returns matched order',
+    () async {
+      orderRepo.ordersToReturn = [order1, order2];
+      paymentRepo.summariesToReturn = {
+        'ord-2': const OrderPaymentSummary(
+          totalPaid: Money.zero,
+          remaining: Money.fromPiastres(8000),
+        ),
+      };
 
-    await cubit.searchOrders('سارة');
+      await cubit.searchOrders('سارة');
 
-    expect(orderRepo.lastQuery, 'سارة');
-    expect(cubit.state.orders.length, 1);
-    expect(cubit.state.orders.first.order.customerNameSnapshot, 'سارة عبد الله');
-  });
+      expect(orderRepo.lastQuery, 'سارة');
+      expect(cubit.state.orders.length, 1);
+      expect(
+        cubit.state.orders.first.order.customerNameSnapshot,
+        'سارة عبد الله',
+      );
+    },
+  );
 
-  test('search by customer phone forwards query and returns matched order', () async {
-    orderRepo.ordersToReturn = [order1, order2];
-    paymentRepo.summariesToReturn = {
-      'ord-1': const OrderPaymentSummary(
-        totalPaid: Money.fromPiastres(4000),
-        remaining: Money.fromPiastres(6000),
-      ),
-    };
+  test(
+    'search by customer phone forwards query and returns matched order',
+    () async {
+      orderRepo.ordersToReturn = [order1, order2];
+      paymentRepo.summariesToReturn = {
+        'ord-1': const OrderPaymentSummary(
+          totalPaid: Money.fromPiastres(4000),
+          remaining: Money.fromPiastres(6000),
+        ),
+      };
 
-    await cubit.searchOrders('01012345678');
+      await cubit.searchOrders('01012345678');
 
-    expect(orderRepo.lastQuery, '01012345678');
-    expect(cubit.state.orders.length, 1);
-    expect(cubit.state.orders.first.order.customerPhoneSnapshot, '01012345678');
-  });
+      expect(orderRepo.lastQuery, '01012345678');
+      expect(cubit.state.orders.length, 1);
+      expect(
+        cubit.state.orders.first.order.customerPhoneSnapshot,
+        '01012345678',
+      );
+    },
+  );
 
   test('search by # order number normalizes query by stripping #', () async {
     orderRepo.ordersToReturn = [order1, order2];
@@ -230,43 +257,49 @@ void main() {
     expect(cubit.state.orders.first.order.id, 'ord-1');
   });
 
-  test('search using Arabic numerals normalizes Eastern Arabic digits', () async {
-    orderRepo.ordersToReturn = [order1, order2];
-    paymentRepo.summariesToReturn = {
-      'ord-1': const OrderPaymentSummary(
-        totalPaid: Money.fromPiastres(4000),
-        remaining: Money.fromPiastres(6000),
-      ),
-    };
+  test(
+    'search using Arabic numerals normalizes Eastern Arabic digits',
+    () async {
+      orderRepo.ordersToReturn = [order1, order2];
+      paymentRepo.summariesToReturn = {
+        'ord-1': const OrderPaymentSummary(
+          totalPaid: Money.fromPiastres(4000),
+          remaining: Money.fromPiastres(6000),
+        ),
+      };
 
-    // Phone with Eastern Arabic digits
-    await cubit.searchOrders('٠١٠١٢٣٤٥٦٧٨');
-    expect(orderRepo.lastQuery, '01012345678');
-    expect(cubit.state.orders.length, 1);
+      // Phone with Eastern Arabic digits
+      await cubit.searchOrders('٠١٠١٢٣٤٥٦٧٨');
+      expect(orderRepo.lastQuery, '01012345678');
+      expect(cubit.state.orders.length, 1);
 
-    // Order number with Eastern Arabic digits
-    await cubit.searchOrders('#٢٦-٠٠١');
-    expect(orderRepo.lastQuery, '26-001');
-    expect(cubit.state.orders.length, 1);
-  });
+      // Order number with Eastern Arabic digits
+      await cubit.searchOrders('#٢٦-٠٠١');
+      expect(orderRepo.lastQuery, '26-001');
+      expect(cubit.state.orders.length, 1);
+    },
+  );
 
-  test('stale async search result is ignored when a newer search occurs', () async {
-    orderRepo.ordersToReturn = [order1];
-    paymentRepo.summariesToReturn = {
-      'ord-1': const OrderPaymentSummary(
-        totalPaid: Money.fromPiastres(4000),
-        remaining: Money.fromPiastres(6000),
-      ),
-    };
+  test(
+    'stale async search result is ignored when a newer search occurs',
+    () async {
+      orderRepo.ordersToReturn = [order1];
+      paymentRepo.summariesToReturn = {
+        'ord-1': const OrderPaymentSummary(
+          totalPaid: Money.fromPiastres(4000),
+          remaining: Money.fromPiastres(6000),
+        ),
+      };
 
-    // First search triggers and a second search is triggered immediately
-    final future1 = cubit.searchOrders('first');
-    final future2 = cubit.searchOrders('second');
+      // First search triggers and a second search is triggered immediately
+      final future1 = cubit.searchOrders('first');
+      final future2 = cubit.searchOrders('second');
 
-    await Future.wait([future1, future2]);
+      await Future.wait([future1, future2]);
 
-    expect(orderRepo.lastQuery, 'second');
-  });
+      expect(orderRepo.lastQuery, 'second');
+    },
+  );
 
   test('orders with zero remaining are excluded from results', () async {
     orderRepo.ordersToReturn = [order1];
@@ -282,69 +315,81 @@ void main() {
     expect(cubit.state.orders, isEmpty);
   });
 
-  test('selectOrder changes step to enterPayment and backToOrderSelection returns to selectOrder', () {
-    final item = DashboardOrderItem(
-      order: order1,
-      totalPaid: const Money.fromPiastres(4000),
-      remainingAmount: const Money.fromPiastres(6000),
-    );
+  test(
+    'selectOrder changes step to enterPayment and backToOrderSelection returns to selectOrder',
+    () {
+      final item = DashboardOrderItem(
+        order: order1,
+        totalPaid: const Money.fromPiastres(4000),
+        remainingAmount: const Money.fromPiastres(6000),
+      );
 
-    cubit.selectOrder(item);
+      cubit.selectOrder(item);
 
-    expect(cubit.state.step, RecordPaymentStep.enterPayment);
-    expect(cubit.state.selectedOrder, item);
+      expect(cubit.state.step, RecordPaymentStep.enterPayment);
+      expect(cubit.state.selectedOrder, item);
 
-    cubit.backToOrderSelection();
+      cubit.backToOrderSelection();
 
-    expect(cubit.state.step, RecordPaymentStep.selectOrder);
-    expect(cubit.state.selectedOrder, isNull);
-  });
+      expect(cubit.state.step, RecordPaymentStep.selectOrder);
+      expect(cubit.state.selectedOrder, isNull);
+    },
+  );
 
-  test('recordPayment rejects non-positive amount and amount exceeding remaining', () async {
-    final item = DashboardOrderItem(
-      order: order1,
-      totalPaid: const Money.fromPiastres(4000),
-      remainingAmount: const Money.fromPiastres(6000),
-    );
-    cubit.selectOrder(item);
+  test(
+    'recordPayment rejects non-positive amount and amount exceeding remaining',
+    () async {
+      final item = DashboardOrderItem(
+        order: order1,
+        totalPaid: const Money.fromPiastres(4000),
+        remainingAmount: const Money.fromPiastres(6000),
+      );
+      cubit.selectOrder(item);
 
-    // Zero amount
-    var result = await cubit.recordPayment(
-      amount: Money.zero,
-      method: PaymentMethod.cash,
-    );
-    expect(result, isNull);
-    expect(cubit.state.errorMessage, 'يرجى إدخال مبلغ أكبر من الصفر');
+      // Zero amount
+      var result = await cubit.recordPayment(
+        amount: Money.zero,
+        method: PaymentMethod.cash,
+      );
+      expect(result, isNull);
+      expect(cubit.state.errorMessage, 'يرجى إدخال مبلغ أكبر من الصفر');
 
-    // Exceeding amount
-    result = await cubit.recordPayment(
-      amount: const Money.fromPiastres(7000),
-      method: PaymentMethod.cash,
-    );
-    expect(result, isNull);
-    expect(cubit.state.errorMessage, 'المبلغ المدخل يتجاوز المبلغ المتبقي على الطلب');
-  });
+      // Exceeding amount
+      result = await cubit.recordPayment(
+        amount: const Money.fromPiastres(7000),
+        method: PaymentMethod.cash,
+      );
+      expect(result, isNull);
+      expect(
+        cubit.state.errorMessage,
+        'المبلغ المدخل يتجاوز المبلغ المتبقي على الطلب',
+      );
+    },
+  );
 
-  test('recordPayment successfully records payment and sets isPaymentSuccess', () async {
-    final item = DashboardOrderItem(
-      order: order1,
-      totalPaid: const Money.fromPiastres(4000),
-      remainingAmount: const Money.fromPiastres(6000),
-    );
-    cubit.selectOrder(item);
+  test(
+    'recordPayment successfully records payment and sets isPaymentSuccess',
+    () async {
+      final item = DashboardOrderItem(
+        order: order1,
+        totalPaid: const Money.fromPiastres(4000),
+        remainingAmount: const Money.fromPiastres(6000),
+      );
+      cubit.selectOrder(item);
 
-    final payment = await cubit.recordPayment(
-      amount: const Money.fromPiastres(6000),
-      method: PaymentMethod.cash,
-    );
+      final payment = await cubit.recordPayment(
+        amount: const Money.fromPiastres(6000),
+        method: PaymentMethod.cash,
+      );
 
-    expect(payment, isNotNull);
-    expect(payment?.amount, const Money.fromPiastres(6000));
-    expect(payment?.paymentMethod, PaymentMethod.cash);
-    expect(paymentRepo.recordedPayment, isNotNull);
-    expect(cubit.state.isPaymentSuccess, isTrue);
-    expect(cubit.state.isRecordingPayment, isFalse);
-  });
+      expect(payment, isNotNull);
+      expect(payment?.amount, const Money.fromPiastres(6000));
+      expect(payment?.paymentMethod, PaymentMethod.cash);
+      expect(paymentRepo.recordedPayment, isNotNull);
+      expect(cubit.state.isPaymentSuccess, isTrue);
+      expect(cubit.state.isRecordingPayment, isFalse);
+    },
+  );
 
   test('recordPayment handles failure properly', () async {
     paymentRepo.shouldThrow = true;

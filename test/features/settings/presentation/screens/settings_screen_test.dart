@@ -26,37 +26,38 @@ void main() {
   Widget buildSettingsScreen() {
     return const MaterialApp(
       locale: Locale('ar'),
-      home: Scaffold(
-        body: SettingsScreen(),
-      ),
+      home: Scaffold(body: SettingsScreen()),
     );
   }
 
   group('SettingsScreen Integration / Widget Tests', () {
-    testWidgets('renders header and all 8 horizontal RTL tabs in correct order',
-        (tester) async {
-      tester.view.physicalSize = const Size(1280, 800);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
+    testWidgets(
+      'renders header and all 8 horizontal RTL tabs in correct order',
+      (tester) async {
+        tester.view.physicalSize = const Size(1280, 800);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
 
-      await tester.pumpWidget(buildSettingsScreen());
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(buildSettingsScreen());
+        await tester.pumpAndSettle();
 
-      expect(find.text(AppStrings.settings), findsOneWidget);
+        expect(find.text(AppStrings.settings), findsOneWidget);
 
-      // Verify all 8 tabs are present in the tab bar
-      expect(find.text(AppStrings.tabBusinessInfo), findsWidgets);
-      expect(find.text(AppStrings.tabInvoice), findsOneWidget);
-      expect(find.text(AppStrings.tabServices), findsOneWidget);
-      expect(find.text(AppStrings.tabItemTypes), findsOneWidget);
-      expect(find.text(AppStrings.tabItemDefinitions), findsOneWidget);
-      expect(find.text(AppStrings.tabCarpetSizes), findsOneWidget);
-      expect(find.text(AppStrings.tabStorageLocations), findsOneWidget);
-      expect(find.text(AppStrings.tabExpenseCategories), findsOneWidget);
-    });
+        // Verify all 8 tabs are present in the tab bar
+        expect(find.text(AppStrings.tabBusinessInfo), findsWidgets);
+        expect(find.text(AppStrings.tabBluetoothPrinter), findsOneWidget);
+        expect(find.text(AppStrings.tabServices), findsOneWidget);
+        expect(find.text(AppStrings.tabItemTypes), findsOneWidget);
+        expect(find.text(AppStrings.tabItemDefinitions), findsOneWidget);
+        expect(find.text(AppStrings.tabCarpetSizes), findsOneWidget);
+        expect(find.text(AppStrings.tabStorageLocations), findsOneWidget);
+        expect(find.text(AppStrings.tabExpenseCategories), findsOneWidget);
+      },
+    );
 
-    testWidgets('switching tabs renders corresponding sections',
-        (tester) async {
+    testWidgets('switching tabs renders corresponding sections', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(1280, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -67,11 +68,11 @@ void main() {
       // Tab 0: Business Info initially active
       expect(find.text(AppStrings.businessNameLabel), findsOneWidget);
 
-      // Switch to Tab 1: Invoice Preview
-      await tester.ensureVisible(find.text(AppStrings.tabInvoice));
-      await tester.tap(find.text(AppStrings.tabInvoice));
+      // Switch to Tab 1: Bluetooth Printer
+      await tester.ensureVisible(find.text(AppStrings.tabBluetoothPrinter));
+      await tester.tap(find.text(AppStrings.tabBluetoothPrinter));
       await tester.pumpAndSettle();
-      expect(find.text(AppStrings.invoicePreviewTitle), findsOneWidget);
+      expect(find.text('الطابعة الحرارية'), findsOneWidget);
 
       // Switch to Tab 2: Services
       await tester.ensureVisible(find.text(AppStrings.tabServices));

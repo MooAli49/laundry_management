@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:laundry_management/core/constants/app_constants.dart';
-import 'package:laundry_management/core/theme/app_colors.dart';
+
+import '../constants/app_constants.dart';
+import 'app_colors.dart';
 
 class AppTextStyles {
   AppTextStyles._();

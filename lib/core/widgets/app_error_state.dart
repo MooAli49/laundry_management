@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:laundry_management/core/localization/app_strings.dart';
-import 'package:laundry_management/core/theme/app_colors.dart';
-import 'package:laundry_management/core/theme/app_colors_extension.dart';
-import 'package:laundry_management/core/theme/app_spacing.dart';
-import 'package:laundry_management/core/theme/app_text_styles.dart';
-import 'package:laundry_management/core/widgets/app_button.dart';
+
+import '../localization/app_strings.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_colors_extension.dart';
+import '../theme/app_spacing.dart';
+import '../theme/app_text_styles.dart';
+import 'app_button.dart';
 
 /// Reusable error presentation widget adhering to the Laundry Design System.
 ///

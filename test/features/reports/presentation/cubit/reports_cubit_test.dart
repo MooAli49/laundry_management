@@ -78,7 +78,10 @@ void main() {
       expect(cubit.state.isLoading, isFalse);
       expect(cubit.state.errorMessage, isNull);
       expect(cubit.state.ordersReport.totalOrders, 10);
-      expect(cubit.state.financialReport.netProfit, const Money.fromPiastres(38000));
+      expect(
+        cubit.state.financialReport.netProfit,
+        const Money.fromPiastres(38000),
+      );
       expect(cubit.state.selectedTab, ReportsTab.orders);
     });
 

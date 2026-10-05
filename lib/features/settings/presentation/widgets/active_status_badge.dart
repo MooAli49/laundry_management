@@ -21,13 +21,12 @@ class ActiveStatusBadge extends StatelessWidget {
     final borderColor = isActive
         ? AppColors.success.withValues(alpha: 0.25)
         : AppColors.border;
-    final label = isActive ? AppStrings.statusActive : AppStrings.statusInactive;
+    final label = isActive
+        ? AppStrings.statusActive
+        : AppStrings.statusInactive;
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10.0,
-        vertical: 4.0,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(999),
@@ -40,10 +39,7 @@ class ActiveStatusBadge extends StatelessWidget {
           Container(
             width: 6.0,
             height: 6.0,
-            decoration: BoxDecoration(
-              color: dotColor,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
           ),
           const SizedBox(width: 6.0),
           Text(

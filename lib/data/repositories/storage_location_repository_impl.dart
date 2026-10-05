@@ -7,6 +7,7 @@ import '../local/daos/storage_locations_dao.dart';
 import '../local/daos/storage_records_dao.dart';
 import '../local/daos/sync_operations_dao.dart';
 import '../local/database/app_database.dart' as app_db;
+import '../sync/sync_payload_builder.dart';
 
 class StorageLocationRepositoryImpl implements StorageLocationRepository {
   final StorageLocationsDao _storageLocationsDao;
@@ -19,10 +20,10 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
     required StorageRecordsDao storageRecordsDao,
     required SyncOperationsDao syncOperationsDao,
     required app_db.AppDatabase db,
-  })  : _storageLocationsDao = storageLocationsDao,
-        _storageRecordsDao = storageRecordsDao,
-        _syncOperationsDao = syncOperationsDao,
-        _db = db;
+  }) : _storageLocationsDao = storageLocationsDao,
+       _storageRecordsDao = storageRecordsDao,
+       _syncOperationsDao = syncOperationsDao,
+       _db = db;
 
   @override
   Future<StorageLocation> createStorageLocation(
@@ -52,6 +53,10 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
           entityType: 'storage_location',
           entityId: location.id,
           operationType: 'create',
+          payload: SyncPayloadBuilder.buildStorageLocationPayload(
+            location,
+            supportedItemTypeIds,
+          ),
         );
 
         return location;
@@ -71,7 +76,9 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
   }) async {
     try {
       return await _db.transaction(() async {
-        final existing = await _storageLocationsDao.getLocationById(location.id);
+        final existing = await _storageLocationsDao.getLocationById(
+          location.id,
+        );
         if (existing == null) {
           throw ValidationFailure('Storage location not found');
         }
@@ -86,6 +93,10 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
           ),
         );
 
+        final finalSupportedTypes =
+            supportedItemTypeIds ??
+            await _storageLocationsDao.getSupportedItemTypeIds(location.id);
+
         if (supportedItemTypeIds != null) {
           await _storageLocationsDao.replaceSupportedItemTypes(
             location.id,
@@ -97,6 +108,10 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
           entityType: 'storage_location',
           entityId: location.id,
           operationType: 'update',
+          payload: SyncPayloadBuilder.buildStorageLocationUpdatePayload(
+            location,
+            finalSupportedTypes,
+          ),
         );
 
         return location;
@@ -143,9 +158,13 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
   }
 
   @override
-  Future<List<StorageLocation>> getCompatibleLocationsForItemType(String itemTypeId) async {
+  Future<List<StorageLocation>> getCompatibleLocationsForItemType(
+    String itemTypeId,
+  ) async {
     try {
-      final rows = await _storageLocationsDao.getCompatibleLocationsForItemType(itemTypeId);
+      final rows = await _storageLocationsDao.getCompatibleLocationsForItemType(
+        itemTypeId,
+      );
       return rows.map(_mapToDomain).toList();
     } catch (e) {
       if (e is Failure) rethrow;
@@ -162,11 +181,17 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
           throw ValidationFailure('Storage location not found');
         }
 
-        await _storageLocationsDao.setActiveStatus(id, true, DateTime.now());
+        final now = DateTime.now();
+        await _storageLocationsDao.setActiveStatus(id, true, now);
         await _syncOperationsDao.recordOperation(
           entityType: 'storage_location',
           entityId: id,
           operationType: 'activate',
+          payload: SyncPayloadBuilder.buildStorageLocationStatusPayload(
+            id,
+            true,
+            updatedAt: now,
+          ),
         );
       });
     } catch (e) {
@@ -184,18 +209,25 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
           throw ValidationFailure('Storage location not found');
         }
 
-        final activeStored = await _storageRecordsDao.getActiveRecordsForLocation(id);
+        final activeStored = await _storageRecordsDao
+            .getActiveRecordsForLocation(id);
         if (activeStored.isNotEmpty) {
           throw BusinessRuleFailure(
             'Cannot deactivate storage location while items are stored in it',
           );
         }
 
-        await _storageLocationsDao.setActiveStatus(id, false, DateTime.now());
+        final now = DateTime.now();
+        await _storageLocationsDao.setActiveStatus(id, false, now);
         await _syncOperationsDao.recordOperation(
           entityType: 'storage_location',
           entityId: id,
           operationType: 'deactivate',
+          payload: SyncPayloadBuilder.buildStorageLocationStatusPayload(
+            id,
+            false,
+            updatedAt: now,
+          ),
         );
       });
     } catch (e) {
@@ -207,7 +239,9 @@ class StorageLocationRepositoryImpl implements StorageLocationRepository {
   @override
   Future<List<String>> getSupportedItemTypeIds(String storageLocationId) async {
     try {
-      return await _storageLocationsDao.getSupportedItemTypeIds(storageLocationId);
+      return await _storageLocationsDao.getSupportedItemTypeIds(
+        storageLocationId,
+      );
     } catch (e) {
       if (e is Failure) rethrow;
       throw DatabaseFailure(e.toString());

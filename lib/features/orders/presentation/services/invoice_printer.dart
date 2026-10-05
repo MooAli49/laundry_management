@@ -4,10 +4,12 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import '../../../../core/localization/app_strings.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../../../domain/entities/business_settings.dart';
 import '../../../../domain/entities/customer.dart';
 import '../../../../domain/entities/order.dart';
 import '../../../../domain/entities/order_item.dart';
+import '../../../../domain/enums/order_status.dart';
 import '../../../../domain/enums/pricing_type.dart';
 import '../../../../domain/value_objects/money.dart';
 
@@ -59,7 +61,8 @@ class InvoicePrinter {
 
   /// Internal grouping key for aggregating semantically identical invoice lines.
   static String _groupingKey(OrderItem item) {
-    final def = '${item.itemDefinitionId ?? ''}_${item.itemDefinitionNameSnapshot ?? ''}';
+    final def =
+        '${item.itemDefinitionId ?? ''}_${item.itemDefinitionNameSnapshot ?? ''}';
     final notes = (item.notes ?? '').trim();
     final carpetKey = item.carpetData != null
         ? '${formatNumber(item.carpetData!.length)}x${formatNumber(item.carpetData!.width)}'
@@ -102,20 +105,32 @@ class InvoicePrinter {
           ? '${first.itemTypeNameSnapshot} (${first.itemDefinitionNameSnapshot}) - ${first.serviceNameSnapshot}'
           : '${first.itemTypeNameSnapshot} - ${first.serviceNameSnapshot}';
 
-      final notes = first.notes?.trim().isNotEmpty == true ? first.notes!.trim() : null;
+      final notes = first.notes?.trim().isNotEmpty == true
+          ? first.notes!.trim()
+          : null;
 
       if (isCarpet) {
-        final totalPieces = group.fold<double>(0.0, (sum, item) => sum + item.quantity);
-        final pieceCount = totalPieces > 0 ? totalPieces : group.length.toDouble();
+        // Persisted OrderItem.quantity for carpets holds the pricing area (m²),
+        // NOT the physical piece count. Each carpet row with carpetData is one
+        // physical piece, so never display quantity (area) as piece count.
+        final pieceCount = group.fold<double>(
+          0.0,
+          (sum, item) => sum + (item.carpetData != null ? 1.0 : item.quantity),
+        );
         final quantityDisplay = formatPieceCount(pieceCount);
 
         // Price for ONE carpet piece
         final unitPrice = first.carpetData != null
-            ? Money.fromPiastres((first.unitPrice.piastres * first.carpetData!.area).round())
+            ? Money.fromPiastres(
+                (first.unitPrice.piastres * first.carpetData!.area).round(),
+              )
             : first.calculatedTotal;
 
         // Sum of calculated totals across all carpet pieces in this group
-        final totalPiastres = group.fold<int>(0, (sum, item) => sum + item.calculatedTotal.piastres);
+        final totalPiastres = group.fold<int>(
+          0,
+          (sum, item) => sum + item.calculatedTotal.piastres,
+        );
         final calculatedTotal = Money.fromPiastres(totalPiastres);
 
         String? dimensionsSubtext;
@@ -135,11 +150,17 @@ class InvoicePrinter {
           notes: notes,
         );
       } else {
-        final totalQuantity = group.fold<double>(0.0, (sum, item) => sum + item.quantity);
+        final totalQuantity = group.fold<double>(
+          0.0,
+          (sum, item) => sum + item.quantity,
+        );
         final quantityDisplay = formatPieceCount(totalQuantity);
         final unitPrice = first.unitPrice;
 
-        final totalPiastres = group.fold<int>(0, (sum, item) => sum + item.calculatedTotal.piastres);
+        final totalPiastres = group.fold<int>(
+          0,
+          (sum, item) => sum + item.calculatedTotal.piastres,
+        );
         final calculatedTotal = Money.fromPiastres(totalPiastres);
 
         return InvoiceLineItem(
@@ -199,10 +220,16 @@ class InvoicePrinter {
     pw.Font? boldFont,
   }) async {
     // 1. Resolve embedded fonts (100% offline via rootBundle if not injected)
-    final resolvedRegular = regularFont ??
-        pw.Font.ttf(await rootBundle.load('assets/fonts/IBMPlexSansArabic-Regular.ttf'));
-    final resolvedBold = boldFont ??
-        pw.Font.ttf(await rootBundle.load('assets/fonts/IBMPlexSansArabic-Bold.ttf'));
+    final resolvedRegular =
+        regularFont ??
+        pw.Font.ttf(
+          await rootBundle.load('assets/fonts/IBMPlexSansArabic-Regular.ttf'),
+        );
+    final resolvedBold =
+        boldFont ??
+        pw.Font.ttf(
+          await rootBundle.load('assets/fonts/IBMPlexSansArabic-Bold.ttf'),
+        );
 
     final doc = pw.Document();
 
@@ -221,7 +248,9 @@ class InvoicePrinter {
       margin: const pw.EdgeInsets.symmetric(horizontal: 11.34, vertical: 17.0),
     );
 
-    final businessName = (settings?.businessName != null && settings!.businessName.trim().isNotEmpty)
+    final businessName =
+        (settings?.businessName != null &&
+            settings!.businessName.trim().isNotEmpty)
         ? settings.businessName
         : AppStrings.defaultBusinessName;
     final address = settings?.address;
@@ -249,7 +278,10 @@ class InvoicePrinter {
               // Business Header
               pw.Text(
                 businessName,
-                style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(
+                  fontSize: 11,
+                  fontWeight: pw.FontWeight.bold,
+                ),
                 textAlign: pw.TextAlign.center,
               ),
               if (address != null && address.trim().isNotEmpty) ...[
@@ -278,48 +310,137 @@ class InvoicePrinter {
               pw.Divider(thickness: 0.5, borderStyle: pw.BorderStyle.dashed),
               pw.SizedBox(height: 4),
 
-              // Order Metadata
+              // Order & Status Row (matching Invoice Preview & Thermal layout)
               pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
-                  pw.Text(
-                    'فاتورة رقم: ',
-                    style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Row(
+                        mainAxisSize: pw.MainAxisSize.min,
+                        children: [
+                          pw.Text(
+                            'فاتورة ',
+                            style: pw.TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                          pw.Text(
+                            '#${order.orderNumber}',
+                            style: pw.TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                            textDirection: pw.TextDirection.ltr,
+                          ),
+                        ],
+                      ),
+                      pw.SizedBox(height: 2),
+                      pw.Text(
+                        'التاريخ: ${DateFormatter.formatArabicDate(order.createdAt)}',
+                        style: const pw.TextStyle(fontSize: 8),
+                      ),
+                    ],
                   ),
-                  pw.Text(
-                    order.orderNumber,
-                    style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
-                    textDirection: pw.TextDirection.ltr,
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: pw.BoxDecoration(
+                      borderRadius: const pw.BorderRadius.all(
+                        pw.Radius.circular(8),
+                      ),
+                      border: pw.Border.all(color: PdfColors.black, width: 0.8),
+                    ),
+                    child: pw.Text(
+                      _statusLabel(order.status),
+                      style: pw.TextStyle(
+                        fontSize: 7.5,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
-              pw.SizedBox(height: 2.5),
-              pw.Text(
-                'التاريخ: ${formatDateTime(order.createdAt)}',
-                style: const pw.TextStyle(fontSize: 8.5),
-              ),
-              pw.SizedBox(height: 2.5),
-              pw.Text(
-                'تاريخ الاستلام المتوقع: ${formatDate(order.expectedPickupDate.toDateTime())}',
-                style: const pw.TextStyle(fontSize: 8.5),
-              ),
-              pw.SizedBox(height: 2.5),
-              pw.Text(
-                'العميل: $customerName',
-                style: const pw.TextStyle(fontSize: 8.5),
-              ),
-              if (customerPhone.isNotEmpty) ...[
-                pw.SizedBox(height: 2.5),
-                pw.Row(
+              pw.SizedBox(height: 4),
+
+              // Customer & Expected Pickup Boxed Card (matching Invoice Preview & Thermal layout)
+              pw.Container(
+                padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 5,
+                ),
+                decoration: pw.BoxDecoration(
+                  color: PdfColors.grey100,
+                  borderRadius: const pw.BorderRadius.all(
+                    pw.Radius.circular(4),
+                  ),
+                  border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
+                ),
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text('الهاتف: ', style: const pw.TextStyle(fontSize: 8.5)),
-                    pw.Text(
-                      customerPhone,
-                      style: const pw.TextStyle(fontSize: 8.5),
-                      textDirection: pw.TextDirection.ltr,
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'بيانات العميل',
+                          style: const pw.TextStyle(
+                            fontSize: 7,
+                            color: PdfColors.grey700,
+                          ),
+                        ),
+                        pw.SizedBox(height: 1.5),
+                        pw.Text(
+                          customerName,
+                          style: pw.TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        if (customerPhone.isNotEmpty) ...[
+                          pw.SizedBox(height: 1.5),
+                          pw.Text(
+                            customerPhone,
+                            style: const pw.TextStyle(
+                              fontSize: 7.5,
+                              color: PdfColors.grey800,
+                            ),
+                            textDirection: pw.TextDirection.ltr,
+                          ),
+                        ],
+                      ],
+                    ),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Text(
+                          'موعد الاستلام',
+                          style: const pw.TextStyle(
+                            fontSize: 7,
+                            color: PdfColors.grey700,
+                          ),
+                        ),
+                        pw.SizedBox(height: 1.5),
+                        pw.Text(
+                          DateFormatter.formatArabicDate(
+                            order.expectedPickupDate.toDateTime(),
+                          ),
+                          style: pw.TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
               pw.SizedBox(height: 4),
               pw.Divider(thickness: 0.5),
               pw.SizedBox(height: 4),
@@ -343,7 +464,10 @@ class InvoicePrinter {
                         padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
                         child: pw.Text(
                           'الإجمالي',
-                          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                          style: pw.TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
                           textAlign: pw.TextAlign.left,
                         ),
                       ),
@@ -351,7 +475,10 @@ class InvoicePrinter {
                         padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
                         child: pw.Text(
                           'سعر الوحدة',
-                          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                          style: pw.TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
                           textAlign: pw.TextAlign.left,
                         ),
                       ),
@@ -359,15 +486,21 @@ class InvoicePrinter {
                         padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
                         child: pw.Text(
                           'الكمية',
-                          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                          style: pw.TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
                           textAlign: pw.TextAlign.center,
                         ),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
                         child: pw.Text(
-                          'البند / الخدمة',
-                          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                          'البند والخدمة',
+                          style: pw.TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
                           textAlign: pw.TextAlign.right,
                         ),
                       ),
@@ -381,7 +514,10 @@ class InvoicePrinter {
                           padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
                           child: pw.Text(
                             line.calculatedTotal.toEgp.toStringAsFixed(2),
-                            style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+                            style: pw.TextStyle(
+                              fontSize: 8.5,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
                             textAlign: pw.TextAlign.left,
                             textDirection: pw.TextDirection.ltr,
                           ),
@@ -438,22 +574,57 @@ class InvoicePrinter {
               pw.SizedBox(height: 4),
 
               // Financial Summary (Authoritative historical values)
-              _summaryRow('المجموع الفرعي:', order.subtotal.toEgp.toStringAsFixed(2)),
+              _summaryRow(
+                'المجموع الفرعي:',
+                order.subtotal.toEgp.toStringAsFixed(2),
+              ),
               if (order.discount.isPositive)
-                _summaryRow('الخصم:', order.discount.toEgp.toStringAsFixed(2), prefix: '-'),
-              if (order.customerPickupRequested && order.customerPickupFee.isPositive)
-                _summaryRow('استلام من العميل:', order.customerPickupFee.toEgp.toStringAsFixed(2), prefix: '+'),
-              if (order.customerDeliveryRequested && order.customerDeliveryFee.isPositive)
-                _summaryRow('توصيل للعميل:', order.customerDeliveryFee.toEgp.toStringAsFixed(2), prefix: '+'),
+                _summaryRow(
+                  'الخصم:',
+                  order.discount.toEgp.toStringAsFixed(2),
+                  prefix: '-',
+                ),
+              if (order.customerPickupRequested &&
+                  order.customerPickupFee.isPositive)
+                _summaryRow(
+                  'استلام من العميل:',
+                  order.customerPickupFee.toEgp.toStringAsFixed(2),
+                  prefix: '+',
+                ),
+              if (order.customerDeliveryRequested &&
+                  order.customerDeliveryFee.isPositive)
+                _summaryRow(
+                  'توصيل للعميل:',
+                  order.customerDeliveryFee.toEgp.toStringAsFixed(2),
+                  prefix: '+',
+                ),
               if (order.tax.isPositive)
-                _summaryRow('الضريبة:', order.tax.toEgp.toStringAsFixed(2), prefix: '+'),
+                _summaryRow(
+                  'الضريبة:',
+                  order.tax.toEgp.toStringAsFixed(2),
+                  prefix: '+',
+                ),
               pw.SizedBox(height: 2),
               pw.Divider(thickness: 0.5, borderStyle: pw.BorderStyle.dashed),
               pw.SizedBox(height: 2),
               // Authoritative total (Never recalculated)
-              _summaryRow('الإجمالي:', order.total.toEgp.toStringAsFixed(2), isBold: true, fontSize: 10.0),
-              _summaryRow('المدفوع:', totalPaid.toEgp.toStringAsFixed(2), fontSize: 8.5),
-              _summaryRow('المتبقي:', remainingAmount.toEgp.toStringAsFixed(2), isBold: true, fontSize: 10.0),
+              _summaryRow(
+                'الإجمالي:',
+                order.total.toEgp.toStringAsFixed(2),
+                isBold: true,
+                fontSize: 10.0,
+              ),
+              _summaryRow(
+                'المدفوع:',
+                totalPaid.toEgp.toStringAsFixed(2),
+                fontSize: 8.5,
+              ),
+              _summaryRow(
+                'المتبقي:',
+                remainingAmount.toEgp.toStringAsFixed(2),
+                isBold: true,
+                fontSize: 10.0,
+              ),
 
               pw.SizedBox(height: 5),
               pw.Divider(thickness: 0.5, borderStyle: pw.BorderStyle.dashed),
@@ -502,7 +673,9 @@ class InvoicePrinter {
                   prefix,
                   style: pw.TextStyle(
                     fontSize: fontSize,
-                    fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+                    fontWeight: isBold
+                        ? pw.FontWeight.bold
+                        : pw.FontWeight.normal,
                   ),
                 ),
                 pw.SizedBox(width: 2),
@@ -511,7 +684,9 @@ class InvoicePrinter {
                 amount,
                 style: pw.TextStyle(
                   fontSize: fontSize,
-                  fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+                  fontWeight: isBold
+                      ? pw.FontWeight.bold
+                      : pw.FontWeight.normal,
                 ),
                 textDirection: pw.TextDirection.ltr,
               ),
@@ -520,7 +695,9 @@ class InvoicePrinter {
                 'ج.م',
                 style: pw.TextStyle(
                   fontSize: fontSize,
-                  fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+                  fontWeight: isBold
+                      ? pw.FontWeight.bold
+                      : pw.FontWeight.normal,
                 ),
               ),
             ],
@@ -557,5 +734,18 @@ class InvoicePrinter {
       dynamicLayout: false,
       onLayout: (format) async => doc.save(),
     );
+  }
+
+  static String _statusLabel(OrderStatus status) {
+    switch (status) {
+      case OrderStatus.processing:
+        return 'قيد التجهيز';
+      case OrderStatus.ready:
+        return 'جاهز';
+      case OrderStatus.completed:
+        return 'مكتمل';
+      case OrderStatus.cancelled:
+        return 'ملغي';
+    }
   }
 }

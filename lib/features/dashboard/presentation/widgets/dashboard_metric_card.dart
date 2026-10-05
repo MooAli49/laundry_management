@@ -57,11 +57,7 @@ class DashboardMetricCard extends StatelessWidget {
                   color: effectiveIconBg,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                 ),
-                child: Icon(
-                  icon,
-                  size: 22,
-                  color: effectiveIconColor,
-                ),
+                child: Icon(icon, size: 22, color: effectiveIconColor),
               ),
             ],
           ),

@@ -100,6 +100,7 @@ A Customer contains:
 - Unique identifier
 - Name
 - Phone number
+- Optional address
 - Creation timestamp
 - Update timestamp
 
@@ -117,6 +118,9 @@ One Customer can have multiple Orders.
 - Canonical stored value in the database is the normalized local Egyptian mobile format (11 digits, prefixes: 010, 011, 012, 015).
 - Country code prefixes (+20, 0020) are not accepted.
 - Customer phone number should be unique.
+- Customer address is optional and nullable. Stored on Customer only (no separate Address entity/table). Whitespace-only values normalize to NULL.
+- No address snapshot is added to Order; no address search in V1.
+- Address is profile/customer information; full delivery routing/dispatch management remains out of scope.
 - Customer information may be edited.
 - Customer history must remain available.
 - Customers with historical orders must not be hard-deleted.
@@ -177,19 +181,21 @@ An Order:
 
 The Order Number is a human-readable identifier separate from the internal database identifier.
 
-The approved V1 format is:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length (zero-padded below 1000, expands naturally at 1000+).
 
-    YY-XXX
-
-Example:
+Examples:
 
     26-001
+    26-999
+    26-1000
+    26-10000
 
 The Order Number must:
 
 - Be unique.
 - Be assigned once.
 - Remain unchanged after creation.
+- The sequence generator must ignore non-business test identifiers such as `ORD-TEST-...` when calculating the next sequence number. These synthetic test identifiers must never inflate or distort the business order sequence.
 
 The exact generation mechanism is an implementation concern and is not defined here.
 
@@ -244,6 +250,8 @@ Represents an order that has been cancelled and is no longer an active operation
 
 Cancelled orders remain available as historical records.
 
+Cancelled is strictly a terminal status: cancelled orders cannot transition to any other status.
+
 ---
 
 # 8. Order Status Lifecycle
@@ -264,9 +272,12 @@ Cancellation may occur before completion:
 
     Ready ───────────► Cancelled
 
-Manual status correction is supported when necessary.
-
-Manual status changes must not automatically create incorrect Storage state.
+Administrative status correction:
+- Completed -> Processing is supported ONLY as an explicit administrative correction.
+- Requirements: explicit non-empty operational reason; `completed_at` is cleared to NULL; existing payments remain unchanged; previous storage records remain inactive (storage is NOT automatically reactivated).
+- Re-store is required: items must be explicitly stored again before the order can transition back to Ready.
+- Completed -> Ready and Completed -> Cancelled remain strictly forbidden.
+- Cancelled status remains strictly terminal.
 
 ---
 
@@ -562,22 +573,41 @@ A Service contains master data such as:
 
 - Unique identifier
 - Name
-- Pricing Type
-- Current Price
+- Description (optional)
 - Active state
-- Supported Item Types
+
+Note: The Service entity must NOT own a single default/current price or pricing type. Pricing configuration belongs strictly to the **Service–Item Type** relationship (`ServiceItemType`).
 
 ---
 
-# 20. Service Availability
+# 20. Service Availability & Pricing Configuration
 
 A Service may be available for one or more ItemTypes.
 
-This is an N:M relationship between Service and ItemType. In the implementation, the relationship is represented through the ServiceItemType association entity.
+This is an N:M relationship between Service and ItemType, represented in the domain through the `ServiceItemType` association entity.
 
 Conceptually:
 
     Service N ──────── M ItemType
+             through
+         ServiceItemType
+      (pricing_type, price)
+
+In this laundry system, the actual price depends on the combination of:
+
+> **Service + Item Type**
+
+Each valid `ServiceItemType` configuration defines:
+
+1. `pricing_type` (`per_piece` or `per_square_meter`)
+2. `price` (strictly positive money amount in minor currency units)
+
+Example:
+
+Washing
+  ├── Clothing → per_piece → 50 EGP
+  ├── Blanket  → per_piece → 100 EGP
+  └── Carpet   → per_square_meter → 60 EGP
 
 Only compatible active services should be available when creating a new OrderItem.
 
@@ -595,21 +625,19 @@ A service that is not configured for Carpets should not be selectable for a Carp
 
 # 21. Pricing Type
 
-The domain supports these pricing types:
+The supported operational pricing types in V1 are:
 
-    PerPiece
-    PerKilogram
-    PerSquareMeter
-    FixedPrice
+    PerPiece (`per_piece`)
+    PerSquareMeter (`per_square_meter`)
 
-Typical V1 usage:
+`FixedPrice` (`fixed_price`) is removed from the V1 operational pricing model because under the current OrderItem model, fixed price behaves effectively the same as per-piece pricing (each physical item is represented as its own OrderItem and receives a unit price; it does not represent a distinct business behavior). Per Kilogram pricing remains completely excluded from V1.
 
-    Clothing       → PerPiece
-    Blankets       → PerPiece
-    Carpet Covers  → PerPiece
-    Carpets        → PerSquareMeter
+Typical V1 configurations:
 
-The domain supports all four pricing types even when a particular UI flow only exposes a relevant subset.
+    Clothing + Service       → PerPiece
+    Blankets + Service       → PerPiece
+    Carpet Covers + Service  → PerPiece
+    Carpets + Service        → PerSquareMeter
 
 ---
 
@@ -617,25 +645,27 @@ The domain supports all four pricing types even when a particular UI flow only e
 
 Historical transaction data must not depend entirely on current master data.
 
-When a Service is selected for an OrderItem, the OrderItem must preserve the relevant historical pricing information.
+When a Service + Item Type pricing configuration is selected for an OrderItem, the OrderItem must preserve the relevant historical pricing information.
 
 At minimum, the historical pricing concept includes:
 
 - Service reference
-- Service name snapshot
-- Pricing Type snapshot
-- Unit price snapshot
-- Calculated item total
+- Service name snapshot (`serviceNameSnapshot`)
+- Pricing Type snapshot (`pricingTypeSnapshot`)
+- Unit price snapshot (`unitPrice`)
+- Calculated item total (`calculatedTotal`)
 
 Example:
 
-    Current Service Price:
-    50 ج.م
-
-    Existing OrderItem Price:
+    Service + Item Type Configured Price at Order Creation:
     40 ج.م
 
-Changing the current Service price must not change the existing OrderItem.
+    Later Master Price for that Service + Item Type:
+    50 ج.م
+
+Changing the Service's pricing configuration later must NOT change the existing OrderItem or historical orders. The historical OrderItem preserves:
+
+    40 ج.م
 
 During Order creation, the user may adjust the applicable OrderItem price according to the approved pricing behavior.
 
@@ -657,6 +687,14 @@ This includes relevant:
 - Notes
 
 Changes to current master data must not make historical orders ambiguous or incorrect.
+
+Snapshot invariants:
+- `itemTypeNameSnapshot` is required and non-empty.
+- `serviceNameSnapshot` is required and non-empty.
+- They are historical snapshots captured with the OrderItem.
+- Empty or whitespace-only snapshots are invalid domain data.
+- The application must NOT fabricate fallback names such as `ملابس` or `غسيل`.
+- Test fixtures must always provide valid snapshot values.
 
 ---
 
@@ -990,23 +1028,19 @@ A Payment must not be used to represent an operating expense.
 
 The Financial Report derives financial values from transactional data.
 
-The report may include:
+The report includes the approved V1 financial metrics:
 
-- Sales
-- Payments
-- Expenses
-- Outstanding amounts
-- Discounts
-- Payment method breakdown
-- Net Profit
+- **Total Sales**: Sum of non-cancelled order totals (`status != cancelled`) created during the selected period. Cancelled orders contribute 0.
+- **Total Payments**: Historical payments recorded during the selected period based on `Payment.paidAt`. Payments from cancelled orders remain historical payments.
+- **Total Refunds**: Order-level refunds recorded during the selected period based on `Refund.refundedAt`.
+- **Net Payments**: Net payment movement for the period, calculated as `Total Payments - Total Refunds`.
+- **Outstanding**: Sum of unpaid balances for non-cancelled orders only (`remaining > 0`, `status != cancelled`). Cancelled orders are excluded.
+- **Operating Expenses**: Sum of expenses recorded for the period based on `Expense.expenseDate`.
+- **Net Profit**: Derived financial result calculated as:
 
-Expenses are selected according to:
+    Net Profit = Total Sales - Operating Expenses
 
-    Expense Date
-
-Net Profit is a derived reporting value:
-
-    Net Profit = Sales - Operating Expenses
+Important: Refunds are NOT operating expenses and are not subtracted from Total Sales. Payments and Outstanding amounts remain separate reporting metrics.
 
 Net Profit is not a separate domain entity.
 
@@ -1267,17 +1301,26 @@ Cancelled Orders:
 - Remain in history.
 - Are not active operational orders.
 - Preserve their payment history.
-- Do not automatically trigger refunds.
+- Do not automatically trigger refunds (eligible cancelled orders may receive manual refunds).
 
 ---
 
 # 53. Refund
 
-Refund is intentionally not modeled as a V1 domain workflow.
+Refund is an order-level first-class immutable financial transaction in V1.
 
-There is no V1 Refund entity or Refund process.
+Cancellation and Refund are separate concepts: cancellation does not trigger an automatic refund.
 
-Cancellation and Refund are separate concepts.
+Key domain semantics:
+- Entity: `Refund`
+- Fields: `id`, `orderId`, `amount` (positive Money in minor units), `refundMethod` (`cash`, `instaPay`, `eWallet`), `reason` (optional text), `refundedAt`, `createdAt`, `updatedAt`.
+- Only `cancelled` orders can receive refunds.
+- Refundable balance is derived as `Total Paid - Total Refunded`.
+- Refund amount must be > 0 and <= remaining refundable balance.
+- Multiple partial refunds and full refunds are supported.
+- Once total refunded equals total paid, subsequent refunds are rejected.
+- Existing `Payment` records remain immutable and are neither deleted nor updated upon refund.
+- No `paymentId` reference: refunds belong directly to the Order in V1.
 
 ---
 
@@ -1310,7 +1353,7 @@ It must preserve and display, where applicable:
 - Payment information
 - Remaining amount
 
-The Invoice / Receipt must not recalculate historical values using current Service prices or other current master data.
+The Invoice / Receipt must not recalculate historical values using current Service + Item Type prices or other current master data.
 
 The domain does not require a separate Invoice entity for V1.
 
@@ -1387,10 +1430,10 @@ The system must be able to preserve the historical meaning of an Order even afte
 
 For example:
 
-    Service Price at Order Creation:
+    Service + Item Type Price at Order Creation:
     40 ج.م
 
-    Current Service Price:
+    Current Service + Item Type Price:
     50 ج.م
 
 The historical OrderItem must still represent:
@@ -1538,7 +1581,7 @@ The following are intentionally not part of the V1 domain model:
 - Role
 - Permission
 - Branch
-- Refund
+- Automated payment gateway refunds and item-level refunds
 - Loyalty
 - Barcode scanning workflow
 - Storage movement history
@@ -1563,7 +1606,7 @@ The domain should remain capable of supporting future requirements such as:
 - Advanced synchronization
 - Multi-branch support
 - Delivery management
-- Refunds
+- Advanced refund capabilities (item-level refunds, store credit, gateway reconciliation)
 - Expanded tax functionality
 - Advanced pricing
 - Storage history

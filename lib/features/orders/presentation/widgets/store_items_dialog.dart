@@ -14,7 +14,8 @@ class StoreItemsDialog extends StatefulWidget {
   final Future<void> Function({
     required List<String> orderItemIds,
     required String storageLocationId,
-  }) onStore;
+  })
+  onStore;
 
   const StoreItemsDialog({
     super.key,
@@ -113,7 +114,10 @@ class _StoreItemsDialogState extends State<StoreItemsDialog> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = e.toString().replaceFirst('BusinessRuleFailure: ', '').replaceFirst('Failure: ', '');
+        _errorMessage = e
+            .toString()
+            .replaceFirst('BusinessRuleFailure: ', '')
+            .replaceFirst('Failure: ', '');
       });
     }
   }
@@ -121,7 +125,8 @@ class _StoreItemsDialogState extends State<StoreItemsDialog> {
   @override
   Widget build(BuildContext context) {
     final effectiveLocations = _effectiveLocations;
-    final hasConflictingTypes = _selectedItemIds.isNotEmpty && effectiveLocations.isEmpty;
+    final hasConflictingTypes =
+        _selectedItemIds.isNotEmpty && effectiveLocations.isEmpty;
 
     return Dialog(
       shape: RoundedRectangleBorder(
@@ -159,7 +164,9 @@ class _StoreItemsDialogState extends State<StoreItemsDialog> {
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.error,
+                          ),
                         ),
                       ),
                     ],
@@ -179,7 +186,8 @@ class _StoreItemsDialogState extends State<StoreItemsDialog> {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: widget.unstoredItems.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.divider),
+                  separatorBuilder: (_, __) =>
+                      const Divider(height: 1, color: AppColors.divider),
                   itemBuilder: (context, index) {
                     final item = widget.unstoredItems[index];
                     final isChecked = _selectedItemIds.contains(item.id);
@@ -189,7 +197,9 @@ class _StoreItemsDialogState extends State<StoreItemsDialog> {
                         '${item.itemTypeNameSnapshot} - ${item.serviceNameSnapshot}',
                         style: AppTextStyles.bodyMedium,
                       ),
-                      subtitle: item.notes != null ? Text(item.notes!, style: AppTextStyles.labelSmall) : null,
+                      subtitle: item.notes != null
+                          ? Text(item.notes!, style: AppTextStyles.labelSmall)
+                          : null,
                       onChanged: (val) => _onItemToggled(item.id, val == true),
                     );
                   },
@@ -211,7 +221,9 @@ class _StoreItemsDialogState extends State<StoreItemsDialog> {
                       Expanded(
                         child: Text(
                           'القطع المحددة تتطلب أماكن تخزين مختلفة (أنواع مختلفة). يرجى تخزين كل نوع على حدة.',
-                          style: AppTextStyles.bodySmall.copyWith(color: AppColors.warning),
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.warning,
+                          ),
                         ),
                       ),
                     ],
@@ -249,7 +261,10 @@ class _StoreItemsDialogState extends State<StoreItemsDialog> {
                   AppButton(
                     label: 'تخزين',
                     isLoading: _isLoading,
-                    onPressed: (_isLoading || _selectedLocation == null || _selectedItemIds.isEmpty)
+                    onPressed:
+                        (_isLoading ||
+                            _selectedLocation == null ||
+                            _selectedItemIds.isEmpty)
                         ? null
                         : _handleStore,
                   ),
@@ -257,7 +272,9 @@ class _StoreItemsDialogState extends State<StoreItemsDialog> {
                   AppButton(
                     label: 'إلغاء',
                     variant: AppButtonVariant.secondary,
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isLoading
+                        ? null
+                        : () => Navigator.of(context).pop(),
                   ),
                 ],
               ),

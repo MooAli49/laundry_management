@@ -1,9 +1,6 @@
 import '../../../../domain/entities/dashboard_order_item.dart';
 
-enum RecordPaymentStep {
-  selectOrder,
-  enterPayment,
-}
+enum RecordPaymentStep { selectOrder, enterPayment }
 
 class RecordPaymentState {
   final RecordPaymentStep step;
@@ -39,10 +36,14 @@ class RecordPaymentState {
       step: step ?? this.step,
       isLoadingOrders: isLoadingOrders ?? this.isLoadingOrders,
       orders: orders ?? this.orders,
-      selectedOrder: clearSelectedOrder ? null : (selectedOrder ?? this.selectedOrder),
+      selectedOrder: clearSelectedOrder
+          ? null
+          : (selectedOrder ?? this.selectedOrder),
       isRecordingPayment: isRecordingPayment ?? this.isRecordingPayment,
       isPaymentSuccess: isPaymentSuccess ?? this.isPaymentSuccess,
-      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
     );
   }
 }

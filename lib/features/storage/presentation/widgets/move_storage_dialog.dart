@@ -109,8 +109,14 @@ class _MoveStorageDialogState extends State<MoveStorageDialog> {
                     ),
                   ),
                   IconButton(
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, size: 20, color: AppColors.textTertiary),
+                    onPressed: _isLoading
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.close,
+                      size: 20,
+                      color: AppColors.textTertiary,
+                    ),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
@@ -121,14 +127,21 @@ class _MoveStorageDialogState extends State<MoveStorageDialog> {
               // Error banner if any
               if (_errorMessage != null) ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.errorLight,
                     borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline, color: AppColors.error, size: 18),
+                      const Icon(
+                        Icons.error_outline,
+                        color: AppColors.error,
+                        size: 18,
+                      ),
                       AppSpacing.gapHorizontalSm,
                       Expanded(
                         child: Text(
@@ -148,17 +161,35 @@ class _MoveStorageDialogState extends State<MoveStorageDialog> {
               // Summary Banner (Figma: rounded-xl bg-secondary px-4 py-3 text-[14px] text-text-secondary)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.secondary,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                 ),
-                child: Text(
-                  'العنصر: ${widget.item.orderItem.itemTypeNameSnapshot} — الموقع الحالي: $currentLocName',
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'العنصر: ${widget.item.orderItem.itemTypeNameSnapshot}${widget.item.orderItem.itemDefinitionNameSnapshot != null && widget.item.orderItem.itemDefinitionNameSnapshot!.isNotEmpty ? " - ${widget.item.orderItem.itemDefinitionNameSnapshot}" : ""}${widget.item.orderItem.carpetData != null ? " (${widget.item.orderItem.carpetData!.length.truncateToDouble() == widget.item.orderItem.carpetData!.length ? widget.item.orderItem.carpetData!.length.toStringAsFixed(1) : widget.item.orderItem.carpetData!.length.toStringAsFixed(2)} × ${widget.item.orderItem.carpetData!.width.truncateToDouble() == widget.item.orderItem.carpetData!.width ? widget.item.orderItem.carpetData!.width.toStringAsFixed(1) : widget.item.orderItem.carpetData!.width.toStringAsFixed(2)} م = ${widget.item.orderItem.carpetData!.area.truncateToDouble() == widget.item.orderItem.carpetData!.area ? widget.item.orderItem.carpetData!.area.toStringAsFixed(0) : widget.item.orderItem.carpetData!.area.toStringAsFixed(2)} م²)" : ""} — ${widget.item.orderItem.serviceNameSnapshot}',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'الطلب: #${widget.item.orderNumber} • العميل: ${widget.item.customerName} • الموقع الحالي: $currentLocName',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               AppSpacing.gapLg,
@@ -167,7 +198,10 @@ class _MoveStorageDialogState extends State<MoveStorageDialog> {
               if (!hasLocations) ...[
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.warningLight,
                     borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
@@ -220,7 +254,10 @@ class _MoveStorageDialogState extends State<MoveStorageDialog> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                      borderSide: const BorderSide(
+                        color: AppColors.primary,
+                        width: 1.5,
+                      ),
                     ),
                     filled: true,
                     fillColor: AppColors.surface,
@@ -270,7 +307,9 @@ class _MoveStorageDialogState extends State<MoveStorageDialog> {
                   AppButton(
                     label: AppStrings.cancel,
                     variant: AppButtonVariant.secondary,
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isLoading
+                        ? null
+                        : () => Navigator.of(context).pop(),
                   ),
                 ],
               ),

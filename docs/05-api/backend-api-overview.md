@@ -255,13 +255,13 @@ This applies to:
 
 # 11. Human-readable Order Number
 
-The approved Order Number format is:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length (zero-padded below 1000; expands to 4+ digits at 1000+).
 
-    YY-XXX
-
-Example:
+Examples:
 
     26-001
+    26-999
+    26-1000
 
 The Order Number is separate from:
 
@@ -314,6 +314,19 @@ The API must support:
     POST   /api/v1/customers
     PATCH  /api/v1/customers/{id}
 
+Customer payload attributes:
+
+```json
+{
+  "id": "UUID",
+  "name": "string",
+  "phone": "string",
+  "address": "string | null",
+  "created_at": "ISO-8601 string",
+  "updated_at": "ISO-8601 string"
+}
+```
+
 Customer search fields include:
 
 - Name
@@ -333,6 +346,7 @@ The backend must enforce:
 - Unique Customer Phone
 - Required Customer Name
 - Required Customer Phone
+- Optional Customer Address (nullable text; whitespace-only strings normalize to NULL; no delivery routing in V1)
 - Valid supported data format
 
 The backend must return a deterministic validation error when a Customer Phone conflicts with an existing Customer.
@@ -347,6 +361,22 @@ The API must support:
     GET    /api/v1/orders/{id}
     POST   /api/v1/orders
     PATCH  /api/v1/orders/{id}
+    PATCH  /api/v1/orders/{id}/edit-aggregate
+
+### 16.1 Order Aggregate Edit: `PATCH /api/v1/orders/{id}/edit-aggregate`
+
+Backed by the PostgreSQL `sync_update_order_aggregate` SECURITY DEFINER RPC.
+
+- **Purpose**: Full transactional aggregate edit of an active order, its items, and carpet details.
+- **Payload Concept**: Complete aggregate representation including order-level fields (fees, discount, notes, expected pickup date) and full array of items.
+- **Lifecycle Restriction**: Order status MUST be `processing`. Any attempt to edit an order in `ready`, `completed`, or `cancelled` status is strictly rejected.
+- **Financial Validation**: The new order total must be greater than or equal to the total payments already collected (`total >= totalPaid`). Negative remaining balance is prohibited.
+- **Customer-Change Restriction**: `customerId` cannot be modified; customer reassignment is prohibited.
+- **Item Reconciliation**: Items included in the payload are upserted; existing items omitted from the payload are deleted.
+- **Storage Deletion Guard**: An item cannot be deleted if it has active storage records.
+- **Sync Changes Behavior**: Emits discrete `sync_changes` events for affected entities (`order`, `order_items`, `order_item_carpets`) with incremented `server_version`.
+- **Idempotency**: Atomic and idempotent via `X-Operation-ID` and `sync_idempotency_log`.
+- **Concurrency**: Flutter Edit V3 does not send `base_version`; OCC client propagation remains deferred as previously documented.
 
 The backend must preserve:
 
@@ -410,6 +440,15 @@ The backend must accept only the approved V1 Order statuses:
 
 No additional status values should be introduced without an approved Product/Domain change.
 
+Lifecycle validation rules:
+- `Completed -> Processing` is supported ONLY as an explicit administrative correction (`allow_completed_to_processing_correction`).
+- Administrative correction requires an explicit, non-empty operational reason.
+- `completed_at` is cleared to NULL.
+- Historical payments remain unchanged.
+- Storage records remain inactive; storage is NOT automatically reactivated (re-store is required before the order can become Ready again).
+- Generic transitions from `Completed -> Ready` and `Completed -> Cancelled` remain strictly forbidden.
+- `Cancelled` status remains strictly terminal.
+
 ---
 
 # 20. Order Financial Validation
@@ -463,7 +502,7 @@ The backend must not allow normal updates that alter:
 - Payment Method
 - Paid At
 
-If a future correction/refund workflow is required, it must be explicitly introduced as a new Product/Domain decision.
+Refunds are handled through the separate order-level Refund V1 API (`POST /api/v1/refunds`) and do not modify or delete historical Payment records.
 
 ---
 
@@ -500,6 +539,47 @@ V1 supports:
 - E-Wallet
 
 No additional payment methods should be introduced without an approved Product change.
+
+---
+
+# 25A. Refunds API
+
+The backend supports an order-level Refund V1 endpoint for cancelled orders.
+
+The API supports:
+
+    POST   /api/v1/refunds
+
+Headers:
+
+    X-Operation-ID: <UUID> (required for idempotency)
+
+Request Body:
+
+```json
+{
+  "id": "UUID",
+  "order_id": "UUID",
+  "amount": 3500,
+  "refund_method": "cash | insta_pay | e_wallet",
+  "reason": "optional string",
+  "refunded_at": "ISO-8601 string"
+}
+```
+
+Response:
+
+- `201 Created`: Returns created refund JSON object and generates exactly one `sync_changes` event (`entity_type: 'refund'`, `operation_type: 'create'`, `server_version: null`).
+- `404 Not Found`: Order does not exist.
+- `409 Conflict`: `REFUND_BALANCE_EXCEEDED` (refund amount exceeds remaining refundable balance: `Total Paid - Total Refunded`).
+- `422 Unprocessable Entity`: `INVALID_LIFECYCLE_TRANSITION` (order status is not `cancelled`, invalid method, non-positive amount, etc.).
+
+Implementation Semantics:
+- Backed by the transactional `sync_create_refund` SECURITY DEFINER RPC.
+- Row-level concurrency lock on the parent order (`SELECT status FROM orders WHERE id = v_order_id FOR UPDATE`) prevents concurrent over-refund race conditions.
+- Strictly idempotent: repeating the same `X-Operation-ID` returns the cached result without duplicate insertions.
+- Original payment records remain immutable and untouched.
+- `GET /api/v1/refunds`, `PATCH /api/v1/refunds/{id}`, and `DELETE /api/v1/refunds/{id}` are out of scope for V1.
 
 ---
 
@@ -617,21 +697,21 @@ Conceptually:
     POST   /api/v1/services
     PATCH  /api/v1/services/{id}
 
-Service configuration may include:
+Service configuration includes:
 
 - Name
-- Pricing Type
-- Price
+- Description (optional)
 - Active state
-- Supported Item Types
+
+The Service entity must NOT own a single default/current price or pricing type. Pricing configuration belongs to the ServiceItemType relationship.
 
 Changing a current Service configuration must not rewrite historical OrderItem snapshots.
 
 ---
 
-# 33. Service/ItemType Compatibility API
+# 33. Service/ItemType Compatibility & Pricing API
 
-The API must support synchronization of ServiceItemType relationships.
+The API must support synchronization of ServiceItemType relationships and operational pricing configurations.
 
 Conceptually:
 
@@ -639,7 +719,16 @@ Conceptually:
     POST   /api/v1/service-item-types
     PATCH  /api/v1/service-item-types/{id}
 
-The backend must prevent duplicate Service/ItemType compatibility relationships.
+ServiceItemType configuration includes:
+
+- `service_id`
+- `item_type_id`
+- `pricing_type` (`per_piece`, `per_square_meter`)
+- `price` (strictly positive minor currency units)
+
+The backend must prevent duplicate Service/ItemType compatibility relationships (`UNIQUE(service_id, item_type_id)`).
+
+Changing a ServiceItemType pricing configuration must not rewrite historical OrderItem snapshots (`order_items.unit_price`).
 
 ---
 
@@ -1691,11 +1780,11 @@ The backend must preserve master data changes independently from transaction sna
 
 Example:
 
-    Service price = 100
+    Service + Item Type price = 100
         ↓
     Historical OrderItem.unitPrice = 100
         ↓
-    Service price becomes 120
+    Service + Item Type price becomes 120
 
 The historical OrderItem remains:
 
@@ -1754,7 +1843,7 @@ The backend must not introduce V1 entities for:
 - Drivers
 - Vehicles
 - Delivery Routes
-- Refunds
+- Automated payment gateway refunds and line-item refunds
 - Loyalty
 - AI features
 - Processing stages
@@ -1799,6 +1888,7 @@ The conceptual V1 endpoints include:
     /api/v1/customers
     /api/v1/orders
     /api/v1/payments
+    /api/v1/refunds
     /api/v1/storage
     /api/v1/storage-locations
     /api/v1/item-types

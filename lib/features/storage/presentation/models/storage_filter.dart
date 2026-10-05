@@ -37,12 +37,15 @@ class StorageFilter {
     return StorageFilter(
       itemTypeId: clearItemTypeId ? null : (itemTypeId ?? this.itemTypeId),
       serviceId: clearServiceId ? null : (serviceId ?? this.serviceId),
-      storageLocationId:
-          clearStorageLocationId ? null : (storageLocationId ?? this.storageLocationId),
-      expectedPickupDate:
-          clearExpectedPickupDate ? null : (expectedPickupDate ?? this.expectedPickupDate),
-      orderReceivedDate:
-          clearOrderReceivedDate ? null : (orderReceivedDate ?? this.orderReceivedDate),
+      storageLocationId: clearStorageLocationId
+          ? null
+          : (storageLocationId ?? this.storageLocationId),
+      expectedPickupDate: clearExpectedPickupDate
+          ? null
+          : (expectedPickupDate ?? this.expectedPickupDate),
+      orderReceivedDate: clearOrderReceivedDate
+          ? null
+          : (orderReceivedDate ?? this.orderReceivedDate),
     );
   }
 
@@ -61,10 +64,10 @@ class StorageFilter {
 
   @override
   int get hashCode => Object.hash(
-        itemTypeId,
-        serviceId,
-        storageLocationId,
-        expectedPickupDate,
-        orderReceivedDate,
-      );
+    itemTypeId,
+    serviceId,
+    storageLocationId,
+    expectedPickupDate,
+    orderReceivedDate,
+  );
 }

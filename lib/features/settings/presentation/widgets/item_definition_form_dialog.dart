@@ -44,7 +44,8 @@ class ItemDefinitionFormDialog extends StatefulWidget {
   }
 
   @override
-  State<ItemDefinitionFormDialog> createState() => _ItemDefinitionFormDialogState();
+  State<ItemDefinitionFormDialog> createState() =>
+      _ItemDefinitionFormDialogState();
 }
 
 class _ItemDefinitionFormDialogState extends State<ItemDefinitionFormDialog> {
@@ -62,7 +63,9 @@ class _ItemDefinitionFormDialogState extends State<ItemDefinitionFormDialog> {
     if (def != null) {
       _selectedItemTypeId = def.itemTypeId;
     } else if (widget.preselectedItemTypeId != null &&
-        widget.availableItemTypes.any((t) => t.id == widget.preselectedItemTypeId)) {
+        widget.availableItemTypes.any(
+          (t) => t.id == widget.preselectedItemTypeId,
+        )) {
       _selectedItemTypeId = widget.preselectedItemTypeId!;
     } else if (widget.availableItemTypes.isNotEmpty) {
       _selectedItemTypeId = widget.availableItemTypes.first.id;
@@ -183,8 +186,9 @@ class _ItemDefinitionFormDialogState extends State<ItemDefinitionFormDialog> {
                 ),
                 AppSpacing.gapXs,
                 DropdownButtonFormField<String>(
-                  initialValue:
-                      _selectedItemTypeId.isNotEmpty ? _selectedItemTypeId : null,
+                  initialValue: _selectedItemTypeId.isNotEmpty
+                      ? _selectedItemTypeId
+                      : null,
                   decoration: InputDecoration(
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.md,
@@ -225,10 +229,7 @@ class _ItemDefinitionFormDialogState extends State<ItemDefinitionFormDialog> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    AppButton(
-                      label: AppStrings.save,
-                      onPressed: _handleSubmit,
-                    ),
+                    AppButton(label: AppStrings.save, onPressed: _handleSubmit),
                     AppSpacing.gapHorizontalMd,
                     AppButton(
                       label: AppStrings.cancel,

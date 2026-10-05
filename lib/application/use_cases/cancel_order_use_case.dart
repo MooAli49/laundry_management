@@ -22,7 +22,9 @@ class CancelOrderUseCase {
 
   Future<Order> execute(CancelOrderInput input) async {
     if (!input.confirmed) {
-      throw const ValidationFailure('Cancellation must be explicitly confirmed');
+      throw const ValidationFailure(
+        'Cancellation must be explicitly confirmed',
+      );
     }
 
     final trimmedReason = input.cancellationReason.trim();
@@ -35,7 +37,9 @@ class CancelOrderUseCase {
       throw const ValidationFailure('Order not found');
     }
     if (order.status == OrderStatus.completed) {
-      throw const BusinessRuleFailure('Cannot cancel an already completed order');
+      throw const BusinessRuleFailure(
+        'Cannot cancel an already completed order',
+      );
     }
     if (order.status == OrderStatus.cancelled) {
       throw const BusinessRuleFailure('Order is already cancelled');

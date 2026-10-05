@@ -141,17 +141,15 @@ The form should remain short and fast.
 
 ## 9. Customer Creation Fields
 
-The V1 Customer form should support the approved Customer fields.
+The V1 Customer form supports the approved Customer fields:
 
-At minimum, the workflow centers around:
+    الاسم (Customer Name - required)
+    رقم الهاتف (Customer Phone - required)
+    العنوان (Customer Address - optional)
 
-    الاسم
-    رقم الهاتف
+Address is an optional profile field. Whitespace-only values normalize to null.
 
-Additional fields should only be displayed when they exist in the
-approved Product/Domain model.
-
-The UI must not invent additional Customer profile fields.
+The UI must not invent additional Customer profile fields. Full delivery routing and dispatch management remain out of scope.
 
 ---
 
@@ -237,6 +235,7 @@ The Customer Details screen should provide a concise view of:
 
     Customer Name
     Customer Phone
+    Customer Address (when present)
     Customer Order History
 
 The screen should prioritize information useful during daily operations.
@@ -249,6 +248,7 @@ The Customer Details header should prominently display:
 
     Customer Name
     Customer Phone
+    Customer Address (when present)
 
 The header should remain simple.
 
@@ -343,7 +343,12 @@ The user may edit Customer information through:
     تعديل العميل
 
 The form should reuse the same Customer input components used during
-Customer Creation.
+Customer Creation:
+- الاسم (Customer Name - required)
+- رقم الهاتف (Customer Phone - required)
+- العنوان (Customer Address - optional)
+
+The optional address field is fully editable in the customer edit dialog. Clearing the field or entering whitespace-only values normalizes the stored address to null.
 
 This ensures consistent validation and behavior.
 

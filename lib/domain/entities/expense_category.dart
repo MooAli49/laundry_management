@@ -51,5 +51,6 @@ class ExpenseCategory {
   int get hashCode => Object.hash(id, name, isActive, createdAt, updatedAt);
 
   @override
-  String toString() => 'ExpenseCategory(id: $id, name: $name, active: $isActive)';
+  String toString() =>
+      'ExpenseCategory(id: $id, name: $name, active: $isActive)';
 }

@@ -24,7 +24,10 @@ class StorageLocationsSection extends StatelessWidget {
     );
   }
 
-  Future<void> _handleEdit(BuildContext context, StorageLocation location) async {
+  Future<void> _handleEdit(
+    BuildContext context,
+    StorageLocation location,
+  ) async {
     final cubit = context.read<StorageLocationsManagementCubit>();
     final supportedIds = await cubit.getSupportedItemTypeIds(location.id);
     if (context.mounted) {
@@ -57,8 +60,10 @@ class StorageLocationsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<StorageLocationsManagementCubit,
-        StorageLocationsManagementState>(
+    return BlocConsumer<
+      StorageLocationsManagementCubit,
+      StorageLocationsManagementState
+    >(
       listener: (context, state) {
         if (state.errorMessage != null) {
           ScaffoldMessenger.of(context).showSnackBar(

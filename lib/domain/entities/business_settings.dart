@@ -26,7 +26,11 @@ class BusinessSettings {
       throw ArgumentError('BusinessSettings id cannot be empty');
     }
     if (taxRate < 0.0) {
-      throw ArgumentError.value(taxRate, 'taxRate', 'taxRate cannot be negative');
+      throw ArgumentError.value(
+        taxRate,
+        'taxRate',
+        'taxRate cannot be negative',
+      );
     }
   }
 
@@ -74,17 +78,17 @@ class BusinessSettings {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        businessName,
-        address,
-        phone,
-        logoReference,
-        invoiceFooterText,
-        taxEnabled,
-        taxRate,
-        createdAt,
-        updatedAt,
-      );
+    id,
+    businessName,
+    address,
+    phone,
+    logoReference,
+    invoiceFooterText,
+    taxEnabled,
+    taxRate,
+    createdAt,
+    updatedAt,
+  );
 
   @override
   String toString() =>

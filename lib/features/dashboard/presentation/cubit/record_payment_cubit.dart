@@ -21,10 +21,10 @@ class RecordPaymentCubit extends Cubit<RecordPaymentState> {
     required OrderRepository orderRepository,
     required PaymentRepository paymentRepository,
     Uuid uuid = const Uuid(),
-  })  : _orderRepository = orderRepository,
-        _paymentRepository = paymentRepository,
-        _uuid = uuid,
-        super(const RecordPaymentState());
+  }) : _orderRepository = orderRepository,
+       _paymentRepository = paymentRepository,
+       _uuid = uuid,
+       super(const RecordPaymentState());
 
   int _searchToken = 0;
 
@@ -61,43 +61,54 @@ class RecordPaymentCubit extends Cubit<RecordPaymentState> {
       }
 
       final orderIds = nonCancelled.map((o) => o.id).toList();
-      final summaries = await _paymentRepository.getPaymentSummariesForOrders(orderIds);
+      final summaries = await _paymentRepository.getPaymentSummariesForOrders(
+        orderIds,
+      );
       if (currentToken != _searchToken) return;
 
-      final items = nonCancelled.map((order) {
-        final summary = summaries[order.id];
-        return DashboardOrderItem(
-          order: order,
-          totalPaid: summary?.totalPaid ?? Money.zero,
-          remainingAmount: summary?.remaining ?? order.total,
-        );
-      }).where((item) => item.remainingAmount.isPositive).toList();
+      final items = nonCancelled
+          .map((order) {
+            final summary = summaries[order.id];
+            return DashboardOrderItem(
+              order: order,
+              totalPaid: summary?.totalPaid ?? Money.zero,
+              remainingAmount: summary?.remaining ?? order.total,
+            );
+          })
+          .where((item) => item.remainingAmount.isPositive)
+          .toList();
 
       if (currentToken != _searchToken) return;
       emit(state.copyWith(isLoadingOrders: false, orders: items));
     } catch (_) {
       if (currentToken != _searchToken) return;
-      emit(state.copyWith(
-        isLoadingOrders: false,
-        errorMessage: 'تعذر البحث عن الطلبات، يرجى المحاولة مرة أخرى',
-      ));
+      emit(
+        state.copyWith(
+          isLoadingOrders: false,
+          errorMessage: 'تعذر البحث عن الطلبات، يرجى المحاولة مرة أخرى',
+        ),
+      );
     }
   }
 
   void selectOrder(DashboardOrderItem order) {
-    emit(state.copyWith(
-      selectedOrder: order,
-      step: RecordPaymentStep.enterPayment,
-      clearErrorMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        selectedOrder: order,
+        step: RecordPaymentStep.enterPayment,
+        clearErrorMessage: true,
+      ),
+    );
   }
 
   void backToOrderSelection() {
-    emit(state.copyWith(
-      step: RecordPaymentStep.selectOrder,
-      clearSelectedOrder: true,
-      clearErrorMessage: true,
-    ));
+    emit(
+      state.copyWith(
+        step: RecordPaymentStep.selectOrder,
+        clearSelectedOrder: true,
+        clearErrorMessage: true,
+      ),
+    );
   }
 
   Future<Payment?> recordPayment({
@@ -113,7 +124,11 @@ class RecordPaymentCubit extends Cubit<RecordPaymentState> {
     }
 
     if (amount > selected.remainingAmount) {
-      emit(state.copyWith(errorMessage: 'المبلغ المدخل يتجاوز المبلغ المتبقي على الطلب'));
+      emit(
+        state.copyWith(
+          errorMessage: 'المبلغ المدخل يتجاوز المبلغ المتبقي على الطلب',
+        ),
+      );
       return null;
     }
 
@@ -131,19 +146,18 @@ class RecordPaymentCubit extends Cubit<RecordPaymentState> {
       );
 
       final createdPayment = await _paymentRepository.recordPayment(payment);
-      emit(state.copyWith(
-        isRecordingPayment: false,
-        isPaymentSuccess: true,
-      ));
+      emit(state.copyWith(isRecordingPayment: false, isPaymentSuccess: true));
       return createdPayment;
     } on Failure catch (e) {
       emit(state.copyWith(isRecordingPayment: false, errorMessage: e.message));
       return null;
     } catch (e) {
-      emit(state.copyWith(
-        isRecordingPayment: false,
-        errorMessage: e.toString().replaceFirst('BusinessRuleFailure: ', ''),
-      ));
+      emit(
+        state.copyWith(
+          isRecordingPayment: false,
+          errorMessage: e.toString().replaceFirst('BusinessRuleFailure: ', ''),
+        ),
+      );
       return null;
     }
   }

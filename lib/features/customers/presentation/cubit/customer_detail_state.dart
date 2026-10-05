@@ -36,7 +36,9 @@ class CustomerDetailState {
       isSaving: isSaving ?? this.isSaving,
       hasMoreOrders: hasMoreOrders ?? this.hasMoreOrders,
       data: data ?? this.data,
-      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
       actionSuccessMessage: clearActionSuccessMessage
           ? null
           : (actionSuccessMessage ?? this.actionSuccessMessage),

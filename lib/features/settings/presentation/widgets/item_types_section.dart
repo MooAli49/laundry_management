@@ -24,7 +24,10 @@ class ItemTypesSection extends StatelessWidget {
     await ItemTypeFormDialog.show(context, itemType: itemType);
   }
 
-  Future<void> _handleToggleStatus(BuildContext context, ItemType itemType) async {
+  Future<void> _handleToggleStatus(
+    BuildContext context,
+    ItemType itemType,
+  ) async {
     final cubit = context.read<ItemTypesManagementCubit>();
     if (itemType.isActive) {
       final confirmed = await DeactivationConfirmDialog.show(
@@ -81,7 +84,8 @@ class ItemTypesSection extends StatelessWidget {
                     SettingsCard(
                       icon: Icons.inventory_2_outlined,
                       title: type.name,
-                      subtitle: '${state.getDefinitionCountForType(type.id)} تعريفات متاحة',
+                      subtitle:
+                          '${state.getDefinitionCountForType(type.id)} تعريفات متاحة',
                       isActive: type.isActive,
                       onEdit: () => _handleEdit(context, type),
                       onToggleActive: (_) => _handleToggleStatus(context, type),

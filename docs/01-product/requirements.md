@@ -23,6 +23,10 @@ Required information:
 - Customer name
 - Customer phone number
 
+Optional information:
+
+- Customer address (`Customer.address` is optional and nullable text; stored on Customer profile only; no separate Address entity/table; whitespace-only values normalize to NULL; no address snapshot on Order; no address search in V1; full delivery routing/dispatch management remains out of scope).
+
 The system should validate the phone number format.
 
 The system should prevent duplicate customers based on an existing phone number.
@@ -46,6 +50,7 @@ The user must be able to edit:
 
 - Customer name
 - Customer phone number
+- Customer address
 
 Customer information may be updated without modifying historical order snapshots.
 
@@ -104,13 +109,21 @@ Every order must have a human-readable unique Order Number.
 
 The Order Number is separate from the internal database identifier.
 
-The approved V1 display format is:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length:
 
-    YY-XXX
+- YY = 2-digit year prefix.
+- The sequence contains digits only.
+- The sequence has a minimum display width of 3 digits (zero-padded below 1000).
+- There is no maximum length or 999 ceiling; once the sequence reaches 1000, it expands to 4 digits (e.g. 26-1000, 26-10000).
+- Non-numeric or alphanumeric values (e.g. 26-T123) are not valid business order numbers.
+- The sequence generator must ignore non-business test identifiers such as `ORD-TEST-...` when calculating the next sequence number. These synthetic test identifiers must never inflate or distort the business order sequence.
 
-Example:
+Examples:
 
     26-001
+    26-999
+    26-1000
+    26-10000
 
 The exact numbering implementation must guarantee uniqueness.
 
@@ -154,7 +167,7 @@ The system must not track individual laundry processing stages.
 
 ---
 
-## 3.5 Manual Status Changes
+## 3.5 Manual Status Changes & Administrative Correction
 
 The user must be able to manually change the order status when necessary to correct an operational mistake.
 
@@ -162,7 +175,14 @@ Manual status changes must respect the system's business rules and validations.
 
 The system must not silently perform unintended side effects when a status is manually changed.
 
-If a status change affects storage or other operational state, the behavior must follow the approved business rules.
+If a status change affects storage or other operational state, the behavior must follow the approved business rules:
+- Completed -> Processing is supported ONLY as an explicit administrative correction.
+- Administrative correction requires an explicit non-empty operational reason.
+- Upon correction, `completed_at` is cleared to NULL; existing payments remain unchanged.
+- Previous storage records remain inactive; storage is NOT automatically reactivated.
+- Items must be explicitly stored again before the order can transition back to Ready.
+- Completed -> Ready and Completed -> Cancelled remain strictly forbidden.
+- Cancelled status remains strictly terminal.
 
 ---
 
@@ -180,8 +200,12 @@ Editable information may include:
 - Delivery fees where applicable
 - Discount
 - Notes
-- Payments where applicable
 - Order item prices where permitted by the approved pricing behavior
+
+Payment rules during Edit Order:
+- Existing payments are immutable during Edit Order.
+- Edit Order must not add, modify, or delete payments.
+- The edited order total must remain >= totalPaid.
 
 Completed and Cancelled orders are considered historical records and should be read-only.
 
@@ -348,6 +372,14 @@ This information must be available in:
 
 The system must not rely on the Service name alone to identify the physical item.
 
+Snapshot rules:
+- `itemTypeNameSnapshot` is required and non-empty.
+- `serviceNameSnapshot` is required and non-empty.
+- They are historical snapshots captured with the OrderItem.
+- Empty or whitespace-only snapshots are invalid domain data.
+- The application must NOT fabricate fallback names such as `ملابس` or `غسيل`.
+- Test fixtures must provide valid snapshot values.
+
 ---
 
 # 5. Services
@@ -356,12 +388,18 @@ The system must not rely on the Service name alone to identify the physical item
 
 The user must be able to create, edit, activate, and deactivate services.
 
-A service must contain at least:
+A service must contain:
 
+- Unique identifier
 - Service name
-- Pricing type
-- Price
-- Supported item types
+- Description (optional)
+- Active state
+
+Pricing configuration belongs to the **Service–Item Type** relationship (`ServiceItemType`), not directly to Service. The Service entity must NOT own a single default/current price.
+
+For each supported Item Type linked to a Service, the user configures:
+- Pricing type (`per_piece` or `per_square_meter`)
+- Price (strictly positive money amount in minor currency units)
 
 ---
 
@@ -381,24 +419,33 @@ the system should show only services configured for Clothing.
 
 ## 5.3 Service Pricing
 
-The system must support the following pricing models at the domain level:
+In this laundry system, the actual price depends on the combination of:
 
-- Per Piece
-- Per Kilogram
-- Per Square Meter
-- Fixed Price
+> **Service + Item Type**
 
-V1 UI should only expose pricing options that are actually relevant to the selected service/item combination.
+The supported operational pricing models in V1 are:
 
-The system should not unnecessarily show unsupported or irrelevant pricing options.
+- Per Piece (`per_piece`)
+- Per Square Meter (`per_square_meter`)
+
+*(Note: `fixed_price` has been removed from the V1 operational model because each physical item is represented as an individual OrderItem with a unit price, making fixed price functionally identical to per-piece pricing without distinct business behavior. Per Kilogram pricing remains completely excluded from V1).*
+
+Example:
+
+Washing
+  ├── Clothing → per_piece → 50 EGP
+  ├── Blanket  → per_piece → 100 EGP
+  └── Carpet   → per_square_meter → 60 EGP
+
+The UI exposes only the pricing type and fields configured for the selected Service + Item Type combination.
 
 ---
 
 ## 5.4 Price Snapshot
 
-When a service is added to an order, the price used for that OrderItem must be preserved as historical data.
+When a Service + Item Type combination is selected for an OrderItem, the actual price used at that time must be preserved as historical data (snapshotted into `order_items.unit_price`).
 
-Changing the service's current price must not change the price of existing orders.
+Changing a Service's pricing configuration later must NOT change the price of existing OrderItems or historical orders.
 
 ---
 
@@ -406,11 +453,11 @@ Changing the service's current price must not change the price of existing order
 
 During Order creation, the user must be able to adjust the applicable item/service price before saving the order according to the approved pricing behavior.
 
-The adjusted price becomes part of the historical order data.
+The adjusted price becomes part of the historical order data (`order_items.unit_price`).
 
 Opening an existing editable order must allow the user to modify its applicable price when permitted by the business rules.
 
-Historical orders must not be recalculated using the current service price.
+Historical orders must not be recalculated using current Service pricing configurations.
 
 ---
 
@@ -532,6 +579,19 @@ Currency selection is not required.
 
 ---
 
+## 7.6 Manual Draft Item Total Override (`customTotal`)
+
+The user may manually override the calculated draft total for an item group:
+
+- **Lossless Piastre Distribution**: When an item group with quantity > 1 has a custom total, the total integer piastres are distributed losslessly across the expanded physical `OrderItem` records:
+  - Base piece piastres = `totalPiastres ~/ quantity`
+  - Remainder = `totalPiastres % quantity`
+  - The first `remainder` items receive `basePiecePiastres + 1` piastre, and the remaining items receive `basePiecePiastres`.
+  - The sum of physical piece totals is strictly guaranteed to equal the custom total.
+- **Historical Price Stability**: The stored snapshot values (`unitPrice`, `calculatedTotal`) are saved permanently with each `OrderItem` in local SQLite and are never recalculated from updated service–item pricing configurations.
+
+---
+
 # 8. Tax
 
 Tax is disabled by default.
@@ -608,9 +668,24 @@ The system must prevent a payment from exceeding the current remaining amount.
 
 ## 9.6 Refunds
 
-A complete refund workflow is not required in V1.
+The system supports an order-level Refund V1 workflow for cancelled orders.
 
-There is no dedicated refund management system.
+Key business and domain rules:
+- Refund is a first-class immutable financial transaction.
+- Refund is ORDER-LEVEL in V1: belongs directly to an Order and has NO `payment_id`.
+- Only Cancelled orders can receive refunds. Processing, Ready, and Completed orders cannot receive refunds.
+- Cancelled status remains strictly terminal.
+- Original Payment records are immutable and are never modified or deleted upon refund.
+- Refundable amount is: `Total Paid - Total Refunded`.
+- Refund amount must be > 0 and cannot exceed the remaining refundable balance.
+- Multiple partial refunds are supported, as well as full refunds.
+- Cancellation does not trigger an automatic refund: cancellation and refund are separate operations.
+- Supported refund methods: Cash (`cash`), InstaPay (`insta_pay`), and E-Wallet (`e_wallet`).
+- Optional refund reason may be recorded.
+- Refund history is immutable: no editing or deletion of refund records.
+- Financial reporting: Total Refunds = sum of refunds by `refundedAt`. Net Payments = `Total Payments - Total Refunds`.
+- Refunds are NOT operating expenses. Net Profit remains: `Total Sales - Operating Expenses`.
+- Automated payment gateway refunds and item-level refunds are out of scope for V1.
 
 ---
 
@@ -759,7 +834,8 @@ If an order has active Storage Records when it is cancelled:
 
 Existing payment records remain stored as historical records.
 
-There is no automatic refund workflow.
+Cancellation does not trigger an automatic refund.
+Manual refunds may be issued for eligible cancelled orders through the Refund workflow.
 
 ---
 
@@ -886,7 +962,18 @@ Example:
 
 The system should allow filtering orders based on the Expected Pickup Date.
 
-Orders whose Expected Pickup Date has passed while they are not Completed or Cancelled are considered overdue.
+Overdue boundary semantics:
+An active order is overdue only when:
+`expected_pickup_date < start_of_today`
+The comparison is strictly calendar-date based.
+Therefore:
+- Yesterday → overdue
+- Today → NOT overdue
+- Tomorrow → NOT overdue
+- Completed orders → NOT overdue
+- Cancelled orders → NOT overdue
+
+The system must never describe orders with expected pickup date of "today" as overdue.
 
 ---
 
@@ -934,6 +1021,11 @@ The invoice or receipt should display, where applicable:
 ## 14.4 Printing
 
 The user must be able to print the Invoice / Receipt from the Order workflow.
+
+The system supports two complementary printing modes:
+
+1. **Direct Bluetooth Thermal Printing**: Direct ESC/POS printing to 80mm (standard) and 58mm companion thermal printers via Bluetooth from Android tablets, formatted with Arabic typography, item tables, and invoice metadata.
+2. **System / PDF Printing**: Standard document printing and PDF export using the operating system's native print framework.
 
 ---
 
@@ -1024,7 +1116,6 @@ It should focus on:
 - Items requiring storage
 - Outstanding payments
 - Overdue orders
-- Today's expected pickups
 - Recent orders
 
 The Dashboard must provide Quick Actions for:
@@ -1065,25 +1156,24 @@ Must provide:
 
 Must provide:
 
-- Sales for the selected period
-- Payments recorded during the selected period
-- Expenses for the selected period
-- Outstanding amounts
-- Total discounts
-- Payment method breakdown
-- Net Profit
+- **Total Sales**: Sum of non-cancelled order totals (`status != cancelled`) created during the selected period. Cancelled orders are excluded.
+- **Total Payments**: Historical payments recorded during the selected period based on `Payment.paidAt`. Payments from cancelled orders remain historical payments.
+- **Total Refunds**: Sum of order-level refunds recorded during the selected period based on `Refund.refundedAt`.
+- **Net Payments**: Net payment movement for the period, calculated as:
+      Net Payments = Total Payments - Total Refunds
+- **Outstanding**: Sum of unpaid balances for non-cancelled orders only (`remaining > 0`, `status != cancelled`). Cancelled orders are excluded.
+- **Total Discounts**: Sum of discounts applied to non-cancelled orders in the selected period.
+- **Payment Method Breakdown**: Distribution of payments by payment method (Cash, InstaPay, E-Wallet).
+- **Operating Expenses**: Total expenses recorded for the period based on `Expense.expenseDate`.
+- **Net Profit**: Derived financial result calculated as:
+      Net Profit = Total Sales - Operating Expenses
 
-Expenses must be included according to their Expense Date.
-
-Net Profit is a derived reporting value.
-
-The calculation is:
-
-    Net Profit = Sales - Operating Expenses
-
-Net Profit is not a separate transaction or entity.
-
-The system must not require a separate profit table, profit snapshot, or analytics table for Net Profit.
+Important financial reporting rules:
+- Refunds are NOT operating expenses and must not be added to Expenses.
+- Refunds are not subtracted from Total Sales.
+- Payments and Outstanding amounts remain separate reporting metrics.
+- Net Profit is a derived reporting value and not a separate transaction or entity.
+- The system must not require a separate profit table, profit snapshot, or analytics table for Net Profit.
 
 ---
 
@@ -1238,6 +1328,7 @@ Synchronization must support the relevant transactional and master data required
 - OrderItems
 - Customers
 - Payments
+- Refunds
 - Expenses
 - Expense Categories
 - Storage
@@ -1266,7 +1357,7 @@ Historical order information must remain stable even when master data changes.
 
 For example:
 
-If a service price changes from:
+If a Service + Item Type configured price changes from:
 
     40 ج.م
 
@@ -1278,7 +1369,7 @@ existing orders must continue to show:
 
     40 ج.م
 
-Similarly, historical order items should preserve the relevant item/service information used at the time the order was created.
+Similarly, historical order items must preserve the relevant item/service information used at the time the order was created.
 
 Historical Order financial information must preserve the applicable:
 
@@ -1325,10 +1416,39 @@ The system should prioritize:
 
 ---
 
+# 24A. System Licensing & Operational Control
+
+The system includes a remote licensing mechanism to manage client deployments while preserving offline-first guarantees:
+
+1. **Remote Status**: The backend issues two operational states: `'active'` or `'suspended'`.
+2. **Authoritative Suspension Anchor**: The grace period clock is anchored strictly to the remote `suspended_at` timestamp. Device detection time is never used as the anchor.
+3. **7-Day Grace Period**: When a license is suspended, the application remains fully functional for exactly 7 days after `suspended_at`. A warning banner (`LicenseWarningBanner`) is displayed across all screens inside the shell.
+4. **Timer-Based Local Expiration**: `LicenseService` schedules a local timer for the exact remaining grace duration. When it expires, status transitions to `lockedOut` without requiring an app restart or network event.
+5. **Locked-Out State**: Exactly 7 days after `suspended_at`, the application blocks all navigation and displays the full-screen `LicenseLockScreen` outside the shell.
+6. **24-Hour Remote Check Policy (Policy A)**: Startup evaluates local cache immediately and checks remote status if online. Subsequent checks on resume are throttled to once every 24 hours.
+7. **Offline Safety**: Offline launches enforce the cached license status. Fresh installations with no cached state fail open to `'active'`.
+8. **Reinstatement**: Reinstating the license to `'active'` immediately unlocks the application and cancels all active timers.
+
+---
+
+# 24B. Device Orientation & Form Factor
+
+The system is a Point of Sale (POS) and counter operations management application designed exclusively for tablet and large-screen usage in Landscape mode:
+
+1. **Landscape-Only Operation**: The application operates strictly in landscape orientations (`DeviceOrientation.landscapeLeft` and `DeviceOrientation.landscapeRight`).
+2. **Portrait Unsupported**: Portrait orientation is explicitly unsupported. The application must not render in portrait mode or provide portrait-specific layouts.
+3. **Centralized Startup Enforcement**: The orientation lock is applied globally at application bootstrap (`main()`) via `SystemChrome.setPreferredOrientations` and natively via `android:screenOrientation="sensorLandscape"`. Individual screens must not manage orientation independently.
+4. **Landscape Responsive Viewports**: UI responsiveness is required across different landscape display sizes (e.g., 8-inch, 10-inch, 12-inch tablets, and desktop landscape windows). Single-column or two-column master-detail layouts must adapt to varying landscape widths without overflow.
+5. **No Portrait Workarounds**: Portrait overflow workarounds (such as wrapping entire screens in portrait-specific scroll views or introducing conditional portrait logic) are out of scope.
+
+---
+
 # 25. Explicitly Out of Scope for V1
 
 The following features must not be implemented unless explicitly added to the requirements later:
 
+- Portrait orientation and portrait-specific mobile layouts (Landscape-only system)
+- "Today's Deliveries" / "تسليمات اليوم" Dashboard section (intentionally removed from V1 Dashboard scope)
 - Multiple user roles
 - Permissions
 - Employee management
@@ -1340,7 +1460,7 @@ The following features must not be implemented unless explicitly added to the re
 - Delivery status management
 - Delivery optimization
 - Proof of delivery
-- Refund workflow
+- Automated payment gateway refunds and advanced refund workflows (order-level Refund V1 is in scope)
 - Loyalty program
 - Customer points
 - Multi-branch support
@@ -1353,7 +1473,7 @@ The following features must not be implemented unless explicitly added to the re
 - Storage capacity management
 - Complex notification system
 - Full accounting system
-- Full delivery management system
+- Full delivery management system and dispatch routing (customer address is an optional profile field only)
 - Separate profit management system
 
 ---

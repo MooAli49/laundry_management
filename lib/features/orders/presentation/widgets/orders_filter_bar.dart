@@ -59,8 +59,12 @@ class OrdersFilterBar extends StatelessWidget {
                   child: Text(
                     filter.label,
                     style: AppTextStyles.bodySmall.copyWith(
-                      color: isSelected ? AppColors.textOnPrimary : AppColors.textSecondary,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      color: isSelected
+                          ? AppColors.textOnPrimary
+                          : AppColors.textSecondary,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
                       fontSize: 13.0,
                     ),
                   ),
@@ -131,7 +135,10 @@ class OrdersFilterBar extends StatelessWidget {
                 onTap: () => onFilterSelected(OrderListFilter.all),
                 borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6.0,
+                    vertical: 4.0,
+                  ),
                   child: Text(
                     'مسح الفلاتر',
                     style: AppTextStyles.bodySmall.copyWith(

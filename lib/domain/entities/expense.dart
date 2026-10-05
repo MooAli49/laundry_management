@@ -30,13 +30,20 @@ class Expense {
       throw ArgumentError('Expense expenseCategoryId cannot be empty');
     }
     if (!amount.isPositive) {
-      throw ArgumentError.value(amount, 'amount', 'Expense amount must be greater than 0');
+      throw ArgumentError.value(
+        amount,
+        'amount',
+        'Expense amount must be greater than 0',
+      );
     }
     if (categoryNameSnapshot.trim().isEmpty) {
       throw ArgumentError('Expense categoryNameSnapshot cannot be empty');
     }
-    if (categoryNameSnapshot == 'أخرى' && (expenseName == null || expenseName!.trim().isEmpty)) {
-      throw ArgumentError('Expense using category "أخرى" must provide an expenseName');
+    if (categoryNameSnapshot == 'أخرى' &&
+        (expenseName == null || expenseName!.trim().isEmpty)) {
+      throw ArgumentError(
+        'Expense using category "أخرى" must provide an expenseName',
+      );
     }
   }
 
@@ -81,16 +88,16 @@ class Expense {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        expenseCategoryId,
-        amount,
-        expenseName,
-        expenseDate,
-        notes,
-        categoryNameSnapshot,
-        createdAt,
-        updatedAt,
-      );
+    id,
+    expenseCategoryId,
+    amount,
+    expenseName,
+    expenseDate,
+    notes,
+    categoryNameSnapshot,
+    createdAt,
+    updatedAt,
+  );
 
   @override
   String toString() =>

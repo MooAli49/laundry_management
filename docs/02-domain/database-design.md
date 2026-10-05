@@ -290,7 +290,7 @@ service_name_snapshot = "غسيل وكي"
 unit_price = 40
 ```
 
-If the current Service later becomes:
+If the current Service configuration for that Item Type later becomes:
 
 ```text
 service_name = "غسيل وكي"
@@ -383,29 +383,32 @@ services
 | Column | Type | Required | Description |
 |---|---|---:|---|
 | id | UUID | Yes | Primary key |
-| name | String | Yes | Service name |
-| pricing_type | Enum/String | Yes | Per Piece / Per Kilogram / Per Square Meter / Fixed Price |
-| price | Decimal | Yes | Current service price |
+| name | String | Yes | Service name (unique) |
+| description | String | No | Optional service description |
 | is_active | Boolean | Yes | Availability for new orders |
 | created_at | DateTime | Yes | Creation timestamp |
 | updated_at | DateTime | Yes | Last update timestamp |
 
 ## Constraints
 
-- `price` cannot be negative.
-- `pricing_type` must be one of the supported pricing types.
+- `name` must be unique.
 - Inactive services cannot be selected for new OrderItems.
 - Existing OrderItems remain valid after service deactivation.
+- The Service entity does NOT own a single default/current price or pricing type. Pricing configuration belongs to the `service_item_types` associative entity.
 
 ---
 
-# 14. Service Item Type Relation
+# 14. Service Item Type Table
 
 A Service may be available for multiple Item Types.
 
 An Item Type may support multiple Services.
 
-Therefore this is a many-to-many relationship.
+In this laundry system, the actual price depends on the combination of:
+
+> **Service + Item Type**
+
+Therefore, `service_item_types` is an associative entity defining both compatibility and operational pricing configuration.
 
 ## Table
 
@@ -417,21 +420,26 @@ service_item_types
 
 | Column | Type | Required | Description |
 |---|---|---:|---|
-| service_id | UUID | Yes | Service reference |
-| item_type_id | UUID | Yes | Item Type reference |
+| id | UUID | Yes | Primary key |
+| service_id | UUID | Yes | Service reference (FK to services.id) |
+| item_type_id | UUID | Yes | Item Type reference (FK to item_types.id) |
+| pricing_type | Enum/String | Yes | Operational pricing type (`per_piece` / `per_square_meter`) |
+| price | Integer / Decimal | Yes | Configured price (minor currency units, strictly positive) |
+| created_at | DateTime | Yes | Creation timestamp |
+| updated_at | DateTime | Yes | Last update timestamp |
 
-## Primary Key
+## Primary Key & Constraints
 
-Composite primary key:
-
-```text
-(service_id, item_type_id)
-```
+- Primary key: `id` (UUID).
+- Unique constraint: `UNIQUE (service_id, item_type_id)` — duplicate combinations are strictly forbidden.
+- Check constraint: `price > 0` (zero and negative prices are invalid).
+- Check constraint: `pricing_type IN ('per_piece', 'per_square_meter')`.
+- Historical stability: modifying `price` or `pricing_type` on this table later must NOT modify existing OrderItems or historical orders.
 
 ## Relationship
 
 ```text
-services N ──────── M item_types
+services 1 ──────── N service_item_types N ──────── 1 item_types
 ```
 
 ---
@@ -785,7 +793,7 @@ total
 
 These values represent the historical financial state of the Order.
 
-They should not be recalculated from current Service prices after the Order has been created unless the Order is intentionally edited according to the business rules.
+They should not be recalculated from current Service + Item Type prices after the Order has been created unless the Order is intentionally edited according to the business rules.
 
 ---
 
@@ -806,16 +814,16 @@ The exact calculation depends on the Pricing Type.
 
 # 28. Pricing Type Values
 
-The database must support:
+The database must support the approved V1 operational pricing types:
 
 ```text
 per_piece
-per_kilogram
 per_square_meter
-fixed_price
 ```
 
-The exact implementation may use an enum or constrained string depending on the selected database technology.
+*(Note: `fixed_price` is removed from the V1 operational pricing model because each physical item is represented as its own OrderItem with a unit price, making fixed_price functionally equivalent to per_piece without distinct business behavior. `per_kg` remains excluded from V1).*
+
+The exact implementation uses constrained text / enums across Drift and remote PostgreSQL.
 
 ---
 
@@ -1393,7 +1401,7 @@ The database/application layer must preserve:
 9. A Payment references an existing Order.
 10. Payment amount must be positive.
 11. Payment amount must not exceed the Order's remaining amount.
-12. Historical prices must not depend on the current Service price.
+12. Historical prices must not depend on current Service pricing configurations.
 13. Historical carpet measurements must not depend on the current CarpetSize.
 14. Completed Orders must not have active StorageRecords.
 15. Cancelled Orders must not have active StorageRecords.
@@ -1448,7 +1456,7 @@ Do not create dedicated tables for:
 - Roles
 - Permissions
 - Branches
-- Refunds
+- Automated payment gateway refunds and line-item refunds
 - Loyalty
 - Storage movement history
 - Storage capacity

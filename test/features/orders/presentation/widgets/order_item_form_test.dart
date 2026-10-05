@@ -10,10 +10,12 @@ import 'package:laundry_management/data/local/daos/customers_dao.dart';
 import 'package:laundry_management/data/local/daos/item_definitions_dao.dart';
 import 'package:laundry_management/data/local/daos/item_types_dao.dart';
 import 'package:laundry_management/data/local/daos/orders_dao.dart';
+import 'package:laundry_management/data/local/daos/payments_dao.dart';
 import 'package:laundry_management/data/local/daos/services_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
-import 'package:laundry_management/data/local/database/app_database.dart' as db_pkg;
+import 'package:laundry_management/data/local/database/app_database.dart'
+    as db_pkg;
 import 'package:laundry_management/data/repositories/carpet_size_repository_impl.dart';
 import 'package:laundry_management/data/repositories/customer_repository_impl.dart';
 import 'package:laundry_management/data/repositories/item_definition_repository_impl.dart';
@@ -22,6 +24,7 @@ import 'package:laundry_management/data/repositories/order_repository_impl.dart'
 import 'package:laundry_management/data/repositories/service_repository_impl.dart';
 import 'package:laundry_management/data/repositories/settings_repository_impl.dart';
 import 'package:laundry_management/domain/entities/service.dart';
+import 'package:laundry_management/domain/entities/service_item_type.dart';
 import 'package:laundry_management/domain/enums/pricing_type.dart';
 import 'package:laundry_management/domain/value_objects/money.dart';
 import 'package:laundry_management/features/orders/presentation/cubit/create_order_cubit.dart';
@@ -32,9 +35,7 @@ Widget testBoilerplate(Widget child) {
     theme: AppTheme.lightTheme,
     home: Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
-        body: SingleChildScrollView(child: child),
-      ),
+      child: Scaffold(body: SingleChildScrollView(child: child)),
     ),
   );
 }
@@ -62,7 +63,7 @@ void main() {
   late CreateOrderCubit cubit;
 
   setUp(() async {
-    db = db_pkg.AppDatabase(NativeDatabase.memory());
+    db = db_pkg.AppDatabase(NativeDatabase.memory(), true);
     customersDao = CustomersDao(db);
     ordersDao = OrdersDao(db);
     storageRecordsDao = StorageRecordsDao(db);
@@ -81,6 +82,7 @@ void main() {
 
     orderRepository = OrderRepositoryImpl(
       ordersDao: ordersDao,
+      paymentsDao: PaymentsDao(db),
       storageRecordsDao: storageRecordsDao,
       syncOperationsDao: syncOperationsDao,
       db: db,
@@ -140,92 +142,127 @@ void main() {
     await db.close();
   });
 
-  testWidgets('OrderItemForm initializes notes field from state and clears after adding item', (tester) async {
+  testWidgets(
+    'OrderItemForm initializes notes field from state and clears after adding item',
+    (tester) async {
+      await cubit.initialize();
+      final itemType = cubit.state.itemTypes.first;
+      final now = DateTime.now();
+      final service = Service(
+        id: 'srv-form-test',
+        name: 'غسيل وكي',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      );
+      final sit = ServiceItemType(
+        id: 'sit-form-test',
+        serviceId: service.id,
+        itemTypeId: itemType.id,
+        pricingType: PricingType.perPiece,
+        price: const Money.fromPiastres(2500),
+        createdAt: now,
+        updatedAt: now,
+      );
+      await serviceRepository.createService(
+        service,
+        serviceItemTypes: [sit],
+      );
+
+      await cubit.selectItemType(itemType);
+      cubit.selectService(cubit.state.compatibleServices.first);
+
+      // Pump widget with initial cubit state
+      await tester.pumpWidget(
+        testBoilerplate(OrderItemForm(state: cubit.state, cubit: cubit)),
+      );
+      await tester.pumpAndSettle();
+
+      final notesFieldContainer = find.widgetWithText(
+        AppTextField,
+        'ملاحظات القطعة',
+      );
+      expect(notesFieldContainer, findsOneWidget);
+
+      final notesTextFormField = find.descendant(
+        of: notesFieldContainer,
+        matching: find.byType(TextFormField),
+      );
+      expect(notesTextFormField, findsOneWidget);
+
+      // Enter notes in text field
+      await tester.enterText(notesTextFormField, 'بقعة شاي على الصدر');
+      await tester.pumpAndSettle();
+
+      expect(cubit.state.draftNotes, 'بقعة شاي على الصدر');
+
+      // Tap Add Item button
+      final addButtonFinder = find.text('إضافة القطعة');
+      expect(addButtonFinder, findsOneWidget);
+      await tester.tap(addButtonFinder);
+      await tester.pumpAndSettle();
+
+      // Verify item draft has notes intact
+      expect(cubit.state.items.length, 1);
+      expect(cubit.state.items.first.notes, 'بقعة شاي على الصدر');
+
+      // Verify cubit state draftNotes is reset
+      expect(cubit.state.draftNotes, isNull);
+
+      // Pump with updated state
+      await tester.pumpWidget(
+        testBoilerplate(OrderItemForm(state: cubit.state, cubit: cubit)),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify TextFormField controller text is empty
+      final textFormFieldWidget = tester.widget<TextFormField>(
+        notesTextFormField,
+      );
+      expect(textFormFieldWidget.controller?.text, '');
+    },
+  );
+
+  testWidgets('OrderItemForm prevents note leakage to second item in UI flow', (
+    tester,
+  ) async {
     await cubit.initialize();
     final itemType = cubit.state.itemTypes.first;
-    final service = Service(
-      id: 'srv-form-test',
-      name: 'غسيل وكي',
-      pricingType: PricingType.perPiece,
-      price: const Money.fromPiastres(2500),
-      isActive: true,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-    await serviceRepository.createService(service, supportedItemTypeIds: [itemType.id]);
-
-    await cubit.selectItemType(itemType);
-    cubit.selectService(cubit.state.compatibleServices.first);
-
-    // Pump widget with initial cubit state
-    await tester.pumpWidget(testBoilerplate(
-      OrderItemForm(state: cubit.state, cubit: cubit),
-    ));
-    await tester.pumpAndSettle();
-
-    final notesFieldContainer = find.widgetWithText(AppTextField, 'ملاحظات القطعة');
-    expect(notesFieldContainer, findsOneWidget);
-
-    final notesTextFormField = find.descendant(
-      of: notesFieldContainer,
-      matching: find.byType(TextFormField),
-    );
-    expect(notesTextFormField, findsOneWidget);
-
-    // Enter notes in text field
-    await tester.enterText(notesTextFormField, 'بقعة شاي على الصدر');
-    await tester.pumpAndSettle();
-
-    expect(cubit.state.draftNotes, 'بقعة شاي على الصدر');
-
-    // Tap Add Item button
-    final addButtonFinder = find.text('إضافة القطعة');
-    expect(addButtonFinder, findsOneWidget);
-    await tester.tap(addButtonFinder);
-    await tester.pumpAndSettle();
-
-    // Verify item draft has notes intact
-    expect(cubit.state.items.length, 1);
-    expect(cubit.state.items.first.notes, 'بقعة شاي على الصدر');
-
-    // Verify cubit state draftNotes is reset
-    expect(cubit.state.draftNotes, isNull);
-
-    // Pump with updated state
-    await tester.pumpWidget(testBoilerplate(
-      OrderItemForm(state: cubit.state, cubit: cubit),
-    ));
-    await tester.pumpAndSettle();
-
-    // Verify TextFormField controller text is empty
-    final textFormFieldWidget = tester.widget<TextFormField>(notesTextFormField);
-    expect(textFormFieldWidget.controller?.text, '');
-  });
-
-  testWidgets('OrderItemForm prevents note leakage to second item in UI flow', (tester) async {
-    await cubit.initialize();
-    final itemType = cubit.state.itemTypes.first;
+    final now = DateTime.now();
     final service = Service(
       id: 'srv-form-leak-test',
       name: 'غسيل سريع',
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final sit = ServiceItemType(
+      id: 'sit-form-leak-test',
+      serviceId: service.id,
+      itemTypeId: itemType.id,
       pricingType: PricingType.perPiece,
       price: const Money.fromPiastres(3500),
-      isActive: true,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
+      createdAt: now,
+      updatedAt: now,
     );
-    await serviceRepository.createService(service, supportedItemTypeIds: [itemType.id]);
+    await serviceRepository.createService(
+      service,
+      serviceItemTypes: [sit],
+    );
 
     // Item 1
     await cubit.selectItemType(itemType);
     cubit.selectService(cubit.state.compatibleServices.first);
 
-    await tester.pumpWidget(testBoilerplate(
-      OrderItemForm(state: cubit.state, cubit: cubit),
-    ));
+    await tester.pumpWidget(
+      testBoilerplate(OrderItemForm(state: cubit.state, cubit: cubit)),
+    );
     await tester.pumpAndSettle();
 
-    final notesFieldContainer = find.widgetWithText(AppTextField, 'ملاحظات القطعة');
+    final notesFieldContainer = find.widgetWithText(
+      AppTextField,
+      'ملاحظات القطعة',
+    );
     final notesTextFormField = find.descendant(
       of: notesFieldContainer,
       matching: find.byType(TextFormField),
@@ -247,13 +284,15 @@ void main() {
     await cubit.selectItemType(itemType);
     cubit.selectService(cubit.state.compatibleServices.first);
 
-    await tester.pumpWidget(testBoilerplate(
-      OrderItemForm(state: cubit.state, cubit: cubit),
-    ));
+    await tester.pumpWidget(
+      testBoilerplate(OrderItemForm(state: cubit.state, cubit: cubit)),
+    );
     await tester.pumpAndSettle();
 
     // Verify text field is blank for Item 2
-    final textWidgetAfterReset = tester.widget<TextFormField>(notesTextFormField);
+    final textWidgetAfterReset = tester.widget<TextFormField>(
+      notesTextFormField,
+    );
     expect(textWidgetAfterReset.controller?.text, '');
 
     // Add item 2 without entering notes
@@ -269,98 +308,119 @@ void main() {
     expect(cubit.state.draftNotes, isNull);
   });
 
-  testWidgets('Carpet quantity regression test: Quantity and dimension controls remain visible for perSquareMeter service', (tester) async {
-    await cubit.initialize();
-    final carpetType = cubit.state.itemTypes.firstWhere(
-      (t) => t.name.contains('سجاد'),
-    );
+  testWidgets(
+    'Carpet quantity regression test: Quantity and dimension controls remain visible for perSquareMeter service',
+    (tester) async {
+      await cubit.initialize();
+      final carpetType = cubit.state.itemTypes.firstWhere(
+        (t) => t.name.contains('سجاد'),
+      );
 
-    final carpetService = Service(
-      id: 'srv-carpet-regression-test',
-      name: 'غسيل سجاد',
-      pricingType: PricingType.perSquareMeter,
-      price: const Money.fromPiastres(6000), // 60 EGP / m2
-      isActive: true,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-    await serviceRepository.createService(carpetService, supportedItemTypeIds: [carpetType.id]);
+      final now = DateTime.now();
+      final carpetService = Service(
+        id: 'srv-carpet-regression-test',
+        name: 'غسيل سجاد للاختبار',
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      );
+      final sit = ServiceItemType(
+        id: 'sit-carpet-reg',
+        serviceId: carpetService.id,
+        itemTypeId: carpetType.id,
+        pricingType: PricingType.perSquareMeter,
+        price: const Money.fromPiastres(6000), // 60 EGP / m2
+        createdAt: now,
+        updatedAt: now,
+      );
+      await serviceRepository.createService(
+        carpetService,
+        serviceItemTypes: [sit],
+      );
 
-    // 1. Select item type "سجاد"
-    await cubit.selectItemType(carpetType);
-    // 2. Select a perSquareMeter service
-    cubit.selectService(cubit.state.compatibleServices.firstWhere((s) => s.id == carpetService.id));
+      // 1. Select item type "سجاد"
+      await cubit.selectItemType(carpetType);
+      // 2. Select a perSquareMeter service
+      cubit.selectService(
+        cubit.state.compatibleServices.firstWhere(
+          (s) => s.id == carpetService.id,
+        ),
+      );
 
-    await tester.pumpWidget(testBoilerplate(
-      OrderItemForm(state: cubit.state, cubit: cubit),
-    ));
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        testBoilerplate(OrderItemForm(state: cubit.state, cubit: cubit)),
+      );
+      await tester.pumpAndSettle();
 
-    // 3. Verify the Quantity control is still visible
-    expect(find.text('الكمية'), findsOneWidget);
-    expect(find.byKey(const ValueKey('quantity_stepper_value')), findsOneWidget);
-    expect(find.text('1'), findsOneWidget); // Initial quantity
-    final plusButton = find.byKey(const ValueKey('quantity_stepper_plus'));
-    final minusButton = find.byKey(const ValueKey('quantity_stepper_minus'));
-    expect(plusButton, findsOneWidget);
-    expect(minusButton, findsOneWidget);
+      // 3. Verify the Quantity control is still visible
+      expect(find.text('الكمية'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('quantity_stepper_value')),
+        findsOneWidget,
+      );
+      expect(find.text('1'), findsOneWidget); // Initial quantity
+      final plusButton = find.byKey(const ValueKey('quantity_stepper_plus'));
+      final minusButton = find.byKey(const ValueKey('quantity_stepper_minus'));
+      expect(plusButton, findsOneWidget);
+      expect(minusButton, findsOneWidget);
 
-    // 4. Verify user can increment/decrement quantity
-    await tester.tap(plusButton);
-    await tester.pumpAndSettle();
-    expect(cubit.state.draftQuantity, 2);
+      // 4. Verify user can increment/decrement quantity
+      await tester.tap(plusButton);
+      await tester.pumpAndSettle();
+      expect(cubit.state.draftQuantity, 2);
 
-    // Re-pump with updated state
-    await tester.pumpWidget(testBoilerplate(
-      OrderItemForm(state: cubit.state, cubit: cubit),
-    ));
-    await tester.pumpAndSettle();
-    expect(find.text('2'), findsOneWidget);
+      // Re-pump with updated state
+      await tester.pumpWidget(
+        testBoilerplate(OrderItemForm(state: cubit.state, cubit: cubit)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('2'), findsOneWidget);
 
-    await tester.tap(plusButton);
-    await tester.pumpAndSettle();
-    expect(cubit.state.draftQuantity, 3);
+      await tester.tap(plusButton);
+      await tester.pumpAndSettle();
+      expect(cubit.state.draftQuantity, 3);
 
-    await tester.pumpWidget(testBoilerplate(
-      OrderItemForm(state: cubit.state, cubit: cubit),
-    ));
-    await tester.pumpAndSettle();
-    expect(find.text('3'), findsOneWidget);
+      await tester.pumpWidget(
+        testBoilerplate(OrderItemForm(state: cubit.state, cubit: cubit)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('3'), findsOneWidget);
 
-    // Decrement
-    await tester.tap(minusButton);
-    await tester.pumpAndSettle();
-    expect(cubit.state.draftQuantity, 2);
+      // Decrement
+      await tester.tap(minusButton);
+      await tester.pumpAndSettle();
+      expect(cubit.state.draftQuantity, 2);
 
-    // 5. Verify the carpet dimension controls are also still present
-    expect(find.text('مقاس السجادة'), findsOneWidget);
-    expect(find.widgetWithText(AppTextField, 'الطول (م) *'), findsOneWidget);
-    expect(find.widgetWithText(AppTextField, 'العرض (م) *'), findsOneWidget);
-    expect(find.text('المساحة'), findsOneWidget);
+      // 5. Verify the carpet dimension controls are also still present
+      expect(find.text('مقاس السجادة'), findsOneWidget);
+      expect(find.widgetWithText(AppTextField, 'الطول (م) *'), findsOneWidget);
+      expect(find.widgetWithText(AppTextField, 'العرض (م) *'), findsOneWidget);
+      expect(find.text('المساحة'), findsOneWidget);
 
-    // Also verify adding the item calculates total = area * price * quantity
-    cubit.updateCarpetDimensions(length: 3.0, width: 2.0); // 6 m²
-    cubit.updateQuantity(3); // 3 carpets
+      // Also verify adding the item calculates total = area * price * quantity
+      cubit.updateCarpetDimensions(length: 3.0, width: 2.0); // 6 m²
+      cubit.updateQuantity(3); // 3 carpets
 
-    // Re-pump
-    await tester.pumpWidget(testBoilerplate(
-      OrderItemForm(state: cubit.state, cubit: cubit),
-    ));
-    await tester.pumpAndSettle();
+      // Re-pump
+      await tester.pumpWidget(
+        testBoilerplate(OrderItemForm(state: cubit.state, cubit: cubit)),
+      );
+      await tester.pumpAndSettle();
 
-    // Tap 'إضافة القطعة'
-    final addButton = find.text('إضافة القطعة');
-    await tester.ensureVisible(addButton);
-    await tester.tap(addButton);
-    await tester.pumpAndSettle();
+      // Tap 'إضافة القطعة'
+      final addButton = find.text('إضافة القطعة');
+      await tester.ensureVisible(addButton);
+      await tester.tap(addButton);
+      await tester.pumpAndSettle();
 
-    expect(cubit.state.items.length, 1);
-    final addedItem = cubit.state.items.first;
-    expect(addedItem.physicalQuantity, 3);
-    expect(addedItem.length, 3.0);
-    expect(addedItem.width, 2.0);
-    expect(addedItem.carpetArea, 6.0);
-    // 6 m² * 60 EGP (6000 piastres) * 3 = 1080 EGP (108000 piastres)
-    expect(addedItem.calculatedTotal, const Money.fromPiastres(108000));
-  });
+      expect(cubit.state.items.length, 1);
+      final addedItem = cubit.state.items.first;
+      expect(addedItem.physicalQuantity, 3);
+      expect(addedItem.length, 3.0);
+      expect(addedItem.width, 2.0);
+      expect(addedItem.carpetArea, 6.0);
+      // 6 m² * 60 EGP (6000 piastres) * 3 = 1080 EGP (108000 piastres)
+      expect(addedItem.calculatedTotal, const Money.fromPiastres(108000));
+    },
+  );
 }

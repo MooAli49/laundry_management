@@ -170,7 +170,7 @@ The following are not V1 Domain entities:
 - Role
 - Permission
 - Branch
-- Refund
+- Automated payment gateway refunds and item-level refunds
 - LoyaltyAccount
 - StorageMovement
 - StorageCapacity
@@ -355,13 +355,13 @@ Business invariants must also be validated before persistence.
 
 The human-readable Order Number is separate from the internal database ID.
 
-Approved V1 format:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length (zero-padded below 1000; naturally expands to 4+ digits at 1000+).
 
-YY-XXX
+Examples:
 
-Example:
-
-26-001
+    26-001
+    26-999
+    26-1000
 
 The Order Number must:
 
@@ -566,15 +566,15 @@ Cancellation information should include:
 
 ---
 
-## 21. Cancellation Does Not Mean Refund
+## 21. Cancellation Does Not Mean Automatic Refund
 
 Cancelling an Order does not automatically create a refund.
 
-The V1 Domain does not contain a Refund entity.
+Refund is an approved V1 Domain entity (`Refund`) operating at the order level for cancelled orders.
 
-Existing Payment records remain historical records.
+Existing Payment records remain immutable historical records.
 
-If refund functionality is introduced later, it must be an explicitly approved requirement.
+Cancellation and refund remain separate operations: cancelled orders with a positive refundable balance (`Total Paid - Total Refunded`) can receive manual refunds via `CreateRefundUseCase`.
 
 ---
 
@@ -893,82 +893,70 @@ The UI should not be the only layer enforcing the rule.
 
 ---
 
-## 37. Service Pricing
+## 37. Service Pricing Configuration
 
-V1 supports these Domain-level PricingTypes:
+The Service entity must NOT own a single default/current price or pricing type.
 
-- Per Piece
-- Per Kilogram
-- Per Square Meter
-- Fixed Price
+Pricing configuration belongs to the **Service–Item Type** relationship (`ServiceItemType`).
 
-Only relevant pricing options should be presented to users according to the applicable item/service context.
+Supported V1 operational PricingTypes:
 
-Typical usage:
+- Per Piece (`per_piece`)
+- Per Square Meter (`per_square_meter`)
 
-Clothing
-→ Per Piece
+*(Note: `fixed_price` is removed from the V1 operational model because each physical item is represented as an individual OrderItem and receives a unit price; it does not represent a distinct business behavior. Per Kilogram pricing remains completely excluded from V1).*
 
-Blankets
-→ Per Piece
+In this laundry system, the actual price depends on the combination of Service + Item Type:
 
-Carpet Covers
-→ Per Piece
+    Washing
+      ├── Clothing → per_piece → 50 EGP
+      ├── Blanket  → per_piece → 100 EGP
+      └── Carpet   → per_square_meter → 60 EGP
 
-Carpets
-→ Per Square Meter
+Typical V1 configurations:
+
+    Clothing + Service       → Per Piece (`per_piece`)
+    Blankets + Service       → Per Piece (`per_piece`)
+    Carpet Covers + Service  → Per Piece (`per_piece`)
+    Carpets + Service        → Per Square Meter (`per_square_meter`)
 
 ---
 
 ## 38. Pricing Calculation
 
-Pricing calculation must respect the selected PricingType.
+Pricing calculation must respect the selected PricingType configured on the Service + Item Type combination.
 
-The Domain must not blindly multiply every service price by quantity.
+The Domain must not blindly calculate every item price using a single formula.
 
-The required calculation depends on the pricing type.
+Calculations for supported V1 types:
 
-Examples:
+- **Per Piece (`per_piece`)**:
+  `unit_price × 1` (each physical piece is an independent OrderItem)
 
-Per Piece:
+- **Per Square Meter (`per_square_meter`)**:
+  `unit_price × calculated_area` (where area = length × width)
 
-unit price × piece quantity
-
-Per Kilogram:
-
-price × applicable weight
-
-Per Square Meter:
-
-price × calculated area
-
-Fixed Price:
-
-applicable fixed amount
-
-The exact input requirements must follow the approved feature/business rules.
-
-Do not invent unsupported pricing inputs.
+The exact input requirements must follow the approved feature/business rules. Do not invent unsupported pricing inputs.
 
 ---
 
 ## 39. Historical Pricing
 
-Current Service pricing belongs to master data.
+Current Service–Item Type pricing belongs to master data on `ServiceItemType`.
 
-Historical OrderItem pricing belongs to the transaction.
+Historical OrderItem pricing belongs to the transaction on `OrderItem.unitPrice`.
 
 Therefore:
 
-Current Service Price
+    Current ServiceItemType Price
 
 must never be used to reconstruct:
 
-Historical OrderItem Price
+    Historical OrderItem Price
 
 after the transaction has been created.
 
-An OrderItem must preserve the pricing information used at transaction time.
+An OrderItem must preserve the pricing information used at transaction time (`unitPrice`, `pricingTypeSnapshot`, `calculatedTotal`).
 
 ---
 
@@ -1526,7 +1514,7 @@ This applies to:
 - ItemType
 - ItemDefinition
 - Service
-- Service price
+- Service + Item Type price
 - PricingType
 - ExpenseCategory
 - StorageLocation status
@@ -2167,7 +2155,7 @@ Used for creating/editing new transactions.
 
 Examples:
 
-Current Service price
+Current Service + Item Type price
 
 Current ItemDefinition name
 
@@ -2515,7 +2503,7 @@ Tests must verify that changing master data does not alter historical transactio
 
 Example:
 
-Service price:
+Service + Item Type price:
 
 100 EGP
 
@@ -2523,7 +2511,7 @@ OrderItem created:
 
 100 EGP
 
-Service price later changed:
+Service + Item Type price later changed:
 
 150 EGP
 
@@ -2820,7 +2808,7 @@ The AI must not create new V1 entities for:
 - Role
 - Permission
 - Branch
-- Refund
+- Automated payment gateway refunds and line-item refunds
 - Loyalty
 - StorageMovement
 - StorageCapacity
@@ -2867,7 +2855,7 @@ The AI must never implement master-data updates in a way that rewrites historica
 
 Examples:
 
-Changing Service price must not recalculate old OrderItems.
+Changing Service + Item Type price must not recalculate old OrderItems.
 
 Changing Service name must not erase historical service name snapshots.
 

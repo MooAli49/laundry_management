@@ -22,10 +22,7 @@ class StoreOrderItemsResult {
   final Order order;
   final bool allStored;
 
-  const StoreOrderItemsResult({
-    required this.order,
-    required this.allStored,
-  });
+  const StoreOrderItemsResult({required this.order, required this.allStored});
 }
 
 class StoreOrderItemsUseCase {
@@ -37,9 +34,9 @@ class StoreOrderItemsUseCase {
     required OrderRepository orderRepository,
     required StorageRepository storageRepository,
     required StorageLocationRepository storageLocationRepository,
-  })  : _orderRepository = orderRepository,
-        _storageRepository = storageRepository,
-        _storageLocationRepository = storageLocationRepository;
+  }) : _orderRepository = orderRepository,
+       _storageRepository = storageRepository,
+       _storageLocationRepository = storageLocationRepository;
 
   Future<StoreOrderItemsResult> execute(StoreOrderItemsInput input) async {
     if (input.orderItemIds.isEmpty) {
@@ -48,10 +45,14 @@ class StoreOrderItemsUseCase {
 
     final uniqueItemIds = input.orderItemIds.toSet();
     if (uniqueItemIds.length != input.orderItemIds.length) {
-      throw const ValidationFailure('Duplicate item IDs are not allowed in storage request');
+      throw const ValidationFailure(
+        'Duplicate item IDs are not allowed in storage request',
+      );
     }
 
-    final location = await _storageLocationRepository.getStorageLocationById(input.storageLocationId);
+    final location = await _storageLocationRepository.getStorageLocationById(
+      input.storageLocationId,
+    );
     if (location == null) {
       throw const ValidationFailure('Storage location not found');
     }
@@ -69,7 +70,9 @@ class StoreOrderItemsUseCase {
         throw const ValidationFailure('Order not found');
       }
       if (order.status != OrderStatus.processing) {
-        throw const BusinessRuleFailure('Only processing orders can store items');
+        throw const BusinessRuleFailure(
+          'Only processing orders can store items',
+        );
       }
       ordersById[order.id] = order;
 
@@ -79,7 +82,9 @@ class StoreOrderItemsUseCase {
       for (final itemId in input.orderItemIds) {
         final item = orderItemMap[itemId];
         if (item == null) {
-          throw BusinessRuleFailure('Item $itemId does not belong to order ${input.orderId}');
+          throw BusinessRuleFailure(
+            'Item $itemId does not belong to order ${input.orderId}',
+          );
         }
         resolvedItems.add(item);
       }
@@ -97,7 +102,9 @@ class StoreOrderItemsUseCase {
             throw ValidationFailure('Order ${item.orderId} not found');
           }
           if (order.status != OrderStatus.processing) {
-            throw const BusinessRuleFailure('Only processing orders can store items');
+            throw const BusinessRuleFailure(
+              'Only processing orders can store items',
+            );
           }
           ordersById[order.id] = order;
         }
@@ -106,10 +113,11 @@ class StoreOrderItemsUseCase {
 
     // Validate location compatibility with EVERY selected item (Intersection)
     for (final item in resolvedItems) {
-      final compatibleLocations = await _storageLocationRepository.getCompatibleLocationsForItemType(
-        item.itemTypeId,
+      final compatibleLocations = await _storageLocationRepository
+          .getCompatibleLocationsForItemType(item.itemTypeId);
+      final isCompatible = compatibleLocations.any(
+        (loc) => loc.id == input.storageLocationId,
       );
-      final isCompatible = compatibleLocations.any((loc) => loc.id == input.storageLocationId);
       if (!isCompatible) {
         throw IncompatibleStorageLocationFailure(
           storageLocationId: input.storageLocationId,
@@ -129,7 +137,9 @@ class StoreOrderItemsUseCase {
     Order? lastUpdatedOrder;
 
     for (final orderId in ordersById.keys) {
-      final allStored = await _storageRepository.areAllOrderItemsStored(orderId);
+      final allStored = await _storageRepository.areAllOrderItemsStored(
+        orderId,
+      );
       if (allStored) {
         lastUpdatedOrder = await _orderRepository.markOrderReady(orderId);
       } else {

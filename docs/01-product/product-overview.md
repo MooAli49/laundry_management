@@ -207,9 +207,10 @@ Manages:
 - Services
 - Item types
 - Item definitions
-- Pricing types
-- Service prices
+- Service–Item Type pricing configurations (pricing type and price per combination)
 - Common carpet sizes
+
+Note: The Service entity does NOT own a single default/current price. Pricing configuration belongs to the Service–Item Type relationship. Supported V1 pricing types are `per_piece` and `per_square_meter`.
 
 Services & Pricing is part of Settings in the V1 navigation structure.
 
@@ -366,9 +367,10 @@ V1 payment methods are:
 - InstaPay
 - E-Wallet
 
-The system does not currently implement a complete refund workflow.
+The system implements an order-level Refund V1 workflow for cancelled orders.
 
-Payment records remain part of the historical financial record of the Order.
+Payment records remain immutable historical financial records of the Order.
+Refunds are recorded as separate immutable financial transactions.
 
 ---
 
@@ -604,13 +606,13 @@ Every Order has a unique human-readable Order Number.
 
 The Order Number is separate from the internal database identifier.
 
-The approved V1 display format is:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length (zero-padded below 1000; naturally expands to 4+ digits at 1000+).
 
-> YY-XXX
-
-Example:
+Examples:
 
 > 26-001
+> 26-999
+> 26-1000
 
 The Order Number is immutable after assignment.
 

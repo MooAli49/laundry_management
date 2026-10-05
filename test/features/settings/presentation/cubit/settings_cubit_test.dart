@@ -83,37 +83,39 @@ void main() {
       expect(cubit.state.errorMessage, 'DB error');
     });
 
-    test('updateBusinessInfo successfully updates business information', () async {
-      await cubit.loadSettings();
+    test(
+      'updateBusinessInfo successfully updates business information',
+      () async {
+        await cubit.loadSettings();
 
-      final result = await cubit.updateBusinessInfo(
-        businessName: 'مغسلة الأمل الحديثة',
-        phone: '01111111111',
-        address: 'شارع التحرير',
-        invoiceFooterText: 'أهلاً بكم دائماً',
-      );
+        final result = await cubit.updateBusinessInfo(
+          businessName: 'مغسلة الأمل الحديثة',
+          phone: '01111111111',
+          address: 'شارع التحرير',
+          invoiceFooterText: 'أهلاً بكم دائماً',
+        );
 
-      expect(result, isTrue);
-      expect(cubit.state.isSaving, isFalse);
-      expect(cubit.state.settings?.businessName, 'مغسلة الأمل الحديثة');
-      expect(cubit.state.settings?.phone, '01111111111');
-      expect(cubit.state.settings?.address, 'شارع التحرير');
-      expect(cubit.state.settings?.invoiceFooterText, 'أهلاً بكم دائماً');
-      expect(cubit.state.saveSuccessMessage, AppStrings.saveBusinessSettingsSuccess);
-    });
+        expect(result, isTrue);
+        expect(cubit.state.isSaving, isFalse);
+        expect(cubit.state.settings?.businessName, 'مغسلة الأمل الحديثة');
+        expect(cubit.state.settings?.phone, '01111111111');
+        expect(cubit.state.settings?.address, 'شارع التحرير');
+        expect(cubit.state.settings?.invoiceFooterText, 'أهلاً بكم دائماً');
+        expect(
+          cubit.state.saveSuccessMessage,
+          AppStrings.saveBusinessSettingsSuccess,
+        );
+      },
+    );
 
     test('updateBusinessInfo rejects empty or whitespace-only name', () async {
       await cubit.loadSettings();
 
-      final result1 = await cubit.updateBusinessInfo(
-        businessName: '',
-      );
+      final result1 = await cubit.updateBusinessInfo(businessName: '');
       expect(result1, isFalse);
       expect(cubit.state.errorMessage, AppStrings.businessNameRequired);
 
-      final result2 = await cubit.updateBusinessInfo(
-        businessName: '   ',
-      );
+      final result2 = await cubit.updateBusinessInfo(businessName: '   ');
       expect(result2, isFalse);
       expect(cubit.state.errorMessage, AppStrings.businessNameRequired);
     });

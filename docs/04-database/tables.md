@@ -59,6 +59,7 @@ Examples:
     orders
     order_items
     payments
+    refunds
     expenses
 
 Column names use:
@@ -262,6 +263,26 @@ Optional customer notes.
 
 ---
 
+### address
+
+Type:
+
+    TEXT
+
+Required:
+
+    No
+
+Nullable:
+
+    Yes
+
+Description:
+
+Optional customer address. Stored on Customer only (no separate address table or delivery routing in V1). Whitespace-only values normalize to NULL. Profile attribute only.
+
+---
+
 ### created_at
 
 Type:
@@ -354,13 +375,19 @@ Description:
 
 Human-readable business Order Number.
 
-The approved V1 format is:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length:
 
-    YY-XXX
+- YY = 2-digit year prefix.
+- Numeric sequence only.
+- Minimum display width of 3 digits (zero-padded below 1000).
+- No maximum length (valid values include 26-001, 26-999, 26-1000, 26-10000).
+- Non-numeric or alphanumeric values (e.g. 26-T123) are not valid business order numbers.
 
-Example:
+Examples:
 
     26-001
+    26-999
+    26-1000
 
 The Order Number:
 
@@ -1027,9 +1054,9 @@ Historical pricing type used for this OrderItem.
 Expected V1 values:
 
     per_piece
-    per_kg
     per_square_meter
-    fixed_price
+
+*(Note: fixed_price is removed from V1, per_kg remains excluded)*
 
 The value is stored as transaction-time historical data.
 
@@ -1059,12 +1086,9 @@ Examples:
     1
 
     Per Square Meter:
-    6.25
+    6.25 (calculated area)
 
-    Fixed Price:
-    1
-
-    (Note: Per Kilogram pricing is not supported in V1 operations)
+    (Note: fixed_price has been removed as it is identical to per_piece; per_kg remains excluded from V1)
 
 The exact physical representation of decimal quantities must follow the approved implementation strategy.
 
@@ -1092,7 +1116,7 @@ Example:
     →
     10050
 
-This value must not be reconstructed from the current Service price.
+This value must not be reconstructed from current Service + Item Type pricing (`service_item_types.price`).
 
 ---
 
@@ -1319,6 +1343,40 @@ Payment belongs to an Order.
 Payment is independent from Expense.
 
 A Payment cannot exceed the current Order remaining amount.
+
+---
+
+# 7A. refunds
+
+## Purpose
+
+Stores order-level refund transactions returned to customers for cancelled orders.
+
+Append-only, immutable financial transaction records.
+
+## Columns
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| id | UUID | PRIMARY KEY | Unique refund transaction ID |
+| order_id | UUID | NOT NULL REFERENCES orders(id) ON DELETE RESTRICT | Associated cancelled order |
+| amount | BIGINT | NOT NULL CHECK (amount > 0) | Refund amount in positive minor units (piastres) |
+| refund_method | TEXT | NOT NULL CHECK (refund_method IN ('cash', 'insta_pay', 'e_wallet')) | Method used to issue refund |
+| reason | TEXT | NULL | Optional explanation for refund |
+| refunded_at | TIMESTAMPTZ | NOT NULL | Transaction timestamp |
+| created_at | TIMESTAMPTZ | NOT NULL DEFAULT now() | Record creation timestamp |
+| updated_at | TIMESTAMPTZ | NOT NULL DEFAULT now() | Record update timestamp |
+
+## Refund Data Rules
+
+- Append-only and immutable: records are never edited or deleted.
+- Append-only financial records: refunds do not use `server_version`.
+- Order-level: directly references `orders(id)`, no `payment_id`.
+- Only `cancelled` orders can receive refunds.
+- Cumulative refunds for an order cannot exceed the order's total paid amount (`Total Paid - Total Refunded >= amount`).
+- Mutation is strictly controlled through the `sync_create_refund` SECURITY DEFINER RPC.
+- Protected by row-level locking on `orders` (`FOR UPDATE`) to prevent race conditions.
+- Direct table mutation via PostgREST is blocked by RLS default-deny.
 
 ---
 
@@ -1908,56 +1966,17 @@ Optional Service description.
 
 ---
 
-### pricing_type
+### Pricing Configuration Note
 
-Type:
+The Service entity must NOT own a single default/current price or pricing type.
 
-    TEXT
+In this laundry system, the actual price depends on the combination of:
 
-Required:
+    Service + Item Type
 
-    Yes
+Therefore, pricing configuration belongs to the `service_item_types` table, not directly to `services`.
 
-Description:
 
-Current pricing model for the Service.
-
-Approved V1 values:
-
-    per_piece
-    per_kg
-    per_square_meter
-    fixed_price
-
----
-
-### price
-
-Type:
-
-    INTEGER
-
-Required:
-
-    Yes
-
-Description:
-
-Current configured Service price.
-
-Stored in minor currency units.
-
-Example:
-
-    100.50 EGP
-    →
-    10050
-
-This is master-data pricing.
-
-It must not be used to reconstruct historical OrderItem prices.
-
-The current Service price is editable through Settings.
 
 ---
 
@@ -2017,19 +2036,23 @@ Timestamp of the latest Service update.
 
 ## Purpose
 
-Junction table defining which Services are compatible with which Item Types.
+Associative table defining which Services are compatible with which Item Types, as well as the operational pricing configuration for each combination.
 
 Relationship:
 
     Service
-        N
+        1
         ↕
-    ServiceItemType
+    ServiceItemType (pricing_type, price)
         ↕
     ItemType
-        N
+        1
 
-This represents the many-to-many relationship between Services and Item Types.
+In this laundry system, the actual price depends on the combination of:
+
+    Service + Item Type
+
+The Service entity does NOT own a single default/current price. Pricing configuration belongs here.
 
 ---
 
@@ -2051,7 +2074,7 @@ Primary Key:
 
 Description:
 
-Stable identifier for the compatibility record.
+Stable identifier for the Service–Item Type configuration record.
 
 ---
 
@@ -2071,7 +2094,7 @@ Foreign Key:
 
 Description:
 
-Service participating in the compatibility relationship.
+Service participating in the compatibility and pricing relationship.
 
 ---
 
@@ -2095,6 +2118,51 @@ Item Type supported by the Service.
 
 ---
 
+### pricing_type
+
+Type:
+
+    TEXT
+
+Required:
+
+    Yes
+
+Description:
+
+Operational pricing type for this Service + Item Type combination.
+
+Approved V1 values:
+
+    per_piece
+    per_square_meter
+
+*(Note: fixed_price is removed from V1 operational model, per_kg remains excluded)*
+
+---
+
+### price
+
+Type:
+
+    INTEGER
+
+Required:
+
+    Yes
+
+Description:
+
+Current configured price for this Service + Item Type combination.
+
+Stored in minor currency units (e.g. 5000 = 50.00 EGP).
+
+Must be strictly positive (`price > 0`).
+
+This is master-data pricing. When an OrderItem is created, this price is snapshotted into `order_items.unit_price`. Modifying this value later does not alter historical orders.
+
+---
+
 ### created_at
 
 Type:
@@ -2107,19 +2175,39 @@ Required:
 
 Description:
 
-Timestamp when the compatibility record was created.
+Timestamp when the record was created.
 
 ---
 
-## Compatibility Rule
+### updated_at
 
-The same:
+Type:
+
+    DATETIME
+
+Required:
+
+    Yes
+
+Description:
+
+Timestamp when the record was last updated.
+
+---
+
+## Compatibility and Pricing Rules
+
+1. **Uniqueness**: The combination:
 
     service_id + item_type_id
 
-combination must not be duplicated.
+must not be duplicated. Each Service + Item Type pair has exactly one pricing configuration.
 
-This relationship determines whether a Service can be selected for a particular Item Type.
+2. **Supported Pricing Types**: Must be one of `per_piece` or `per_square_meter`.
+
+3. **Strictly Positive Price**: `price > 0` (zero and negative prices are prohibited).
+
+4. **Historical Price Stability**: Modifying `price` or `pricing_type` on `service_item_types` does not affect existing `order_items`. Existing items preserve their transaction-time `unit_price` snapshot.
 
 ---
 
@@ -3395,7 +3483,144 @@ Timestamp of the latest synchronization attempt.
 
 ---
 
-# 21. Table Summary
+### Retention
+
+Synced operations (`status = 'synced'`) are retained for **90 days**. Automatic background deletion is deferred in V1; retention maintenance is manual.
+
+---
+
+# 21. sync_state
+
+## Purpose
+
+Infrastructure table used by the offline-first bidirectional synchronization system to persist the local incoming Pull cursor.
+
+This is NOT a Domain business entity.
+
+It exists to store the client's current synchronization position and guarantee crash-safe change application.
+
+---
+
+## Columns
+
+### id
+
+Type:
+
+    TEXT
+
+Required:
+
+    Yes
+
+Primary Key:
+
+    Yes
+
+Default:
+
+    'singleton'
+
+Description:
+
+Singleton identifier for the device synchronization state.
+
+---
+
+### last_applied_sequence
+
+Type:
+
+    INTEGER / BIGINT
+
+Required:
+
+    Yes
+
+Default:
+
+    0
+
+Description:
+
+The monotonically increasing sequence number of the latest remote change from `sync_changes` that was successfully applied to the local SQLite database.
+
+---
+
+### last_sync_at
+
+Type:
+
+    DATETIME
+
+Required:
+
+    No
+
+Nullable:
+
+    Yes
+
+Description:
+
+Timestamp of the latest successful pull synchronization.
+
+---
+
+### updated_at
+
+Type:
+
+    DATETIME
+
+Required:
+
+    Yes
+
+Description:
+
+Timestamp when the local sync state was last updated.
+
+---
+
+## Crash Safety & Ingestion Invariant
+
+The local database must enforce the following invariant:
+
+    Apply remote changes to local DAOs
+        +
+    Advance sync_state.last_applied_sequence
+        ↓
+    SAME LOCAL SQLITE TRANSACTION
+
+If the application or device crashes mid-batch, the entire transaction rolls back cleanly, leaving `last_applied_sequence` at the previous confirmed position so the batch can be safely re-pulled and re-applied without data loss.
+
+Remote change application must NEVER write to `sync_operations`.
+
+---
+
+# 21.1. Entity Concurrency Versioning Classification (server_version)
+
+For optimistic concurrency control across devices, entities are classified by whether they require versioning:
+
+### Entities Requiring server_version (Optimistic Concurrency):
+- `orders`: High concurrency risk (status transitions, cancellations, order details).
+- `customers`: Mutable customer phone, address, and name.
+- `expenses`: Mutable expense amount, notes, date, category.
+- `expense_categories`: Mutable category name and active/inactive status.
+- `business_settings`: Mutable singleton shop settings (tax rate, receipt footer, phone, etc.).
+- Master Data (`item_types`, `item_definitions`, `carpet_sizes`, `storage_locations`): Mutable/deactivatable configuration.
+
+### Entities NOT Requiring server_version:
+- `payments`: Append-only, immutable financial transaction records. Protected by stable UUID idempotency and server-side `SELECT ... FOR UPDATE` row locks on `orders`.
+- `storage_records`: Immutable physical movement logs. Protected by locking `order_item_id` and ensuring at most one active record.
+- `order_items`: Created within the Order Creation aggregate; subsequent edits are governed by Order concurrency or dedicated domain workflows.
+
+*Note: While the remote PostgreSQL backend RPCs maintain `server_version` for optimistic concurrency on these entities, the local Flutter Drift database currently does NOT maintain local `server_version` columns and does NOT propagate `base_version` through the normal `SyncOperation` flow. This is a known deferred V1 limitation.*
+
+---
+
+# 22. Table Summary
 
 The V1 business tables are:
 
@@ -3416,9 +3641,10 @@ The V1 business tables are:
     expenses
     business_settings
 
-Infrastructure table:
+Infrastructure tables:
 
     sync_operations
+    sync_state
 
 ---
 
@@ -3509,7 +3735,7 @@ The following tables are not part of V1:
     drivers
     vehicles
     delivery_routes
-    refunds
+    payment_gateway_refunds
     loyalty_accounts
     storage_movement_history
     storage_capacity
@@ -3626,7 +3852,7 @@ Applicable fields include:
     orders.total
     order_items.unit_price
     order_items.calculated_total
-    services.price
+    service_item_types.price
     payments.amount
     expenses.amount
 
@@ -3940,15 +4166,19 @@ The historical StorageRecords remain preserved.
 
 ---
 
-# 39. Service Pricing Rule
+# 39. Service Pricing Configuration Rule
 
-The Service table contains the current master price.
+The Service entity does NOT own a single default/current price.
 
-The OrderItem table contains the historical transaction price.
+Pricing configuration belongs to the Service + Item Type combination in:
+
+    service_item_types
+
+The `order_items` table contains the historical transaction price (`order_items.unit_price`).
 
 Therefore:
 
-    services.price
+    service_item_types.price
 
 may change.
 
@@ -3960,18 +4190,18 @@ must remain historically stable.
 
 Example:
 
-Current Service:
+Current Service + Item Type (Washing + Blanket):
 
-    غسيل
-    150 EGP
+    بطانية + غسيل
+    100 EGP
 
 Historical OrderItem:
 
-    120 EGP
+    90 EGP
 
-Changing the Service price to:
+Changing the `service_item_types.price` to:
 
-    160 EGP
+    110 EGP
 
 does not modify the historical OrderItem price.
 
@@ -4200,7 +4430,7 @@ The database must not introduce dedicated V1 business tables for:
     Roles
     Permissions
     Branches
-    Refunds
+    Payment Gateway Refunds and Item-Level Refunds
     Loyalty
     Storage Movement History
     Storage Capacity
@@ -4450,6 +4680,42 @@ using:
     delivery_to_laundry_fee
     customer_delivery_requested
     customer_delivery_fee
+
+---
+
+# 57A. License Cache Table — license_cache
+
+Location:
+
+    data/local/tables/license_cache_table.dart
+
+Purpose:
+
+Stores the locally cached license verification state for offline license enforcement and 24-hour check throttling.
+
+Table definition:
+
+    CREATE TABLE license_cache (
+        id TEXT NOT NULL PRIMARY KEY DEFAULT 'singleton',
+        remote_status TEXT NOT NULL,
+        suspended_at INTEGER,
+        last_checked_at INTEGER
+    );
+
+Column details:
+
+| Column | Type | Nullable | Default | Description |
+|---|---|---|---|---|
+| `id` | TEXT | No | `'singleton'` | Technical primary key; fixed constant singleton row. |
+| `remote_status` | TEXT | No | None | Last verified remote status (`'active'` or `'suspended'`). |
+| `suspended_at` | INTEGER | Yes | NULL | Authoritative suspension UTC timestamp from remote `license_info.suspended_at`. |
+| `last_checked_at` | INTEGER | Yes | NULL | Local timestamp when remote check was last performed (used for 24h throttling). |
+
+Operational rules:
+- **Singleton**: Only one row ever exists (`id = 'singleton'`).
+- **Isolation**: Excluded from synchronization (`sync_operations` / `SyncEngine`).
+- **No Foreign Keys**: Independent infrastructure cache with no business table relationships.
+- **Migration**: Added in Drift database schema version 7.
 
 ---
 

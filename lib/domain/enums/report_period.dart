@@ -30,7 +30,15 @@ enum ReportPeriod {
   }) {
     final current = now ?? DateTime.now();
     final startOfToday = DateTime(current.year, current.month, current.day);
-    final endOfToday = DateTime(current.year, current.month, current.day, 23, 59, 59, 999);
+    final endOfToday = DateTime(
+      current.year,
+      current.month,
+      current.day,
+      23,
+      59,
+      59,
+      999,
+    );
 
     switch (this) {
       case ReportPeriod.today:
@@ -40,7 +48,15 @@ enum ReportPeriod {
         final yesterday = startOfToday.subtract(const Duration(days: 1));
         return (
           start: DateTime(yesterday.year, yesterday.month, yesterday.day),
-          end: DateTime(yesterday.year, yesterday.month, yesterday.day, 23, 59, 59, 999),
+          end: DateTime(
+            yesterday.year,
+            yesterday.month,
+            yesterday.day,
+            23,
+            59,
+            59,
+            999,
+          ),
         );
 
       case ReportPeriod.last7Days:
@@ -49,12 +65,28 @@ enum ReportPeriod {
 
       case ReportPeriod.thisMonth:
         final startOfMonth = DateTime(current.year, current.month, 1);
-        final endOfMonth = DateTime(current.year, current.month + 1, 0, 23, 59, 59, 999);
+        final endOfMonth = DateTime(
+          current.year,
+          current.month + 1,
+          0,
+          23,
+          59,
+          59,
+          999,
+        );
         return (start: startOfMonth, end: endOfMonth);
 
       case ReportPeriod.lastMonth:
         final startOfLastMonth = DateTime(current.year, current.month - 1, 1);
-        final endOfLastMonth = DateTime(current.year, current.month, 0, 23, 59, 59, 999);
+        final endOfLastMonth = DateTime(
+          current.year,
+          current.month,
+          0,
+          23,
+          59,
+          59,
+          999,
+        );
         return (start: startOfLastMonth, end: endOfLastMonth);
 
       case ReportPeriod.custom:
@@ -62,7 +94,15 @@ enum ReportPeriod {
             ? DateTime(customStart.year, customStart.month, customStart.day)
             : startOfToday;
         final end = customEnd != null
-            ? DateTime(customEnd.year, customEnd.month, customEnd.day, 23, 59, 59, 999)
+            ? DateTime(
+                customEnd.year,
+                customEnd.month,
+                customEnd.day,
+                23,
+                59,
+                59,
+                999,
+              )
             : endOfToday;
         return (start: start, end: end);
     }

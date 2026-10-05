@@ -59,14 +59,50 @@ The main `lib/` structure is:
 
     lib/
     ├── core/
+    │   ├── constants/
+    │   ├── errors/
+    │   ├── license/
+    │   │   └── license_guard.dart
+    │   ├── localization/
+    │   ├── network/
+    │   ├── routing/
+    │   ├── theme/
+    │   ├── utils/
+    │   └── widgets/
     ├── domain/
+    │   ├── entities/
+    │   ├── enums/
+    │   ├── license/
+    │   │   └── license_status.dart
+    │   └── repositories/
     ├── application/
+    │   ├── license/
+    │   │   └── license_service.dart
     │   └── use_cases/
     ├── data/
+    │   ├── datasources/remote/
+    │   ├── local/
+    │   │   ├── daos/
+    │   │   ├── database/
+    │   │   └── tables/
+    │   ├── repositories/
+    │   └── sync/
     ├── features/
+    │   ├── customers/
+    │   ├── dashboard/
+    │   ├── expenses/
+    │   ├── license/
+    │   │   └── presentation/
+    │   │       ├── screens/license_lock_screen.dart
+    │   │       └── widgets/license_warning_banner.dart
+    │   ├── orders/
+    │   ├── payments/
+    │   ├── reports/
+    │   ├── settings/
+    │   └── storage/
     └── main.dart
 
-Each area has a clear responsibility. Simple CRUD features interact directly with Domain Repository contracts, while complex multi-step business operations interact through the Application UseCases layer.
+Each area has a clear responsibility. Simple CRUD features interact directly with Domain Repository contracts, while complex multi-step business operations interact through the Application UseCases layer. The Application layer also hosts the cross-cutting `LicenseService` orchestration exception.
 
 ---
 
@@ -78,15 +114,16 @@ Location:
 
 The Core layer contains application-wide infrastructure and genuinely shared UI components.
 
-Recommended structure:
+Approved structure:
 
     core/
     ├── constants/
+    ├── di/
     ├── errors/
+    ├── license/
     ├── localization/
     ├── network/
     ├── routing/
-    ├── storage/
     ├── theme/
     ├── utils/
     └── widgets/
@@ -1573,15 +1610,14 @@ Data conversion should remain simple and close to the Data Layer boundary when r
 
 ---
 
-## 65. No Application Layer
+## 65. Application Layer Scope & Boundaries
 
-The project does not contain:
+The Application layer (`lib/application/`) exists exclusively for two approved purposes:
 
-    application/
+1. **Selective Domain Use Cases** (`lib/application/use_cases/`): Complex, multi-step business workflows (order creation, storage, relocation, status transitions, completion, cancellation) where cross-repository orchestration is required.
+2. **Cross-Cutting Orchestration Exception: License Control** (`lib/application/license/license_service.dart`): Orchestrating cross-cutting operational license enforcement across SQLite cache, remote API, connectivity, and router gating.
 
-unless a future architecture decision explicitly introduces it.
-
-Do not create an Application layer simply to add another abstraction between Cubit and Repository.
+Do not create an Application layer for simple entity operations, and do not introduce generic CRUD wrappers, managers, or services between Cubit and Repository.
 
 ---
 
@@ -1821,7 +1857,7 @@ Possible future additions include:
 - Advanced conflict handling
 - Multi-branch
 - Delivery management
-- Refunds
+- Advanced refund capabilities (item-level refunds, store credit, gateway reconciliation)
 - Advanced reporting
 - Barcode support
 - Advanced Expense workflows
@@ -2157,9 +2193,9 @@ And:
 
 There are:
 
-    No mandatory Use Cases
+    No mandatory CRUD Use Cases
     No mandatory Mappers
-    No Application layer
+    No generic CRUD Application layer
     No unnecessary abstractions
 
 Expenses are a normal V1 business feature.

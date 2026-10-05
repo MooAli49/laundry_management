@@ -103,7 +103,10 @@ class _StatusChangeDialogState extends State<StatusChangeDialog> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = e.toString().replaceFirst('ValidationFailure: ', '').replaceFirst('BusinessRuleFailure: ', '');
+        _errorMessage = e
+            .toString()
+            .replaceFirst('ValidationFailure: ', '')
+            .replaceFirst('BusinessRuleFailure: ', '');
       });
     }
   }
@@ -155,7 +158,9 @@ class _StatusChangeDialogState extends State<StatusChangeDialog> {
               if (_errorMessage != null) ...[
                 Text(
                   _errorMessage!,
-                  style: AppTextStyles.labelMedium.copyWith(color: AppColors.error),
+                  style: AppTextStyles.labelMedium.copyWith(
+                    color: AppColors.error,
+                  ),
                 ),
                 AppSpacing.gapSm,
               ],
@@ -180,7 +185,9 @@ class _StatusChangeDialogState extends State<StatusChangeDialog> {
                   AppButton(
                     label: 'إلغاء',
                     variant: AppButtonVariant.secondary,
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isLoading
+                        ? null
+                        : () => Navigator.of(context).pop(),
                   ),
                 ],
               ),

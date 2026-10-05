@@ -91,45 +91,48 @@ void main() {
       );
     });
 
-    test('throws ArgumentError if cancelled order lacks reason or cancelledAt', () {
-      expect(
-        () => Order(
-          id: 'ord-4',
-          orderNumber: '26-004',
-          customerId: 'cust-1',
-          customerNameSnapshot: 'عميل أ',
-          customerPhoneSnapshot: '01011112222',
-          status: OrderStatus.cancelled,
-          expectedPickupDate: OrderDate(2026, 9, 10),
-          subtotal: const Money.fromPiastres(5000),
-          total: const Money.fromPiastres(5000),
-          cancelledAt: null,
-          cancellationReason: 'Client requested',
-          createdAt: now,
-          updatedAt: now,
-        ),
-        throwsArgumentError,
-      );
+    test(
+      'throws ArgumentError if cancelled order lacks reason or cancelledAt',
+      () {
+        expect(
+          () => Order(
+            id: 'ord-4',
+            orderNumber: '26-004',
+            customerId: 'cust-1',
+            customerNameSnapshot: 'عميل أ',
+            customerPhoneSnapshot: '01011112222',
+            status: OrderStatus.cancelled,
+            expectedPickupDate: OrderDate(2026, 9, 10),
+            subtotal: const Money.fromPiastres(5000),
+            total: const Money.fromPiastres(5000),
+            cancelledAt: null,
+            cancellationReason: 'Client requested',
+            createdAt: now,
+            updatedAt: now,
+          ),
+          throwsArgumentError,
+        );
 
-      expect(
-        () => Order(
-          id: 'ord-5',
-          orderNumber: '26-005',
-          customerId: 'cust-1',
-          customerNameSnapshot: 'عميل أ',
-          customerPhoneSnapshot: '01011112222',
-          status: OrderStatus.cancelled,
-          expectedPickupDate: OrderDate(2026, 9, 10),
-          subtotal: const Money.fromPiastres(5000),
-          total: const Money.fromPiastres(5000),
-          cancelledAt: now,
-          cancellationReason: '  ', // empty reason invalid!
-          createdAt: now,
-          updatedAt: now,
-        ),
-        throwsArgumentError,
-      );
-    });
+        expect(
+          () => Order(
+            id: 'ord-5',
+            orderNumber: '26-005',
+            customerId: 'cust-1',
+            customerNameSnapshot: 'عميل أ',
+            customerPhoneSnapshot: '01011112222',
+            status: OrderStatus.cancelled,
+            expectedPickupDate: OrderDate(2026, 9, 10),
+            subtotal: const Money.fromPiastres(5000),
+            total: const Money.fromPiastres(5000),
+            cancelledAt: now,
+            cancellationReason: '  ', // empty reason invalid!
+            createdAt: now,
+            updatedAt: now,
+          ),
+          throwsArgumentError,
+        );
+      },
+    );
 
     test('isOverdue identifies processing/ready orders past pickup date', () {
       final pastDate = OrderDate(2020, 1, 1);
@@ -162,29 +165,30 @@ void main() {
       expect(completedPastOrder.isOverdue, isFalse);
     });
 
-    test('customerNameSnapshot and customerPhoneSnapshot are immutable and included in equality', () {
-      final orderA = Order(
-        id: 'ord-snap-1',
-        orderNumber: '26-001',
-        customerId: 'cust-1',
-        customerNameSnapshot: 'العميل الأصلي',
-        customerPhoneSnapshot: '01011112222',
-        expectedPickupDate: OrderDate(2026, 9, 10),
-        subtotal: const Money.fromPiastres(5000),
-        total: const Money.fromPiastres(5000),
-        createdAt: now,
-        updatedAt: now,
-      );
+    test(
+      'customerNameSnapshot and customerPhoneSnapshot are immutable and included in equality',
+      () {
+        final orderA = Order(
+          id: 'ord-snap-1',
+          orderNumber: '26-001',
+          customerId: 'cust-1',
+          customerNameSnapshot: 'العميل الأصلي',
+          customerPhoneSnapshot: '01011112222',
+          expectedPickupDate: OrderDate(2026, 9, 10),
+          subtotal: const Money.fromPiastres(5000),
+          total: const Money.fromPiastres(5000),
+          createdAt: now,
+          updatedAt: now,
+        );
 
-      expect(orderA.customerNameSnapshot, 'العميل الأصلي');
-      expect(orderA.customerPhoneSnapshot, '01011112222');
+        expect(orderA.customerNameSnapshot, 'العميل الأصلي');
+        expect(orderA.customerPhoneSnapshot, '01011112222');
 
-      final orderB = orderA.copyWith(
-        customerNameSnapshot: 'اسم مختلف',
-      );
-      expect(orderA == orderB, isFalse);
-      expect(orderB.customerNameSnapshot, 'اسم مختلف');
-      expect(orderB.customerPhoneSnapshot, '01011112222');
-    });
+        final orderB = orderA.copyWith(customerNameSnapshot: 'اسم مختلف');
+        expect(orderA == orderB, isFalse);
+        expect(orderB.customerNameSnapshot, 'اسم مختلف');
+        expect(orderB.customerPhoneSnapshot, '01011112222');
+      },
+    );
   });
 }

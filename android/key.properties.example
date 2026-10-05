@@ -1,0 +1,17 @@
+# Production Android Keystore Configuration Template
+# ----------------------------------------------------
+# 1. Copy this file to 'android/key.properties':
+#      cp android/key.properties.example android/key.properties
+# 2. Update with the actual keystore credentials.
+# 3. NEVER commit 'key.properties' or keystore files (*.jks, *.keystore) to version control.
+#
+# Alternatively, provide these values via environment variables (e.g. in CI/CD):
+#   - ANDROID_KEYSTORE_PATH
+#   - ANDROID_KEYSTORE_PASSWORD
+#   - ANDROID_KEY_ALIAS
+#   - ANDROID_KEY_PASSWORD
+
+storePassword=YOUR_KEYSTORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=YOUR_KEY_ALIAS
+storeFile=upload-keystore.jks

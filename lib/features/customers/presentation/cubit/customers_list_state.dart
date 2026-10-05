@@ -36,7 +36,9 @@ class CustomersListState {
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       hasMoreCustomers: hasMoreCustomers ?? this.hasMoreCustomers,
       searchQuery: searchQuery ?? this.searchQuery,
-      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
     );
   }
 }

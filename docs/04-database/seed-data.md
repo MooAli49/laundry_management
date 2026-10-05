@@ -334,67 +334,65 @@ If the final business requirements provide a specific Service catalog, the seed 
 
 \---
 
-**## 7.1 Service Pricing**
+**## 7.1 Service Pricing Configuration**
 
-Default Service prices must not be invented.
+The Service entity must NOT own a single default/current price or pricing type.
 
-A Service seed may contain:
+Pricing configuration belongs to the Service–Item Type relationship (`service_item_types`).
 
-    name
+Default Service–Item Type prices must not be invented without approved business configuration.
 
-    pricing\_type
+A Service seed contains:
 
-    is\_active
+    name
+    is_active
 
-but a real business price should be configured by the business unless an approved default price list exists.
+Operational pricing configuration is defined per supported Item Type on `service_item_types`:
 
-The system must not silently assume arbitrary prices.
+    pricing_type
+    price
 
 \---
 
 **## 7.2 Pricing Type**
 
-Every seeded Service must use an approved Pricing Type.
+Every seeded Service–Item Type configuration must use an approved V1 Pricing Type.
 
-Examples:
+Approved V1 values:
 
-    per\_piece
+    per_piece
+    per_square_meter
 
-    per\_kg
-
-    per\_square\_meter
-
-    fixed\_price
+*(Note: fixed_price is removed from V1 operational model, per_kg remains excluded).*
 
 Only pricing types supported by the Domain Model should be seeded.
 
 \---
 
-**# 8. Service / ItemType Compatibility**
+**# 8. Service / ItemType Compatibility & Pricing Configuration**
 
-If default Services are seeded, their compatibility with ItemTypes may also be seeded.
+If default Services are seeded, their compatibility and operational pricing configurations with ItemTypes are also seeded in `service_item_types`.
 
 Example structure:
 
-    Service
+    Washing
+      ├── Clothing → per_piece → 50 EGP
+      ├── Blanket  → per_piece → 100 EGP
+      └── Carpet   → per_square_meter → 60 EGP
 
-        ↓
-
-    ServiceItemType
-
-        ↓
-
-    ItemType
+Each seeded `service_item_types` record must define:
+- `service_id`
+- `item_type_id`
+- `pricing_type` (`per_piece` or `per_square_meter`)
+- `price` (strictly positive minor currency units)
 
 Only explicitly approved combinations should be inserted.
 
 The seed process must not automatically assume:
 
-    Every Service
-
-        +
-
-    Every ItemType
+    Every Service
+        +
+    Every ItemType
 
 is valid.
 
@@ -1226,7 +1224,7 @@ The only financial-looking data present initially should come from approved conf
 
 **# 31. No Arbitrary Prices**
 
-The seed system must not invent production Service prices.
+The seed system must not invent production Service + Item Type prices.
 
 If approved business pricing exists:
 
@@ -1310,7 +1308,7 @@ The initial setup flow may allow the business to configure:
 
     Services
 
-    Service Prices
+    Service + Item Type Prices
 
     Item Types
 
@@ -2025,3 +2023,60 @@ For local testing, UI development, and end-to-end verification, a dedicated `Dev
 2. **DevTestData Scope**: Populates 12 synthetic customers and 18 synthetic orders covering all operational test scenarios (processing, ready, completed, cancelled, partial storage, discount, pickup/delivery fees, carpet dimensions, price overrides, multi-payments).
 3. **Strict Gate**: DevTestData is NEVER executed in production by default. It is gated by `--dart-define=ENABLE_DEV_TEST_DATA=true` (or programmatic flag in tests).
 4. **Idempotency**: All synthetic records use deterministic IDs and `INSERT OR IGNORE` so repeated runs do not duplicate data.
+
+---
+
+## 59. Canonical Seed Ownership, Outbox Safety & Operational Cleanup
+
+### 59.1 Canonical Seed Ownership & Catalog Alignment
+The project maintains a single canonical master data baseline shared across offline SQLite clients and the central Supabase backend. Canonical entities use deterministic RFC 4122 UUIDs:
+- **BusinessSettings**: `00000000-0000-0000-0000-000000000001`
+- **ItemTypes (4)**: `00000000-0000-0000-0001-000000000001` to `...0004` (ملابس, بطاطين, سجاد, أغطية)
+- **ExpenseCategories (7)**: `00000000-0000-0000-0002-000000000001` to `...0007` (كهرباء, مياه, منظفات, صيانة, مستلزمات, نقل, أخرى)
+- **Services (5)**: `00000000-0000-0000-0003-000000000001` to `...0005`
+- **ServiceItemTypes (5)**: `00000000-0000-0000-0004-000000000001` to `...0005`
+- **CarpetSizes (3)**: `00000000-0000-0000-0007-000000000001` to `...0003`
+- **StorageLocations (5)**: `00000000-0000-0000-0006-000000000001` to `...0005`
+- **StorageLocationItemTypes (9)**: `00000000-0000-0000-0008-000000000001` to `...0009`
+- **ItemDefinitions (10)**: `00000000-0000-0000-0009-000000000001` to `...0010`
+
+### 59.2 Local Seed vs Remote Seed Responsibilities
+- **Local SQLite Seed (`SeedData.seedInitialData`)**:
+  - Provides instant offline cold-start capability for new POS terminals. A brand-new terminal with no internet connection has the full canonical catalog immediately available to take orders, calculate prices, and configure storage.
+  - Inserts all 9 master tables using `INSERT OR IGNORE`.
+  - Initializes `sync_state` with `last_applied_sequence = 0`.
+- **Remote Supabase Seed (`scripts/dev_supabase_seed_canonical_baseline.sql`)**:
+  - Acts as the central authoritative catalog and seeds the initial changelog in `sync_changes` (sequences 1..35).
+  - Supplies the baseline for new devices connecting via Pull sync.
+
+### 59.3 Why Canonical Seed Records Do NOT Create Outbox Operations
+Under NO circumstances may initial canonical seeding generate rows in `sync_operations` (the Outbox queue).
+- **Rationale**:
+  1. Canonical seed records represent pre-existing, shared static baseline data, not user mutations.
+  2. Generating outbox entries on terminal bootstrap would trigger an **outbox echo storm**: terminals would attempt to push `create` operations for canonical UUIDs that already exist on the central server, causing HTTP 409 conflict errors or duplicate log noise.
+  3. By keeping `SeedData` outbox-free, a fresh terminal has zero pending sync operations. When it connects to Supabase, it pulls changes from sequence 0; the `RemoteChangeApplier` idempotently updates the local rows without re-queueing them to the outbox.
+
+### 59.4 How to Explicitly Enable DevTestData
+By default, `flutter run` and standard debug/release execution run with `DevTestData` disabled to prevent synthetic customers/orders from being created on developer machines.
+- **Normal Execution**: `DevTestData.isEnabled == false`.
+- **Explicit Activation**: Pass `--dart-define=ENABLE_DEV_TEST_DATA=true` at build or run time:
+  ```bash
+  flutter run -d windows --dart-define=ENABLE_DEV_TEST_DATA=true
+  ```
+- **Code Enforcement**: `lib/main.dart` compiles the environment flag:
+  ```dart
+  const bool enableDevSeeds = bool.fromEnvironment(
+    'ENABLE_DEV_TEST_DATA',
+    defaultValue: false,
+  );
+  await initDependencies(enableDevTestData: enableDevSeeds);
+  ```
+
+### 59.5 Development Database Reset & Reseed Procedure
+When the development Supabase project (`dyhfgnbhijukbdptreto`) accumulates test artifacts, use the approved two-stage transactional procedure:
+1. **Safe Reset**: Execute [`scripts/dev_supabase_safe_reset.sql`](file:///d:/projects/laundry_management/scripts/dev_supabase_safe_reset.sql) to purge transactional data and non-canonical master rows in reverse-dependency order and reset the changelog sequence.
+2. **Reseed Baseline**: Execute [`scripts/dev_supabase_seed_canonical_baseline.sql`](file:///d:/projects/laundry_management/scripts/dev_supabase_seed_canonical_baseline.sql) to re-insert the 35 canonical baseline rows and changelog entries.
+
+> [!CAUTION]
+> ### CRITICAL PRODUCTION WARNING
+> The safe reset script (`scripts/dev_supabase_safe_reset.sql`) **MUST NEVER BE RUN ON THE PRODUCTION SUPABASE PROJECT** (`rvrskluqfbrkvvlxtxfp`). Production contains live business data, actual orders, and customer records. The reset script enforces strict guard variables (`app.project_ref = 'dyhfgnbhijukbdptreto'`, `app.environment = 'development'`) that deliberately cause the transaction to abort if attempted on any database other than the disposable development instance.

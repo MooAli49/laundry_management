@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/utils/phone_utils.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_text_field.dart';
 
@@ -11,14 +12,12 @@ class AddCustomerDialog extends StatefulWidget {
   final Future<void> Function({
     required String name,
     required String phone,
+    String? address,
     String? notes,
-  }) onSave;
+  })
+  onSave;
 
-  const AddCustomerDialog({
-    super.key,
-    this.initialQuery,
-    required this.onSave,
-  });
+  const AddCustomerDialog({super.key, this.initialQuery, required this.onSave});
 
   @override
   State<AddCustomerDialog> createState() => _AddCustomerDialogState();
@@ -27,6 +26,7 @@ class AddCustomerDialog extends StatefulWidget {
 class _AddCustomerDialogState extends State<AddCustomerDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
+  final TextEditingController _addressController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
 
   String? _errorMessage;
@@ -36,23 +36,29 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
   void initState() {
     super.initState();
     final query = widget.initialQuery?.trim() ?? '';
-    final isDigitsOnly = RegExp(r'^[0-9]+$').hasMatch(query);
+    final normalizedQuery = PhoneUtils.normalizePhoneNumber(query);
+    final isDigitsOnly = RegExp(r'^[0-9]+$').hasMatch(normalizedQuery);
 
     _nameController = TextEditingController(text: isDigitsOnly ? '' : query);
-    _phoneController = TextEditingController(text: isDigitsOnly ? query : '');
+    _phoneController = TextEditingController(
+      text: isDigitsOnly ? normalizedQuery : '',
+    );
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _addressController.dispose();
     _notesController.dispose();
     super.dispose();
   }
 
   Future<void> _handleSave() async {
     final name = _nameController.text.trim();
-    final phone = _phoneController.text.trim();
+    final phone = PhoneUtils.normalizePhoneNumber(_phoneController.text);
+    final rawAddress = _addressController.text.trim();
+    final address = rawAddress.isNotEmpty ? rawAddress : null;
 
     if (name.isEmpty) {
       setState(() => _errorMessage = 'اسم العميل مطلوب');
@@ -72,6 +78,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
       await widget.onSave(
         name: name,
         phone: phone,
+        address: address,
         notes: _notesController.text.trim().isNotEmpty
             ? _notesController.text.trim()
             : null,
@@ -125,7 +132,9 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.error,
+                          ),
                         ),
                       ),
                     ],
@@ -150,6 +159,14 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
               AppSpacing.gapMd,
 
               AppTextField(
+                controller: _addressController,
+                label: 'العنوان',
+                hintText: 'مثال: 12 شارع الجمهورية',
+                maxLines: 2,
+              ),
+              AppSpacing.gapMd,
+
+              AppTextField(
                 controller: _notesController,
                 label: 'ملاحظات',
                 hintText: 'أي ملاحظات خاصة بالعميل',
@@ -169,7 +186,9 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
                   AppButton(
                     label: 'إلغاء',
                     variant: AppButtonVariant.secondary,
-                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isLoading
+                        ? null
+                        : () => Navigator.of(context).pop(),
                   ),
                 ],
               ),

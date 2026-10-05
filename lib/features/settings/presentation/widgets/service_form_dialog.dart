@@ -9,28 +9,28 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../domain/entities/item_type.dart';
 import '../../../../domain/entities/service.dart';
+import '../../../../domain/entities/service_item_type.dart';
 import '../../../../domain/enums/pricing_type.dart';
 import '../../../../domain/value_objects/money.dart';
 import '../cubit/services_management_cubit.dart';
-import 'settings_table_components.dart';
 
 class ServiceFormDialog extends StatefulWidget {
   final Service? service;
   final List<ItemType> availableItemTypes;
-  final List<String> initialSupportedTypeIds;
+  final List<ServiceItemType> initialConfigs;
 
   const ServiceFormDialog({
     super.key,
     this.service,
     required this.availableItemTypes,
-    this.initialSupportedTypeIds = const [],
+    this.initialConfigs = const [],
   });
 
   static Future<bool?> show(
     BuildContext context, {
     Service? service,
     required List<ItemType> availableItemTypes,
-    List<String> initialSupportedTypeIds = const [],
+    List<ServiceItemType> initialConfigs = const [],
   }) {
     return showDialog<bool>(
       context: context,
@@ -40,7 +40,7 @@ class ServiceFormDialog extends StatefulWidget {
         child: ServiceFormDialog(
           service: service,
           availableItemTypes: availableItemTypes,
-          initialSupportedTypeIds: initialSupportedTypeIds,
+          initialConfigs: initialConfigs,
         ),
       ),
     );
@@ -50,23 +50,34 @@ class ServiceFormDialog extends StatefulWidget {
   State<ServiceFormDialog> createState() => _ServiceFormDialogState();
 }
 
+class _ItemTypeRowConfig {
+  final ItemType itemType;
+  bool isEnabled;
+  PricingType pricingType;
+  final TextEditingController priceController;
+
+  _ItemTypeRowConfig({
+    required this.itemType,
+    this.isEnabled = false,
+    this.pricingType = PricingType.perPiece,
+    String initialPriceText = '',
+  }) : priceController = TextEditingController(text: initialPriceText);
+
+  void dispose() {
+    priceController.dispose();
+  }
+}
+
 class _ServiceFormDialogState extends State<ServiceFormDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _descriptionController;
-  late final TextEditingController _priceController;
-
-  late PricingType _selectedPricingType;
-  late Set<String> _selectedTypeIds;
-  Money? _originalPrice;
-  bool _priceChanged = false;
+  late final List<_ItemTypeRowConfig> _itemTypeRows;
   String? _inlineError;
 
-  // V1 allowed pricing types ONLY
   static const List<PricingType> _v1PricingTypes = [
     PricingType.perPiece,
     PricingType.perSquareMeter,
-    PricingType.fixedPrice,
   ];
 
   @override
@@ -74,55 +85,38 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
     super.initState();
     final svc = widget.service;
     _nameController = TextEditingController(text: svc?.name ?? '');
-    _descriptionController = TextEditingController(text: svc?.description ?? '');
-    _selectedPricingType = (svc != null && _v1PricingTypes.contains(svc.pricingType))
-        ? svc.pricingType
-        : PricingType.perPiece;
+    _descriptionController = TextEditingController(
+      text: svc?.description ?? '',
+    );
 
-    final initialPriceText = svc != null
-        ? (svc.price.toEgp == svc.price.toEgp.roundToDouble()
-            ? svc.price.toEgp.toInt().toString()
-            : svc.price.toEgp.toStringAsFixed(2))
-        : '';
-    _priceController = TextEditingController(text: initialPriceText);
-    _originalPrice = svc?.price;
-
-    _selectedTypeIds = Set.from(widget.initialSupportedTypeIds);
-
-    _priceController.addListener(_onPriceChanged);
+    _itemTypeRows = widget.availableItemTypes.map((type) {
+      final existing = widget.initialConfigs
+          .where((c) => c.itemTypeId == type.id)
+          .firstOrNull;
+      final isEnabled = existing != null;
+      final pricingType = existing?.pricingType ?? PricingType.perPiece;
+      final initialPriceText = existing != null
+          ? (existing.price.toEgp == existing.price.toEgp.roundToDouble()
+              ? existing.price.toEgp.toInt().toString()
+              : existing.price.toEgp.toStringAsFixed(2))
+          : '';
+      return _ItemTypeRowConfig(
+        itemType: type,
+        isEnabled: isEnabled,
+        pricingType: pricingType,
+        initialPriceText: initialPriceText,
+      );
+    }).toList();
   }
 
   @override
   void dispose() {
-    _priceController.removeListener(_onPriceChanged);
     _nameController.dispose();
     _descriptionController.dispose();
-    _priceController.dispose();
+    for (final row in _itemTypeRows) {
+      row.dispose();
+    }
     super.dispose();
-  }
-
-  void _onPriceChanged() {
-    if (widget.service == null) return;
-    final parsed = Money.tryParseEgp(_priceController.text);
-    final changed = parsed != null && _originalPrice != null && parsed != _originalPrice;
-    if (changed != _priceChanged) {
-      setState(() {
-        _priceChanged = changed;
-      });
-    }
-  }
-
-  String _getPriceLabel() {
-    switch (_selectedPricingType) {
-      case PricingType.perPiece:
-        return AppStrings.priceLabelPerPiece;
-      case PricingType.perSquareMeter:
-        return AppStrings.priceLabelPerSquareMeter;
-      case PricingType.fixedPrice:
-        return AppStrings.priceLabelFixedPrice;
-      default:
-        return AppStrings.servicePriceLabel;
-    }
   }
 
   String _getPricingTypeLabel(PricingType type) {
@@ -131,10 +125,6 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
         return AppStrings.pricingPerPiece;
       case PricingType.perSquareMeter:
         return AppStrings.pricingPerSquareMeter;
-      case PricingType.fixedPrice:
-        return AppStrings.pricingFixedPrice;
-      case PricingType.perKilogram:
-        return '';
     }
   }
 
@@ -142,10 +132,29 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
     setState(() => _inlineError = null);
     if (!_formKey.currentState!.validate()) return;
 
-    final money = Money.tryParseEgp(_priceController.text);
-    if (money == null || money <= Money.zero) {
-      setState(() => _inlineError = AppStrings.servicePriceMustBePositive);
+    final enabledRows = _itemTypeRows.where((r) => r.isEnabled).toList();
+    if (enabledRows.isEmpty) {
+      setState(() => _inlineError = AppStrings.selectAtLeastOneItemType);
       return;
+    }
+
+    final configs = <ServiceItemTypeConfig>[];
+    for (final row in enabledRows) {
+      final money = Money.tryParseEgp(row.priceController.text);
+      if (money == null || money <= Money.zero) {
+        setState(
+          () => _inlineError =
+              'يرجى إدخال سعر صحيح أكبر من الصفر لنوع القطعة: ${row.itemType.name}',
+        );
+        return;
+      }
+      configs.add(
+        ServiceItemTypeConfig(
+          itemTypeId: row.itemType.id,
+          pricingType: row.pricingType,
+          price: money,
+        ),
+      );
     }
 
     final cubit = context.read<ServicesManagementCubit>();
@@ -157,22 +166,12 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
         description: _descriptionController.text.trim().isEmpty
             ? null
             : _descriptionController.text.trim(),
-        pricingType: _selectedPricingType,
-        price: money,
-        supportedItemTypeIds: _selectedTypeIds.toList(),
+        itemTypeConfigs: configs,
       );
     } else {
-      final updated = widget.service!.copyWith(
-        name: _nameController.text.trim(),
-        description: _descriptionController.text.trim().isEmpty
-            ? null
-            : _descriptionController.text.trim(),
-        pricingType: _selectedPricingType,
-        price: money,
-      );
       success = await cubit.updateService(
-        service: updated,
-        supportedItemTypeIds: _selectedTypeIds.toList(),
+        service: widget.service!,
+        itemTypeConfigs: configs,
       );
     }
 
@@ -196,7 +195,7 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
       backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480, maxHeight: 720),
+        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.xl),
           child: Form(
@@ -205,7 +204,6 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header matching Figma (no X button, no divider)
                 Text(
                   isEditing ? AppStrings.editService : AppStrings.addService,
                   style: AppTextStyles.titleLarge.copyWith(
@@ -213,7 +211,7 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                   ),
                 ),
                 AppSpacing.gapLg,
-                Expanded(
+                Flexible(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
                     child: Column(
@@ -224,7 +222,9 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                             padding: const EdgeInsets.all(AppSpacing.md),
                             decoration: BoxDecoration(
                               color: AppColors.errorLight,
-                              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusMd,
+                              ),
                               border: Border.all(
                                 color: AppColors.error.withValues(alpha: 0.3),
                               ),
@@ -269,84 +269,24 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                           hintText: AppStrings.serviceDescriptionHint,
                         ),
                         AppSpacing.gapLg,
-                        // Pricing Type selector (V1 only)
-                        Text(
-                          AppStrings.pricingTypeLabel,
-                          style: AppTextStyles.labelLarge.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        AppSpacing.gapSm,
-                        Wrap(
-                          spacing: AppSpacing.sm,
-                          runSpacing: AppSpacing.sm,
-                          children: _v1PricingTypes.map((type) {
-                            final isSelected = _selectedPricingType == type;
-                            return ChoiceChip(
-                              label: Text(_getPricingTypeLabel(type)),
-                              selected: isSelected,
-                              onSelected: (selected) {
-                                if (selected) {
-                                  setState(() => _selectedPricingType = type);
-                                }
-                              },
-                              selectedColor: AppColors.primaryLighter,
-                              backgroundColor: AppColors.surface,
-                              labelStyle: AppTextStyles.labelMedium.copyWith(
-                                color: isSelected
-                                    ? AppColors.primaryDark
-                                    : AppColors.textPrimary,
-                                fontWeight:
-                                    isSelected ? FontWeight.bold : FontWeight.normal,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(AppSpacing.radiusMd),
-                                side: BorderSide(
-                                  color: isSelected
-                                      ? AppColors.primary
-                                      : AppColors.border,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                        AppSpacing.gapLg,
-                        // Price Field
-                        AppTextField(
-                          controller: _priceController,
-                          label: '${_getPriceLabel()} (ج.م) *',
-                          hintText: '0.00',
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return AppStrings.servicePriceRequired;
-                            }
-                            final parsed = Money.tryParseEgp(value);
-                            if (parsed == null || parsed <= Money.zero) {
-                              return AppStrings.servicePriceMustBePositive;
-                            }
-                            return null;
-                          },
-                        ),
-                        // Service Price Change Notice (matching Figma banner)
-                        if (isEditing && _priceChanged) ...[
-                          AppSpacing.gapSm,
-                          const SettingsInfoBanner(
-                            message: AppStrings.servicePriceChangeNotice,
-                          ),
-                        ],
-                        AppSpacing.gapLg,
-                        // Supported Item Types
+
+                        // Item Type Pricing Matrix Header
                         Text(
                           AppStrings.supportedItemTypesLabel,
                           style: AppTextStyles.labelLarge.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        AppSpacing.gapSm,
-                        if (widget.availableItemTypes.isEmpty)
+                        AppSpacing.gapXs,
+                        Text(
+                          AppStrings.itemTypePricingMatrixPrompt,
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        AppSpacing.gapMd,
+
+                        if (_itemTypeRows.isEmpty)
                           Text(
                             AppStrings.noItemTypes,
                             style: AppTextStyles.bodySmall.copyWith(
@@ -354,44 +294,163 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                             ),
                           )
                         else
-                          Wrap(
-                            spacing: AppSpacing.sm,
-                            runSpacing: AppSpacing.sm,
-                            children: widget.availableItemTypes.map((type) {
-                              final isSelected = _selectedTypeIds.contains(type.id);
-                              return FilterChip(
-                                label: Text(type.name),
-                                selected: isSelected,
-                                onSelected: (selected) {
-                                  setState(() {
-                                    if (selected) {
-                                      _selectedTypeIds.add(type.id);
-                                    } else {
-                                      _selectedTypeIds.remove(type.id);
-                                    }
-                                  });
-                                },
-                                selectedColor: AppColors.primaryLighter,
-                                backgroundColor: AppColors.surface,
-                                labelStyle: AppTextStyles.labelMedium.copyWith(
-                                  color: isSelected
-                                      ? AppColors.primaryDark
-                                      : AppColors.textPrimary,
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppSpacing.radiusMd),
-                                  side: BorderSide(
-                                    color: isSelected
+                          ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _itemTypeRows.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 12),
+                            itemBuilder: (context, index) {
+                              final row = _itemTypeRows[index];
+                              return Container(
+                                padding: const EdgeInsets.all(AppSpacing.md),
+                                decoration: BoxDecoration(
+                                  color: row.isEnabled
+                                      ? AppColors.primaryLighter.withValues(alpha: 0.15)
+                                      : AppColors.backgroundSecondary,
+                                  borderRadius: BorderRadius.circular(
+                                    AppSpacing.radiusMd,
+                                  ),
+                                  border: Border.all(
+                                    color: row.isEnabled
                                         ? AppColors.primary
                                         : AppColors.border,
+                                    width: row.isEnabled ? 1.5 : 1,
                                   ),
                                 ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Checkbox(
+                                          value: row.isEnabled,
+                                          activeColor: AppColors.primary,
+                                          onChanged: (val) {
+                                            setState(() {
+                                              row.isEnabled = val ?? false;
+                                            });
+                                          },
+                                        ),
+                                        Expanded(
+                                          child: GestureDetector(
+                                            onTap: () {
+                                              setState(() {
+                                                row.isEnabled = !row.isEnabled;
+                                              });
+                                            },
+                                            child: Text(
+                                              row.itemType.name,
+                                              style: AppTextStyles.titleSmall.copyWith(
+                                                fontWeight: FontWeight.w600,
+                                                color: row.isEnabled
+                                                    ? AppColors.textPrimary
+                                                    : AppColors.textSecondary,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (row.isEnabled) ...[
+                                      const Divider(height: 16),
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          // Pricing Type ChoiceChips
+                                          Expanded(
+                                            flex: 3,
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  AppStrings.pricingTypeLabel,
+                                                  style: AppTextStyles.labelSmall
+                                                      .copyWith(
+                                                    color:
+                                                        AppColors.textSecondary,
+                                                  ),
+                                                ),
+                                                AppSpacing.gapXs,
+                                                Wrap(
+                                                  spacing: 6,
+                                                  children: _v1PricingTypes
+                                                      .map((type) {
+                                                    final isSelected =
+                                                        row.pricingType == type;
+                                                    return ChoiceChip(
+                                                      label: Text(
+                                                        _getPricingTypeLabel(type),
+                                                        style: AppTextStyles
+                                                            .labelSmall
+                                                            .copyWith(
+                                                          color: isSelected
+                                                              ? AppColors
+                                                                  .primaryDark
+                                                              : AppColors
+                                                                  .textPrimary,
+                                                          fontWeight: isSelected
+                                                              ? FontWeight.bold
+                                                              : FontWeight
+                                                                  .normal,
+                                                        ),
+                                                      ),
+                                                      selected: isSelected,
+                                                      selectedColor: AppColors
+                                                          .primaryLighter,
+                                                      onSelected: (selected) {
+                                                        if (selected) {
+                                                          setState(() {
+                                                            row.pricingType =
+                                                                type;
+                                                          });
+                                                        }
+                                                      },
+                                                    );
+                                                  }).toList(),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          AppSpacing.gapHorizontalMd,
+                                          // Price Field
+                                          Expanded(
+                                            flex: 2,
+                                            child: AppTextField(
+                                              controller: row.priceController,
+                                              label:
+                                                  '${AppStrings.servicePriceLabel} (ج.م)',
+                                              hintText: '0.00',
+                                              keyboardType:
+                                                  const TextInputType
+                                                      .numberWithOptions(
+                                                decimal: true,
+                                              ),
+                                              validator: (val) {
+                                                if (!row.isEnabled) return null;
+                                                if (val == null ||
+                                                    val.trim().isEmpty) {
+                                                  return AppStrings
+                                                      .servicePriceRequired;
+                                                }
+                                                final parsed =
+                                                    Money.tryParseEgp(val);
+                                                if (parsed == null ||
+                                                    parsed <= Money.zero) {
+                                                  return AppStrings
+                                                      .servicePriceMustBePositive;
+                                                }
+                                                return null;
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               );
-                            }).toList(),
+                            },
                           ),
                         AppSpacing.gapMd,
                       ],
@@ -399,7 +458,6 @@ class _ServiceFormDialogState extends State<ServiceFormDialog> {
                   ),
                 ),
                 AppSpacing.gapLg,
-                // Actions matching Figma (Save on right, Cancel text button on left)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [

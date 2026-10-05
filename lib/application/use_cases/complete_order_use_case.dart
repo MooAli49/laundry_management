@@ -22,8 +22,8 @@ class CompleteOrderUseCase {
   CompleteOrderUseCase({
     required OrderRepository orderRepository,
     required PaymentRepository paymentRepository,
-  })  : _orderRepository = orderRepository,
-        _paymentRepository = paymentRepository;
+  }) : _orderRepository = orderRepository,
+       _paymentRepository = paymentRepository;
 
   Future<Order> execute(CompleteOrderInput input) async {
     if (!input.handoverConfirmed) {
@@ -40,7 +40,9 @@ class CompleteOrderUseCase {
       throw const BusinessRuleFailure('Only Ready orders can be completed');
     }
 
-    final payments = await _paymentRepository.getPaymentsForOrder(input.orderId);
+    final payments = await _paymentRepository.getPaymentsForOrder(
+      input.orderId,
+    );
     var totalPaid = Money.zero;
     for (final payment in payments) {
       totalPaid += payment.amount;

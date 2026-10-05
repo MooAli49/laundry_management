@@ -40,7 +40,9 @@ class FakeOrderRepository implements OrderRepository {
       discount: existing.discount,
       tax: existing.tax,
       total: existing.total,
-      completedAt: newStatus == OrderStatus.processing ? null : existing.completedAt,
+      completedAt: newStatus == OrderStatus.processing
+          ? null
+          : existing.completedAt,
       cancelledAt: existing.cancelledAt,
       cancellationReason: existing.cancellationReason,
       createdAt: existing.createdAt,
@@ -89,7 +91,9 @@ void main() {
       total: const Money.fromPiastres(1000),
       completedAt: status == OrderStatus.completed ? now : null,
       cancelledAt: status == OrderStatus.cancelled ? now : null,
-      cancellationReason: status == OrderStatus.cancelled ? 'سبب الإلغاء' : null,
+      cancellationReason: status == OrderStatus.cancelled
+          ? 'سبب الإلغاء'
+          : null,
       createdAt: now,
       updatedAt: now,
     );
@@ -99,7 +103,10 @@ void main() {
     orderRepo = FakeOrderRepository();
     useCase = ChangeOrderStatusUseCase(orderRepo);
 
-    orderRepo.orders['ord-proc'] = makeOrder('ord-proc', OrderStatus.processing);
+    orderRepo.orders['ord-proc'] = makeOrder(
+      'ord-proc',
+      OrderStatus.processing,
+    );
     orderRepo.orders['ord-ready'] = makeOrder('ord-ready', OrderStatus.ready);
     orderRepo.orders['ord-comp'] = makeOrder('ord-comp', OrderStatus.completed);
     orderRepo.orders['ord-canc'] = makeOrder('ord-canc', OrderStatus.cancelled);
@@ -179,17 +186,20 @@ void main() {
       expect(orderRepo.cancelOrderCalled, true);
     });
 
-    test('LOCKED RULE: Processing -> Completed is FORBIDDEN directly', () async {
-      expect(
-        () => useCase.execute(
-          const ChangeOrderStatusInput(
-            orderId: 'ord-proc',
-            newStatus: OrderStatus.completed,
+    test(
+      'LOCKED RULE: Processing -> Completed is FORBIDDEN directly',
+      () async {
+        expect(
+          () => useCase.execute(
+            const ChangeOrderStatusInput(
+              orderId: 'ord-proc',
+              newStatus: OrderStatus.completed,
+            ),
           ),
-        ),
-        throwsA(isA<InvalidOrderTransitionFailure>()),
-      );
-    });
+          throwsA(isA<InvalidOrderTransitionFailure>()),
+        );
+      },
+    );
 
     test('Ready -> Processing is allowed', () async {
       final result = await useCase.execute(
@@ -217,17 +227,20 @@ void main() {
       expect(orderRepo.cancelOrderCalled, true);
     });
 
-    test('LOCKED RULE: Ready -> Completed is FORBIDDEN via generic UseCase (must use CompleteOrderUseCase)', () async {
-      expect(
-        () => useCase.execute(
-          const ChangeOrderStatusInput(
-            orderId: 'ord-ready',
-            newStatus: OrderStatus.completed,
+    test(
+      'LOCKED RULE: Ready -> Completed is FORBIDDEN via generic UseCase (must use CompleteOrderUseCase)',
+      () async {
+        expect(
+          () => useCase.execute(
+            const ChangeOrderStatusInput(
+              orderId: 'ord-ready',
+              newStatus: OrderStatus.completed,
+            ),
           ),
-        ),
-        throwsA(isA<InvalidOrderTransitionFailure>()),
-      );
-    });
+          throwsA(isA<InvalidOrderTransitionFailure>()),
+        );
+      },
+    );
 
     test('Completed -> Processing requires non-empty reason', () async {
       expect(

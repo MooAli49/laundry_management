@@ -1,4 +1,1 @@
-enum StorageTab {
-  requiringStorage,
-  currentStorage,
-}
+enum StorageTab { requiringStorage, currentStorage }

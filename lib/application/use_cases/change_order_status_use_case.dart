@@ -45,7 +45,9 @@ class ChangeOrderStatusUseCase {
           );
         } else if (input.newStatus == OrderStatus.cancelled) {
           if (input.reason == null || input.reason!.trim().isEmpty) {
-            throw const ValidationFailure('Cancellation reason cannot be empty');
+            throw const ValidationFailure(
+              'Cancellation reason cannot be empty',
+            );
           }
           return await _orderRepository.cancelOrder(
             orderId: input.orderId,
@@ -75,7 +77,9 @@ class ChangeOrderStatusUseCase {
           );
         } else if (input.newStatus == OrderStatus.cancelled) {
           if (input.reason == null || input.reason!.trim().isEmpty) {
-            throw const ValidationFailure('Cancellation reason cannot be empty');
+            throw const ValidationFailure(
+              'Cancellation reason cannot be empty',
+            );
           }
           return await _orderRepository.cancelOrder(
             orderId: input.orderId,

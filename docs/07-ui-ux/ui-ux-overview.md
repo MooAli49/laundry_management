@@ -256,34 +256,23 @@ The UI should avoid presenting irrelevant fields.
 
 ## 12. Pricing UX
 
-The interface must adapt to the selected Pricing Type.
+The interface adapts to the Pricing Type configured for the selected **Service + Item Type** combination.
+
+The Service entity does NOT own a single default/current price. Pricing is resolved from the Service–Item Type relationship (`ServiceItemType`).
 
 Supported V1 Pricing Types are:
 
-    Per Piece
-    Per Kilogram
-    Per Square Meter
-    Fixed Price
+    Per Piece (`per_piece`)
+    Per Square Meter (`per_square_meter`)
 
-The user should not be required to understand the internal pricing implementation.
+*(Note: Fixed Price is removed from V1 operational pricing because each physical piece is represented as an individual OrderItem and receives a unit price; it behaves identically to per-piece pricing. Per Kilogram pricing remains completely excluded from V1).*
 
-The interface should present the relevant input naturally.
+The user should not be required to understand internal pricing data structures. The interface presents the relevant inputs naturally:
 
-Examples:
+- **Per Piece**: Operates on individual physical items; unit price is resolved from Service + Item Type.
+- **Per Square Meter**: Operates on carpet dimensions (Length × Width) to compute area and total price.
 
-    Per Piece
-        → Item count / physical items
-
-    Per Kilogram
-        → Weight
-
-    Per Square Meter
-        → Carpet dimensions / area
-
-    Fixed Price
-        → Fixed transaction price
-
-The exact domain calculation remains outside the UI.
+The exact domain calculation remains decoupled from the presentation layer.
 
 ---
 
@@ -367,13 +356,13 @@ Financial values must be displayed using the approved EGP formatting.
 
 After an Order is created, the generated Order Number should be highly visible.
 
-V1 format:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length (zero-padded below 1000, expands naturally at 1000+).
 
-    YY-XXX
-
-Example:
+Examples:
 
     26-001
+    26-999
+    26-1000
 
 The Order Number is immutable.
 

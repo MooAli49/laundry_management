@@ -12,11 +12,15 @@ class ItemTypesDao extends DatabaseAccessor<app_db.AppDatabase> {
   }
 
   Future<void> updateItemType(app_db.ItemTypesCompanion companion) async {
-    await (update(db.itemTypes)..where((t) => t.id.equals(companion.id.value))).write(companion);
+    await (update(
+      db.itemTypes,
+    )..where((t) => t.id.equals(companion.id.value))).write(companion);
   }
 
   Future<app_db.ItemType?> getItemTypeById(String id) async {
-    return (select(db.itemTypes)..where((t) => t.id.equals(id))).getSingleOrNull();
+    return (select(
+      db.itemTypes,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
   Future<List<app_db.ItemType>> getActiveItemTypes() async {
@@ -27,10 +31,16 @@ class ItemTypesDao extends DatabaseAccessor<app_db.AppDatabase> {
   }
 
   Future<List<app_db.ItemType>> getAllItemTypes() async {
-    return (select(db.itemTypes)..orderBy([(t) => OrderingTerm.asc(t.name)])).get();
+    return (select(
+      db.itemTypes,
+    )..orderBy([(t) => OrderingTerm.asc(t.name)])).get();
   }
 
-  Future<void> setActiveStatus(String id, bool isActive, DateTime updatedAt) async {
+  Future<void> setActiveStatus(
+    String id,
+    bool isActive,
+    DateTime updatedAt,
+  ) async {
     await (update(db.itemTypes)..where((t) => t.id.equals(id))).write(
       app_db.ItemTypesCompanion(
         isActive: Value(isActive),

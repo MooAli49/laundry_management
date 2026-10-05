@@ -1174,7 +1174,6 @@ The Dashboard may display attention items such as:
     Orders requiring storage
     Outstanding payments
     Overdue orders
-    Today's expected pickups
     Synchronization requiring attention
 
 Only actionable or meaningful information should be shown.

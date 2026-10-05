@@ -2,10 +2,7 @@ import '../../../../domain/entities/financial_report_data.dart';
 import '../../../../domain/entities/orders_report_data.dart';
 import '../../../../domain/enums/report_period.dart';
 
-enum ReportsTab {
-  orders,
-  financial,
-}
+enum ReportsTab { orders, financial }
 
 class ReportsState {
   final ReportsTab selectedTab;
@@ -55,7 +52,9 @@ class ReportsState {
       ordersReport: ordersReport ?? this.ordersReport,
       financialReport: financialReport ?? this.financialReport,
       isLoading: isLoading ?? this.isLoading,
-      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
     );
   }
 }

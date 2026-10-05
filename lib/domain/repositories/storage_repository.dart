@@ -23,9 +23,14 @@ abstract class StorageRepository {
 
   Future<StorageRecord?> getActiveRecordForOrderItem(String orderItemId);
 
-  Future<List<StorageRecord>> getActiveRecordsForLocation(String storageLocationId);
+  Future<List<StorageRecord>> getActiveRecordsForLocation(
+    String storageLocationId,
+  );
 
-  Future<List<OrderItem>> getItemsRequiringStorage({int limit = 50, int offset = 0});
+  Future<List<OrderItem>> getItemsRequiringStorage({
+    int limit = 50,
+    int offset = 0,
+  });
 
   Future<List<StorageItem>> getItemsRequiringStorageWithDetails({
     String? query,
@@ -69,7 +74,9 @@ abstract class StorageRepository {
     DateTime? orderReceivedDate,
   });
 
-  Stream<List<StorageRecord>> watchActiveRecordsForLocation(String storageLocationId);
+  Stream<List<StorageRecord>> watchActiveRecordsForLocation(
+    String storageLocationId,
+  );
 
   Future<bool> areAllOrderItemsStored(String orderId);
 }

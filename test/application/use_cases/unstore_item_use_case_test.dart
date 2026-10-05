@@ -11,7 +11,10 @@ class FakeStorageRepository implements StorageRepository {
   @override
   Future<void> unstoreItem(String orderItemId) async {
     if (shouldThrow) {
-      throw failureToThrow ?? const BusinessRuleFailure('Item has no active storage record to unstore');
+      throw failureToThrow ??
+          const BusinessRuleFailure(
+            'Item has no active storage record to unstore',
+          );
     }
     unstoredItemIds.add(orderItemId);
   }
@@ -47,20 +50,27 @@ void main() {
       expect(storageRepo.unstoredItemIds, contains('item-101'));
     });
 
-    test('propagates repository BusinessRuleFailure when item not stored', () async {
-      storageRepo.shouldThrow = true;
-      storageRepo.failureToThrow = const BusinessRuleFailure('Item has no active storage record to unstore');
+    test(
+      'propagates repository BusinessRuleFailure when item not stored',
+      () async {
+        storageRepo.shouldThrow = true;
+        storageRepo.failureToThrow = const BusinessRuleFailure(
+          'Item has no active storage record to unstore',
+        );
 
-      expect(
-        () => useCase.execute(const UnstoreItemInput(orderItemId: 'item-not-stored')),
-        throwsA(
-          isA<BusinessRuleFailure>().having(
-            (e) => e.message,
-            'message',
-            contains('Item has no active storage record to unstore'),
+        expect(
+          () => useCase.execute(
+            const UnstoreItemInput(orderItemId: 'item-not-stored'),
           ),
-        ),
-      );
-    });
+          throwsA(
+            isA<BusinessRuleFailure>().having(
+              (e) => e.message,
+              'message',
+              contains('Item has no active storage record to unstore'),
+            ),
+          ),
+        );
+      },
+    );
   });
 }

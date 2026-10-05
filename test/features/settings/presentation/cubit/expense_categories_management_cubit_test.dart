@@ -60,7 +60,9 @@ void main() {
 
   setUp(() {
     repository = FakeExpenseCategoryRepository();
-    cubit = ExpenseCategoriesManagementCubit(expenseCategoryRepository: repository);
+    cubit = ExpenseCategoriesManagementCubit(
+      expenseCategoryRepository: repository,
+    );
   });
 
   tearDown(() {
@@ -68,22 +70,30 @@ void main() {
   });
 
   group('ExpenseCategoriesManagementCubit Tests', () {
-    test('createCategory validates required name and creates category', () async {
-      final failRes = await cubit.createCategory('');
-      expect(failRes, isFalse);
-      expect(cubit.state.errorMessage, AppStrings.expenseCategoryNameRequired);
+    test(
+      'createCategory validates required name and creates category',
+      () async {
+        final failRes = await cubit.createCategory('');
+        expect(failRes, isFalse);
+        expect(
+          cubit.state.errorMessage,
+          AppStrings.expenseCategoryNameRequired,
+        );
 
-      final successRes = await cubit.createCategory('فواتير كهرباء');
-      expect(successRes, isTrue);
-      expect(cubit.state.categories.length, 1);
-      expect(cubit.state.categories.first.name, 'فواتير كهرباء');
-    });
+        final successRes = await cubit.createCategory('فواتير كهرباء');
+        expect(successRes, isTrue);
+        expect(cubit.state.categories.length, 1);
+        expect(cubit.state.categories.first.name, 'فواتير كهرباء');
+      },
+    );
 
     test('updateCategory updates existing category name', () async {
       await cubit.createCategory('منظفات');
       final cat = cubit.state.categories.first;
 
-      final updateRes = await cubit.updateCategory(cat.copyWith(name: 'منظفات ومساحيق'));
+      final updateRes = await cubit.updateCategory(
+        cat.copyWith(name: 'منظفات ومساحيق'),
+      );
       expect(updateRes, isTrue);
       expect(cubit.state.categories.first.name, 'منظفات ومساحيق');
     });

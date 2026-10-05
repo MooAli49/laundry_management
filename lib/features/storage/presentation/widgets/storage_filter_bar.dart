@@ -51,9 +51,9 @@ class StorageFilterBar extends StatelessWidget {
       lastDate: DateTime(2035),
     );
     if (picked != null) {
-      onFilterChanged(filter.copyWith(
-        expectedPickupDate: OrderDate.fromDate(picked),
-      ));
+      onFilterChanged(
+        filter.copyWith(expectedPickupDate: OrderDate.fromDate(picked)),
+      );
     }
   }
 
@@ -66,9 +66,7 @@ class StorageFilterBar extends StatelessWidget {
       lastDate: DateTime(2035),
     );
     if (picked != null) {
-      onFilterChanged(filter.copyWith(
-        orderReceivedDate: picked,
-      ));
+      onFilterChanged(filter.copyWith(orderReceivedDate: picked));
     }
   }
 
@@ -80,7 +78,8 @@ class StorageFilterBar extends StatelessWidget {
       builder: (context, constraints) {
         final totalWidth = constraints.maxWidth;
         final int columns = totalWidth >= 800 ? 4 : (totalWidth >= 500 ? 2 : 1);
-        final itemWidth = (totalWidth - (columns - 1) * AppSpacing.md) / columns;
+        final itemWidth =
+            (totalWidth - (columns - 1) * AppSpacing.md) / columns;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,22 +116,26 @@ class StorageFilterBar extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            ...itemTypes.map((t) => DropdownMenuItem<String?>(
-                                  value: t.id,
-                                  child: Text(
-                                    t.name,
-                                    style: AppTextStyles.bodyMedium.copyWith(
-                                      fontSize: 14,
-                                      color: AppColors.textPrimary,
-                                    ),
+                            ...itemTypes.map(
+                              (t) => DropdownMenuItem<String?>(
+                                value: t.id,
+                                child: Text(
+                                  t.name,
+                                  style: AppTextStyles.bodyMedium.copyWith(
+                                    fontSize: 14,
+                                    color: AppColors.textPrimary,
                                   ),
-                                )),
+                                ),
+                              ),
+                            ),
                           ],
                           onChanged: (val) {
-                            onFilterChanged(filter.copyWith(
-                              itemTypeId: val,
-                              clearItemTypeId: val == null,
-                            ));
+                            onFilterChanged(
+                              filter.copyWith(
+                                itemTypeId: val,
+                                clearItemTypeId: val == null,
+                              ),
+                            );
                           },
                         ),
                       ),
@@ -167,22 +170,26 @@ class StorageFilterBar extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            ...services.map((s) => DropdownMenuItem<String?>(
-                                  value: s.id,
-                                  child: Text(
-                                    s.name,
-                                    style: AppTextStyles.bodyMedium.copyWith(
-                                      fontSize: 14,
-                                      color: AppColors.textPrimary,
-                                    ),
+                            ...services.map(
+                              (s) => DropdownMenuItem<String?>(
+                                value: s.id,
+                                child: Text(
+                                  s.name,
+                                  style: AppTextStyles.bodyMedium.copyWith(
+                                    fontSize: 14,
+                                    color: AppColors.textPrimary,
                                   ),
-                                )),
+                                ),
+                              ),
+                            ),
                           ],
                           onChanged: (val) {
-                            onFilterChanged(filter.copyWith(
-                              serviceId: val,
-                              clearServiceId: val == null,
-                            ));
+                            onFilterChanged(
+                              filter.copyWith(
+                                serviceId: val,
+                                clearServiceId: val == null,
+                              ),
+                            );
                           },
                         ),
                       ),
@@ -200,11 +207,13 @@ class StorageFilterBar extends StatelessWidget {
                       onTap: () => _selectExpectedPickupDate(context),
                       onClear: filter.expectedPickupDate != null
                           ? () => onFilterChanged(
-                              filter.copyWith(clearExpectedPickupDate: true))
+                              filter.copyWith(clearExpectedPickupDate: true),
+                            )
                           : null,
                       displayText: filter.expectedPickupDate != null
                           ? DateFormatter.formatArabicDate(
-                              filter.expectedPickupDate!.toDateTime())
+                              filter.expectedPickupDate!.toDateTime(),
+                            )
                           : 'اختر التاريخ',
                     ),
                   ),
@@ -220,11 +229,13 @@ class StorageFilterBar extends StatelessWidget {
                       onTap: () => _selectOrderReceivedDate(context),
                       onClear: filter.orderReceivedDate != null
                           ? () => onFilterChanged(
-                              filter.copyWith(clearOrderReceivedDate: true))
+                              filter.copyWith(clearOrderReceivedDate: true),
+                            )
                           : null,
                       displayText: filter.orderReceivedDate != null
                           ? DateFormatter.formatArabicDate(
-                              filter.orderReceivedDate!)
+                              filter.orderReceivedDate!,
+                            )
                           : 'اختر التاريخ',
                     ),
                   ),
@@ -258,22 +269,26 @@ class StorageFilterBar extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              ...locations.map((loc) => DropdownMenuItem<String?>(
-                                    value: loc.id,
-                                    child: Text(
-                                      loc.name,
-                                      style: AppTextStyles.bodyMedium.copyWith(
-                                        fontSize: 14,
-                                        color: AppColors.textPrimary,
-                                      ),
+                              ...locations.map(
+                                (loc) => DropdownMenuItem<String?>(
+                                  value: loc.id,
+                                  child: Text(
+                                    loc.name,
+                                    style: AppTextStyles.bodyMedium.copyWith(
+                                      fontSize: 14,
+                                      color: AppColors.textPrimary,
                                     ),
-                                  )),
+                                  ),
+                                ),
+                              ),
                             ],
                             onChanged: (val) {
-                              onFilterChanged(filter.copyWith(
-                                storageLocationId: val,
-                                clearStorageLocationId: val == null,
-                              ));
+                              onFilterChanged(
+                                filter.copyWith(
+                                  storageLocationId: val,
+                                  clearStorageLocationId: val == null,
+                                ),
+                              );
                             },
                           ),
                         ),
@@ -319,10 +334,7 @@ class _FilterField extends StatelessWidget {
   final String label;
   final Widget child;
 
-  const _FilterField({
-    required this.label,
-    required this.child,
-  });
+  const _FilterField({required this.label, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -349,10 +361,7 @@ class _DropdownContainer extends StatelessWidget {
   final Widget child;
   final bool isActive;
 
-  const _DropdownContainer({
-    required this.child,
-    this.isActive = false,
-  });
+  const _DropdownContainer({required this.child, this.isActive = false});
 
   @override
   Widget build(BuildContext context) {
@@ -419,7 +428,9 @@ class _DateFilterContainer extends StatelessWidget {
                 displayText,
                 style: AppTextStyles.bodyMedium.copyWith(
                   fontSize: 14,
-                  color: isActive ? AppColors.textPrimary : AppColors.textTertiary,
+                  color: isActive
+                      ? AppColors.textPrimary
+                      : AppColors.textTertiary,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

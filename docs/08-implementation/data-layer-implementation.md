@@ -1572,20 +1572,26 @@ Remote clients must remain hidden from Presentation.
 
 The remote implementation is not required for normal V1 local workflows.
 
-## 83. Remote Implementation Deferral
+## 83. Remote Implementation Phase
 
-The following are deferred until the synchronization/backend phase:
+The project has entered the Offline / Sync Integration phase.
 
-- Backend API implementation
-- Remote authentication integration
-- Remote synchronization execution
-- Conflict resolution
-- Background synchronization
-- Advanced retry orchestration
-- Remote pull implementation
-- Remote push implementation
+The following remote data infrastructure is now active:
 
-The local architecture must remain compatible with future synchronization.
+- Remote Data Source implementation using Retrofit + Dio
+- Durable Sync Queue processing and push execution
+- Idempotent remote request handling
+- Exponential backoff retry handling
+- Entity-specific deterministic conflict handling
+
+The following remain deferred from this phase:
+
+- Platform-specific background synchronization
+- Advanced multi-device distributed conflict resolution
+- Real-time synchronization
+- Full SaaS multi-tenant features
+
+The local architecture continues to operate offline-first as the primary source of truth.
 
 ## 84. Synchronization Infrastructure
 

@@ -14,10 +14,7 @@ import '../../../../domain/entities/dashboard_order_item.dart';
 class DashboardRecentOrdersSection extends StatelessWidget {
   final List<DashboardOrderItem> orders;
 
-  const DashboardRecentOrdersSection({
-    super.key,
-    required this.orders,
-  });
+  const DashboardRecentOrdersSection({super.key, required this.orders});
 
   @override
   Widget build(BuildContext context) {
@@ -35,10 +32,7 @@ class DashboardRecentOrdersSection extends StatelessWidget {
                   size: 22,
                 ),
                 AppSpacing.gapHorizontalSm,
-                Text(
-                  'أحدث الطلبات',
-                  style: AppTextStyles.titleLarge,
-                ),
+                Text('أحدث الطلبات', style: AppTextStyles.titleLarge),
               ],
             ),
             if (orders.isNotEmpty)
@@ -99,7 +93,8 @@ class DashboardRecentOrdersSection extends StatelessWidget {
 
               return AppCard(
                 key: ValueKey('recent_order_${item.order.id}'),
-                onTap: () => context.push(AppRoutes.orderDetailPath(item.order.id)),
+                onTap: () =>
+                    context.push(AppRoutes.orderDetailPath(item.order.id)),
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.md,
                   vertical: AppSpacing.md,
@@ -112,7 +107,9 @@ class DashboardRecentOrdersSection extends StatelessWidget {
                       height: 40,
                       decoration: BoxDecoration(
                         color: AppColors.primaryLighter,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusSm,
+                        ),
                       ),
                       child: const Icon(
                         Icons.receipt_outlined,
@@ -131,11 +128,16 @@ class DashboardRecentOrdersSection extends StatelessWidget {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                displayNumber,
-                                style: AppTextStyles.labelLarge.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
+                              Flexible(
+                                child: Text(
+                                  displayNumber,
+                                  textDirection: TextDirection.ltr,
+                                  style: AppTextStyles.labelLarge.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               AppSpacing.gapHorizontalSm,
@@ -158,6 +160,8 @@ class DashboardRecentOrdersSection extends StatelessWidget {
                             style: AppTextStyles.bodySmall.copyWith(
                               color: AppColors.textTertiary,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
@@ -177,7 +181,15 @@ class DashboardRecentOrdersSection extends StatelessWidget {
                           ),
                         ),
                         AppSpacing.gapXs,
-                        if (hasRemaining)
+                        if (item.isCancelled)
+                          Text(
+                            item.cancelledFinancialLabel,
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          )
+                        else if (hasRemaining)
                           Text(
                             'متبقي: ${item.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
                             style: AppTextStyles.bodySmall.copyWith(

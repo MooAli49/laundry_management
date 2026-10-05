@@ -69,6 +69,7 @@ The application does not attempt to model a large enterprise laundry operation.
 - Start a new order from customer details
 - Validate phone numbers
 - Prevent duplicate customers based on phone number
+- Optional customer address (`Customer.address` nullable profile text; no separate entity; no delivery routing in V1)
 
 ## Not Included
 
@@ -79,7 +80,7 @@ The application does not attempt to model a large enterprise laundry operation.
 - Customer levels
 - Marketing campaigns
 - Customer segmentation
-- Customer addresses as a delivery management system
+- Customer addresses as a delivery routing / dispatch management system (address is a profile attribute only; delivery routing is out of scope)
 - Customer notifications
 - Email management
 
@@ -114,13 +115,19 @@ The application does not attempt to model a large enterprise laundry operation.
 
 Every order must have a unique human-readable Order Number.
 
-The approved V1 display format is:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length:
 
-    YY-XXX
+- Minimum width of 3 digits (zero-padded below 1000).
+- No maximum length (expands to 4+ digits when reaching 1000+).
+- Numeric sequence only.
+- The sequence generator must ignore non-business test identifiers such as `ORD-TEST-...` when calculating the next sequence number. These synthetic test identifiers must never inflate or distort the business order sequence.
 
-Example:
+Examples:
 
     26-001
+    26-999
+    26-1000
+    26-10000
 
 The Order Number is separate from the internal database identifier.
 
@@ -136,6 +143,11 @@ V1 supports only:
 - Cancelled
 
 No additional operational statuses should be introduced.
+
+Status Transition Rules:
+- `Completed -> Processing` is supported ONLY as an explicit administrative correction (requires non-empty reason, clears `completed_at`, preserves existing payments, leaves storage inactive; order must be explicitly re-stored before becoming Ready again).
+- `Completed -> Ready` and `Completed -> Cancelled` remain forbidden.
+- `Cancelled` status remains strictly terminal.
 
 ---
 
@@ -229,41 +241,50 @@ The system calculates the area automatically.
 - Create service
 - Edit service
 - Activate/deactivate service
-- Configure pricing type
-- Configure price
-- Configure supported item types
+- Configure supported item types and their pricing (pricing type and price per Service + Item Type combination)
 - Manage item definitions
 - Manage common carpet sizes
 
 Services & Pricing is part of Settings in the V1 navigation structure.
 
-## Supported Pricing Types at Domain Level
+The Service entity does NOT own a single default/current price. Pricing configuration belongs to the **Service–Item Type** relationship (`ServiceItemType`).
 
-- Per Piece
-- Per Kilogram
-- Per Square Meter
-- Fixed Price
+## Supported Operational Pricing Types
 
-Only relevant pricing options should be exposed in the V1 UI.
+The supported V1 operational pricing types are:
+
+- Per Piece (`per_piece`)
+- Per Square Meter (`per_square_meter`)
+
+*(Note: `fixed_price` has been removed from the V1 operational model because each physical item is represented as an individual OrderItem and receives a unit price; it does not represent a distinct business behavior. Per Kilogram pricing remains completely excluded from V1).*
 
 ## Current Expected Usage
 
-| Item Type | Typical Pricing |
-|---|---|
-| Clothing | Per Piece |
-| Blankets | Per Piece |
-| Carpet Covers | Per Piece |
-| Carpets | Per Square Meter |
+In this laundry system, the actual price depends on the combination of Service + Item Type.
+
+Example:
+
+Washing
+  ├── Clothing → per_piece → 50 EGP
+  ├── Blanket  → per_piece → 100 EGP
+  └── Carpet   → per_square_meter → 60 EGP
+
+| Item Type | Supported Pricing Type | Example Rate |
+|---|---|---|
+| Clothing | Per Piece (`per_piece`) | 50 EGP |
+| Blankets | Per Piece (`per_piece`) | 100 EGP |
+| Carpet Covers | Per Piece (`per_piece`) | 70 EGP |
+| Carpets | Per Square Meter (`per_square_meter`) | 60 EGP / m² |
 
 ---
 
 # 10. Pricing History Scope
 
-Historical order prices must remain unchanged after service prices are modified.
+Historical order prices must remain unchanged after service pricing configurations are modified.
 
-V1 must preserve the price used when the OrderItem was created.
+V1 must preserve the actual price used when the OrderItem was created (snapshotted into `order_items.unit_price`).
 
-The system must not recalculate historical orders using current service prices.
+The system must not recalculate historical orders using current service pricing configurations.
 
 The user may adjust the applicable OrderItem price during Order creation according to the approved pricing behavior.
 
@@ -341,7 +362,7 @@ Tax is disabled.
 - Online payment gateway
 - Card terminal integration
 - Automatic bank reconciliation
-- Refund workflow
+- Automated payment gateway refunds
 - Chargeback handling
 - Payment settlement system
 
@@ -371,13 +392,22 @@ Being Ready or fully paid alone must not automatically mark the order as Complet
 - Preserve cancelled order history
 - Deactivate active storage records
 - Preserve payment history
+- Refund workflow (order-level Refund V1 for cancelled orders)
+- First-class immutable financial transactions (no `payment_id`, order-level)
+- Only cancelled orders are eligible for refunds
+- Refundable balance tracking (`Total Paid - Total Refunded`)
+- Multiple partial refunds and full refunds up to refundable balance
+- Refund methods: Cash, InstaPay, E-Wallet
+- Immutable refund history
+- Financial reporting: Total Refunds by `refundedAt`, Net Payments (`Total Payments - Total Refunds`)
 
 ## Not Included
 
-- Refund workflow
-- Automatic refund
-- Refund approvals
-- Refund reports
+- Automatic refund upon cancellation (cancellation and refund are separate operations)
+- Refund approvals / multi-tier authorization
+- Payment gateway refund integration
+- Item-level refunds
+- Refunds on active orders (Processing, Ready, Completed)
 
 ---
 
@@ -549,7 +579,7 @@ Delivery remains an Order-level operational and financial option in V1.
 
 The Invoice / Receipt must use the historical information of the Order.
 
-It must not recalculate historical Order information using current Service prices or other current master data.
+It must not recalculate historical Order information using current Service pricing configurations or other current master data.
 
 ## Not Included
 
@@ -691,23 +721,20 @@ Includes:
 
 Includes:
 
-- Sales
-- Payments recorded
-- Expenses
-- Outstanding amounts
-- Discounts
-- Payment method breakdown
-- Net Profit
+- **Total Sales**: Sum of non-cancelled order totals (`status != cancelled`) created in the selected period.
+- **Total Payments**: Historical payments recorded in the selected period based on `Payment.paidAt`.
+- **Total Refunds**: Sum of refunds recorded in the selected period based on `Refund.refundedAt`.
+- **Net Payments**: Net cash movement calculated as `Total Payments - Total Refunds`.
+- **Outstanding**: Unpaid balance on non-cancelled orders created in the selected period.
+- **Discounts**: Total discounts applied to non-cancelled orders in the selected period.
+- **Payment Method Breakdown**: Breakdown by Cash, InstaPay, and E-Wallet.
+- **Operating Expenses**: Total expenses recorded for the period based on `Expense.expenseDate`.
+- **Net Profit**: Derived financial result calculated as:
+      Net Profit = Total Sales - Operating Expenses
 
-Expenses are included according to their Expense Date.
+Important: Refunds are NOT operating expenses and are not subtracted from Total Sales.
 
-Net Profit is a derived reporting value.
-
-The calculation is:
-
-    Net Profit = Sales - Operating Expenses
-
-Net Profit is not a separate transaction or entity.
+Net Profit is a derived reporting value and not a separate transaction or entity.
 
 The system does not require:
 
@@ -976,7 +1003,7 @@ The following are outside the V1 scope:
 - Employee management
 - Loyalty system
 - Advanced notifications
-- Refund workflow
+- Automated payment gateway refunds and line-item refunds (order-level Refund V1 is included)
 - Advanced reporting
 - Advanced warehouse management
 - Storage movement history
@@ -1019,3 +1046,87 @@ Changes should be documented before implementation.
 The relevant documentation must be updated whenever an approved scope change occurs.
 
 The implementation must always reflect the latest approved documentation.
+
+---
+
+# 35. Current Active Implementation Milestone
+
+## Offline / Sync Integration
+
+Status:
+
+    Active Implementation Phase
+
+### 35.1 What This Milestone Is
+
+Offline / Sync Integration is the current active implementation milestone.
+
+It is **not** a new V1 business feature.
+
+It is an **infrastructure / integration** phase that connects the existing Local-First application to the approved Supabase remote backend, while preserving all existing V1 business rules, entity lifecycle states, and user workflows.
+
+The Orders module has completed its Local-First implementation and final E2E verification.
+
+### 35.2 Local-First Remains Mandatory
+
+V1 workflows remain Local-First.
+
+Network availability must not block normal approved V1 operations.
+
+The following must continue working without an active Internet connection:
+
+- Customer management
+- Order management
+- Order item management
+- Storage management
+- Payment recording
+- Expense management
+- Dashboard
+- Reports
+- Settings
+
+The local database remains the operational source of truth for the Flutter client.
+
+The UI must continue to reflect successful local writes immediately, without waiting for remote acknowledgment.
+
+### 35.3 What Is Being Implemented
+
+The following synchronization infrastructure is being implemented in this milestone:
+
+- Durable Sync Queue (persisted locally).
+- Atomic local mutation + sync operation enqueue.
+- Sync Engine (retry, ordering, failure classification, crash recovery).
+- Remote Data Sources communicating with Supabase via Retrofit + Dio.
+- Idempotent remote operation processing.
+- Dependency-aware synchronization ordering.
+- Entity-specific conflict handling strategy.
+- Financial record protection.
+
+### 35.4 SaaS / Multi-Tenant Readiness
+
+The architecture should remain suitable for future multi-device / multi-tenant / SaaS evolution.
+
+This is an architectural goal only.
+
+The following are **not** part of the current implementation:
+
+- Tenants
+- Branches
+- Roles
+- Permissions
+- Subscription management
+- Multi-tenant UI
+- Employee management
+- User accounts
+
+These remain explicitly out of scope until a separate milestone introduces them.
+
+### 35.5 Scope Boundary
+
+The following are not introduced by this milestone:
+
+- New V1 business features.
+- Changes to existing Order lifecycle statuses.
+- Sync-lifecycle statuses on business entities (PendingSync, Syncing, SyncFailed).
+- User-facing multi-tenant or SaaS functionality.
+- Complex distributed conflict resolution (advanced multi-device merge algorithms, CRDTs, etc.).

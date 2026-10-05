@@ -51,10 +51,7 @@ class _StorageView extends StatefulWidget {
   final String? initialOrderId;
   final String? initialOrderNumber;
 
-  const _StorageView({
-    this.initialOrderId,
-    this.initialOrderNumber,
-  });
+  const _StorageView({this.initialOrderId, this.initialOrderNumber});
 
   @override
   State<_StorageView> createState() => _StorageViewState();
@@ -104,9 +101,8 @@ class _StorageViewState extends State<_StorageView> {
       builder: (_) => StoreStorageDialog(
         itemsToStore: selectedItems,
         availableLocations: locations,
-        onConfirm: (storageLocationId) => cubit.bulkStoreSelected(
-          storageLocationId: storageLocationId,
-        ),
+        onConfirm: (storageLocationId) =>
+            cubit.bulkStoreSelected(storageLocationId: storageLocationId),
       ),
     );
   }
@@ -135,9 +131,7 @@ class _StorageViewState extends State<_StorageView> {
       context: context,
       builder: (_) => UnstoreConfirmDialog(
         item: item,
-        onConfirm: () => cubit.unstoreItem(
-          orderItemId: item.orderItem.id,
-        ),
+        onConfirm: () => cubit.unstoreItem(orderItemId: item.orderItem.id),
       ),
     );
   }
@@ -220,8 +214,11 @@ class _StorageViewState extends State<_StorageView> {
                                       ),
                                       children: [
                                         TextSpan(
-                                          text: '#${widget.initialOrderNumber ?? widget.initialOrderId}',
-                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                          text:
+                                              '#${widget.initialOrderNumber ?? widget.initialOrderId}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -243,17 +240,20 @@ class _StorageViewState extends State<_StorageView> {
                                 TextButton.icon(
                                   onPressed: () {
                                     final allSelected =
-                                        state.selectedItemIds.length == state.items.length;
+                                        state.selectedItemIds.length ==
+                                        state.items.length;
                                     cubit.toggleSelectAll(!allSelected);
                                   },
                                   icon: Icon(
-                                    state.selectedItemIds.length == state.items.length
+                                    state.selectedItemIds.length ==
+                                            state.items.length
                                         ? Icons.deselect_outlined
                                         : Icons.select_all_outlined,
                                     size: 18,
                                   ),
                                   label: Text(
-                                    state.selectedItemIds.length == state.items.length
+                                    state.selectedItemIds.length ==
+                                            state.items.length
                                         ? 'إلغاء تحديد الكل'
                                         : 'تحديد كل الصفحة',
                                   ),
@@ -268,7 +268,9 @@ class _StorageViewState extends State<_StorageView> {
                             child: Container(
                               decoration: BoxDecoration(
                                 color: AppColors.secondary,
-                                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                                borderRadius: BorderRadius.circular(
+                                  AppSpacing.radiusLg,
+                                ),
                                 border: Border.all(color: AppColors.border),
                               ),
                               padding: const EdgeInsets.all(4),
@@ -278,14 +280,16 @@ class _StorageViewState extends State<_StorageView> {
                                   _FigmaSegmentedTab(
                                     label: AppStrings.itemsRequiringStorage,
                                     isSelected: isRequiring,
-                                    onTap: () =>
-                                        cubit.switchTab(StorageTab.requiringStorage),
+                                    onTap: () => cubit.switchTab(
+                                      StorageTab.requiringStorage,
+                                    ),
                                   ),
                                   _FigmaSegmentedTab(
                                     label: AppStrings.currentStorage,
                                     isSelected: !isRequiring,
-                                    onTap: () =>
-                                        cubit.switchTab(StorageTab.currentStorage),
+                                    onTap: () => cubit.switchTab(
+                                      StorageTab.currentStorage,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -298,7 +302,9 @@ class _StorageViewState extends State<_StorageView> {
                             height: 44,
                             decoration: BoxDecoration(
                               color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusLg,
+                              ),
                               border: Border.all(color: AppColors.border),
                             ),
                             child: TextField(
@@ -353,7 +359,9 @@ class _StorageViewState extends State<_StorageView> {
                             itemTypes: state.itemTypes,
                             services: state.services,
                             locations: state.availableLocations,
-                            isSearchActive: _searchController.text.trim().isNotEmpty,
+                            isSearchActive: _searchController.text
+                                .trim()
+                                .isNotEmpty,
                             onFilterChanged: cubit.setFilter,
                             onResetFilters: () {
                               _searchController.clear();
@@ -367,7 +375,8 @@ class _StorageViewState extends State<_StorageView> {
                             AppSpacing.gapLg,
                             BulkStorageBottomBar(
                               selectedCount: state.selectedItemsCount,
-                              hasConflictingTypes: state.hasConflictingItemTypes,
+                              hasConflictingTypes:
+                                  state.hasConflictingItemTypes,
                               onClearSelection: cubit.clearSelection,
                               onBulkStore: () => _openBulkStoreDialog(context),
                             ),
@@ -404,7 +413,9 @@ class _StorageViewState extends State<_StorageView> {
                           AppSpacing.page,
                           AppSpacing.lg,
                         ),
-                        child: (state.searchQuery.isNotEmpty || state.filter.isActive)
+                        child:
+                            (state.searchQuery.isNotEmpty ||
+                                state.filter.isActive)
                             ? _StorageEmptyContainer(
                                 icon: Icons.search_off_outlined,
                                 iconColor: AppColors.textSecondary,
@@ -449,8 +460,8 @@ class _StorageViewState extends State<_StorageView> {
                         AppSpacing.lg,
                       ),
                       sliver: SliverList.builder(
-                        itemCount: state.items.length +
-                            (state.isLoadingMore ? 1 : 0),
+                        itemCount:
+                            state.items.length + (state.isLoadingMore ? 1 : 0),
                         itemBuilder: (context, index) {
                           if (index == state.items.length) {
                             return const Padding(
@@ -462,25 +473,23 @@ class _StorageViewState extends State<_StorageView> {
                           }
 
                           final item = state.items[index];
-                          final isSelected = state.selectedItemIds
-                              .contains(item.orderItem.id);
+                          final isSelected = state.selectedItemIds.contains(
+                            item.orderItem.id,
+                          );
 
                           return StorageItemCard(
                             item: item,
                             isSelected: isSelected,
                             onSelectionChanged: isRequiring
-                                ? (selected) =>
-                                    cubit.toggleItemSelection(
-                                      item.orderItem.id,
-                                      selected,
-                                    )
+                                ? (selected) => cubit.toggleItemSelection(
+                                    item.orderItem.id,
+                                    selected,
+                                  )
                                 : null,
                             onStore: () =>
                                 _openStoreSingleDialog(context, item),
-                            onMove: () =>
-                                _openMoveDialog(context, item),
-                            onUnstore: () =>
-                                _openUnstoreDialog(context, item),
+                            onMove: () => _openMoveDialog(context, item),
+                            onUnstore: () => _openUnstoreDialog(context, item),
                           );
                         },
                       ),
@@ -612,10 +621,7 @@ class _StorageEmptyContainer extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
               ),
-              if (action != null) ...[
-                const SizedBox(height: 16),
-                action!,
-              ],
+              if (action != null) ...[const SizedBox(height: 16), action!],
             ],
           ),
         ),

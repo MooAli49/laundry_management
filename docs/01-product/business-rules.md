@@ -107,6 +107,19 @@ If customer deactivation is introduced in the future, it must not remove histori
 
 ---
 
+## BR-010A — Customer Address
+
+Customer address is optional profile information:
+
+- `Customer.address` is optional and nullable.
+- Stored directly on the Customer record only (no separate Address entity or table).
+- Whitespace-only values normalize to NULL.
+- No address snapshot is added to Order.
+- No customer address search in V1.
+- Address is profile/contact information; full delivery routing and dispatch management remain out of scope.
+
+---
+
 # 4. Order Creation Rules
 
 ## BR-011 — Order Must Have Items
@@ -165,13 +178,21 @@ Every order must have a unique human-readable Order Number.
 
 ## BR-017 — Order Number Format
 
-The intended format is:
+Order number format is YY-<numeric sequence>, with a minimum width of 3 digits and no maximum length:
 
-> YY-XXX
+- YY = 2-digit year prefix.
+- Sequence contains digits only.
+- Sequence has a minimum display width of 3 digits (zero-padded below 1000).
+- Sequence has no maximum length (supports 26-001, 26-999, 26-1000, 26-10000).
+- Non-numeric or alphanumeric values (e.g. 26-T123) are not valid business order numbers.
+- The sequence generator must ignore non-business test identifiers such as `ORD-TEST-...` when calculating the next sequence number. These synthetic test identifiers must never inflate or distort the business order sequence.
 
-Example:
+Examples:
 
 > 26-001
+> 26-999
+> 26-1000
+> 26-10000
 
 The exact generation mechanism is an implementation detail, but uniqueness is mandatory.
 
@@ -180,8 +201,20 @@ The exact generation mechanism is an implementation detail, but uniqueness is ma
 ## BR-018 — Order Number Immutability & Concurrency Retry
 
 - Once an Order Number is assigned, it must never change. Updating an order must always preserve the existing Order Number, and attempting to mutate it is strictly rejected with a `BusinessRuleFailure`.
-- Final Order Number format is strictly `YY-XXX` (e.g. `26-001`).
+- Final Order Number format is `YY-<numeric sequence>` (minimum 3 digits, no maximum length; e.g. `26-001`, `26-999`, `26-1000`, `26-10000`).
 - During order creation, order number collision against the UNIQUE database constraint on `orders.order_number` triggers an immediate rollback and a whole-transaction retry from the beginning (up to 5 attempts), generating a fresh order number.
+
+### Product Deployment Policy — Single-Terminal Order Intake & Multi-Terminal Readiness
+
+- **Initial Deployment Policy**: The primary deployment model uses one physical device/terminal dedicated to receiving and creating orders at the cashier desk. The laundry operates as a single branch with the owner/admin as the primary cashier/operator.
+- **Customer Guidance**: For initial deployment, it is explicitly recommended to use one device for receiving and creating orders. If the business later needs a second order-intake device, the system architecture is prepared to support it.
+- **Deferred Multi-Terminal Numbering**: Station-partitioned order numbers and onboarding Station ID selection are intentionally deferred to avoid premature onboarding and operational complexity.
+- **Preserved Invariants**:
+  - The canonical `YY-<numeric sequence>` format (BR-017) remains strictly unchanged.
+  - Strict immutability of assigned order numbers (BR-018) is maintained; physical receipts, tags, and database records remain permanently consistent.
+  - No reactive renumbering or silent mutation is performed during synchronization.
+  - Multi-terminal concurrent order creation via station partitioning is designated as the future architectural path when additional intake terminals are deployed.
+- **Replacement / Reinstalled Device Operational Requirement**: Any replacement or reinstalled primary cashier device must connect to the internet and complete an initial synchronization before creating new customer orders. This guarantees that local sequence generation is hydrated with the latest historical order numbers from the remote database and prevents sequence resets to `26-001`.
 
 ---
 
@@ -290,10 +323,14 @@ Status changes follow strict operational rules:
    - Strictly FORBIDDEN through generic/manual status change.
    - Completion is ONLY allowed through `CompleteOrderUseCase` / `OrderRepository.completeOrder` when Ready, remaining == 0, and customer handover is confirmed.
 
-4. **Completed → Processing (Operational Correction)**:
+4. **Completed → Processing (Administrative Correction)**:
+   - Supported ONLY as an administrative status correction.
    - Requires an explicit, non-empty operational reason.
-   - Status becomes `Processing`, and `completedAt` is cleared.
-   - Storage records remain inactive; items must be explicitly stored again if needed.
+   - Status becomes `Processing`, and `completedAt` is cleared (`completed_at = NULL`).
+   - Existing payments remain unchanged and paid amount is preserved.
+   - Previous storage records remain inactive; storage is NOT automatically reactivated.
+   - Items must be explicitly stored again if the order needs to become Ready.
+   - Direct transitions from `Completed → Ready` and `Completed → Cancelled` remain strictly forbidden.
 
 5. **Cancelled is Terminal**:
    - Cancelled orders cannot transition to any other status.
@@ -349,7 +386,13 @@ Completed orders are historical records.
 
 They should be read-only through the normal UI.
 
-If a correction is required, the system may allow controlled manual status correction according to the documented status rules.
+Completed → Processing is supported ONLY as an administrative correction:
+- Requires an explicit, non-empty operational reason.
+- `completedAt` is cleared to `null` (`completed_at = NULL`).
+- Existing payments remain unchanged.
+- Previous storage records remain inactive and storage is NOT automatically reactivated; items must be explicitly stored again if the order needs to become Ready.
+- Cancelled status remains strictly terminal.
+- Direct transitions from `Completed → Ready` and `Completed → Cancelled` remain forbidden.
 
 ---
 
@@ -431,7 +474,7 @@ Cancellation does not automatically delete payment history.
 
 Cancellation does not trigger an automatic refund.
 
-There is no V1 refund workflow.
+Cancellation and refund are separate operations. Cancelled orders with recorded payments may receive manual refunds through the approved Refund V1 workflow.
 
 ---
 
@@ -526,15 +569,27 @@ Existing orders using an inactive service must remain valid.
 
 ---
 
-## BR-052 — Service Price Snapshot
+## BR-052 — Service + Item Type Price Snapshot
 
-When a service is selected for an OrderItem, the price used at that time must be preserved in the OrderItem.
+When a valid Service + Item Type pricing configuration is selected for an OrderItem, the actual price used at that time must be preserved in the OrderItem (`order_items.unit_price`).
+
+---
+
+## BR-052A — OrderItem Name Snapshots Invariant
+
+Historical OrderItems must capture and preserve explicit name snapshots:
+- `itemTypeNameSnapshot` is required and non-empty.
+- `serviceNameSnapshot` is required and non-empty.
+- They are historical snapshots captured at order item creation.
+- Empty or whitespace-only snapshots are invalid domain data and rejected by validation.
+- The application must NOT fabricate fallback names such as `ملابس` or `غسيل`.
+- Test fixtures must always provide valid, non-empty snapshot values.
 
 ---
 
 ## BR-053 — Historical Price Stability
 
-Changing the current service price must not change the price of existing OrderItems.
+Changing a Service's pricing configuration (the price configured for that Service + Item Type combination) later must NOT change the price of existing OrderItems or historical orders.
 
 ---
 
@@ -550,11 +605,10 @@ Deactivating a service must not modify historical orders.
 
 The supported V1 operational pricing types are:
 
-- Per Piece
-- Fixed Price
-- Per Square Meter
+- Per Piece (`per_piece`)
+- Per Square Meter (`per_square_meter`)
 
-*(Note: Per Kilogram pricing has been completely removed from the V1 operational workflow and domain model by locked business decision. No PerKg items, migrations, or workflows exist in V1).*
+*(Note: `fixed_price` has been removed from the V1 operational pricing model because under the current OrderItem model, fixed price behaves effectively the same as per-piece pricing since each physical item is represented as its own OrderItem and receives a unit price; it does not represent a distinct business behavior. Per Kilogram pricing remains completely excluded from V1).*
 
 ---
 
@@ -564,26 +618,43 @@ For V1, an order item's final unit price must be strictly positive:
 
 > `unitPrice > Money.zero`
 
-This requirement applies to both the Service's default price and any `customUnitPrice`. Zero price and negative price are strictly invalid and rejected.
+This requirement applies to both the Service + Item Type configured price and any `customUnitPrice`. Zero price and negative price are strictly invalid and rejected.
 
 ---
 
-## BR-056 — Relevant Pricing Types
+## BR-056 — Pricing Configuration on Service–Item Type Relationship
 
-The UI should expose only pricing types relevant to the selected service and Item Type.
+The Service entity must NOT own a single default/current price or pricing type.
 
-The user should not be forced to choose from irrelevant pricing models.
+Pricing configuration belongs strictly to the combination of:
+
+> **Service + Item Type**
+
+Each valid Service + Item Type combination defines:
+1. `pricing_type` (`per_piece` or `per_square_meter`)
+2. `price` (strictly positive money amount)
+
+During order creation, when an Item Type and Service are selected, the applicable pricing configuration is resolved from their combination.
 
 ---
 
-## BR-057 — Current Expected Pricing
+## BR-057 — Current Expected Pricing Configurations
 
-The normal V1 use cases are:
+In this laundry system, the actual price depends on the combination of Service + Item Type.
 
-- Clothing → Per Piece
-- Blankets → Per Piece
-- Carpet Covers → Per Piece
-- Carpets → Per Square Meter
+Example:
+
+Washing
+  ├── Clothing → per_piece → 50 EGP
+  ├── Blanket  → per_piece → 100 EGP
+  └── Carpet   → per_square_meter → 60 EGP
+
+Typical V1 configurations:
+
+- Clothing + Service → Per Piece (`per_piece`)
+- Blankets + Service → Per Piece (`per_piece`)
+- Carpet Covers + Service → Per Piece (`per_piece`)
+- Carpets + Service → Per Square Meter (`per_square_meter`)
 
 ---
 
@@ -640,6 +711,29 @@ Changing the list of common carpet sizes must not affect existing orders.
 ## BR-063 — Subtotal
 
 Subtotal is calculated from the OrderItems using their applicable pricing rules.
+
+---
+
+## BR-063A — Manual Draft Item Total Override (customTotal) & Lossless Physical Piece Distribution
+
+When creating or editing an order item group, the user may manually override the calculated draft item total (`customTotal`):
+
+1. **Lossless Piastre Division**:
+   - The total amount is converted to integer minor units (piastres: `totalPiastres = customTotal.piastres`).
+   - For an item group with quantity `count > 1`, piastres are divided integer-wise across the `count` expanded physical `OrderItem` records:
+     - `basePiecePiastres = totalPiastres ~/ count`
+     - `remainder = totalPiastres % count`
+     - The first `remainder` items receive `basePiecePiastres + 1` piastre, and the remaining items receive `basePiecePiastres`.
+   - The sum of all individual piece totals is strictly and losslessly equal to `customTotal`:
+     `basePiecePiastres * count + remainder == totalPiastres`.
+
+2. **Effective Unit Price Snapshot**:
+   - For reporting and display purposes, `effectiveUnitPrice` is computed as:
+     - Carpets: `Money.fromPiastres((totalPiastres / (area * count)).round())`
+     - Non-carpets: `Money.fromPiastres((totalPiastres / count).round())`
+
+3. **Historical Value Immutability**:
+   - The stored transaction-time `OrderItem.calculatedTotal` and `OrderItem.unitPrice` are permanently saved in SQLite and are NEVER recalculated from updated `Service` or `ServiceItemType` pricing configurations.
 
 ---
 
@@ -749,9 +843,20 @@ V1 supports:
 
 ---
 
-## BR-076 — No Refund Workflow
+## BR-076 — Refund V1 Workflow
 
-V1 does not implement a refund workflow.
+Refund is a first-class immutable financial transaction at the order level.
+
+1. Only Cancelled orders can receive refunds.
+2. Processing, Ready, and Completed orders cannot receive refunds.
+3. Refundable amount equals Total Paid minus Total Refunded.
+4. Refund amount must be greater than zero and less than or equal to the remaining refundable balance.
+5. Multiple partial refunds and full refunds are supported up to the total paid amount.
+6. Once an order is fully refunded, subsequent refunds are rejected.
+7. Supported refund methods: Cash, InstaPay, E-Wallet.
+8. Existing Payment records remain immutable and are neither deleted nor updated upon refund.
+9. Refunds are distinct from operating expenses and do not alter Net Profit directly.
+10. Refund creation works offline via local database and outbox synchronization.
 
 ---
 
@@ -902,9 +1007,20 @@ No pickup time is required.
 
 ## BR-096 — Overdue Order
 
-An order is considered overdue when:
+An active order is overdue only when:
 
-Expected Pickup Date < Today AND Status != Completed AND Status != Cancelled
+expected_pickup_date < start_of_today
+
+The comparison is strictly calendar-date based.
+
+Therefore:
+- Yesterday → overdue
+- Today → NOT overdue
+- Tomorrow → NOT overdue
+- Completed orders → NOT overdue
+- Cancelled orders → NOT overdue
+
+The system must never describe an order with expected pickup date of "today" as overdue.
 
 ---
 
@@ -972,7 +1088,7 @@ This is separate from the order creation date.
 
 ## BR-106 — Historical Price Usage
 
-Reports must use historical OrderItem prices rather than current service prices.
+Reports must use historical OrderItem prices (`order_items.unit_price`) rather than current Service pricing configurations.
 
 ---
 
@@ -1831,29 +1947,55 @@ The custom name recorded for an Expense using أخرى must remain part of that 
 
 ## BR-191 — Total Sales
 
-Total Sales / Order Value is based on the applicable historical Order totals for the selected reporting period.
+Total Sales / Order Value is based on the applicable historical Order totals for non-cancelled orders (`status != cancelled`) created during the selected reporting period (`Order.createdAt`).
 
-Current Service prices must not be used to reconstruct historical Order totals.
+Cancelled orders contribute 0 to Total Sales.
+
+Refunds are not subtracted from Total Sales.
+
+Current Service pricing configurations must not be used to reconstruct historical Order totals.
 
 ---
 
 ## BR-192 — Total Payments
 
-Total Payments are based on payments recorded during the selected reporting period.
+Total Payments are based on historical payments recorded during the selected reporting period according to `Payment.paidAt`.
+
+Cancelled-order payments remain included in historical Total Payments.
+
+---
+
+## BR-192A — Total Refunds
+
+Total Refunds are based on refunds recorded during the selected reporting period according to `Refund.refundedAt`.
+
+Refunds are distinct from operating expenses and are not subtracted from Total Sales.
+
+---
+
+## BR-192B — Net Payments
+
+Net Payments represents net cash movement in the selected reporting period, calculated as:
+
+Net Payments = Total Payments - Total Refunds
 
 ---
 
 ## BR-193 — Outstanding Amounts
 
-Outstanding Amounts are based on Orders where:
+Outstanding Amounts are based on non-cancelled orders created within the selected reporting period where:
 
 Remaining Amount > 0
+
+Cancelled orders contribute 0 to Outstanding Amounts. Refunds do not reduce or alter outstanding amounts.
 
 ---
 
 ## BR-194 — Total Operating Expenses
 
-Total Operating Expenses are based on Expenses recorded for the selected Expense Date range.
+Total Operating Expenses are based on Expenses recorded for the selected Expense Date range (`Expense.expenseDate`).
+
+Refunds are not operating expenses and must not be added to Expenses.
 
 ---
 
@@ -1865,7 +2007,7 @@ Total Sales
 -
 Total Operating Expenses
 
-Payments and Outstanding Amounts remain separate report metrics.
+Refunds do not directly alter this formula. Payments and Outstanding Amounts remain separate report metrics.
 
 ---
 
@@ -1995,6 +2137,66 @@ The Expense must remain available locally.
 
 ---
 
+# 46A. License Control System Rules
+
+## BR-140A — Authoritative Remote Suspension Anchor
+
+The 7-day grace period clock is anchored strictly to the remote `license_info.suspended_at` timestamp.
+- Local device detection time is NEVER used as the suspension anchor.
+- On offline launches, the cached `suspended_at` timestamp remains the sole authoritative anchor.
+- If the remote backend updates `suspended_at` to a newer timestamp, the local cached anchor is updated accordingly.
+- Reinstatement to `'active'` clears the cached suspension timestamp.
+
+---
+
+## BR-140B — 7-Day Grace Period Duration
+
+The grace period duration is exactly 7 days (`kLicenseGracePeriod = Duration(days: 7)`).
+- When remote status is `'suspended'` and `now - suspended_at < 7 days`, the effective state is `LicenseStatus.gracePeriod`.
+- The application remains 100% operational; all workflows (creating orders, payments, storage, printing) continue normally.
+- A non-blocking warning banner (`LicenseWarningBanner`) is prominently displayed inside the main shell.
+
+---
+
+## BR-140C — Local Timer Expiration
+
+When entering `gracePeriod`, `LicenseService` schedules an in-memory Dart `Timer` for the exact remaining duration (`suspended_at + 7 days - now`).
+- Upon timer expiry, the status automatically transitions to `lockedOut` and broadcasts to `LicenseGuard`.
+- `LicenseGuard` triggers `GoRouter.refreshListenable`, immediately redirecting navigation to `/license-locked`.
+- The application does NOT remain indefinitely in `gracePeriod` simply because no network event or app resume occurred.
+- If the license is reinstated before expiration, the timer is cancelled immediately.
+
+---
+
+## BR-140D — Locked-Out State
+
+When `now - suspended_at >= 7 days`:
+- Effective license status becomes `LicenseStatus.lockedOut`.
+- All normal application navigation is blocked.
+- The user is redirected to the full-screen `LicenseLockScreen` outside the application shell.
+- No sidebar, bottom navigation, or back navigation is permitted.
+- Historical business data is preserved and never deleted or corrupted.
+
+---
+
+## BR-140E — 24-Hour Remote Check Policy (Policy A)
+
+- **Application Startup**: Evaluates local cache immediately for instantaneous offline launch, then checks remote status if online.
+- **Background / Resume**: Remote license checks are throttled to once every 24 hours based on `last_checked_at`.
+- **Offline Resilience**: Offline launches use the cached status. Fresh installations with no local cache fail open to `'active'`.
+
+---
+
+## BR-140F — Reinstatement
+
+When the backend changes status back to `'active'`:
+- The local cached status is updated to `'active'`.
+- The local suspension timestamp is cleared (`suspended_at = NULL`).
+- Any active grace period timer is cancelled.
+- The application automatically unlocks and redirects back to the dashboard.
+
+---
+
 # 47. Final Business Rule Principles
 
 The V1 business rules are based on:
@@ -2015,15 +2217,21 @@ The Expense system follows the same principles.
 The key financial separation is:
 
 Payment
-→ Money received from customer
+→ Money received from customer (immutable historical transaction)
+
+Refund
+→ Money returned to customer for cancelled orders (order-level immutable transaction)
+
+Net Payments
+→ Total Payments - Total Refunds
 
 Expense
-→ Money spent by business
+→ Money spent by business (independent transaction)
 
 Net Profit
 → Total Sales - Total Operating Expenses
 
 Outstanding Amount
-→ Customer money still due
+→ Customer money still due on non-cancelled orders
 
 These concepts must never be merged or treated as interchangeable.

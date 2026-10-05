@@ -26,6 +26,7 @@ class MockOrderRepository implements OrderRepository {
     List<OrderStatus>? excludedStatuses,
     OrderDate? expectedPickupDate,
     bool? isOverdue,
+    DateTime? referenceDate,
     DateTime? createdFrom,
     DateTime? createdTo,
     String? customerId,
@@ -37,11 +38,14 @@ class MockOrderRepository implements OrderRepository {
     lastQuery = query;
     if (query != null && query.trim().isNotEmpty) {
       final q = query.trim();
-      return ordersToReturn.where((o) =>
-        o.orderNumber.contains(q) ||
-        o.customerNameSnapshot.contains(q) ||
-        o.customerPhoneSnapshot.contains(q)
-      ).toList();
+      return ordersToReturn
+          .where(
+            (o) =>
+                o.orderNumber.contains(q) ||
+                o.customerNameSnapshot.contains(q) ||
+                o.customerPhoneSnapshot.contains(q),
+          )
+          .toList();
     }
     return ordersToReturn;
   }
@@ -61,7 +65,9 @@ class MockPaymentRepository implements PaymentRepository {
   }
 
   @override
-  Future<Map<String, OrderPaymentSummary>> getPaymentSummariesForOrders(List<String> orderIds) async {
+  Future<Map<String, OrderPaymentSummary>> getPaymentSummariesForOrders(
+    List<String> orderIds,
+  ) async {
     return summariesToReturn;
   }
 }
@@ -90,9 +96,7 @@ void main() {
     return MaterialApp(
       home: Directionality(
         textDirection: TextDirection.rtl,
-        child: Scaffold(
-          body: child,
-        ),
+        child: Scaffold(body: child),
       ),
     );
   }
@@ -117,62 +121,84 @@ void main() {
     cubit.close();
   });
 
-  testWidgets('RecordPaymentDialog renders Step 1 (search & order list) and allows selecting an order', (tester) async {
+  testWidgets(
+    'RecordPaymentDialog renders Step 1 (search & order list) and allows selecting an order',
+    (tester) async {
+      await tester.pumpWidget(
+        buildTestableWidget(RecordPaymentDialog(cubit: cubit)),
+      );
+      await tester.pumpAndSettle();
+
+      // Step 1 title & search field with phone support placeholder and suffix search icon (on the left in RTL)
+      expect(find.text('تسجيل دفعة'), findsOneWidget);
+      expect(
+        find.text('ابحث برقم الطلب أو اسم العميل أو رقم الهاتف'),
+        findsOneWidget,
+      );
+      final searchField = tester.widget<AppTextField>(
+        find.byKey(const ValueKey('payment_order_search_field')),
+      );
+      expect(searchField.suffixIcon, isNotNull);
+
+      // Order item is visible with # prefix, customer name, and remaining balance
+      expect(find.text('#26-001'), findsOneWidget);
+      expect(find.text('أحمد محمود'), findsOneWidget);
+      expect(find.text('المتبقي'), findsOneWidget);
+      expect(find.text('60.00 ج.م'), findsOneWidget);
+
+      // Cancel text button exists
+      expect(find.text('إلغاء'), findsOneWidget);
+
+      // Tap order to proceed to Step 2
+      await tester.tap(find.byKey(const ValueKey('payment_order_item_ord-1')));
+      await tester.pumpAndSettle();
+
+      // Step 2 elements
+      expect(find.text('فتح الطلب'), findsOneWidget);
+      expect(find.text('المتبقي: 60.00 ج.م'), findsOneWidget);
+      // Amount starts at 0.00
+      final amountField = tester.widget<TextField>(
+        find.descendant(
+          of: find.byKey(const ValueKey('record_payment_amount_field')),
+          matching: find.byType(TextField),
+        ),
+      );
+      expect(amountField.controller?.text, '0.00');
+      // "المبلغ كامل" uses compact neutral OutlinedButton
+      expect(
+        find.widgetWithText(OutlinedButton, 'المبلغ كامل'),
+        findsOneWidget,
+      );
+      expect(find.text('طريقة الدفع *'), findsOneWidget);
+      expect(find.text('كاش'), findsOneWidget);
+      expect(find.text('InstaPay'), findsOneWidget);
+      expect(find.text('محفظة إلكترونية'), findsOneWidget);
+      expect(find.text('اختيار طلب آخر'), findsOneWidget);
+      expect(find.text('تأكيد الدفع'), findsOneWidget);
+
+      // RTL Action layout: Right = تأكيد الدفع, Left = اختيار طلب آخر
+      final confirmDx = tester
+          .getTopLeft(
+            find.byKey(const ValueKey('record_payment_confirm_button')),
+          )
+          .dx;
+      final backDx = tester
+          .getTopLeft(find.byKey(const ValueKey('record_payment_back_button')))
+          .dx;
+      expect(
+        confirmDx > backDx,
+        isTrue,
+        reason:
+            'تأكيد الدفع should be on the right and اختيار طلب آخر on the left in RTL',
+      );
+    },
+  );
+
+  testWidgets('Step 2: "اختيار طلب آخر" navigates back to Step 1', (
+    tester,
+  ) async {
     await tester.pumpWidget(
-      buildTestableWidget(
-        RecordPaymentDialog(cubit: cubit),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    // Step 1 title & search field with phone support placeholder and suffix search icon (on the left in RTL)
-    expect(find.text('تسجيل دفعة'), findsOneWidget);
-    expect(find.text('ابحث برقم الطلب أو اسم العميل أو رقم الهاتف'), findsOneWidget);
-    final searchField = tester.widget<AppTextField>(find.byKey(const ValueKey('payment_order_search_field')));
-    expect(searchField.suffixIcon, isNotNull);
-
-    // Order item is visible with # prefix, customer name, and remaining balance
-    expect(find.text('#26-001'), findsOneWidget);
-    expect(find.text('أحمد محمود'), findsOneWidget);
-    expect(find.text('المتبقي'), findsOneWidget);
-    expect(find.text('60.00 ج.م'), findsOneWidget);
-
-    // Cancel text button exists
-    expect(find.text('إلغاء'), findsOneWidget);
-
-    // Tap order to proceed to Step 2
-    await tester.tap(find.byKey(const ValueKey('payment_order_item_ord-1')));
-    await tester.pumpAndSettle();
-
-    // Step 2 elements
-    expect(find.text('فتح الطلب'), findsOneWidget);
-    expect(find.text('المتبقي: 60.00 ج.م'), findsOneWidget);
-    // Amount starts at 0.00
-    final amountField = tester.widget<TextField>(find.descendant(
-      of: find.byKey(const ValueKey('record_payment_amount_field')),
-      matching: find.byType(TextField),
-    ));
-    expect(amountField.controller?.text, '0.00');
-    // "المبلغ كامل" uses compact neutral OutlinedButton
-    expect(find.widgetWithText(OutlinedButton, 'المبلغ كامل'), findsOneWidget);
-    expect(find.text('طريقة الدفع *'), findsOneWidget);
-    expect(find.text('كاش'), findsOneWidget);
-    expect(find.text('InstaPay'), findsOneWidget);
-    expect(find.text('محفظة إلكترونية'), findsOneWidget);
-    expect(find.text('اختيار طلب آخر'), findsOneWidget);
-    expect(find.text('تأكيد الدفع'), findsOneWidget);
-
-    // RTL Action layout: Right = تأكيد الدفع, Left = اختيار طلب آخر
-    final confirmDx = tester.getTopLeft(find.byKey(const ValueKey('record_payment_confirm_button'))).dx;
-    final backDx = tester.getTopLeft(find.byKey(const ValueKey('record_payment_back_button'))).dx;
-    expect(confirmDx > backDx, isTrue, reason: 'تأكيد الدفع should be on the right and اختيار طلب آخر on the left in RTL');
-  });
-
-  testWidgets('Step 2: "اختيار طلب آخر" navigates back to Step 1', (tester) async {
-    await tester.pumpWidget(
-      buildTestableWidget(
-        RecordPaymentDialog(cubit: cubit),
-      ),
+      buildTestableWidget(RecordPaymentDialog(cubit: cubit)),
     );
     await tester.pumpAndSettle();
 
@@ -187,82 +213,114 @@ void main() {
     await tester.pumpAndSettle();
 
     // Back to Step 1
-    expect(find.byKey(const ValueKey('payment_order_search_field')), findsOneWidget);
-    expect(find.byKey(const ValueKey('payment_order_item_ord-1')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('payment_order_search_field')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('payment_order_item_ord-1')),
+      findsOneWidget,
+    );
   });
 
-  testWidgets('Step 2: "المبلغ كامل" fills remaining balance, switches method, and confirms payment', (tester) async {
-    bool paymentSuccessCalled = false;
+  testWidgets(
+    'Step 2: "المبلغ كامل" fills remaining balance, switches method, and confirms payment',
+    (tester) async {
+      bool paymentSuccessCalled = false;
 
-    await tester.pumpWidget(
-      buildTestableWidget(
-        RecordPaymentDialog(
-          cubit: cubit,
-          onPaymentSuccess: () => paymentSuccessCalled = true,
+      await tester.pumpWidget(
+        buildTestableWidget(
+          RecordPaymentDialog(
+            cubit: cubit,
+            onPaymentSuccess: () => paymentSuccessCalled = true,
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    // Select order
-    await tester.tap(find.byKey(const ValueKey('payment_order_item_ord-1')));
-    await tester.pumpAndSettle();
+      // Select order
+      await tester.tap(find.byKey(const ValueKey('payment_order_item_ord-1')));
+      await tester.pumpAndSettle();
 
-    // Tap "المبلغ كامل"
-    await tester.tap(find.byKey(const ValueKey('record_payment_full_amount_button')));
-    await tester.pumpAndSettle();
+      // Tap "المبلغ كامل"
+      await tester.tap(
+        find.byKey(const ValueKey('record_payment_full_amount_button')),
+      );
+      await tester.pumpAndSettle();
 
-    final filledAmountField = tester.widget<TextField>(find.descendant(
-      of: find.byKey(const ValueKey('record_payment_amount_field')),
-      matching: find.byType(TextField),
-    ));
-    expect(filledAmountField.controller?.text, '60.00');
+      final filledAmountField = tester.widget<TextField>(
+        find.descendant(
+          of: find.byKey(const ValueKey('record_payment_amount_field')),
+          matching: find.byType(TextField),
+        ),
+      );
+      expect(filledAmountField.controller?.text, '60.00');
 
-    // Select E-wallet method
-    await tester.tap(find.byKey(const ValueKey('payment_method_ewallet')));
-    await tester.pumpAndSettle();
+      // Select E-wallet method
+      await tester.tap(find.byKey(const ValueKey('payment_method_ewallet')));
+      await tester.pumpAndSettle();
 
-    // Confirm Payment
-    await tester.tap(find.byKey(const ValueKey('record_payment_confirm_button')));
-    await tester.pumpAndSettle();
+      // Confirm Payment
+      await tester.tap(
+        find.byKey(const ValueKey('record_payment_confirm_button')),
+      );
+      await tester.pumpAndSettle();
 
-    expect(paymentSuccessCalled, isTrue);
-    expect(paymentRepo.recordedPayment, isNotNull);
-    expect(paymentRepo.recordedPayment?.amount, const Money.fromPiastres(6000));
-    expect(paymentRepo.recordedPayment?.paymentMethod, PaymentMethod.ewallet);
-  });
+      expect(paymentSuccessCalled, isTrue);
+      expect(paymentRepo.recordedPayment, isNotNull);
+      expect(
+        paymentRepo.recordedPayment?.amount,
+        const Money.fromPiastres(6000),
+      );
+      expect(paymentRepo.recordedPayment?.paymentMethod, PaymentMethod.ewallet);
+    },
+  );
 
-  testWidgets('Step 1: debounced live search filters orders or shows empty state', (tester) async {
-    await tester.pumpWidget(
-      buildTestableWidget(
-        RecordPaymentDialog(cubit: cubit),
-      ),
-    );
-    await tester.pumpAndSettle();
+  testWidgets(
+    'Step 1: debounced live search filters orders or shows empty state',
+    (tester) async {
+      await tester.pumpWidget(
+        buildTestableWidget(RecordPaymentDialog(cubit: cubit)),
+      );
+      await tester.pumpAndSettle();
 
-    // Enter search that does not match
-    await tester.enterText(find.byKey(const ValueKey('payment_order_search_field')), 'غير موجود');
-    // Wait for 250ms debounce
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.pumpAndSettle();
+      // Enter search that does not match
+      await tester.enterText(
+        find.byKey(const ValueKey('payment_order_search_field')),
+        'غير موجود',
+      );
+      // Wait for 250ms debounce
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
 
-    expect(find.text('لا توجد طلبات مطابقة للبحث'), findsOneWidget);
-    expect(find.byKey(const ValueKey('payment_order_item_ord-1')), findsNothing);
-  });
+      expect(find.text('لا توجد طلبات مطابقة للبحث'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('payment_order_item_ord-1')),
+        findsNothing,
+      );
+    },
+  );
 
-  testWidgets('Step 1: searching with # prefix filters and shows matching order', (tester) async {
-    await tester.pumpWidget(
-      buildTestableWidget(
-        RecordPaymentDialog(cubit: cubit),
-      ),
-    );
-    await tester.pumpAndSettle();
+  testWidgets(
+    'Step 1: searching with # prefix filters and shows matching order',
+    (tester) async {
+      await tester.pumpWidget(
+        buildTestableWidget(RecordPaymentDialog(cubit: cubit)),
+      );
+      await tester.pumpAndSettle();
 
-    // Enter search with # prefix
-    await tester.enterText(find.byKey(const ValueKey('payment_order_search_field')), '#26-001');
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.pumpAndSettle();
+      // Enter search with # prefix
+      await tester.enterText(
+        find.byKey(const ValueKey('payment_order_search_field')),
+        '#26-001',
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('payment_order_item_ord-1')), findsOneWidget);
-  });
+      expect(
+        find.byKey(const ValueKey('payment_order_item_ord-1')),
+        findsOneWidget,
+      );
+    },
+  );
 }

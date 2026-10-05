@@ -347,7 +347,7 @@ The following fields use integer minor currency units:
     order_items.unit_price
     order_items.calculated_total
 
-    services.price
+    service_item_types.price
 
     payments.amount
 
@@ -824,9 +824,9 @@ Quantity must be greater than zero.
 Examples:
 
     Per Piece → 1
-    Per Kilogram → 3.5
-    Per Square Meter → 6.25
-    Fixed Price → 1
+    Per Square Meter → 6.25 (calculated area)
+
+*(Note: fixed_price is removed from V1, per_kg remains excluded)*
 
 The exact precision must follow the approved entity/database definition.
 
@@ -839,9 +839,9 @@ The implementation must not use integer-only storage if the approved domain allo
 Allowed values:
 
     per_piece
-    per_kg
     per_square_meter
-    fixed_price
+
+*(Note: fixed_price is removed from the V1 operational model, per_kg remains excluded)*
 
 The implementation must not introduce additional pricing types.
 
@@ -862,7 +862,7 @@ Both must be non-negative.
 
 The OrderItem price represents transaction-time pricing.
 
-It must not automatically follow future Service price changes.
+It must not automatically follow future Service + Item Type price changes.
 
 ---
 
@@ -1262,8 +1262,6 @@ Required fields:
     id
     name
     description
-    pricing_type
-    price
     is_active
     created_at
     updated_at
@@ -1277,39 +1275,34 @@ Name:
     NOT NULL
     UNIQUE
 
-Pricing Type:
+Description:
 
-    NOT NULL
-
-Price:
-
-    NOT NULL
-    >= 0
+    NULLABLE
 
 Active:
 
     NOT NULL
     DEFAULT true
 
+Note: The Service entity must NOT own a single default/current price or pricing type. Pricing configuration belongs to the `service_item_types` table.
+
 ---
 
-## 55. Service Pricing
+## 55. Service Pricing Configuration
 
-Current Service pricing is master data.
+Current Service–Item Type pricing is master data in `service_item_types`.
 
-Historical OrderItem pricing is transaction data.
+Historical OrderItem pricing is transaction data in `order_items.unit_price`.
 
 When creating an OrderItem:
 
-    Current Service Price
+    Resolved Service + Item Type Price (service_item_types.price)
         ↓
-    Calculate Transaction Price
-        ↓
-    Store OrderItem.unit_price
+    Store OrderItem.unit_price (Snapshot)
 
 After creation:
 
-    Service.price
+    service_item_types.price
 
 may change.
 
@@ -1321,7 +1314,7 @@ must not automatically change.
 
 ---
 
-## 56. Service / Item Type Junction Table
+## 56. Service / Item Type Associative Table
 
 Table:
 
@@ -1332,6 +1325,8 @@ Required fields:
     id
     service_id
     item_type_id
+    pricing_type
+    price
     created_at
     updated_at
 
@@ -1354,6 +1349,17 @@ Unique:
     service_id
         +
     item_type_id
+
+Pricing Type:
+
+    NOT NULL
+    CHECK (pricing_type IN ('per_piece', 'per_square_meter'))
+
+Price:
+
+    NOT NULL
+    CHECK (price > 0)
+    Integer minor currency units
 
 ---
 
@@ -2344,7 +2350,7 @@ Values that may be zero but must not be negative include:
     order_items.unit_price
     order_items.calculated_total
 
-    services.price
+    service_item_types.price
 
     business_settings.tax_rate
 
@@ -2851,7 +2857,7 @@ Invoice/receipt output must be generated from:
 
 Historical OrderItem values must be used.
 
-Do not retrieve current Service prices for historical Orders.
+Do not retrieve current Service + Item Type prices for historical Orders.
 
 ---
 
@@ -3269,9 +3275,9 @@ but the local database implementation must remain independently usable.
 
 ---
 
-## 151. Future Sync Compatibility
+## 151. Sync Compatibility
 
-Even though remote synchronization is deferred, the local implementation must preserve:
+The local database implementation preserves:
 
     Stable UUIDs
     SyncOperation records
@@ -3280,22 +3286,21 @@ Even though remote synchronization is deferred, the local implementation must pr
     Explicit entity identity
     Deterministic timestamps
 
-This allows future synchronization without redesigning the local identity model.
+This ensures robust synchronization without compromising local data integrity.
 
 ---
 
-## 152. No Backend Dependency
+## 152. Local Autonomy / No Backend Dependency
 
-The V1 local implementation must compile and operate without requiring:
+Local database operations must never block on remote availability.
 
-    Supabase project configuration
-    API URL
-    API key
-    Dio client
-    Retrofit generated client
-    Edge Function availability
+The local application must be capable of running and performing all local business transactions without requiring:
 
-Remote integration is a later phase.
+    Active network connection
+    Live Supabase Edge Function response
+    Immediate remote acknowledgment
+
+While Supabase and Dio + Retrofit are active in the Offline / Sync Integration phase, local operations remain completely autonomous.
 
 ---
 
@@ -3423,9 +3428,9 @@ The implementation must preserve:
 
 independently from:
 
-    services.price
+    service_item_types.price
 
-When Service price changes:
+When Service + Item Type price changes:
 
     Existing OrderItem.unit_price
         remains unchanged
@@ -3964,7 +3969,7 @@ The implementation must not create tables for:
     Delivery Routes
     Delivery Tracking
     Loyalty
-    Refunds
+    Payment Gateway Refunds and Item-Level Refunds
     Employee Permissions
     Multi-Branch
     Advanced Inventory
@@ -4555,7 +4560,7 @@ The AI must not:
     Add Invoice tables.
     Add Analytics tables.
     Add Loyalty tables.
-    Add Refund tables.
+    Add Line-Item Refund tables.
     Add Processing Stage tables.
     Add Storage Capacity tables.
     Add Barcode tables.
@@ -4587,7 +4592,7 @@ The AI must not generate a second UUID for OrderItemCarpet.
 
 The AI must not:
 
-    Replace historical OrderItem prices with current Service prices.
+    Replace historical OrderItem prices with current Service + Item Type prices.
 
     Replace historical Service names.
 
@@ -4915,7 +4920,7 @@ Transaction data:
 
 Therefore:
 
-    Service.price
+    ServiceItemType.price
         ≠
     OrderItem.unit_price
 

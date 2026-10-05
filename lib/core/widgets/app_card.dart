@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:laundry_management/core/theme/app_colors.dart';
-import 'package:laundry_management/core/theme/app_spacing.dart';
+
+import '../theme/app_colors.dart';
+import '../theme/app_spacing.dart';
 
 class AppCard extends StatelessWidget {
   final Widget child;
