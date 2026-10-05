@@ -12,6 +12,7 @@ import '../tables/expense_categories_table.dart';
 import '../tables/expenses_table.dart';
 import '../tables/item_definitions_table.dart';
 import '../tables/item_types_table.dart';
+import '../tables/license_cache_table.dart';
 import '../tables/order_item_carpets_table.dart';
 import '../tables/order_items_table.dart';
 import '../tables/orders_table.dart';
@@ -22,6 +23,7 @@ import '../tables/services_table.dart';
 import '../tables/storage_location_item_types_table.dart';
 import '../tables/storage_locations_table.dart';
 import '../tables/storage_records_table.dart';
+import '../tables/sync_conflicts_table.dart';
 import '../tables/sync_operations_table.dart';
 import '../tables/sync_states_table.dart';
 import 'seed_data.dart';
@@ -48,14 +50,25 @@ part 'app_database.g.dart';
     Expenses,
     BusinessSettings,
     SyncOperations,
+    SyncConflicts,
     SyncStates,
+    LicenseCache,
   ],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
+  /// Creates the application database.
+  ///
+  /// [enableCanonicalSeed] controls whether [SeedData.seedInitialData] runs on
+  /// open. It defaults to [SeedData.isEnabled] (`ENABLE_CANONICAL_SEED`,
+  /// default `false`), so a fresh database is EMPTY unless explicitly opted in.
+  AppDatabase([QueryExecutor? e, bool? enableCanonicalSeed])
+    : _enableCanonicalSeed = enableCanonicalSeed ?? SeedData.isEnabled,
+      super(e ?? _openConnection());
+
+  final bool _enableCanonicalSeed;
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -116,11 +129,90 @@ class AppDatabase extends _$AppDatabase {
       if (from < 6) {
         await m.addColumn(customers, customers.address);
       }
+      if (from < 7) {
+        // Add local license cache table.
+        // Single-row singleton that mirrors the remote license_info state.
+        // This table does NOT participate in the SyncEngine or outbox.
+        await m.createTable(licenseCache);
+      }
+      if (from < 8) {
+        // Upgrade service_item_types and services to Service + Item Type Pricing Model
+        final serviceCols = await customSelect(
+          'PRAGMA table_info(services);',
+        ).get();
+        final hasLegacyServicePricing = serviceCols.any(
+          (r) => r.read<String>('name') == 'pricing_type',
+        );
+
+        if (hasLegacyServicePricing) {
+          await customStatement('''
+            CREATE TABLE IF NOT EXISTS service_item_types_new (
+              id TEXT NOT NULL PRIMARY KEY,
+              service_id TEXT NOT NULL REFERENCES services (id) ON DELETE RESTRICT,
+              item_type_id TEXT NOT NULL REFERENCES item_types (id) ON DELETE RESTRICT,
+              pricing_type TEXT NOT NULL CHECK (pricing_type IN ('per_piece', 'per_square_meter')),
+              price INTEGER NOT NULL CHECK (price > 0),
+              created_at INTEGER NOT NULL,
+              updated_at INTEGER NOT NULL,
+              UNIQUE (service_id, item_type_id)
+            );
+          ''');
+
+          await customStatement('''
+            INSERT OR IGNORE INTO service_item_types_new (id, service_id, item_type_id, pricing_type, price, created_at, updated_at)
+            SELECT
+              sit.id,
+              sit.service_id,
+              sit.item_type_id,
+              CASE WHEN s.pricing_type = 'fixed_price' THEN 'per_piece' ELSE s.pricing_type END,
+              s.price,
+              sit.created_at,
+              sit.created_at
+            FROM service_item_types sit
+            JOIN services s ON s.id = sit.service_id
+            WHERE s.price > 0;
+          ''');
+
+          await customStatement('DROP TABLE service_item_types;');
+          await customStatement(
+            'ALTER TABLE service_item_types_new RENAME TO service_item_types;',
+          );
+
+          await customStatement('''
+            CREATE TABLE IF NOT EXISTS services_new (
+              id TEXT NOT NULL PRIMARY KEY,
+              name TEXT NOT NULL UNIQUE,
+              description TEXT,
+              is_active INTEGER NOT NULL DEFAULT 1,
+              created_at INTEGER NOT NULL,
+              updated_at INTEGER NOT NULL
+            );
+          ''');
+
+          await customStatement('''
+            INSERT OR IGNORE INTO services_new (id, name, description, is_active, created_at, updated_at)
+            SELECT id, name, description, is_active, created_at, updated_at
+            FROM services;
+          ''');
+
+          await customStatement('DROP TABLE services;');
+          await customStatement('ALTER TABLE services_new RENAME TO services;');
+        }
+
+        await customStatement('''
+          UPDATE order_items SET pricing_type = 'per_piece' WHERE pricing_type = 'fixed_price';
+        ''');
+      }
+      if (from < 9) {
+        await m.createTable(syncConflicts);
+      }
     },
     beforeOpen: (OpeningDetails details) async {
       await customStatement('PRAGMA foreign_keys = ON;');
       await _createIndexes();
-      await SeedData.seedInitialData(this);
+      if (_enableCanonicalSeed) {
+        await SeedData.seedInitialData(this);
+      }
     },
   );
 

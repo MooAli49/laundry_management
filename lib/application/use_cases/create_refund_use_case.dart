@@ -43,7 +43,9 @@ class CreateRefundUseCase {
       orderId: input.orderId,
       amount: input.amount,
       refundMethod: input.refundMethod,
-      reason: input.reason?.trim().isEmpty ?? true ? null : input.reason!.trim(),
+      reason: input.reason?.trim().isEmpty ?? true
+          ? null
+          : input.reason!.trim(),
       refundedAt: input.refundedAt ?? now,
       createdAt: now,
       updatedAt: now,

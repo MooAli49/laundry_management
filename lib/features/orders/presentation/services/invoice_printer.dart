@@ -4,10 +4,12 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import '../../../../core/localization/app_strings.dart';
+import '../../../../core/utils/date_formatter.dart';
 import '../../../../domain/entities/business_settings.dart';
 import '../../../../domain/entities/customer.dart';
 import '../../../../domain/entities/order.dart';
 import '../../../../domain/entities/order_item.dart';
+import '../../../../domain/enums/order_status.dart';
 import '../../../../domain/enums/pricing_type.dart';
 import '../../../../domain/value_objects/money.dart';
 
@@ -108,13 +110,13 @@ class InvoicePrinter {
           : null;
 
       if (isCarpet) {
-        final totalPieces = group.fold<double>(
+        // Persisted OrderItem.quantity for carpets holds the pricing area (m²),
+        // NOT the physical piece count. Each carpet row with carpetData is one
+        // physical piece, so never display quantity (area) as piece count.
+        final pieceCount = group.fold<double>(
           0.0,
-          (sum, item) => sum + item.quantity,
+          (sum, item) => sum + (item.carpetData != null ? 1.0 : item.quantity),
         );
-        final pieceCount = totalPieces > 0
-            ? totalPieces
-            : group.length.toDouble();
         final quantityDisplay = formatPieceCount(pieceCount);
 
         // Price for ONE carpet piece
@@ -308,57 +310,137 @@ class InvoicePrinter {
               pw.Divider(thickness: 0.5, borderStyle: pw.BorderStyle.dashed),
               pw.SizedBox(height: 4),
 
-              // Order Metadata
+              // Order & Status Row (matching Invoice Preview & Thermal layout)
               pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
-                  pw.Text(
-                    'فاتورة رقم: ',
-                    style: pw.TextStyle(
-                      fontSize: 9,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Row(
+                        mainAxisSize: pw.MainAxisSize.min,
+                        children: [
+                          pw.Text(
+                            'فاتورة ',
+                            style: pw.TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                          pw.Text(
+                            '#${order.orderNumber}',
+                            style: pw.TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                            textDirection: pw.TextDirection.ltr,
+                          ),
+                        ],
+                      ),
+                      pw.SizedBox(height: 2),
+                      pw.Text(
+                        'التاريخ: ${DateFormatter.formatArabicDate(order.createdAt)}',
+                        style: const pw.TextStyle(fontSize: 8),
+                      ),
+                    ],
                   ),
-                  pw.Text(
-                    order.orderNumber,
-                    style: pw.TextStyle(
-                      fontSize: 9,
-                      fontWeight: pw.FontWeight.bold,
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
                     ),
-                    textDirection: pw.TextDirection.ltr,
+                    decoration: pw.BoxDecoration(
+                      borderRadius: const pw.BorderRadius.all(
+                        pw.Radius.circular(8),
+                      ),
+                      border: pw.Border.all(color: PdfColors.black, width: 0.8),
+                    ),
+                    child: pw.Text(
+                      _statusLabel(order.status),
+                      style: pw.TextStyle(
+                        fontSize: 7.5,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
-              pw.SizedBox(height: 2.5),
-              pw.Text(
-                'التاريخ: ${formatDateTime(order.createdAt)}',
-                style: const pw.TextStyle(fontSize: 8.5),
-              ),
-              pw.SizedBox(height: 2.5),
-              pw.Text(
-                'تاريخ الاستلام المتوقع: ${formatDate(order.expectedPickupDate.toDateTime())}',
-                style: const pw.TextStyle(fontSize: 8.5),
-              ),
-              pw.SizedBox(height: 2.5),
-              pw.Text(
-                'العميل: $customerName',
-                style: const pw.TextStyle(fontSize: 8.5),
-              ),
-              if (customerPhone.isNotEmpty) ...[
-                pw.SizedBox(height: 2.5),
-                pw.Row(
+              pw.SizedBox(height: 4),
+
+              // Customer & Expected Pickup Boxed Card (matching Invoice Preview & Thermal layout)
+              pw.Container(
+                padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 5,
+                ),
+                decoration: pw.BoxDecoration(
+                  color: PdfColors.grey100,
+                  borderRadius: const pw.BorderRadius.all(
+                    pw.Radius.circular(4),
+                  ),
+                  border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
+                ),
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text(
-                      'الهاتف: ',
-                      style: const pw.TextStyle(fontSize: 8.5),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'بيانات العميل',
+                          style: const pw.TextStyle(
+                            fontSize: 7,
+                            color: PdfColors.grey700,
+                          ),
+                        ),
+                        pw.SizedBox(height: 1.5),
+                        pw.Text(
+                          customerName,
+                          style: pw.TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        if (customerPhone.isNotEmpty) ...[
+                          pw.SizedBox(height: 1.5),
+                          pw.Text(
+                            customerPhone,
+                            style: const pw.TextStyle(
+                              fontSize: 7.5,
+                              color: PdfColors.grey800,
+                            ),
+                            textDirection: pw.TextDirection.ltr,
+                          ),
+                        ],
+                      ],
                     ),
-                    pw.Text(
-                      customerPhone,
-                      style: const pw.TextStyle(fontSize: 8.5),
-                      textDirection: pw.TextDirection.ltr,
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Text(
+                          'موعد الاستلام',
+                          style: const pw.TextStyle(
+                            fontSize: 7,
+                            color: PdfColors.grey700,
+                          ),
+                        ),
+                        pw.SizedBox(height: 1.5),
+                        pw.Text(
+                          DateFormatter.formatArabicDate(
+                            order.expectedPickupDate.toDateTime(),
+                          ),
+                          style: pw.TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
               pw.SizedBox(height: 4),
               pw.Divider(thickness: 0.5),
               pw.SizedBox(height: 4),
@@ -414,7 +496,7 @@ class InvoicePrinter {
                       pw.Padding(
                         padding: const pw.EdgeInsets.symmetric(vertical: 2.5),
                         child: pw.Text(
-                          'البند / الخدمة',
+                          'البند والخدمة',
                           style: pw.TextStyle(
                             fontSize: 8.5,
                             fontWeight: pw.FontWeight.bold,
@@ -652,5 +734,18 @@ class InvoicePrinter {
       dynamicLayout: false,
       onLayout: (format) async => doc.save(),
     );
+  }
+
+  static String _statusLabel(OrderStatus status) {
+    switch (status) {
+      case OrderStatus.processing:
+        return 'قيد التجهيز';
+      case OrderStatus.ready:
+        return 'جاهز';
+      case OrderStatus.completed:
+        return 'مكتمل';
+      case OrderStatus.cancelled:
+        return 'ملغي';
+    }
   }
 }

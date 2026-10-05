@@ -14,8 +14,6 @@ class FakeDashboardRepository implements DashboardRepository {
     unpaidOrdersCount: 2,
     storageAttentionCount: 4,
     overdueOrdersCount: 1,
-    todayPickupOrdersCount: 2,
-    todayPickupOrders: [],
     recentOrders: [],
   );
 
@@ -89,8 +87,6 @@ void main() {
         unpaidOrdersCount: 3,
         storageAttentionCount: 2,
         overdueOrdersCount: 0,
-        todayPickupOrdersCount: 1,
-        todayPickupOrders: [],
         recentOrders: [],
       );
 

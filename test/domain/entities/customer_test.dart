@@ -70,32 +70,35 @@ void main() {
       );
     });
 
-    test('copyWith sequence: address = "شارع التحرير" -> address = "شارع النيل" -> address = null', () {
-      final initial = Customer(
-        id: 'cust-seq',
-        name: 'عميل التحرير',
-        phone: '01099998888',
-        address: 'شارع التحرير',
-        createdAt: now,
-        updatedAt: now,
-      );
-      expect(initial.address, 'شارع التحرير');
+    test(
+      'copyWith sequence: address = "شارع التحرير" -> address = "شارع النيل" -> address = null',
+      () {
+        final initial = Customer(
+          id: 'cust-seq',
+          name: 'عميل التحرير',
+          phone: '01099998888',
+          address: 'شارع التحرير',
+          createdAt: now,
+          updatedAt: now,
+        );
+        expect(initial.address, 'شارع التحرير');
 
-      // Then address = "شارع النيل"
-      final step2 = initial.copyWith(address: 'شارع النيل');
-      expect(step2.address, 'شارع النيل');
-      expect(step2.name, 'عميل التحرير');
+        // Then address = "شارع النيل"
+        final step2 = initial.copyWith(address: 'شارع النيل');
+        expect(step2.address, 'شارع النيل');
+        expect(step2.name, 'عميل التحرير');
 
-      // Then address = null
-      final step3 = step2.copyWith(address: null);
-      expect(step3.address, isNull);
-      expect(step3.name, 'عميل التحرير');
+        // Then address = null
+        final step3 = step2.copyWith(address: null);
+        expect(step3.address, isNull);
+        expect(step3.name, 'عميل التحرير');
 
-      // Without specifying address keeps existing
-      final step4 = step2.copyWith(name: 'اسم جديد');
-      expect(step4.address, 'شارع النيل');
-      expect(step4.name, 'اسم جديد');
-    });
+        // Without specifying address keeps existing
+        final step4 = step2.copyWith(name: 'اسم جديد');
+        expect(step4.address, 'شارع النيل');
+        expect(step4.name, 'اسم جديد');
+      },
+    );
 
     test('copyWith supports clearAddress: true', () {
       final customer = Customer(

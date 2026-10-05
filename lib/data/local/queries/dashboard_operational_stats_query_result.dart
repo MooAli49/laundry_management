@@ -5,7 +5,6 @@ class DashboardOperationalStatsQueryResult {
   final int totalRemainingPiastres;
   final int unpaidOrdersCount;
   final int overdueOrdersCount;
-  final int todayPickupOrdersCount;
 
   const DashboardOperationalStatsQueryResult({
     required this.todayOrdersCount,
@@ -14,7 +13,6 @@ class DashboardOperationalStatsQueryResult {
     required this.totalRemainingPiastres,
     required this.unpaidOrdersCount,
     required this.overdueOrdersCount,
-    required this.todayPickupOrdersCount,
   });
 
   static const empty = DashboardOperationalStatsQueryResult(
@@ -24,6 +22,5 @@ class DashboardOperationalStatsQueryResult {
     totalRemainingPiastres: 0,
     unpaidOrdersCount: 0,
     overdueOrdersCount: 0,
-    todayPickupOrdersCount: 0,
   );
 }

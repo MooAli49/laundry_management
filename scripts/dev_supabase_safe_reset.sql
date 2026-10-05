@@ -40,6 +40,7 @@ DECLARE
     v_carpets_count BIGINT;
     v_payments_count BIGINT;
     v_storage_records_count BIGINT;
+    v_refunds_count BIGINT;
     v_expenses_count BIGINT;
     v_customers_count BIGINT;
     v_services_count BIGINT;
@@ -69,6 +70,7 @@ BEGIN
     SELECT count(*) INTO v_order_items_count FROM public.order_items;
     SELECT count(*) INTO v_carpets_count FROM public.order_item_carpets;
     SELECT count(*) INTO v_payments_count FROM public.payments;
+    SELECT count(*) INTO v_refunds_count FROM public.refunds;
     SELECT count(*) INTO v_storage_records_count FROM public.storage_records;
     SELECT count(*) INTO v_expenses_count FROM public.expenses;
     SELECT count(*) INTO v_customers_count FROM public.customers;
@@ -87,6 +89,7 @@ BEGIN
     RAISE NOTICE 'order_items:              % rows', v_order_items_count;
     RAISE NOTICE 'order_item_carpets:       % rows', v_carpets_count;
     RAISE NOTICE 'payments:                 % rows', v_payments_count;
+    RAISE NOTICE 'refunds:                  % rows', v_refunds_count;
     RAISE NOTICE 'storage_records:          % rows', v_storage_records_count;
     RAISE NOTICE 'expenses:                 % rows', v_expenses_count;
     RAISE NOTICE 'customers:                % rows', v_customers_count;
@@ -219,14 +222,20 @@ BEGIN
 
     -- 3. Volume thresholds (Development safety bounds)
     SELECT count(*) INTO v_orders_count FROM public.orders;
-    IF v_orders_count > 1000 THEN
-        RAISE EXCEPTION 'GUARD 3 FAILED: Order count (%) exceeds development threshold (1000).', v_orders_count
+    IF v_orders_count > 2000 THEN
+        RAISE EXCEPTION 'GUARD 3 FAILED: Order count (%) exceeds development threshold (2000).', v_orders_count
             USING ERRCODE = 'P0001';
     END IF;
 
     SELECT count(*) INTO v_payments_count FROM public.payments;
-    IF v_payments_count > 1000 THEN
-        RAISE EXCEPTION 'GUARD 3 FAILED: Payment count (%) exceeds development threshold (1000).', v_payments_count
+    IF v_payments_count > 2000 THEN
+        RAISE EXCEPTION 'GUARD 3 FAILED: Payment count (%) exceeds development threshold (2000).', v_payments_count
+            USING ERRCODE = 'P0001';
+    END IF;
+
+    SELECT count(*) INTO v_refunds_count FROM public.refunds;
+    IF v_refunds_count > 2000 THEN
+        RAISE EXCEPTION 'GUARD 3 FAILED: Refund count (%) exceeds development threshold (2000).', v_refunds_count
             USING ERRCODE = 'P0001';
     END IF;
 
@@ -306,6 +315,7 @@ DELETE FROM public.sync_changes;
 DELETE FROM public.sync_idempotency_log;
 
 -- 2. Transactional Order Children
+DELETE FROM public.refunds;
 DELETE FROM public.payments;
 DELETE FROM public.storage_records;
 DELETE FROM public.order_item_carpets;
@@ -447,6 +457,9 @@ BEGIN
 
     SELECT count(*) INTO v_count FROM public.payments;
     IF v_count <> 0 THEN RAISE EXCEPTION 'POST-RESET ASSERTION FAILED: payments count (%) <> 0', v_count; END IF;
+
+    SELECT count(*) INTO v_count FROM public.refunds;
+    IF v_count <> 0 THEN RAISE EXCEPTION 'POST-RESET ASSERTION FAILED: refunds count (%) <> 0', v_count; END IF;
 
     SELECT count(*) INTO v_count FROM public.storage_records;
     IF v_count <> 0 THEN RAISE EXCEPTION 'POST-RESET ASSERTION FAILED: storage_records count (%) <> 0', v_count; END IF;

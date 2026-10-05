@@ -514,35 +514,33 @@ Service persistence must support:
 - Edit Service
 - Activate Service
 - Deactivate Service
-- Configure Pricing Type
-- Configure Price
-- Configure Supported Item Types
+- Configure Supported Item Types with Pricing Configuration (pricing_type and price per ServiceItemType)
 - List Active Services
 - Load Service details
 
-Current Service configuration belongs to master data.
+The Service entity does NOT own a single default/current price. Pricing configuration belongs to the `ServiceItemType` associative entity.
 
 Historical OrderItem pricing remains independent.
 
 ---
 
-# 27. Service Compatibility Data
+# 27. Service / Item Type Associative & Pricing Data
 
 The Data Layer must support the relationship:
 
     Service
         ↕
-    ServiceItemType
+    ServiceItemType (pricing_type, price)
         ↕
     ItemType
 
 Queries must support:
 
-- Item Types supported by a Service
-- Services supported by an Item Type
-- Adding compatibility
-- Removing compatibility
-- Preventing duplicate compatibility records
+- Item Types and pricing configurations for a Service
+- Services and pricing configurations available for an Item Type
+- Adding or updating ServiceItemType pricing configuration (`pricing_type`, `price`)
+- Removing ServiceItemType configuration
+- Preventing duplicate `(service_id, item_type_id)` combinations
 
 ---
 
@@ -1354,7 +1352,7 @@ The Data Layer must preserve historical transaction values.
 
 Examples:
 
-OrderItem service price snapshot.
+OrderItem Service + Item Type price snapshot (`unit_price`).
 
 Order total.
 
@@ -1929,6 +1927,24 @@ The approved conceptual Data Layer is:
         ├── Retry Handling
         ├── Remote Pull
         └── Local Push
+
+---
+
+# 99A. License Cache Infrastructure Persistence (`license_cache`)
+
+The Data Layer includes a local singleton cache table dedicated to system license enforcement:
+
+- **Purpose**: Persists operational license status locally so the application can enforce license gating and 7-day grace periods offline without network access.
+- **Table**: `license_cache` (introduced in Drift schema version 7).
+- **Structure**:
+  - `id`: TextColumn, primary key (constant `'singleton'`).
+  - `remote_status`: TextColumn (`'active'` or `'suspended'`).
+  - `suspended_at`: DateTimeColumn (nullable, remote authoritative UTC timestamp).
+  - `last_checked_at`: DateTimeColumn (nullable, local check timestamp for 24-hour throttling).
+- **Operational Rules**:
+  - **Isolation**: Completely excluded from SyncEngine and outbox queue (`sync_operations`). It is never synced.
+  - **Zero Coupling**: Has no foreign keys, relationships, or dependencies on business tables (`orders`, `customers`, etc.).
+  - **Access Boundary**: Read and written exclusively by `LicenseCacheDao` and orchestrated by `LicenseService`. Does not affect business queries.
 
 ---
 

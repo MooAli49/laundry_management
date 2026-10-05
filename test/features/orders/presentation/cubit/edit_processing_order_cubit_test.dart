@@ -2,7 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/application/use_cases/edit_processing_order_use_case.dart';
 import 'package:laundry_management/data/local/daos/payments_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
-import 'package:laundry_management/data/local/database/app_database.dart' as app_db;
+import 'package:laundry_management/data/local/database/app_database.dart'
+    as app_db;
 import 'package:laundry_management/domain/entities/business_settings.dart';
 import 'package:laundry_management/domain/entities/carpet_size.dart';
 import 'package:laundry_management/domain/entities/customer.dart';
@@ -11,9 +12,11 @@ import 'package:laundry_management/domain/entities/item_type.dart';
 import 'package:laundry_management/domain/entities/order.dart';
 import 'package:laundry_management/domain/entities/order_item.dart';
 import 'package:laundry_management/domain/entities/service.dart';
+import 'package:laundry_management/domain/entities/service_item_type.dart';
 import 'package:laundry_management/domain/entities/storage_location.dart';
 import 'package:laundry_management/domain/enums/order_status.dart';
 import 'package:laundry_management/domain/enums/pricing_type.dart';
+import 'package:laundry_management/domain/models/service_with_pricing.dart';
 import 'package:laundry_management/domain/repositories/carpet_size_repository.dart';
 import 'package:laundry_management/domain/repositories/customer_repository.dart';
 import 'package:laundry_management/domain/repositories/item_definition_repository.dart';
@@ -55,8 +58,7 @@ class MockCustomerRepo implements CustomerRepository {
     String? query,
     int limit = 20,
     int offset = 0,
-  }) async =>
-      customers;
+  }) async => customers;
 
   @override
   Future<Customer?> getCustomerById(String id) async =>
@@ -67,11 +69,11 @@ class MockCustomerRepo implements CustomerRepository {
 }
 
 class MockServiceRepo implements ServiceRepository {
-  List<Service> services = [];
+  List<ServiceWithPricing> servicesWithPricing = [];
 
   @override
-  Future<List<Service>> getServicesForItemType(String itemTypeId) async =>
-      services;
+  Future<List<ServiceWithPricing>> getServicesForItemType(String itemTypeId) async =>
+      servicesWithPricing;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -81,7 +83,8 @@ class MockItemTypeRepo implements ItemTypeRepository {
   List<ItemType> types = [];
 
   @override
-  Future<List<ItemType>> getAllItemTypes({bool activeOnly = false}) async => types;
+  Future<List<ItemType>> getAllItemTypes({bool activeOnly = false}) async =>
+      types;
 
   @override
   Future<List<ItemType>> getActiveItemTypes() async => types;
@@ -97,8 +100,7 @@ class MockItemDefRepo implements ItemDefinitionRepository {
   Future<List<ItemDefinition>> getDefinitionsForItemType(
     String itemTypeId, {
     bool activeOnly = false,
-  }) async =>
-      defs;
+  }) async => defs;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -133,7 +135,9 @@ class FakeStorageDao extends Fake implements StorageRecordsDao {
       counts[orderItemId] ?? 0;
 
   @override
-  Future<app_db.StorageRecord?> getActiveRecordForOrderItem(String orderItemId) async => null;
+  Future<app_db.StorageRecord?> getActiveRecordForOrderItem(
+    String orderItemId,
+  ) async => null;
 }
 
 class FakeStorageLocRepo extends Fake implements StorageLocationRepository {
@@ -144,11 +148,11 @@ class FakeStorageLocRepo extends Fake implements StorageLocationRepository {
 class FakeSettingsRepo extends Fake implements SettingsRepository {
   @override
   Future<BusinessSettings> getSettings() async => BusinessSettings(
-        id: 'settings-1',
-        businessName: 'مغسلة تجريبية',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
+    id: 'settings-1',
+    businessName: 'مغسلة تجريبية',
+    createdAt: DateTime.now(),
+    updatedAt: DateTime.now(),
+  );
 }
 
 void main() {
@@ -185,8 +189,6 @@ void main() {
   final testService = Service(
     id: 'srv-1',
     name: 'غسيل',
-    price: Money.fromEgp(20),
-    pricingType: PricingType.perPiece,
     createdAt: now,
     updatedAt: now,
   );
@@ -194,10 +196,34 @@ void main() {
   final testCarpetService = Service(
     id: 'srv-carpet',
     name: 'غسيل سجاد',
-    price: Money.fromEgp(30),
-    pricingType: PricingType.perSquareMeter,
     createdAt: now,
     updatedAt: now,
+  );
+
+  final testServiceWithPricing = ServiceWithPricing(
+    service: testService,
+    serviceItemType: ServiceItemType(
+      id: 'sit-1',
+      serviceId: 'srv-1',
+      itemTypeId: 'type-1',
+      pricingType: PricingType.perPiece,
+      price: Money.fromEgp(20),
+      createdAt: now,
+      updatedAt: now,
+    ),
+  );
+
+  final testCarpetServiceWithPricing = ServiceWithPricing(
+    service: testCarpetService,
+    serviceItemType: ServiceItemType(
+      id: 'sit-carpet',
+      serviceId: 'srv-carpet',
+      itemTypeId: 'type-1',
+      pricingType: PricingType.perSquareMeter,
+      price: Money.fromEgp(30),
+      createdAt: now,
+      updatedAt: now,
+    ),
   );
 
   final testItem = OrderItem(
@@ -208,9 +234,9 @@ void main() {
     serviceId: 'srv-1',
     serviceNameSnapshot: 'غسيل',
     pricingType: PricingType.perPiece,
-    quantity: 2,
+    quantity: 1,
     unitPrice: Money.fromEgp(20),
-    calculatedTotal: Money.fromEgp(40),
+    calculatedTotal: Money.fromEgp(20),
     createdAt: now,
     updatedAt: now,
   );
@@ -245,7 +271,7 @@ void main() {
     orderRepo.items = [testItem];
     customerRepo.customers = [testCustomer];
     itemTypeRepo.types = [testType];
-    serviceRepo.services = [testService, testCarpetService];
+    serviceRepo.servicesWithPricing = [testServiceWithPricing, testCarpetServiceWithPricing];
 
     useCase = EditProcessingOrderUseCase(orderRepository: orderRepo);
 
@@ -269,15 +295,18 @@ void main() {
   });
 
   group('EditProcessingOrderCubit', () {
-    test('loadOrder() sets canChangeCustomer true when totalPaid == 0', () async {
-      paymentsDao.totalPaidPiastres = 0;
-      await cubit.loadOrder('order-1');
+    test(
+      'loadOrder() sets canChangeCustomer true when totalPaid == 0',
+      () async {
+        paymentsDao.totalPaidPiastres = 0;
+        await cubit.loadOrder('order-1');
 
-      expect(cubit.state.isLoading, isFalse);
-      expect(cubit.state.canChangeCustomer, isTrue);
-      expect(cubit.state.items.length, 1);
-      expect(cubit.state.total, Money.fromEgp(20));
-    });
+        expect(cubit.state.isLoading, isFalse);
+        expect(cubit.state.canChangeCustomer, isTrue);
+        expect(cubit.state.items.length, 1);
+        expect(cubit.state.total, Money.fromEgp(20));
+      },
+    );
 
     test('loadOrder() locks customer when totalPaid > 0', () async {
       paymentsDao.totalPaidPiastres = 2000; // 20 EGP
@@ -288,48 +317,57 @@ void main() {
       expect(cubit.state.totalPaid, Money.fromEgp(20));
     });
 
-    test('selectCustomer does nothing when canChangeCustomer is false', () async {
-      paymentsDao.totalPaidPiastres = 2000;
-      await cubit.loadOrder('order-1');
+    test(
+      'selectCustomer does nothing when canChangeCustomer is false',
+      () async {
+        paymentsDao.totalPaidPiastres = 2000;
+        await cubit.loadOrder('order-1');
 
-      final newCustomer = Customer(
-        id: 'cust-2',
-        name: 'عميل آخر',
-        phone: '0544444444',
-        createdAt: now,
-        updatedAt: now,
-      );
+        final newCustomer = Customer(
+          id: 'cust-2',
+          name: 'عميل آخر',
+          phone: '0544444444',
+          createdAt: now,
+          updatedAt: now,
+        );
 
-      cubit.selectCustomer(newCustomer);
-      expect(cubit.state.selectedCustomer?.id, 'cust-1');
-      expect(cubit.state.errorMessage, contains('لا يمكن تغيير العميل لوجود مدفوعات'));
-    });
+        cubit.selectCustomer(newCustomer);
+        expect(cubit.state.selectedCustomer?.id, 'cust-1');
+        expect(
+          cubit.state.errorMessage,
+          contains('لا يمكن تغيير العميل لوجود مدفوعات'),
+        );
+      },
+    );
 
-    test('selectCustomer(null) clears selectedCustomer when canChangeCustomer is true (totalPaid == 0)', () async {
-      paymentsDao.totalPaidPiastres = 0;
-      await cubit.loadOrder('order-1');
-      expect(cubit.state.selectedCustomer?.id, 'cust-1');
+    test(
+      'selectCustomer(null) clears selectedCustomer when canChangeCustomer is true (totalPaid == 0)',
+      () async {
+        paymentsDao.totalPaidPiastres = 0;
+        await cubit.loadOrder('order-1');
+        expect(cubit.state.selectedCustomer?.id, 'cust-1');
 
-      // Operator taps "تغيير" -> sets selectedCustomer to null so picker opens
-      cubit.selectCustomer(null);
-      expect(cubit.state.selectedCustomer, isNull);
+        // Operator taps "تغيير" -> sets selectedCustomer to null so picker opens
+        cubit.selectCustomer(null);
+        expect(cubit.state.selectedCustomer, isNull);
 
-      // Operator selects another customer
-      final newCustomer = Customer(
-        id: 'cust-2',
-        name: 'عميل جديد',
-        phone: '0544444444',
-        createdAt: now,
-        updatedAt: now,
-      );
-      cubit.selectCustomer(newCustomer);
-      expect(cubit.state.selectedCustomer?.id, 'cust-2');
+        // Operator selects another customer
+        final newCustomer = Customer(
+          id: 'cust-2',
+          name: 'عميل جديد',
+          phone: '0544444444',
+          createdAt: now,
+          updatedAt: now,
+        );
+        cubit.selectCustomer(newCustomer);
+        expect(cubit.state.selectedCustomer?.id, 'cust-2');
 
-      // Operator saves
-      await cubit.submitEdit();
-      expect(cubit.state.savedOrder, isNotNull);
-      expect(orderRepo.lastInput?.customerId, 'cust-2');
-    });
+        // Operator saves
+        await cubit.submitEdit();
+        expect(cubit.state.savedOrder, isNotNull);
+        expect(orderRepo.lastInput?.customerId, 'cust-2');
+      },
+    );
 
     test('blocks deletion of item that has storage records', () async {
       storageDao.counts['item-1'] = 1;
@@ -346,7 +384,7 @@ void main() {
 
       // Add a second item first
       await cubit.selectItemType(testType);
-      cubit.selectService(testService);
+      cubit.selectService(testServiceWithPricing);
       cubit.saveDraftItem();
       expect(cubit.state.items.length, 2);
 
@@ -355,23 +393,28 @@ void main() {
       expect(cubit.state.deletedItemIds, contains('item-1'));
     });
 
-    test('recalculates totals when discount and delivery fees are updated', () async {
-      await cubit.loadOrder('order-1');
-      expect(cubit.state.total, Money.fromEgp(20));
+    test(
+      'recalculates totals when discount and delivery fees are updated',
+      () async {
+        await cubit.loadOrder('order-1');
+        expect(cubit.state.total, Money.fromEgp(20));
 
-      cubit.updateDiscount(Money.fromEgp(5));
-      expect(cubit.state.total, Money.fromEgp(15));
+        cubit.updateDiscount(Money.fromEgp(5));
+        expect(cubit.state.total, Money.fromEgp(15));
 
-      cubit.toggleCustomerDelivery(true);
-      cubit.updateCustomerDeliveryFee(Money.fromEgp(10));
-      expect(cubit.state.total, Money.fromEgp(25));
-    });
+        cubit.toggleCustomerDelivery(true);
+        cubit.updateCustomerDeliveryFee(Money.fromEgp(10));
+        expect(cubit.state.total, Money.fromEgp(25));
+      },
+    );
 
     test('submitEdit blocks when total < totalPaid', () async {
       paymentsDao.totalPaidPiastres = 2000; // 20 EGP paid
       await cubit.loadOrder('order-1');
 
-      cubit.updateDiscount(Money.fromEgp(10)); // Subtotal 20 - 10 = 10 < paid 20
+      cubit.updateDiscount(
+        Money.fromEgp(10),
+      ); // Subtotal 20 - 10 = 10 < paid 20
       await cubit.submitEdit();
 
       expect(cubit.state.savedOrder, isNull);
@@ -379,127 +422,177 @@ void main() {
     });
 
     group('UAT-D — In-flight draft quantity presentation', () {
-      test('adding draft with quantity = 2 creates 2 separate items with physicalQuantity = 1 each', () async {
-        paymentsDao.totalPaidPiastres = 0;
-        await cubit.loadOrder('order-1');
-        expect(cubit.state.items.length, 1);
+      test(
+        'adding draft with quantity = 2 creates 2 separate items with physicalQuantity = 1 each',
+        () async {
+          paymentsDao.totalPaidPiastres = 0;
+          await cubit.loadOrder('order-1');
+          expect(cubit.state.items.length, 1);
 
-        await cubit.selectItemType(testType);
-        cubit.selectService(testService);
-        cubit.updateDraftQuantity(2);
-        cubit.saveDraftItem();
+          await cubit.selectItemType(testType);
+          cubit.selectService(testServiceWithPricing);
+          cubit.updateDraftQuantity(2);
+          cubit.saveDraftItem();
 
-        // 1 original + 2 newly added
-        expect(cubit.state.items.length, 3);
-        final piece1 = cubit.state.items[1];
-        final piece2 = cubit.state.items[2];
+          // 1 original + 2 newly added
+          expect(cubit.state.items.length, 3);
+          final piece1 = cubit.state.items[1];
+          final piece2 = cubit.state.items[2];
 
-        expect(piece1.physicalQuantity, 1);
-        expect(piece2.physicalQuantity, 1);
-        expect(piece1.unitPrice, Money.fromEgp(20));
-        expect(piece2.unitPrice, Money.fromEgp(20));
-        expect(piece1.calculatedTotal, Money.fromEgp(20));
-        expect(piece2.calculatedTotal, Money.fromEgp(20));
+          expect(piece1.physicalQuantity, 1);
+          expect(piece2.physicalQuantity, 1);
+          expect(piece1.unitPrice, Money.fromEgp(20));
+          expect(piece2.unitPrice, Money.fromEgp(20));
+          expect(piece1.calculatedTotal, Money.fromEgp(20));
+          expect(piece2.calculatedTotal, Money.fromEgp(20));
 
-        // Subtotal = 20 (original) + 20 + 20 = 60
-        expect(cubit.state.subtotal, Money.fromEgp(60));
-      });
+          // Subtotal = 20 (original) + 20 + 20 = 60
+          expect(cubit.state.subtotal, Money.fromEgp(60));
+        },
+      );
 
-      test('deleting one newly-added draft piece does not affect the other and recalculates total', () async {
-        paymentsDao.totalPaidPiastres = 0;
-        await cubit.loadOrder('order-1');
+      test(
+        'deleting one newly-added draft piece does not affect the other and recalculates total',
+        () async {
+          paymentsDao.totalPaidPiastres = 0;
+          await cubit.loadOrder('order-1');
 
-        await cubit.selectItemType(testType);
-        cubit.selectService(testService);
-        cubit.updateDraftQuantity(2);
-        cubit.saveDraftItem();
-        expect(cubit.state.items.length, 3);
-        expect(cubit.state.subtotal, Money.fromEgp(60));
+          await cubit.selectItemType(testType);
+          cubit.selectService(testServiceWithPricing);
+          cubit.updateDraftQuantity(2);
+          cubit.saveDraftItem();
+          expect(cubit.state.items.length, 3);
+          expect(cubit.state.subtotal, Money.fromEgp(60));
 
-        // Delete the first newly-added item (index 1)
-        cubit.deleteItem(1);
+          // Delete the first newly-added item (index 1)
+          cubit.deleteItem(1);
 
-        expect(cubit.state.items.length, 2);
-        expect(cubit.state.items[1].physicalQuantity, 1);
-        expect(cubit.state.items[1].serviceName, 'غسيل');
-        // Subtotal should now be 20 (original) + 20 (remaining piece) = 40
-        expect(cubit.state.subtotal, Money.fromEgp(40));
-      });
+          expect(cubit.state.items.length, 2);
+          expect(cubit.state.items[1].physicalQuantity, 1);
+          expect(cubit.state.items[1].serviceName, 'غسيل');
+          // Subtotal should now be 20 (original) + 20 (remaining piece) = 40
+          expect(cubit.state.subtotal, Money.fromEgp(40));
+        },
+      );
 
-      test('saving order persists N individual CreateOrderItemInput rows with physicalQuantity = 1', () async {
-        paymentsDao.totalPaidPiastres = 0;
-        await cubit.loadOrder('order-1');
+      test(
+        'saving order persists N individual CreateOrderItemInput rows with physicalQuantity = 1',
+        () async {
+          paymentsDao.totalPaidPiastres = 0;
+          await cubit.loadOrder('order-1');
 
-        await cubit.selectItemType(testType);
-        cubit.selectService(testService);
-        cubit.updateDraftQuantity(2);
-        cubit.saveDraftItem();
+          await cubit.selectItemType(testType);
+          cubit.selectService(testServiceWithPricing);
+          cubit.updateDraftQuantity(2);
+          cubit.saveDraftItem();
 
-        await cubit.submitEdit();
+          await cubit.submitEdit();
 
-        expect(cubit.state.savedOrder, isNotNull);
-        final newItems = orderRepo.lastInput?.newItems;
-        expect(newItems, isNotNull);
-        expect(newItems!.length, 2);
-        expect(newItems[0].physicalQuantity, 1);
-        expect(newItems[1].physicalQuantity, 1);
-      });
+          expect(cubit.state.savedOrder, isNotNull);
+          final newItems = orderRepo.lastInput?.newItems;
+          expect(newItems, isNotNull);
+          expect(newItems!.length, 2);
+          expect(newItems[0].physicalQuantity, 1);
+          expect(newItems[1].physicalQuantity, 1);
+        },
+      );
 
-      test('adding draft with quantity = 1 creates exactly 1 item with physicalQuantity = 1', () async {
-        paymentsDao.totalPaidPiastres = 0;
-        await cubit.loadOrder('order-1');
-        expect(cubit.state.items.length, 1);
+      test(
+        'adding draft with quantity = 1 creates exactly 1 item with physicalQuantity = 1',
+        () async {
+          paymentsDao.totalPaidPiastres = 0;
+          await cubit.loadOrder('order-1');
+          expect(cubit.state.items.length, 1);
 
-        await cubit.selectItemType(testType);
-        cubit.selectService(testService);
-        cubit.updateDraftQuantity(1);
-        cubit.saveDraftItem();
+          await cubit.selectItemType(testType);
+          cubit.selectService(testServiceWithPricing);
+          cubit.updateDraftQuantity(1);
+          cubit.saveDraftItem();
 
-        expect(cubit.state.items.length, 2);
-        expect(cubit.state.items[1].physicalQuantity, 1);
-        expect(cubit.state.subtotal, Money.fromEgp(40));
-      });
+          expect(cubit.state.items.length, 2);
+          expect(cubit.state.items[1].physicalQuantity, 1);
+          expect(cubit.state.subtotal, Money.fromEgp(40));
+        },
+      );
 
-      test('adding carpet draft with quantity = 2 and dimensions creates 2 separate items with physicalQuantity = 1 each and correct carpet data', () async {
-        paymentsDao.totalPaidPiastres = 0;
-        await cubit.loadOrder('order-1');
-        expect(cubit.state.items.length, 1);
+      test(
+        'adding carpet draft with quantity = 2 and dimensions creates 2 separate items with physicalQuantity = 1 each and correct carpet data',
+        () async {
+          paymentsDao.totalPaidPiastres = 0;
+          await cubit.loadOrder('order-1');
+          expect(cubit.state.items.length, 1);
 
-        await cubit.selectItemType(testType);
-        cubit.selectService(testCarpetService);
-        cubit.updateDraftQuantity(2);
-        cubit.updateDraftCarpetDimensions(3.0, 2.0);
-        cubit.saveDraftItem();
+          await cubit.selectItemType(testType);
+          cubit.selectService(testCarpetServiceWithPricing);
+          cubit.updateDraftQuantity(2);
+          cubit.updateDraftCarpetDimensions(3.0, 2.0);
+          cubit.saveDraftItem();
 
-        // 1 original + 2 newly added carpet items
-        expect(cubit.state.items.length, 3);
-        final piece1 = cubit.state.items[1];
-        final piece2 = cubit.state.items[2];
+          // 1 original + 2 newly added carpet items
+          expect(cubit.state.items.length, 3);
+          final piece1 = cubit.state.items[1];
+          final piece2 = cubit.state.items[2];
 
-        expect(piece1.physicalQuantity, 1);
-        expect(piece2.physicalQuantity, 1);
-        expect(piece1.pricingType, PricingType.perSquareMeter);
-        expect(piece2.pricingType, PricingType.perSquareMeter);
-        expect(piece1.length, 3.0);
-        expect(piece1.width, 2.0);
-        expect(piece1.carpetArea, 6.0);
-        expect(piece2.length, 3.0);
-        expect(piece2.width, 2.0);
-        expect(piece2.carpetArea, 6.0);
-        // unit price 30 EGP / m^2 * 6 m^2 = 180 EGP each
-        expect(piece1.calculatedTotal, Money.fromEgp(180));
-        expect(piece2.calculatedTotal, Money.fromEgp(180));
+          expect(piece1.physicalQuantity, 1);
+          expect(piece2.physicalQuantity, 1);
+          expect(piece1.pricingType, PricingType.perSquareMeter);
+          expect(piece2.pricingType, PricingType.perSquareMeter);
+          expect(piece1.length, 3.0);
+          expect(piece1.width, 2.0);
+          expect(piece1.carpetArea, 6.0);
+          expect(piece2.length, 3.0);
+          expect(piece2.width, 2.0);
+          expect(piece2.carpetArea, 6.0);
+          // unit price 30 EGP / m^2 * 6 m^2 = 180 EGP each
+          expect(piece1.calculatedTotal, Money.fromEgp(180));
+          expect(piece2.calculatedTotal, Money.fromEgp(180));
 
-        // Subtotal = 20 (original) + 180 + 180 = 380
-        expect(cubit.state.subtotal, Money.fromEgp(380));
-      });
+          // Subtotal = 20 (original) + 180 + 180 = 380
+          expect(cubit.state.subtotal, Money.fromEgp(380));
+        },
+      );
 
-      test('existing persisted items loaded from database have physicalQuantity = 1', () async {
-        await cubit.loadOrder('order-1');
-        expect(cubit.state.items.length, 1);
-        expect(cubit.state.items[0].isExisting, isTrue);
-        expect(cubit.state.items[0].physicalQuantity, 1);
-      });
+      test(
+        'existing persisted items loaded from database have physicalQuantity = 1',
+        () async {
+          await cubit.loadOrder('order-1');
+          expect(cubit.state.items.length, 1);
+          expect(cubit.state.items[0].isExisting, isTrue);
+          expect(cubit.state.items[0].physicalQuantity, 1);
+        },
+      );
+    });
+
+    group('Custom Item Total Editing & Reset in EditProcessingOrder', () {
+      test(
+        'editing existing item total updates its calculatedTotal and order total',
+        () async {
+          await cubit.loadOrder('order-1');
+          expect(cubit.state.items[0].calculatedTotal, Money.fromEgp(20));
+          expect(cubit.state.total, Money.fromEgp(20));
+
+          // Start editing item 0
+          await cubit.startEditItem(0);
+          expect(cubit.state.effectiveDraftTotal, Money.fromEgp(20));
+
+          // Update total to 35 EGP
+          cubit.updateDraftTotal(Money.fromEgp(35));
+          expect(cubit.state.effectiveDraftTotal, Money.fromEgp(35));
+          expect(cubit.state.isDraftTotalOverridden, isTrue);
+
+          // Reset back to default
+          cubit.resetDraftTotal();
+          expect(cubit.state.effectiveDraftTotal, Money.fromEgp(20));
+          expect(cubit.state.isDraftTotalOverridden, isFalse);
+
+          // Update to 35 and save
+          cubit.updateDraftTotal(Money.fromEgp(35));
+          cubit.saveDraftItem();
+
+          expect(cubit.state.items[0].calculatedTotal, Money.fromEgp(35));
+          expect(cubit.state.total, Money.fromEgp(35));
+        },
+      );
     });
   });
 }

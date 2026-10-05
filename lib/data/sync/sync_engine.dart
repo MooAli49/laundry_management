@@ -14,6 +14,7 @@ import '../datasources/remote/remote_api_dispatcher.dart';
 import '../datasources/remote/sync_remote_data_source.dart';
 import '../local/daos/sync_operations_dao.dart';
 import '../local/daos/sync_state_dao.dart';
+import '../remote/dto/pull_changes_response_dto.dart';
 import 'remote_change_applier.dart';
 
 /// Orchestrates bidirectional synchronization (Push + Pull + Realtime Wake-Up)
@@ -236,6 +237,69 @@ class SyncEngine {
     await _runSyncLoop();
   }
 
+  /// Performs an explicit full database resync against the remote snapshot.
+  ///
+  /// Rebuilds the authoritative local baseline while strictly preserving any
+  /// unsynced local outbox operations.
+  Future<SyncEngineState> fullResync() async {
+    if (_isDisposed) {
+      return _state;
+    }
+
+    final remoteDataSource = _syncRemoteDataSource;
+    final changeApplier = _remoteChangeApplier;
+
+    if (remoteDataSource == null || changeApplier == null) {
+      throw StateError(
+        'SyncEngine dependencies not fully initialized for fullResync',
+      );
+    }
+
+    final isConnected = await _networkInfo.isConnected;
+    if (!isConnected) {
+      return _state;
+    }
+
+    _updateState(
+      SyncEngineState.syncing(
+        lastSyncTime: _state.lastSyncTime,
+        pendingOperationsCount: _state.pendingOperationsCount,
+      ),
+    );
+
+    try {
+      _log('Starting explicit full resync...');
+      final snapshot = await remoteDataSource.getSnapshot();
+      await changeApplier.applySnapshot(snapshot);
+      _log(
+        'Explicit full resync completed successfully at sequence ${snapshot.latestSequence}.',
+      );
+
+      _pendingNeedsPush = true;
+      return await _runSyncLoop();
+    } catch (e, stack) {
+      _log('Explicit full resync failed: $e', e, stack);
+      int remainingCount = _state.pendingOperationsCount;
+      try {
+        final remainingOps = await _syncOperationsDao.getEligibleOperations(
+          asOf: _clock(),
+        );
+        remainingCount = remainingOps.length;
+      } catch (_) {}
+
+      final errorMessage = _mapPullErrorMessage(e);
+      _updateState(
+        SyncEngineState.failed(
+          error: errorMessage,
+          lastSyncTime: _state.lastSyncTime,
+          pendingOperationsCount: remainingCount,
+          errorDetails: _mapErrorToDetails(e),
+        ),
+      );
+      return _state;
+    }
+  }
+
   /// Core coalescing execution loop.
   ///
   /// Ensures at most ONE synchronization operation actively mutates state.
@@ -317,10 +381,51 @@ class SyncEngine {
           break;
         }
 
-        final response = await remoteDataSource.getChanges(
-          after: cursor,
-          limit: _defaultPageSize,
-        );
+        PullChangesResponseDto response;
+        try {
+          response = await remoteDataSource.getChanges(
+            after: cursor,
+            limit: _defaultPageSize,
+          );
+        } on CursorTooOldException catch (e, stack) {
+          _log(
+            'CURSOR_TOO_OLD encountered during pull (${e.message}). '
+            'Oldest available sequence: ${e.oldestAvailableSequence}. '
+            'Initiating full resync recovery...',
+            e,
+            stack,
+          );
+
+          try {
+            // 1. Fetch authoritative full database snapshot from backend
+            final snapshot = await remoteDataSource.getSnapshot();
+
+            // 2. Ingest snapshot in Drift, preserving pending local outbox operations
+            //    and atomically advancing cursor to snapshot.latestSequence
+            await changeApplier.applySnapshot(snapshot);
+
+            cursor = snapshot.latestSequence;
+            hasMore = false;
+
+            // 3. Re-flag push pass so any preserved pending operations are dispatched
+            _pendingNeedsPush = true;
+
+            _log(
+              'Full resync recovery completed successfully. '
+              'Authoritative baseline established at sequence $cursor.',
+            );
+            break;
+          } catch (recoveryError, recoveryStack) {
+            _log(
+              'Full resync recovery failed ($recoveryError). Preserving CURSOR_TOO_OLD error state.',
+              recoveryError,
+              recoveryStack,
+            );
+            // Throw the original CursorTooOldException e so state reflects the root cause
+            // and surfaces distinctly with HTTP 410 and original error message
+            throw e;
+          }
+        }
 
         if (response.changes.isEmpty) {
           break;
@@ -422,6 +527,7 @@ class SyncEngine {
         ),
       );
 
+      var canRequestTrailingPass = true;
       for (var i = 0; i < operations.length; i++) {
         if (_isDisposed) {
           break;
@@ -431,7 +537,16 @@ class SyncEngine {
 
         final stillConnected = await _networkInfo.isConnected;
         if (!stillConnected || _isDisposed) {
+          canRequestTrailingPass = false;
           break;
+        }
+
+        // Barrier: Do not dispatch if a parent dependency has permanently failed
+        if (await _syncOperationsDao.hasPermanentlyFailedDependency(op)) {
+          _log(
+            'Skipping dispatch of ${op.entityType}:${op.entityId} because a parent dependency has permanently failed.',
+          );
+          continue;
         }
 
         try {
@@ -495,6 +610,12 @@ class SyncEngine {
       final remainingOps = await _syncOperationsDao.getEligibleOperations(
         asOf: _clock(),
       );
+      if (canRequestTrailingPass && remainingOps.isNotEmpty) {
+        // A dependent operation may become eligible after its parent is marked
+        // synced. Request one coordinated trailing pass instead of dispatching
+        // in parallel or treating the initial queue snapshot as authoritative.
+        _pendingNeedsPush = true;
+      }
       final finishTime = _clock();
       _updateState(
         SyncEngineState.completed(
@@ -564,10 +685,16 @@ class SyncEngine {
     if (error is DioException) {
       final statusCode = error.response?.statusCode;
       if (statusCode != null) {
-        return SyncErrorDetails.http(
-          statusCode,
-          message: error.message ?? error.toString(),
-        );
+        String msg = error.message ?? error.toString();
+        final data = error.response?.data;
+        if (data != null) {
+          if (data is Map && data['message'] != null) {
+            msg = data['message'].toString();
+          } else {
+            msg = data.toString();
+          }
+        }
+        return SyncErrorDetails.http(statusCode, message: msg);
       }
       switch (error.type) {
         case DioExceptionType.connectionTimeout:

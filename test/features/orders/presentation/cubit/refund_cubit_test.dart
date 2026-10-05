@@ -110,7 +110,9 @@ void main() {
             (s) =>
                 !s.isSubmitting &&
                 s.errorMessage != null &&
-                s.errorMessage!.contains('مبلغ الاسترداد يتجاوز المبلغ القابل للاسترداد'),
+                s.errorMessage!.contains(
+                  'مبلغ الاسترداد يتجاوز المبلغ القابل للاسترداد',
+                ),
           ),
         ];
 
@@ -137,7 +139,9 @@ void main() {
           (s) =>
               !s.isSubmitting &&
               s.errorMessage != null &&
-              s.errorMessage!.contains('لا يمكن استرداد مبالغ إلا للطلبات الملغاة فقط'),
+              s.errorMessage!.contains(
+                'لا يمكن استرداد مبالغ إلا للطلبات الملغاة فقط',
+              ),
         ),
       ];
 
@@ -152,33 +156,36 @@ void main() {
       expect(cubit.state.hasError, isTrue);
     });
 
-    test('18. Duplicate submission protection prevents double execution', () async {
-      fakeCreateRefundUseCase.delay = const Duration(milliseconds: 50);
-      fakeCreateRefundUseCase.refundToReturn = testRefund;
+    test(
+      '18. Duplicate submission protection prevents double execution',
+      () async {
+        fakeCreateRefundUseCase.delay = const Duration(milliseconds: 50);
+        fakeCreateRefundUseCase.refundToReturn = testRefund;
 
-      // Launch first submission
-      final f1 = cubit.submitRefund(
-        orderId: 'ord-1',
-        amount: Money.fromPiastres(3500),
-        refundMethod: RefundMethod.cash,
-      );
+        // Launch first submission
+        final f1 = cubit.submitRefund(
+          orderId: 'ord-1',
+          amount: Money.fromPiastres(3500),
+          refundMethod: RefundMethod.cash,
+        );
 
-      expect(cubit.state.isSubmitting, isTrue);
+        expect(cubit.state.isSubmitting, isTrue);
 
-      // Launch second submission while first is still submitting
-      final f2 = cubit.submitRefund(
-        orderId: 'ord-1',
-        amount: Money.fromPiastres(3500),
-        refundMethod: RefundMethod.cash,
-      );
+        // Launch second submission while first is still submitting
+        final f2 = cubit.submitRefund(
+          orderId: 'ord-1',
+          amount: Money.fromPiastres(3500),
+          refundMethod: RefundMethod.cash,
+        );
 
-      await Future.wait([f1, f2]);
+        await Future.wait([f1, f2]);
 
-      // Verify use case was invoked only once
-      expect(fakeCreateRefundUseCase.executeCallCount, 1);
-      expect(cubit.state.isSuccess, isTrue);
-      expect(cubit.state.refund, testRefund);
-    });
+        // Verify use case was invoked only once
+        expect(fakeCreateRefundUseCase.executeCallCount, 1);
+        expect(cubit.state.isSuccess, isTrue);
+        expect(cubit.state.refund, testRefund);
+      },
+    );
 
     test('reset() emits default RefundState', () {
       cubit.reset();

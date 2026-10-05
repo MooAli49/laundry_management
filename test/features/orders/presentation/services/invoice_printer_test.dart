@@ -207,6 +207,69 @@ void main() {
       },
     );
 
+    CarpetItemData sixSqmCarpet() => CarpetItemData(
+      id: 'carpet-6',
+      orderItemId: 'item-test-1',
+      length: 2.0,
+      width: 3.0,
+      area: 6.0,
+      createdAt: testDate,
+      updatedAt: testDate,
+    );
+
+    test(
+      'Carpet persisted with quantity = area (6) displays 1 قطعة, not 6, with area shown separately',
+      () {
+        final item = createTestItem(
+          pricingType: PricingType.perSquareMeter,
+          quantity: 6.0, // production persistence: quantity holds area
+          unitPrice: const Money.fromPiastres(24000),
+          calculatedTotal: const Money.fromPiastres(144000),
+          carpetData: sixSqmCarpet(),
+        );
+        final line = InvoicePrinter.groupItems([item]).first;
+        expect(line.quantityDisplay, '1 قطعة');
+        expect(line.quantityDisplay, isNot(contains('6')));
+        expect(line.dimensionsSubtext, '(2 × 3 م) — 6 م²/قطعة');
+        expect(line.calculatedTotal, const Money.fromPiastres(144000));
+      },
+    );
+
+    test('Carpet with quantity 1 and area 6 displays 1 قطعة', () {
+      final item = createTestItem(
+        pricingType: PricingType.perSquareMeter,
+        quantity: 1.0,
+        carpetData: sixSqmCarpet(),
+      );
+      final line = InvoicePrinter.groupItems([item]).first;
+      expect(line.quantityDisplay, '1 قطعة');
+      expect(line.dimensionsSubtext, contains('6 م²'));
+    });
+
+    test('Two identical carpets (quantity = area each) display 2 قطع', () {
+      final items = List.generate(
+        2,
+        (_) => createTestItem(
+          pricingType: PricingType.perSquareMeter,
+          quantity: 6.0,
+          calculatedTotal: const Money.fromPiastres(12000),
+          carpetData: sixSqmCarpet(),
+        ),
+      );
+      final lines = InvoicePrinter.groupItems(items);
+      expect(lines.length, 1);
+      expect(lines.first.quantityDisplay, '2 قطع');
+      expect(lines.first.calculatedTotal, const Money.fromPiastres(24000));
+    });
+
+    test('Clothing quantity 5 displays 5 قطع and no carpet subtext', () {
+      final item = createTestItem(quantity: 5.0);
+      final line = InvoicePrinter.groupItems([item]).first;
+      expect(line.quantityDisplay, '5 قطع');
+      expect(line.dimensionsSubtext, isNull);
+      expect(InvoicePrinter.formatQuantity(item), '5 قطع');
+    });
+
     test(
       'formatNumber preserves exact precision and trims trailing zeroes',
       () {

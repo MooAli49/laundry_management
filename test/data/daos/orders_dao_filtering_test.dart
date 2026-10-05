@@ -170,67 +170,78 @@ void main() {
       expect(cancelledOrders.first.id, 'ord-4');
     });
 
-    test('completed and cancelled filters strictly exclude other statuses at SQL level', () async {
-      final completedOrders = await ordersDao.getOrders(
-        status: OrderStatus.completed.value,
-      );
-      for (final order in completedOrders) {
-        expect(order.status, equals(OrderStatus.completed.value));
-        expect(order.status, isNot(equals(OrderStatus.ready.value)));
-        expect(order.status, isNot(equals(OrderStatus.processing.value)));
-        expect(order.status, isNot(equals(OrderStatus.cancelled.value)));
-      }
+    test(
+      'completed and cancelled filters strictly exclude other statuses at SQL level',
+      () async {
+        final completedOrders = await ordersDao.getOrders(
+          status: OrderStatus.completed.value,
+        );
+        for (final order in completedOrders) {
+          expect(order.status, equals(OrderStatus.completed.value));
+          expect(order.status, isNot(equals(OrderStatus.ready.value)));
+          expect(order.status, isNot(equals(OrderStatus.processing.value)));
+          expect(order.status, isNot(equals(OrderStatus.cancelled.value)));
+        }
 
-      final cancelledOrders = await ordersDao.getOrders(
-        status: OrderStatus.cancelled.value,
-      );
-      for (final order in cancelledOrders) {
-        expect(order.status, equals(OrderStatus.cancelled.value));
-        expect(order.status, isNot(equals(OrderStatus.ready.value)));
-        expect(order.status, isNot(equals(OrderStatus.processing.value)));
-        expect(order.status, isNot(equals(OrderStatus.completed.value)));
-      }
-    });
+        final cancelledOrders = await ordersDao.getOrders(
+          status: OrderStatus.cancelled.value,
+        );
+        for (final order in cancelledOrders) {
+          expect(order.status, equals(OrderStatus.cancelled.value));
+          expect(order.status, isNot(equals(OrderStatus.ready.value)));
+          expect(order.status, isNot(equals(OrderStatus.processing.value)));
+          expect(order.status, isNot(equals(OrderStatus.completed.value)));
+        }
+      },
+    );
 
-    test('combines search query with completed and cancelled status filters', () async {
-      // Customer 'سارة' has ord-3 (completed) and ord-4 (cancelled)
-      final completedSearch = await ordersDao.getOrders(
-        query: 'سارة',
-        status: OrderStatus.completed.value,
-      );
-      expect(completedSearch.length, 1);
-      expect(completedSearch.first.id, 'ord-3');
+    test(
+      'combines search query with completed and cancelled status filters',
+      () async {
+        // Customer 'سارة' has ord-3 (completed) and ord-4 (cancelled)
+        final completedSearch = await ordersDao.getOrders(
+          query: 'سارة',
+          status: OrderStatus.completed.value,
+        );
+        expect(completedSearch.length, 1);
+        expect(completedSearch.first.id, 'ord-3');
 
-      final cancelledSearch = await ordersDao.getOrders(
-        query: 'سارة',
-        status: OrderStatus.cancelled.value,
-      );
-      expect(cancelledSearch.length, 1);
-      expect(cancelledSearch.first.id, 'ord-4');
+        final cancelledSearch = await ordersDao.getOrders(
+          query: 'سارة',
+          status: OrderStatus.cancelled.value,
+        );
+        expect(cancelledSearch.length, 1);
+        expect(cancelledSearch.first.id, 'ord-4');
 
-      // Search for 'أحمد' (has ord-1 processing, ord-2 ready) with completed status
-      final noResults = await ordersDao.getOrders(
-        query: 'أحمد',
-        status: OrderStatus.completed.value,
-      );
-      expect(noResults.isEmpty, true);
-    });
+        // Search for 'أحمد' (has ord-1 processing, ord-2 ready) with completed status
+        final noResults = await ordersDao.getOrders(
+          query: 'أحمد',
+          status: OrderStatus.completed.value,
+        );
+        expect(noResults.isEmpty, true);
+      },
+    );
 
-    test('filters by hasRemaining at SQL level: only active orders with unpaid balance appear', () async {
-      final remainingOrders = await ordersDao.getOrders(hasRemaining: true);
-      // ord-1 (processing, 5000 - 2000 = 3000) appears.
-      // ord-2 (ready, fully paid 3000/3000 = 0) does NOT appear.
-      // ord-3 (completed, fully paid 8000/8000 = 0) does NOT appear.
-      // ord-4 (cancelled, remaining is 0) does NOT appear even though payments = 0.
-      expect(remainingOrders.length, 1);
-      expect(remainingOrders.first.id, 'ord-1');
+    test(
+      'filters by hasRemaining at SQL level: only active orders with unpaid balance appear',
+      () async {
+        final remainingOrders = await ordersDao.getOrders(hasRemaining: true);
+        // ord-1 (processing, 5000 - 2000 = 3000) appears.
+        // ord-2 (ready, fully paid 3000/3000 = 0) does NOT appear.
+        // ord-3 (completed, fully paid 8000/8000 = 0) does NOT appear.
+        // ord-4 (cancelled, remaining is 0) does NOT appear even though payments = 0.
+        expect(remainingOrders.length, 1);
+        expect(remainingOrders.first.id, 'ord-1');
 
-      // hasRemaining: false returns all orders with 0 remaining (fully paid ord-2, ord-3, and cancelled ord-4)
-      final zeroRemainingOrders = await ordersDao.getOrders(hasRemaining: false);
-      expect(zeroRemainingOrders.length, 3);
-      final zeroIds = zeroRemainingOrders.map((o) => o.id).toSet();
-      expect(zeroIds, containsAll(['ord-2', 'ord-3', 'ord-4']));
-    });
+        // hasRemaining: false returns all orders with 0 remaining (fully paid ord-2, ord-3, and cancelled ord-4)
+        final zeroRemainingOrders = await ordersDao.getOrders(
+          hasRemaining: false,
+        );
+        expect(zeroRemainingOrders.length, 3);
+        final zeroIds = zeroRemainingOrders.map((o) => o.id).toSet();
+        expect(zeroIds, containsAll(['ord-2', 'ord-3', 'ord-4']));
+      },
+    );
 
     test('combines status and hasRemaining SQL filters', () async {
       final processingWithRemaining = await ordersDao.getOrders(

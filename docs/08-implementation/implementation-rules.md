@@ -816,7 +816,7 @@ Changing master data must not silently rewrite historical transactions.
 
 Examples:
 
-Changing Service price
+Changing Service + Item Type price
 → does not change previous OrderItem prices.
 
 Changing Service name
@@ -988,18 +988,20 @@ Do not make carpet fields universally required.
 
 ## 50. Pricing Rules
 
-The selected PricingType determines how the item is priced.
+Pricing is configured on the Service + Item Type relationship (`service_item_types`). The selected PricingType determines how the item is priced.
 
-Supported concepts include:
+Supported V1 Operational PricingTypes:
 
-- Per Piece
-- Per Kilogram
-- Per Square Meter
-- Fixed Price
+- Per Piece (`per_piece`)
+- Per Square Meter (`per_square_meter`)
+
+*(Note: Fixed Price (`fixed_price`) is removed from the V1 operational model; Per Kilogram (`per_kg`) remains completely excluded from V1).*
 
 Do not assume all services use:
 
 price × quantity
+
+without checking the configured PricingType (e.g., Carpet uses dimensions for area-based pricing).
 
 Pricing logic must follow the approved Domain rules.
 

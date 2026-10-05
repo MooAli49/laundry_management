@@ -204,6 +204,18 @@ The exact generation mechanism is an implementation detail, but uniqueness is ma
 - Final Order Number format is `YY-<numeric sequence>` (minimum 3 digits, no maximum length; e.g. `26-001`, `26-999`, `26-1000`, `26-10000`).
 - During order creation, order number collision against the UNIQUE database constraint on `orders.order_number` triggers an immediate rollback and a whole-transaction retry from the beginning (up to 5 attempts), generating a fresh order number.
 
+### Product Deployment Policy — Single-Terminal Order Intake & Multi-Terminal Readiness
+
+- **Initial Deployment Policy**: The primary deployment model uses one physical device/terminal dedicated to receiving and creating orders at the cashier desk. The laundry operates as a single branch with the owner/admin as the primary cashier/operator.
+- **Customer Guidance**: For initial deployment, it is explicitly recommended to use one device for receiving and creating orders. If the business later needs a second order-intake device, the system architecture is prepared to support it.
+- **Deferred Multi-Terminal Numbering**: Station-partitioned order numbers and onboarding Station ID selection are intentionally deferred to avoid premature onboarding and operational complexity.
+- **Preserved Invariants**:
+  - The canonical `YY-<numeric sequence>` format (BR-017) remains strictly unchanged.
+  - Strict immutability of assigned order numbers (BR-018) is maintained; physical receipts, tags, and database records remain permanently consistent.
+  - No reactive renumbering or silent mutation is performed during synchronization.
+  - Multi-terminal concurrent order creation via station partitioning is designated as the future architectural path when additional intake terminals are deployed.
+- **Replacement / Reinstalled Device Operational Requirement**: Any replacement or reinstalled primary cashier device must connect to the internet and complete an initial synchronization before creating new customer orders. This guarantees that local sequence generation is hydrated with the latest historical order numbers from the remote database and prevents sequence resets to `26-001`.
+
 ---
 
 # 6. Order Status Rules
@@ -557,9 +569,9 @@ Existing orders using an inactive service must remain valid.
 
 ---
 
-## BR-052 — Service Price Snapshot
+## BR-052 — Service + Item Type Price Snapshot
 
-When a service is selected for an OrderItem, the price used at that time must be preserved in the OrderItem.
+When a valid Service + Item Type pricing configuration is selected for an OrderItem, the actual price used at that time must be preserved in the OrderItem (`order_items.unit_price`).
 
 ---
 
@@ -577,7 +589,7 @@ Historical OrderItems must capture and preserve explicit name snapshots:
 
 ## BR-053 — Historical Price Stability
 
-Changing the current service price must not change the price of existing OrderItems.
+Changing a Service's pricing configuration (the price configured for that Service + Item Type combination) later must NOT change the price of existing OrderItems or historical orders.
 
 ---
 
@@ -593,11 +605,10 @@ Deactivating a service must not modify historical orders.
 
 The supported V1 operational pricing types are:
 
-- Per Piece
-- Fixed Price
-- Per Square Meter
+- Per Piece (`per_piece`)
+- Per Square Meter (`per_square_meter`)
 
-*(Note: Per Kilogram pricing has been completely removed from the V1 operational workflow and domain model by locked business decision. No PerKg items, migrations, or workflows exist in V1).*
+*(Note: `fixed_price` has been removed from the V1 operational pricing model because under the current OrderItem model, fixed price behaves effectively the same as per-piece pricing since each physical item is represented as its own OrderItem and receives a unit price; it does not represent a distinct business behavior. Per Kilogram pricing remains completely excluded from V1).*
 
 ---
 
@@ -607,26 +618,43 @@ For V1, an order item's final unit price must be strictly positive:
 
 > `unitPrice > Money.zero`
 
-This requirement applies to both the Service's default price and any `customUnitPrice`. Zero price and negative price are strictly invalid and rejected.
+This requirement applies to both the Service + Item Type configured price and any `customUnitPrice`. Zero price and negative price are strictly invalid and rejected.
 
 ---
 
-## BR-056 — Relevant Pricing Types
+## BR-056 — Pricing Configuration on Service–Item Type Relationship
 
-The UI should expose only pricing types relevant to the selected service and Item Type.
+The Service entity must NOT own a single default/current price or pricing type.
 
-The user should not be forced to choose from irrelevant pricing models.
+Pricing configuration belongs strictly to the combination of:
+
+> **Service + Item Type**
+
+Each valid Service + Item Type combination defines:
+1. `pricing_type` (`per_piece` or `per_square_meter`)
+2. `price` (strictly positive money amount)
+
+During order creation, when an Item Type and Service are selected, the applicable pricing configuration is resolved from their combination.
 
 ---
 
-## BR-057 — Current Expected Pricing
+## BR-057 — Current Expected Pricing Configurations
 
-The normal V1 use cases are:
+In this laundry system, the actual price depends on the combination of Service + Item Type.
 
-- Clothing → Per Piece
-- Blankets → Per Piece
-- Carpet Covers → Per Piece
-- Carpets → Per Square Meter
+Example:
+
+Washing
+  ├── Clothing → per_piece → 50 EGP
+  ├── Blanket  → per_piece → 100 EGP
+  └── Carpet   → per_square_meter → 60 EGP
+
+Typical V1 configurations:
+
+- Clothing + Service → Per Piece (`per_piece`)
+- Blankets + Service → Per Piece (`per_piece`)
+- Carpet Covers + Service → Per Piece (`per_piece`)
+- Carpets + Service → Per Square Meter (`per_square_meter`)
 
 ---
 
@@ -683,6 +711,29 @@ Changing the list of common carpet sizes must not affect existing orders.
 ## BR-063 — Subtotal
 
 Subtotal is calculated from the OrderItems using their applicable pricing rules.
+
+---
+
+## BR-063A — Manual Draft Item Total Override (customTotal) & Lossless Physical Piece Distribution
+
+When creating or editing an order item group, the user may manually override the calculated draft item total (`customTotal`):
+
+1. **Lossless Piastre Division**:
+   - The total amount is converted to integer minor units (piastres: `totalPiastres = customTotal.piastres`).
+   - For an item group with quantity `count > 1`, piastres are divided integer-wise across the `count` expanded physical `OrderItem` records:
+     - `basePiecePiastres = totalPiastres ~/ count`
+     - `remainder = totalPiastres % count`
+     - The first `remainder` items receive `basePiecePiastres + 1` piastre, and the remaining items receive `basePiecePiastres`.
+   - The sum of all individual piece totals is strictly and losslessly equal to `customTotal`:
+     `basePiecePiastres * count + remainder == totalPiastres`.
+
+2. **Effective Unit Price Snapshot**:
+   - For reporting and display purposes, `effectiveUnitPrice` is computed as:
+     - Carpets: `Money.fromPiastres((totalPiastres / (area * count)).round())`
+     - Non-carpets: `Money.fromPiastres((totalPiastres / count).round())`
+
+3. **Historical Value Immutability**:
+   - The stored transaction-time `OrderItem.calculatedTotal` and `OrderItem.unitPrice` are permanently saved in SQLite and are NEVER recalculated from updated `Service` or `ServiceItemType` pricing configurations.
 
 ---
 
@@ -1037,7 +1088,7 @@ This is separate from the order creation date.
 
 ## BR-106 — Historical Price Usage
 
-Reports must use historical OrderItem prices rather than current service prices.
+Reports must use historical OrderItem prices (`order_items.unit_price`) rather than current Service pricing configurations.
 
 ---
 
@@ -1902,7 +1953,7 @@ Cancelled orders contribute 0 to Total Sales.
 
 Refunds are not subtracted from Total Sales.
 
-Current Service prices must not be used to reconstruct historical Order totals.
+Current Service pricing configurations must not be used to reconstruct historical Order totals.
 
 ---
 
@@ -2083,6 +2134,66 @@ UI Success
 Pending Synchronization
 
 The Expense must remain available locally.
+
+---
+
+# 46A. License Control System Rules
+
+## BR-140A — Authoritative Remote Suspension Anchor
+
+The 7-day grace period clock is anchored strictly to the remote `license_info.suspended_at` timestamp.
+- Local device detection time is NEVER used as the suspension anchor.
+- On offline launches, the cached `suspended_at` timestamp remains the sole authoritative anchor.
+- If the remote backend updates `suspended_at` to a newer timestamp, the local cached anchor is updated accordingly.
+- Reinstatement to `'active'` clears the cached suspension timestamp.
+
+---
+
+## BR-140B — 7-Day Grace Period Duration
+
+The grace period duration is exactly 7 days (`kLicenseGracePeriod = Duration(days: 7)`).
+- When remote status is `'suspended'` and `now - suspended_at < 7 days`, the effective state is `LicenseStatus.gracePeriod`.
+- The application remains 100% operational; all workflows (creating orders, payments, storage, printing) continue normally.
+- A non-blocking warning banner (`LicenseWarningBanner`) is prominently displayed inside the main shell.
+
+---
+
+## BR-140C — Local Timer Expiration
+
+When entering `gracePeriod`, `LicenseService` schedules an in-memory Dart `Timer` for the exact remaining duration (`suspended_at + 7 days - now`).
+- Upon timer expiry, the status automatically transitions to `lockedOut` and broadcasts to `LicenseGuard`.
+- `LicenseGuard` triggers `GoRouter.refreshListenable`, immediately redirecting navigation to `/license-locked`.
+- The application does NOT remain indefinitely in `gracePeriod` simply because no network event or app resume occurred.
+- If the license is reinstated before expiration, the timer is cancelled immediately.
+
+---
+
+## BR-140D — Locked-Out State
+
+When `now - suspended_at >= 7 days`:
+- Effective license status becomes `LicenseStatus.lockedOut`.
+- All normal application navigation is blocked.
+- The user is redirected to the full-screen `LicenseLockScreen` outside the application shell.
+- No sidebar, bottom navigation, or back navigation is permitted.
+- Historical business data is preserved and never deleted or corrupted.
+
+---
+
+## BR-140E — 24-Hour Remote Check Policy (Policy A)
+
+- **Application Startup**: Evaluates local cache immediately for instantaneous offline launch, then checks remote status if online.
+- **Background / Resume**: Remote license checks are throttled to once every 24 hours based on `last_checked_at`.
+- **Offline Resilience**: Offline launches use the cached status. Fresh installations with no local cache fail open to `'active'`.
+
+---
+
+## BR-140F — Reinstatement
+
+When the backend changes status back to `'active'`:
+- The local cached status is updated to `'active'`.
+- The local suspension timestamp is cleared (`suspended_at = NULL`).
+- Any active grace period timer is cancelled.
+- The application automatically unlocks and redirects back to the dashboard.
 
 ---
 

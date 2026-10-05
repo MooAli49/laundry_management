@@ -42,11 +42,10 @@ void main() {
       status: status,
       completedAt: status == OrderStatus.completed ? now : null,
       cancelledAt: status == OrderStatus.cancelled ? now : null,
-      cancellationReason:
-          status == OrderStatus.cancelled ? 'إلغاء تجريبي' : null,
-      expectedPickupDate: OrderDate.fromDate(
-        now.add(const Duration(days: 2)),
-      ),
+      cancellationReason: status == OrderStatus.cancelled
+          ? 'إلغاء تجريبي'
+          : null,
+      expectedPickupDate: OrderDate.fromDate(now.add(const Duration(days: 2))),
       subtotal: Money.fromPiastres(1500),
       discount: Money.zero,
       tax: Money.zero,
@@ -104,9 +103,7 @@ void main() {
       getIt.registerFactory<OrderDetailCubit>(() => fakeCubit);
 
       await tester.pumpWidget(
-        const MaterialApp(
-          home: OrderDetailScreen(orderId: 'ord-test-1'),
-        ),
+        const MaterialApp(home: OrderDetailScreen(orderId: 'ord-test-1')),
       );
       await tester.pumpAndSettle();
 
@@ -114,36 +111,33 @@ void main() {
     },
   );
 
-  testWidgets(
-    'Edit Order button is NOT visible when order status is ready',
-    (tester) async {
-      tester.view.physicalSize = const Size(1920, 1080);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
+  testWidgets('Edit Order button is NOT visible when order status is ready', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
 
-      final readyState = OrderDetailState(
-        isLoading: false,
-        order: createTestOrder(status: OrderStatus.ready),
-        items: [testItem],
-        customer: testCustomer,
-      );
+    final readyState = OrderDetailState(
+      isLoading: false,
+      order: createTestOrder(status: OrderStatus.ready),
+      items: [testItem],
+      customer: testCustomer,
+    );
 
-      final fakeCubit = FakeOrderDetailCubit(readyState);
-      getIt.registerFactory<OrderDetailCubit>(() => fakeCubit);
+    final fakeCubit = FakeOrderDetailCubit(readyState);
+    getIt.registerFactory<OrderDetailCubit>(() => fakeCubit);
 
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: OrderDetailScreen(orderId: 'ord-test-1'),
-        ),
-      );
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      const MaterialApp(home: OrderDetailScreen(orderId: 'ord-test-1')),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('تعديل الطلب'), findsNothing);
-    },
-  );
+    expect(find.text('تعديل الطلب'), findsNothing);
+  });
 
   testWidgets(
     'Edit Order button is NOT visible when order status is completed',
@@ -166,9 +160,7 @@ void main() {
       getIt.registerFactory<OrderDetailCubit>(() => fakeCubit);
 
       await tester.pumpWidget(
-        const MaterialApp(
-          home: OrderDetailScreen(orderId: 'ord-test-1'),
-        ),
+        const MaterialApp(home: OrderDetailScreen(orderId: 'ord-test-1')),
       );
       await tester.pumpAndSettle();
 
@@ -197,9 +189,7 @@ void main() {
       getIt.registerFactory<OrderDetailCubit>(() => fakeCubit);
 
       await tester.pumpWidget(
-        const MaterialApp(
-          home: OrderDetailScreen(orderId: 'ord-test-1'),
-        ),
+        const MaterialApp(home: OrderDetailScreen(orderId: 'ord-test-1')),
       );
       await tester.pumpAndSettle();
 

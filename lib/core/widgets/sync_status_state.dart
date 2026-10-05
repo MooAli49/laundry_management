@@ -36,29 +36,29 @@ class SyncStatusState {
 
   /// Factory constructor for the connected state.
   const SyncStatusState.connected({this.lastSyncTime})
-      : status = SyncStatus.connected,
-        label = AppStrings.syncConnected,
-        dotColor = AppColors.success,
-        errorMessage = null;
+    : status = SyncStatus.connected,
+      label = AppStrings.syncConnected,
+      dotColor = AppColors.success,
+      errorMessage = null;
 
   /// Factory constructor for the active syncing state.
   const SyncStatusState.syncing({this.lastSyncTime})
-      : status = SyncStatus.syncing,
-        label = AppStrings.syncSyncing,
-        dotColor = AppColors.primary,
-        errorMessage = null;
+    : status = SyncStatus.syncing,
+      label = AppStrings.syncSyncing,
+      dotColor = AppColors.primary,
+      errorMessage = null;
 
   /// Factory constructor for the offline state.
   const SyncStatusState.offline({this.lastSyncTime, this.errorMessage})
-      : status = SyncStatus.offline,
-        label = AppStrings.syncOffline,
-        dotColor = AppColors.warning;
+    : status = SyncStatus.offline,
+      label = AppStrings.syncOffline,
+      dotColor = AppColors.warning;
 
   /// Factory constructor for the sync error state.
   const SyncStatusState.syncError({this.lastSyncTime, this.errorMessage})
-      : status = SyncStatus.syncError,
-        label = AppStrings.syncError,
-        dotColor = AppColors.error;
+    : status = SyncStatus.syncError,
+      label = AppStrings.syncError,
+      dotColor = AppColors.error;
 
   bool get isConnected => status == SyncStatus.connected;
   bool get isSyncing => status == SyncStatus.syncing;

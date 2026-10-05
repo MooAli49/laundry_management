@@ -12,7 +12,9 @@ class RefundsDao extends DatabaseAccessor<app_db.AppDatabase> {
   }
 
   Future<app_db.Refund?> getRefundById(String id) async {
-    return (select(db.refunds)..where((t) => t.id.equals(id))).getSingleOrNull();
+    return (select(
+      db.refunds,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
   Future<List<app_db.Refund>> getRefundsForOrder(String orderId) async {

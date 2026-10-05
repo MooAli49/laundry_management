@@ -31,6 +31,7 @@ import 'package:laundry_management/domain/entities/customer.dart';
 import 'package:laundry_management/domain/entities/order.dart';
 import 'package:laundry_management/domain/entities/order_item.dart';
 import 'package:laundry_management/domain/entities/service.dart';
+import 'package:laundry_management/domain/entities/service_item_type.dart';
 import 'package:laundry_management/domain/enums/order_status.dart';
 import 'package:laundry_management/domain/enums/pricing_type.dart';
 import 'package:laundry_management/domain/sync/sync_engine_state.dart';
@@ -237,6 +238,32 @@ void main() {
     storageLocationsDao = StorageLocationsDao(db);
     syncOperationsDao = InterceptableSyncOperationsDao(db);
 
+    final now = DateTime.now();
+    await db.into(db.itemTypes).insert(
+      app_db.ItemTypesCompanion.insert(
+        id: '00000000-0000-0000-0001-000000000001',
+        name: 'ملابس',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await db.into(db.itemTypes).insert(
+      app_db.ItemTypesCompanion.insert(
+        id: '00000000-0000-0000-0001-000000000002',
+        name: 'بطاطين',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await db.into(db.itemTypes).insert(
+      app_db.ItemTypesCompanion.insert(
+        id: '00000000-0000-0000-0001-000000000003',
+        name: 'سجاد',
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
     customerRepo = CustomerRepositoryImpl(
       customersDao: customersDao,
       syncOperationsDao: syncOperationsDao,
@@ -433,22 +460,40 @@ void main() {
           app_db.ServicesCompanion.insert(
             id: 'srv-dryclean',
             name: 'دراي كلين',
-            pricingType: 'perPiece',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        await servicesDao.replaceServiceItemTypes('srv-dryclean', [
+          app_db.ServiceItemTypesCompanion.insert(
+            id: 'sit-dryclean',
+            serviceId: 'srv-dryclean',
+            itemTypeId: suitType.id,
+            pricingType: 'per_piece',
             price: 5000,
             createdAt: now,
             updatedAt: now,
           ),
-        );
+        ]);
         await servicesDao.insertService(
           app_db.ServicesCompanion.insert(
             id: 'srv-wash',
             name: 'غسيل سجاد',
-            pricingType: 'perSquareMeter',
-            price: 10000,
             createdAt: now,
             updatedAt: now,
           ),
         );
+        await servicesDao.replaceServiceItemTypes('srv-wash', [
+          app_db.ServiceItemTypesCompanion.insert(
+            id: 'sit-wash',
+            serviceId: 'srv-wash',
+            itemTypeId: carpetType.id,
+            pricingType: 'per_square_meter',
+            price: 10000,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        ]);
 
         final order = Order(
           id: 'ord-agg-1',
@@ -567,12 +612,21 @@ void main() {
           app_db.ServicesCompanion.insert(
             id: 'srv-1',
             name: 'غسيل',
-            pricingType: 'perPiece',
-            price: 1000,
             createdAt: now,
             updatedAt: now,
           ),
         );
+        await servicesDao.replaceServiceItemTypes('srv-1', [
+          app_db.ServiceItemTypesCompanion.insert(
+            id: 'sit-srv-1-order',
+            serviceId: 'srv-1',
+            itemTypeId: itemType.id,
+            pricingType: 'per_piece',
+            price: 1000,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        ]);
 
         final order = Order(
           id: 'ord-status-1',
@@ -652,19 +706,36 @@ void main() {
           id: 'srv-press-1',
           name: 'كي بالبخار',
           description: 'كي ملابس خفيفة',
-          pricingType: PricingType.perPiece,
-          price: Money.fromPiastres(2500),
           isActive: true,
           createdAt: now,
           updatedAt: now,
         );
 
         final itemTypes = await db.select(db.itemTypes).get();
-        final supportedIds = [itemTypes[0].id, itemTypes[1].id];
+        final sitList = [
+          ServiceItemType(
+            id: 'sit-press-1',
+            serviceId: 'srv-press-1',
+            itemTypeId: itemTypes[0].id,
+            pricingType: PricingType.perPiece,
+            price: Money.fromPiastres(2500),
+            createdAt: now,
+            updatedAt: now,
+          ),
+          ServiceItemType(
+            id: 'sit-press-2',
+            serviceId: 'srv-press-1',
+            itemTypeId: itemTypes[1].id,
+            pricingType: PricingType.perPiece,
+            price: Money.fromPiastres(3000),
+            createdAt: now,
+            updatedAt: now,
+          ),
+        ];
 
         await serviceRepo.createService(
           service,
-          supportedItemTypeIds: supportedIds,
+          serviceItemTypes: sitList,
         );
 
         var ops = await syncOperationsDao.getPendingOperations();
@@ -675,8 +746,10 @@ void main() {
         final payload = jsonDecode(ops.first.payload!) as Map<String, dynamic>;
         expect(payload['id'], equals('srv-press-1'));
         expect(payload['name'], equals('كي بالبخار'));
-        expect(payload['price'], equals(2500));
-        expect(payload['supported_item_type_ids'], equals(supportedIds));
+        final sits = payload['service_item_types'] as List;
+        expect(sits.length, equals(2));
+        expect(sits[0]['price'], equals(2500));
+        expect(sits[0]['pricing_type'], equals('per_piece'));
 
         // Deactivate
         await serviceRepo.deactivateService('srv-press-1');
@@ -710,12 +783,21 @@ void main() {
           app_db.ServicesCompanion.insert(
             id: 'srv-1',
             name: 'غسيل',
-            pricingType: 'perPiece',
-            price: 1000,
             createdAt: now,
             updatedAt: now,
           ),
         );
+        await servicesDao.replaceServiceItemTypes('srv-1', [
+          app_db.ServiceItemTypesCompanion.insert(
+            id: 'sit-srv-1-storage',
+            serviceId: 'srv-1',
+            itemTypeId: itemType.id,
+            pricingType: 'per_piece',
+            price: 1000,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        ]);
 
         final order = Order(
           id: 'ord-storage-1',

@@ -573,22 +573,41 @@ A Service contains master data such as:
 
 - Unique identifier
 - Name
-- Pricing Type
-- Current Price
+- Description (optional)
 - Active state
-- Supported Item Types
+
+Note: The Service entity must NOT own a single default/current price or pricing type. Pricing configuration belongs strictly to the **Service–Item Type** relationship (`ServiceItemType`).
 
 ---
 
-# 20. Service Availability
+# 20. Service Availability & Pricing Configuration
 
 A Service may be available for one or more ItemTypes.
 
-This is an N:M relationship between Service and ItemType. In the implementation, the relationship is represented through the ServiceItemType association entity.
+This is an N:M relationship between Service and ItemType, represented in the domain through the `ServiceItemType` association entity.
 
 Conceptually:
 
     Service N ──────── M ItemType
+             through
+         ServiceItemType
+      (pricing_type, price)
+
+In this laundry system, the actual price depends on the combination of:
+
+> **Service + Item Type**
+
+Each valid `ServiceItemType` configuration defines:
+
+1. `pricing_type` (`per_piece` or `per_square_meter`)
+2. `price` (strictly positive money amount in minor currency units)
+
+Example:
+
+Washing
+  ├── Clothing → per_piece → 50 EGP
+  ├── Blanket  → per_piece → 100 EGP
+  └── Carpet   → per_square_meter → 60 EGP
 
 Only compatible active services should be available when creating a new OrderItem.
 
@@ -606,20 +625,19 @@ A service that is not configured for Carpets should not be selectable for a Carp
 
 # 21. Pricing Type
 
-The domain supports these pricing types:
+The supported operational pricing types in V1 are:
 
-    PerPiece
-    PerSquareMeter
-    FixedPrice
+    PerPiece (`per_piece`)
+    PerSquareMeter (`per_square_meter`)
 
-Typical V1 usage:
+`FixedPrice` (`fixed_price`) is removed from the V1 operational pricing model because under the current OrderItem model, fixed price behaves effectively the same as per-piece pricing (each physical item is represented as its own OrderItem and receives a unit price; it does not represent a distinct business behavior). Per Kilogram pricing remains completely excluded from V1.
 
-    Clothing       → PerPiece
-    Blankets       → PerPiece
-    Carpet Covers  → PerPiece
-    Carpets        → PerSquareMeter
+Typical V1 configurations:
 
-The domain supports all three pricing types even when a particular UI flow only exposes a relevant subset.
+    Clothing + Service       → PerPiece
+    Blankets + Service       → PerPiece
+    Carpet Covers + Service  → PerPiece
+    Carpets + Service        → PerSquareMeter
 
 ---
 
@@ -627,25 +645,27 @@ The domain supports all three pricing types even when a particular UI flow only 
 
 Historical transaction data must not depend entirely on current master data.
 
-When a Service is selected for an OrderItem, the OrderItem must preserve the relevant historical pricing information.
+When a Service + Item Type pricing configuration is selected for an OrderItem, the OrderItem must preserve the relevant historical pricing information.
 
 At minimum, the historical pricing concept includes:
 
 - Service reference
-- Service name snapshot
-- Pricing Type snapshot
-- Unit price snapshot
-- Calculated item total
+- Service name snapshot (`serviceNameSnapshot`)
+- Pricing Type snapshot (`pricingTypeSnapshot`)
+- Unit price snapshot (`unitPrice`)
+- Calculated item total (`calculatedTotal`)
 
 Example:
 
-    Current Service Price:
-    50 ج.م
-
-    Existing OrderItem Price:
+    Service + Item Type Configured Price at Order Creation:
     40 ج.م
 
-Changing the current Service price must not change the existing OrderItem.
+    Later Master Price for that Service + Item Type:
+    50 ج.م
+
+Changing the Service's pricing configuration later must NOT change the existing OrderItem or historical orders. The historical OrderItem preserves:
+
+    40 ج.م
 
 During Order creation, the user may adjust the applicable OrderItem price according to the approved pricing behavior.
 
@@ -1333,7 +1353,7 @@ It must preserve and display, where applicable:
 - Payment information
 - Remaining amount
 
-The Invoice / Receipt must not recalculate historical values using current Service prices or other current master data.
+The Invoice / Receipt must not recalculate historical values using current Service + Item Type prices or other current master data.
 
 The domain does not require a separate Invoice entity for V1.
 
@@ -1410,10 +1430,10 @@ The system must be able to preserve the historical meaning of an Order even afte
 
 For example:
 
-    Service Price at Order Creation:
+    Service + Item Type Price at Order Creation:
     40 ج.م
 
-    Current Service Price:
+    Current Service + Item Type Price:
     50 ج.م
 
 The historical OrderItem must still represent:

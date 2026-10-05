@@ -241,8 +241,9 @@ class OrderRepositoryImpl implements OrderRepository {
         }
 
         // 3. Read total paid for financial validation
-        final totalPaidPiastres =
-            await _paymentsDao.getTotalPaidForOrder(input.orderId);
+        final totalPaidPiastres = await _paymentsDao.getTotalPaidForOrder(
+          input.orderId,
+        );
         final totalPaid = Money.fromPiastres(totalPaidPiastres);
 
         // 4. Customer change validation
@@ -256,9 +257,9 @@ class OrderRepositoryImpl implements OrderRepository {
               'Cannot change customer on an order with recorded payments',
             );
           }
-          final newCustomerRow = await (_db.select(_db.customers)
-                ..where((t) => t.id.equals(input.customerId)))
-              .getSingleOrNull();
+          final newCustomerRow = await (_db.select(
+            _db.customers,
+          )..where((t) => t.id.equals(input.customerId))).getSingleOrNull();
           if (newCustomerRow == null) {
             throw const ValidationFailure('Customer not found');
           }
@@ -268,8 +269,8 @@ class OrderRepositoryImpl implements OrderRepository {
         }
 
         // 5. Existing items and carpets
-        final existingItemAndCarpetRows =
-            await _ordersDao.getOrderItemsWithCarpets(input.orderId);
+        final existingItemAndCarpetRows = await _ordersDao
+            .getOrderItemsWithCarpets(input.orderId);
         final existingItemsMap = {
           for (final r in existingItemAndCarpetRows) r.item.id: r,
         };
@@ -279,8 +280,8 @@ class OrderRepositoryImpl implements OrderRepository {
           if (!existingItemsMap.containsKey(deletedId)) {
             throw ValidationFailure('Item to delete not found: $deletedId');
           }
-          final storageCount =
-              await _storageRecordsDao.countAllRecordsForOrderItem(deletedId);
+          final storageCount = await _storageRecordsDao
+              .countAllRecordsForOrderItem(deletedId);
           if (storageCount > 0) {
             throw BusinessRuleFailure(
               'Cannot delete item with storage records: $deletedId',
@@ -290,15 +291,19 @@ class OrderRepositoryImpl implements OrderRepository {
 
         // 7. Validate and prepare modified items
         final now = DateTime.now();
-        final survivingExistingIds = existingItemsMap.keys
-            .toSet()
-            .difference(input.deletedItemIds.toSet());
+        final survivingExistingIds = existingItemsMap.keys.toSet().difference(
+          input.deletedItemIds.toSet(),
+        );
 
-        final updatedItemsMap = <String, ({
-          app_db.OrderItemsCompanion item,
-          app_db.OrderItemCarpetsCompanion? carpet,
-          Money total,
-        })>{};
+        final updatedItemsMap =
+            <
+              String,
+              ({
+                app_db.OrderItemsCompanion item,
+                app_db.OrderItemCarpetsCompanion? carpet,
+                Money total,
+              })
+            >{};
 
         for (final mod in input.modifiedItems) {
           if (!survivingExistingIds.contains(mod.id)) {
@@ -313,61 +318,86 @@ class OrderRepositoryImpl implements OrderRepository {
           final itemTypeId = existingItem.itemTypeId;
           final itemTypeNameSnapshot = existingItem.itemTypeNameSnapshot;
 
-          // Validate service
-          final serviceRow = await (_db.select(_db.services)
-                ..where((t) => t.id.equals(mod.serviceId)))
-              .getSingleOrNull();
-          if (serviceRow == null) {
-            throw const ValidationFailure('Service not found');
-          }
-          if (!serviceRow.isActive) {
-            throw const BusinessRuleFailure('Service is inactive');
-          }
+          final isServiceChanged = mod.serviceId != existingItem.serviceId;
+          final app_db.Service? serviceRow;
+          final PricingType pricingType;
+          final Money unitPrice;
+          final String serviceNameSnapshot;
 
-          // Verify service compatibility with itemTypeId via service_item_types
-          final isServiceCompatible = await (_db.select(_db.serviceItemTypes)
-                ..where(
-                  (t) =>
-                      t.serviceId.equals(mod.serviceId) &
-                      t.itemTypeId.equals(itemTypeId),
-                ))
-              .getSingleOrNull();
-          if (isServiceCompatible == null) {
-            throw IncompatibleServiceFailure(
-              serviceId: mod.serviceId,
-              itemTypeId: itemTypeId,
-            );
+          if (isServiceChanged) {
+            // Validate service
+            serviceRow = await (_db.select(
+              _db.services,
+            )..where((t) => t.id.equals(mod.serviceId))).getSingleOrNull();
+            if (serviceRow == null) {
+              throw const ValidationFailure('Service not found');
+            }
+            if (!serviceRow.isActive) {
+              throw const BusinessRuleFailure('Service is inactive');
+            }
+
+            // Verify service compatibility with itemTypeId via service_item_types
+            final isServiceCompatible =
+                await (_db.select(_db.serviceItemTypes)..where(
+                      (t) =>
+                          t.serviceId.equals(mod.serviceId) &
+                          t.itemTypeId.equals(itemTypeId),
+                    ))
+                    .getSingleOrNull();
+            if (isServiceCompatible == null) {
+              throw IncompatibleServiceFailure(
+                serviceId: mod.serviceId,
+                itemTypeId: itemTypeId,
+              );
+            }
+
+            pricingType = PricingType.fromValue(isServiceCompatible.pricingType);
+            unitPrice =
+                mod.customUnitPrice ?? Money.fromPiastres(isServiceCompatible.price);
+            serviceNameSnapshot = serviceRow.name;
+          } else {
+            // Unchanged service: historical snapshot data is preserved.
+            // Do NOT reject if catalog mapping is removed or service is inactive.
+            serviceRow = await (_db.select(
+              _db.services,
+            )..where((t) => t.id.equals(mod.serviceId))).getSingleOrNull();
+
+            pricingType = PricingType.fromValue(existingItem.pricingType);
+            unitPrice =
+                mod.customUnitPrice ?? Money.fromPiastres(existingItem.unitPrice);
+            serviceNameSnapshot =
+                serviceRow?.name ?? existingItem.serviceNameSnapshot;
           }
 
           // Validate item definition if provided
-          String? itemDefNameSnapshot =
-              existingItem.itemDefinitionNameSnapshot;
+          String? itemDefNameSnapshot = existingItem.itemDefinitionNameSnapshot;
           if (mod.itemDefinitionId != null) {
-            final defRow = await (_db.select(_db.itemDefinitions)
-                  ..where((t) => t.id.equals(mod.itemDefinitionId!)))
-                .getSingleOrNull();
-            if (defRow == null) {
+            final defRow =
+                await (_db.select(_db.itemDefinitions)
+                      ..where((t) => t.id.equals(mod.itemDefinitionId!)))
+                    .getSingleOrNull();
+            if (defRow != null) {
+              if (defRow.itemTypeId != itemTypeId) {
+                throw const BusinessRuleFailure(
+                  'Item definition does not belong to the selected item type',
+                );
+              }
+              itemDefNameSnapshot = defRow.name;
+            } else if (mod.itemDefinitionId == existingItem.itemDefinitionId) {
+              itemDefNameSnapshot = existingItem.itemDefinitionNameSnapshot;
+            } else {
               throw const ValidationFailure('Item definition not found');
             }
-            if (defRow.itemTypeId != itemTypeId) {
-              throw const BusinessRuleFailure(
-                'Item definition does not belong to the selected item type',
-              );
-            }
-            itemDefNameSnapshot = defRow.name;
           } else {
             itemDefNameSnapshot = null;
           }
 
-          final unitPrice =
-              mod.customUnitPrice ?? Money.fromPiastres(serviceRow.price);
           if (unitPrice <= Money.zero) {
             throw const ValidationFailure(
               'Unit price must be strictly greater than zero',
             );
           }
 
-          final pricingType = PricingType.fromValue(serviceRow.pricingType);
           Money calculatedTotal;
           app_db.OrderItemCarpetsCompanion? carpetCompanion;
 
@@ -383,9 +413,13 @@ class OrderRepositoryImpl implements OrderRepository {
               );
             }
             final area = mod.carpetData!.length * mod.carpetData!.width;
-            calculatedTotal = Money.fromPiastres(
-              (unitPrice.piastres * area).round(),
-            );
+            calculatedTotal =
+                mod.customTotal ??
+                Money.fromPiastres((unitPrice.piastres * area).round());
+
+            final savedUnitPrice = mod.customTotal != null && area > 0
+                ? Money.fromPiastres((mod.customTotal!.piastres / area).round())
+                : unitPrice;
 
             final existingCarpet = existing.carpet;
             final carpetId = existingCarpet?.id ?? const Uuid().v4();
@@ -399,47 +433,68 @@ class OrderRepositoryImpl implements OrderRepository {
               createdAt: Value(existingCarpet?.createdAt ?? now),
               updatedAt: Value(now),
             );
+
+            updatedItemsMap[mod.id] = (
+              item: app_db.OrderItemsCompanion(
+                id: Value(mod.id),
+                orderId: Value(input.orderId),
+                itemTypeId: Value(itemTypeId),
+                itemDefinitionId: Value(mod.itemDefinitionId),
+                serviceId: Value(mod.serviceId),
+                itemTypeNameSnapshot: Value(itemTypeNameSnapshot),
+                itemDefinitionNameSnapshot: Value(itemDefNameSnapshot),
+                serviceNameSnapshot: Value(serviceNameSnapshot),
+                pricingType: Value(pricingType.value),
+                quantity: Value(area),
+                unitPrice: Value(savedUnitPrice.piastres),
+                calculatedTotal: Value(calculatedTotal.piastres),
+                notes: Value(mod.notes),
+                updatedAt: Value(now),
+              ),
+              carpet: carpetCompanion,
+              total: calculatedTotal,
+            );
           } else {
             if (mod.carpetData != null) {
               throw const ValidationFailure(
                 'Carpet data is not allowed for non-carpet pricing types',
               );
             }
-            calculatedTotal = unitPrice;
-          }
+            calculatedTotal = mod.customTotal ?? unitPrice;
+            final savedUnitPrice = mod.customTotal ?? unitPrice;
 
-          updatedItemsMap[mod.id] = (
-            item: app_db.OrderItemsCompanion(
-              id: Value(mod.id),
-              orderId: Value(input.orderId),
-              itemTypeId: Value(itemTypeId),
-              itemDefinitionId: Value(mod.itemDefinitionId),
-              serviceId: Value(mod.serviceId),
-              itemTypeNameSnapshot: Value(itemTypeNameSnapshot),
-              itemDefinitionNameSnapshot: Value(itemDefNameSnapshot),
-              serviceNameSnapshot: Value(serviceRow.name),
-              pricingType: Value(pricingType.value),
-              quantity: Value(
-                pricingType == PricingType.perSquareMeter
-                    ? (mod.carpetData!.length * mod.carpetData!.width)
-                    : 1.0,
+            updatedItemsMap[mod.id] = (
+              item: app_db.OrderItemsCompanion(
+                id: Value(mod.id),
+                orderId: Value(input.orderId),
+                itemTypeId: Value(itemTypeId),
+                itemDefinitionId: Value(mod.itemDefinitionId),
+                serviceId: Value(mod.serviceId),
+                itemTypeNameSnapshot: Value(itemTypeNameSnapshot),
+                itemDefinitionNameSnapshot: Value(itemDefNameSnapshot),
+                serviceNameSnapshot: Value(serviceNameSnapshot),
+                pricingType: Value(pricingType.value),
+                quantity: const Value(1.0),
+                unitPrice: Value(savedUnitPrice.piastres),
+                calculatedTotal: Value(calculatedTotal.piastres),
+                notes: Value(mod.notes),
+                updatedAt: Value(now),
               ),
-              unitPrice: Value(unitPrice.piastres),
-              calculatedTotal: Value(calculatedTotal.piastres),
-              notes: Value(mod.notes),
-              updatedAt: Value(now),
-            ),
-            carpet: carpetCompanion,
-            total: calculatedTotal,
-          );
+              carpet: null,
+              total: calculatedTotal,
+            );
+          }
         }
 
         // 8. Validate and prepare brand new items
-        final newItemsList = <({
-          app_db.OrderItemsCompanion item,
-          app_db.OrderItemCarpetsCompanion? carpet,
-          Money total,
-        })>[];
+        final newItemsList =
+            <
+              ({
+                app_db.OrderItemsCompanion item,
+                app_db.OrderItemCarpetsCompanion? carpet,
+                Money total,
+              })
+            >[];
 
         for (final newItemInput in input.newItems) {
           if (newItemInput.physicalQuantity <= 0) {
@@ -448,9 +503,10 @@ class OrderRepositoryImpl implements OrderRepository {
             );
           }
 
-          final itemType = await (_db.select(_db.itemTypes)
-                ..where((t) => t.id.equals(newItemInput.itemTypeId)))
-              .getSingleOrNull();
+          final itemType =
+              await (_db.select(_db.itemTypes)
+                    ..where((t) => t.id.equals(newItemInput.itemTypeId)))
+                  .getSingleOrNull();
           if (itemType == null) {
             throw const ValidationFailure('Item type not found');
           }
@@ -460,9 +516,11 @@ class OrderRepositoryImpl implements OrderRepository {
 
           String? itemDefName;
           if (newItemInput.itemDefinitionId != null) {
-            final def = await (_db.select(_db.itemDefinitions)
-                  ..where((t) => t.id.equals(newItemInput.itemDefinitionId!)))
-                .getSingleOrNull();
+            final def =
+                await (_db.select(_db.itemDefinitions)..where(
+                      (t) => t.id.equals(newItemInput.itemDefinitionId!),
+                    ))
+                    .getSingleOrNull();
             if (def == null) {
               throw const ValidationFailure('Item definition not found');
             }
@@ -474,9 +532,10 @@ class OrderRepositoryImpl implements OrderRepository {
             itemDefName = def.name;
           }
 
-          final service = await (_db.select(_db.services)
-                ..where((t) => t.id.equals(newItemInput.serviceId)))
-              .getSingleOrNull();
+          final service =
+              await (_db.select(_db.services)
+                    ..where((t) => t.id.equals(newItemInput.serviceId)))
+                  .getSingleOrNull();
           if (service == null) {
             throw const ValidationFailure('Service not found');
           }
@@ -484,13 +543,13 @@ class OrderRepositoryImpl implements OrderRepository {
             throw const BusinessRuleFailure('Service is inactive');
           }
 
-          final isComp = await (_db.select(_db.serviceItemTypes)
-                ..where(
-                  (t) =>
-                      t.serviceId.equals(service.id) &
-                      t.itemTypeId.equals(itemType.id),
-                ))
-              .getSingleOrNull();
+          final isComp =
+              await (_db.select(_db.serviceItemTypes)..where(
+                    (t) =>
+                        t.serviceId.equals(service.id) &
+                        t.itemTypeId.equals(itemType.id),
+                  ))
+                  .getSingleOrNull();
           if (isComp == null) {
             throw IncompatibleServiceFailure(
               serviceId: service.id,
@@ -499,15 +558,14 @@ class OrderRepositoryImpl implements OrderRepository {
           }
 
           final unitPrice =
-              newItemInput.customUnitPrice ??
-              Money.fromPiastres(service.price);
+              newItemInput.customUnitPrice ?? Money.fromPiastres(isComp.price);
           if (unitPrice <= Money.zero) {
             throw const ValidationFailure(
               'Unit price must be strictly greater than zero',
             );
           }
 
-          final pricingType = PricingType.fromValue(service.pricingType);
+          final pricingType = PricingType.fromValue(isComp.pricingType);
 
           if (pricingType == PricingType.perSquareMeter) {
             if (newItemInput.carpetData == null) {
@@ -522,14 +580,33 @@ class OrderRepositoryImpl implements OrderRepository {
               );
             }
             final area =
-                newItemInput.carpetData!.length * newItemInput.carpetData!.width;
-            final calcTotal = Money.fromPiastres(
+                newItemInput.carpetData!.length *
+                newItemInput.carpetData!.width;
+            final defaultPieceTotal = Money.fromPiastres(
               (unitPrice.piastres * area).round(),
             );
+            final totalPiastres = newItemInput.customTotal != null
+                ? newItemInput.customTotal!.piastres
+                : (defaultPieceTotal.piastres * newItemInput.physicalQuantity);
+
+            final basePiecePiastres =
+                totalPiastres ~/ newItemInput.physicalQuantity;
+            final remainder = totalPiastres % newItemInput.physicalQuantity;
+
+            final effectiveUnitPrice =
+                newItemInput.customTotal != null && area > 0
+                ? Money.fromPiastres(
+                    (totalPiastres / (area * newItemInput.physicalQuantity))
+                        .round(),
+                  )
+                : unitPrice;
 
             for (var i = 0; i < newItemInput.physicalQuantity; i++) {
               final itemId = const Uuid().v4();
               final carpetId = const Uuid().v4();
+              final piecePiastres = basePiecePiastres + (i < remainder ? 1 : 0);
+              final pieceTotal = Money.fromPiastres(piecePiastres);
+
               newItemsList.add((
                 item: app_db.OrderItemsCompanion(
                   id: Value(itemId),
@@ -542,8 +619,8 @@ class OrderRepositoryImpl implements OrderRepository {
                   serviceNameSnapshot: Value(service.name),
                   pricingType: Value(pricingType.value),
                   quantity: Value(area),
-                  unitPrice: Value(unitPrice.piastres),
-                  calculatedTotal: Value(calcTotal.piastres),
+                  unitPrice: Value(effectiveUnitPrice.piastres),
+                  calculatedTotal: Value(pieceTotal.piastres),
                   notes: Value(newItemInput.notes),
                   createdAt: Value(now),
                   updatedAt: Value(now),
@@ -558,7 +635,7 @@ class OrderRepositoryImpl implements OrderRepository {
                   createdAt: Value(now),
                   updatedAt: Value(now),
                 ),
-                total: calcTotal,
+                total: pieceTotal,
               ));
             }
           } else {
@@ -567,9 +644,25 @@ class OrderRepositoryImpl implements OrderRepository {
                 'Carpet data is not allowed for non-carpet pricing types',
               );
             }
-            final calcTotal = unitPrice;
+            final totalPiastres = newItemInput.customTotal != null
+                ? newItemInput.customTotal!.piastres
+                : (unitPrice.piastres * newItemInput.physicalQuantity);
+
+            final basePiecePiastres =
+                totalPiastres ~/ newItemInput.physicalQuantity;
+            final remainder = totalPiastres % newItemInput.physicalQuantity;
+
+            final effectiveUnitPrice = newItemInput.customTotal != null
+                ? Money.fromPiastres(
+                    (totalPiastres / newItemInput.physicalQuantity).round(),
+                  )
+                : unitPrice;
+
             for (var i = 0; i < newItemInput.physicalQuantity; i++) {
               final itemId = const Uuid().v4();
+              final piecePiastres = basePiecePiastres + (i < remainder ? 1 : 0);
+              final pieceTotal = Money.fromPiastres(piecePiastres);
+
               newItemsList.add((
                 item: app_db.OrderItemsCompanion(
                   id: Value(itemId),
@@ -582,14 +675,14 @@ class OrderRepositoryImpl implements OrderRepository {
                   serviceNameSnapshot: Value(service.name),
                   pricingType: Value(pricingType.value),
                   quantity: const Value(1.0),
-                  unitPrice: Value(unitPrice.piastres),
-                  calculatedTotal: Value(calcTotal.piastres),
+                  unitPrice: Value(effectiveUnitPrice.piastres),
+                  calculatedTotal: Value(pieceTotal.piastres),
                   notes: Value(newItemInput.notes),
                   createdAt: Value(now),
                   updatedAt: Value(now),
                 ),
                 carpet: null,
-                total: calcTotal,
+                total: pieceTotal,
               ));
             }
           }
@@ -642,12 +735,12 @@ class OrderRepositoryImpl implements OrderRepository {
         // 11. Execute DB mutations
         // 11a. Delete removed items and their carpets
         for (final deletedId in input.deletedItemIds) {
-          await (_db.delete(_db.orderItemCarpets)
-                ..where((t) => t.orderItemId.equals(deletedId)))
-              .go();
-          await (_db.delete(_db.orderItems)
-                ..where((t) => t.id.equals(deletedId)))
-              .go();
+          await (_db.delete(
+            _db.orderItemCarpets,
+          )..where((t) => t.orderItemId.equals(deletedId))).go();
+          await (_db.delete(
+            _db.orderItems,
+          )..where((t) => t.id.equals(deletedId))).go();
         }
 
         // 11b. Update modified items
@@ -661,9 +754,9 @@ class OrderRepositoryImpl implements OrderRepository {
                 .into(_db.orderItemCarpets)
                 .insertOnConflictUpdate(modEntry.carpet!);
           } else {
-            await (_db.delete(_db.orderItemCarpets)
-                  ..where((t) => t.orderItemId.equals(modEntry.item.id.value)))
-                .go();
+            await (_db.delete(
+              _db.orderItemCarpets,
+            )..where((t) => t.orderItemId.equals(modEntry.item.id.value))).go();
           }
         }
 
@@ -690,38 +783,33 @@ class OrderRepositoryImpl implements OrderRepository {
 
         final newStatus =
             (totalItemCount > 0 && activeStoredCount == totalItemCount)
-                ? OrderStatus.ready
-                : OrderStatus.processing;
+            ? OrderStatus.ready
+            : OrderStatus.processing;
 
         // 13. Update orders header
-        await (_db.update(_db.orders)
-              ..where((t) => t.id.equals(input.orderId)))
-            .write(
-              app_db.OrdersCompanion(
-                customerId: Value(customerId),
-                customerNameSnapshot: Value(customerNameSnapshot),
-                customerPhoneSnapshot: Value(customerPhoneSnapshot),
-                status: Value(newStatus.name),
-                expectedPickupDate: Value(
-                  input.expectedPickupDate.toDateTime(),
-                ),
-                notes: Value(input.notes),
-                customerPickupRequested: Value(input.customerPickupRequested),
-                customerPickupFee: Value(pickupFee.piastres),
-                customerDeliveryRequested: Value(
-                  input.customerDeliveryRequested,
-                ),
-                customerDeliveryFee: Value(deliveryFee.piastres),
-                subtotal: Value(subtotal.piastres),
-                discount: Value(input.discount.piastres),
-                total: Value(total.piastres),
-                updatedAt: Value(now),
-              ),
-            );
+        await (_db.update(
+          _db.orders,
+        )..where((t) => t.id.equals(input.orderId))).write(
+          app_db.OrdersCompanion(
+            customerId: Value(customerId),
+            customerNameSnapshot: Value(customerNameSnapshot),
+            customerPhoneSnapshot: Value(customerPhoneSnapshot),
+            status: Value(newStatus.name),
+            expectedPickupDate: Value(input.expectedPickupDate.toDateTime()),
+            notes: Value(input.notes),
+            customerPickupRequested: Value(input.customerPickupRequested),
+            customerPickupFee: Value(pickupFee.piastres),
+            customerDeliveryRequested: Value(input.customerDeliveryRequested),
+            customerDeliveryFee: Value(deliveryFee.piastres),
+            subtotal: Value(subtotal.piastres),
+            discount: Value(input.discount.piastres),
+            total: Value(total.piastres),
+            updatedAt: Value(now),
+          ),
+        );
 
         // 14. Outbox Enqueueing
-        final updatedOrderRow =
-            (await _ordersDao.getOrderById(input.orderId))!;
+        final updatedOrderRow = (await _ordersDao.getOrderById(input.orderId))!;
         final committedOrder = _mapOrderToDomain(updatedOrderRow);
         final currentOrderItems = await getOrderItems(input.orderId);
 
@@ -1235,10 +1323,9 @@ class OrderRepositoryImpl implements OrderRepository {
     } else if (status == OrderStatus.cancelled) {
       cancelledAt ??= row.updatedAt;
       if (cancellationReason == null || cancellationReason.trim().isEmpty) {
-        cancellationReason =
-            (row.notes != null && row.notes!.trim().isNotEmpty)
-                ? row.notes!
-                : 'تم الإلغاء';
+        cancellationReason = (row.notes != null && row.notes!.trim().isNotEmpty)
+            ? row.notes!
+            : 'تم الإلغاء';
       }
     }
 

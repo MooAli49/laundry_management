@@ -45,7 +45,7 @@ void main() {
 
         // Verify all 8 tabs are present in the tab bar
         expect(find.text(AppStrings.tabBusinessInfo), findsWidgets);
-        expect(find.text(AppStrings.tabInvoice), findsOneWidget);
+        expect(find.text(AppStrings.tabBluetoothPrinter), findsOneWidget);
         expect(find.text(AppStrings.tabServices), findsOneWidget);
         expect(find.text(AppStrings.tabItemTypes), findsOneWidget);
         expect(find.text(AppStrings.tabItemDefinitions), findsOneWidget);
@@ -68,11 +68,11 @@ void main() {
       // Tab 0: Business Info initially active
       expect(find.text(AppStrings.businessNameLabel), findsOneWidget);
 
-      // Switch to Tab 1: Invoice Preview
-      await tester.ensureVisible(find.text(AppStrings.tabInvoice));
-      await tester.tap(find.text(AppStrings.tabInvoice));
+      // Switch to Tab 1: Bluetooth Printer
+      await tester.ensureVisible(find.text(AppStrings.tabBluetoothPrinter));
+      await tester.tap(find.text(AppStrings.tabBluetoothPrinter));
       await tester.pumpAndSettle();
-      expect(find.text(AppStrings.invoicePreviewTitle), findsOneWidget);
+      expect(find.text('الطابعة الحرارية'), findsOneWidget);
 
       // Switch to Tab 2: Services
       await tester.ensureVisible(find.text(AppStrings.tabServices));

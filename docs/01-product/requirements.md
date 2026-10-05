@@ -388,12 +388,18 @@ Snapshot rules:
 
 The user must be able to create, edit, activate, and deactivate services.
 
-A service must contain at least:
+A service must contain:
 
+- Unique identifier
 - Service name
-- Pricing type
-- Price
-- Supported item types
+- Description (optional)
+- Active state
+
+Pricing configuration belongs to the **Service–Item Type** relationship (`ServiceItemType`), not directly to Service. The Service entity must NOT own a single default/current price.
+
+For each supported Item Type linked to a Service, the user configures:
+- Pricing type (`per_piece` or `per_square_meter`)
+- Price (strictly positive money amount in minor currency units)
 
 ---
 
@@ -413,24 +419,33 @@ the system should show only services configured for Clothing.
 
 ## 5.3 Service Pricing
 
-The system must support the following pricing models at the domain level:
+In this laundry system, the actual price depends on the combination of:
 
-- Per Piece
-- Per Kilogram
-- Per Square Meter
-- Fixed Price
+> **Service + Item Type**
 
-V1 UI should only expose pricing options that are actually relevant to the selected service/item combination.
+The supported operational pricing models in V1 are:
 
-The system should not unnecessarily show unsupported or irrelevant pricing options.
+- Per Piece (`per_piece`)
+- Per Square Meter (`per_square_meter`)
+
+*(Note: `fixed_price` has been removed from the V1 operational model because each physical item is represented as an individual OrderItem with a unit price, making fixed price functionally identical to per-piece pricing without distinct business behavior. Per Kilogram pricing remains completely excluded from V1).*
+
+Example:
+
+Washing
+  ├── Clothing → per_piece → 50 EGP
+  ├── Blanket  → per_piece → 100 EGP
+  └── Carpet   → per_square_meter → 60 EGP
+
+The UI exposes only the pricing type and fields configured for the selected Service + Item Type combination.
 
 ---
 
 ## 5.4 Price Snapshot
 
-When a service is added to an order, the price used for that OrderItem must be preserved as historical data.
+When a Service + Item Type combination is selected for an OrderItem, the actual price used at that time must be preserved as historical data (snapshotted into `order_items.unit_price`).
 
-Changing the service's current price must not change the price of existing orders.
+Changing a Service's pricing configuration later must NOT change the price of existing OrderItems or historical orders.
 
 ---
 
@@ -438,11 +453,11 @@ Changing the service's current price must not change the price of existing order
 
 During Order creation, the user must be able to adjust the applicable item/service price before saving the order according to the approved pricing behavior.
 
-The adjusted price becomes part of the historical order data.
+The adjusted price becomes part of the historical order data (`order_items.unit_price`).
 
 Opening an existing editable order must allow the user to modify its applicable price when permitted by the business rules.
 
-Historical orders must not be recalculated using the current service price.
+Historical orders must not be recalculated using current Service pricing configurations.
 
 ---
 
@@ -561,6 +576,19 @@ UI representation:
     ج.م
 
 Currency selection is not required.
+
+---
+
+## 7.6 Manual Draft Item Total Override (`customTotal`)
+
+The user may manually override the calculated draft total for an item group:
+
+- **Lossless Piastre Distribution**: When an item group with quantity > 1 has a custom total, the total integer piastres are distributed losslessly across the expanded physical `OrderItem` records:
+  - Base piece piastres = `totalPiastres ~/ quantity`
+  - Remainder = `totalPiastres % quantity`
+  - The first `remainder` items receive `basePiecePiastres + 1` piastre, and the remaining items receive `basePiecePiastres`.
+  - The sum of physical piece totals is strictly guaranteed to equal the custom total.
+- **Historical Price Stability**: The stored snapshot values (`unitPrice`, `calculatedTotal`) are saved permanently with each `OrderItem` in local SQLite and are never recalculated from updated service–item pricing configurations.
 
 ---
 
@@ -994,6 +1022,11 @@ The invoice or receipt should display, where applicable:
 
 The user must be able to print the Invoice / Receipt from the Order workflow.
 
+The system supports two complementary printing modes:
+
+1. **Direct Bluetooth Thermal Printing**: Direct ESC/POS printing to 80mm (standard) and 58mm companion thermal printers via Bluetooth from Android tablets, formatted with Arabic typography, item tables, and invoice metadata.
+2. **System / PDF Printing**: Standard document printing and PDF export using the operating system's native print framework.
+
 ---
 
 # 15. Expenses
@@ -1083,7 +1116,6 @@ It should focus on:
 - Items requiring storage
 - Outstanding payments
 - Overdue orders
-- Today's expected pickups
 - Recent orders
 
 The Dashboard must provide Quick Actions for:
@@ -1325,7 +1357,7 @@ Historical order information must remain stable even when master data changes.
 
 For example:
 
-If a service price changes from:
+If a Service + Item Type configured price changes from:
 
     40 ج.م
 
@@ -1337,7 +1369,7 @@ existing orders must continue to show:
 
     40 ج.م
 
-Similarly, historical order items should preserve the relevant item/service information used at the time the order was created.
+Similarly, historical order items must preserve the relevant item/service information used at the time the order was created.
 
 Historical Order financial information must preserve the applicable:
 
@@ -1384,10 +1416,39 @@ The system should prioritize:
 
 ---
 
+# 24A. System Licensing & Operational Control
+
+The system includes a remote licensing mechanism to manage client deployments while preserving offline-first guarantees:
+
+1. **Remote Status**: The backend issues two operational states: `'active'` or `'suspended'`.
+2. **Authoritative Suspension Anchor**: The grace period clock is anchored strictly to the remote `suspended_at` timestamp. Device detection time is never used as the anchor.
+3. **7-Day Grace Period**: When a license is suspended, the application remains fully functional for exactly 7 days after `suspended_at`. A warning banner (`LicenseWarningBanner`) is displayed across all screens inside the shell.
+4. **Timer-Based Local Expiration**: `LicenseService` schedules a local timer for the exact remaining grace duration. When it expires, status transitions to `lockedOut` without requiring an app restart or network event.
+5. **Locked-Out State**: Exactly 7 days after `suspended_at`, the application blocks all navigation and displays the full-screen `LicenseLockScreen` outside the shell.
+6. **24-Hour Remote Check Policy (Policy A)**: Startup evaluates local cache immediately and checks remote status if online. Subsequent checks on resume are throttled to once every 24 hours.
+7. **Offline Safety**: Offline launches enforce the cached license status. Fresh installations with no cached state fail open to `'active'`.
+8. **Reinstatement**: Reinstating the license to `'active'` immediately unlocks the application and cancels all active timers.
+
+---
+
+# 24B. Device Orientation & Form Factor
+
+The system is a Point of Sale (POS) and counter operations management application designed exclusively for tablet and large-screen usage in Landscape mode:
+
+1. **Landscape-Only Operation**: The application operates strictly in landscape orientations (`DeviceOrientation.landscapeLeft` and `DeviceOrientation.landscapeRight`).
+2. **Portrait Unsupported**: Portrait orientation is explicitly unsupported. The application must not render in portrait mode or provide portrait-specific layouts.
+3. **Centralized Startup Enforcement**: The orientation lock is applied globally at application bootstrap (`main()`) via `SystemChrome.setPreferredOrientations` and natively via `android:screenOrientation="sensorLandscape"`. Individual screens must not manage orientation independently.
+4. **Landscape Responsive Viewports**: UI responsiveness is required across different landscape display sizes (e.g., 8-inch, 10-inch, 12-inch tablets, and desktop landscape windows). Single-column or two-column master-detail layouts must adapt to varying landscape widths without overflow.
+5. **No Portrait Workarounds**: Portrait overflow workarounds (such as wrapping entire screens in portrait-specific scroll views or introducing conditional portrait logic) are out of scope.
+
+---
+
 # 25. Explicitly Out of Scope for V1
 
 The following features must not be implemented unless explicitly added to the requirements later:
 
+- Portrait orientation and portrait-specific mobile layouts (Landscape-only system)
+- "Today's Deliveries" / "تسليمات اليوم" Dashboard section (intentionally removed from V1 Dashboard scope)
 - Multiple user roles
 - Permissions
 - Employee management

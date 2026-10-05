@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:laundry_management/core/config/supabase_config.dart';
 import 'package:laundry_management/core/network/dio_client.dart';
 
 void main() {
   group('Completed -> Processing Backend Lifecycle RPC Integration Tests', () {
     late DioClient client;
     late Dio dio;
-    bool isNetworkAvailable = true;
 
     final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
         .toRadixString(16)
@@ -28,7 +28,9 @@ void main() {
     int baseSeq = 0;
 
     setUpAll(() async {
+      final config = SupabaseConfig.resolve();
       client = DioClient(
+        baseUrl: '${config.apiUrl}/api/v1',
         receiveTimeout: const Duration(seconds: 30),
         connectTimeout: const Duration(seconds: 30),
       );
@@ -37,15 +39,16 @@ void main() {
       try {
         final res = await dio.get('/customers', queryParameters: {'limit': 1});
         if (res.statusCode != 200) {
-          isNetworkAvailable = false;
+          fail('Backend /customers probe returned ${res.statusCode}');
         }
-      } catch (_) {
-        isNetworkAvailable = false;
+      } catch (e) {
+        fail('Backend probe failed: $e. Configure live Supabase before running integration tests.');
       }
 
-      if (!isNetworkAvailable) return;
-
-      final syncRes = await dio.get('/sync/changes', queryParameters: {'limit': 1});
+      final syncRes = await dio.get(
+        '/sync/changes',
+        queryParameters: {'limit': 1},
+      );
       if (syncRes.statusCode == 200 && syncRes.data is Map) {
         baseSeq = syncRes.data['latest_sequence'] ?? 0;
       }
@@ -146,7 +149,9 @@ void main() {
           'completed_at': completedTime,
           'updated_at': completedTime,
         },
-        options: Options(headers: {'X-Operation-ID': 'op-ord1-complete-$runId'}),
+        options: Options(
+          headers: {'X-Operation-ID': 'op-ord1-complete-$runId'},
+        ),
       );
 
       // 3. Seed Order 2 (processing -> cancelled)
@@ -194,162 +199,179 @@ void main() {
       );
     });
 
-    test('A. Completed -> Processing SUCCESS: clears completed_at, preserves payment & storage, increments version, exactly 1 sync_changes', () async {
-      if (!isNetworkAvailable) return;
+    test(
+      'A. Completed -> Processing SUCCESS: clears completed_at, preserves payment & storage, increments version, exactly 1 sync_changes',
+      () async {
 
-      // Verify order 1 is currently completed
-      final beforeRes = await dio.get('/orders/$order1Id');
-      expect(beforeRes.statusCode, equals(200));
-      expect(beforeRes.data['status'], equals('completed'));
-      expect(beforeRes.data['completed_at'], isNotNull);
-      expect(beforeRes.data['paid_amount'], equals(2500));
-      final beforeVersion = beforeRes.data['server_version'] as int;
+        // Verify order 1 is currently completed
+        final beforeRes = await dio.get('/orders/$order1Id');
+        expect(beforeRes.statusCode, equals(200));
+        expect(beforeRes.data['status'], equals('completed'));
+        expect(beforeRes.data['completed_at'], isNotNull);
+        expect(beforeRes.data['paid_amount'], equals(2500));
+        final beforeVersion = beforeRes.data['server_version'] as int;
 
-      // Submit status correction to processing
-      final correctOpId = 'op-correct-ord1-$runId';
-      final correctionTime = DateTime.now().toIso8601String();
-      final patchRes = await dio.patch(
-        '/orders/$order1Id',
-        data: {
-          'status': 'processing',
-          'updated_at': correctionTime,
-        },
-        options: Options(headers: {'X-Operation-ID': correctOpId}),
-      );
-
-      expect(patchRes.statusCode, equals(200));
-      final patchData = patchRes.data is Map ? patchRes.data : {};
-      expect(patchData['status'], equals('processing'));
-      expect(patchData['completed_at'], isNull);
-      expect(patchData['server_version'], equals(beforeVersion + 1));
-
-      // Verify GET /orders/order1Id state
-      final afterRes = await dio.get('/orders/$order1Id');
-      expect(afterRes.statusCode, equals(200));
-      expect(afterRes.data['status'], equals('processing'));
-      expect(afterRes.data['completed_at'], isNull);
-      // Payment records and paid_amount must remain intact
-      expect(afterRes.data['paid_amount'], equals(2500));
-
-      // Verify sync_changes table recorded exactly one change for this operation
-      final changesRes = await dio.get(
-        '/sync/changes',
-        queryParameters: {'after': baseSeq, 'limit': 100},
-      );
-      expect(changesRes.statusCode, equals(200));
-      final changes = (changesRes.data['changes'] as List?) ?? [];
-      final matchingChanges = changes.where(
-        (c) => c['operation_id'] == correctOpId,
-      ).toList();
-      expect(matchingChanges.length, equals(1));
-      final changePayload = matchingChanges.first['payload'] as Map<String, dynamic>;
-      expect(changePayload['status'], equals('processing'));
-      expect(changePayload['completed_at'], isNull);
-      expect(matchingChanges.first['server_version'], equals(beforeVersion + 1));
-    });
-
-    test('F. Duplicate operation ID returns idempotent result without duplicate sync_changes', () async {
-      if (!isNetworkAvailable) return;
-
-      final correctOpId = 'op-correct-ord1-$runId';
-      final repeatRes = await dio.patch(
-        '/orders/$order1Id',
-        data: {
-          'status': 'processing',
-          'updated_at': DateTime.now().toIso8601String(),
-        },
-        options: Options(headers: {'X-Operation-ID': correctOpId}),
-      );
-
-      expect(repeatRes.statusCode, equals(200));
-      expect(repeatRes.data['status'], equals('processing'));
-      expect(repeatRes.data['completed_at'], isNull);
-
-      // Verify sync_changes still has exactly one row for this operation ID
-      final changesRes = await dio.get(
-        '/sync/changes',
-        queryParameters: {'after': baseSeq, 'limit': 100},
-      );
-      final changes = (changesRes.data['changes'] as List?) ?? [];
-      final matchingChanges = changes.where(
-        (c) => c['operation_id'] == correctOpId,
-      ).toList();
-      expect(matchingChanges.length, equals(1));
-    });
-
-    test('C. Completed -> Ready is rejected with INVALID_LIFECYCLE_TRANSITION', () async {
-      if (!isNetworkAvailable) return;
-
-      // Re-complete order 1 for negative tests
-      final recompTime = DateTime.now().toIso8601String();
-      await dio.patch(
-        '/orders/$order1Id',
-        data: {
-          'status': 'completed',
-          'completed_at': recompTime,
-          'updated_at': recompTime,
-        },
-        options: Options(headers: {'X-Operation-ID': 'op-recomp-$runId'}),
-      );
-
-      // Try Completed -> Ready
-      try {
-        await dio.patch(
+        // Submit status correction to processing
+        final correctOpId = 'op-correct-ord1-$runId';
+        final correctionTime = DateTime.now().toIso8601String();
+        final patchRes = await dio.patch(
           '/orders/$order1Id',
-          data: {
-            'status': 'ready',
-            'updated_at': DateTime.now().toIso8601String(),
-          },
-          options: Options(headers: {'X-Operation-ID': 'op-comp-to-ready-$runId'}),
+          data: {'status': 'processing', 'updated_at': correctionTime},
+          options: Options(headers: {'X-Operation-ID': correctOpId}),
         );
-        fail('Completed -> Ready must be rejected');
-      } on DioException catch (e) {
-        expect(e.response?.statusCode, anyOf(equals(409), equals(422)));
-        final body = e.response?.data.toString() ?? '';
-        expect(body.contains('INVALID_LIFECYCLE_TRANSITION'), isTrue);
-      }
-    });
 
-    test('D. Completed -> Cancelled is rejected with INVALID_LIFECYCLE_TRANSITION', () async {
-      if (!isNetworkAvailable) return;
+        expect(patchRes.statusCode, equals(200));
+        final patchData = patchRes.data is Map ? patchRes.data : {};
+        expect(patchData['status'], equals('processing'));
+        expect(patchData['completed_at'], isNull);
+        expect(patchData['server_version'], equals(beforeVersion + 1));
 
-      try {
-        await dio.patch(
+        // Verify GET /orders/order1Id state
+        final afterRes = await dio.get('/orders/$order1Id');
+        expect(afterRes.statusCode, equals(200));
+        expect(afterRes.data['status'], equals('processing'));
+        expect(afterRes.data['completed_at'], isNull);
+        // Payment records and paid_amount must remain intact
+        expect(afterRes.data['paid_amount'], equals(2500));
+
+        // Verify sync_changes table recorded exactly one change for this operation
+        final changesRes = await dio.get(
+          '/sync/changes',
+          queryParameters: {'after': baseSeq, 'limit': 100},
+        );
+        expect(changesRes.statusCode, equals(200));
+        final changes = (changesRes.data['changes'] as List?) ?? [];
+        final matchingChanges = changes
+            .where((c) => c['operation_id'] == correctOpId)
+            .toList();
+        expect(matchingChanges.length, equals(1));
+        final changePayload =
+            matchingChanges.first['payload'] as Map<String, dynamic>;
+        expect(changePayload['status'], equals('processing'));
+        expect(changePayload['completed_at'], isNull);
+        expect(
+          matchingChanges.first['server_version'],
+          equals(beforeVersion + 1),
+        );
+      },
+    );
+
+    test(
+      'F. Duplicate operation ID returns idempotent result without duplicate sync_changes',
+      () async {
+
+        final correctOpId = 'op-correct-ord1-$runId';
+        final repeatRes = await dio.patch(
           '/orders/$order1Id',
-          data: {
-            'status': 'cancelled',
-            'cancelled_at': DateTime.now().toIso8601String(),
-            'cancellation_reason': 'محاولة غير مسموحة',
-            'updated_at': DateTime.now().toIso8601String(),
-          },
-          options: Options(headers: {'X-Operation-ID': 'op-comp-to-canc-$runId'}),
-        );
-        fail('Completed -> Cancelled must be rejected');
-      } on DioException catch (e) {
-        expect(e.response?.statusCode, anyOf(equals(409), equals(422)));
-        final body = e.response?.data.toString() ?? '';
-        expect(body.contains('INVALID_LIFECYCLE_TRANSITION'), isTrue);
-      }
-    });
-
-    test('E. Cancelled -> Processing is rejected with INVALID_LIFECYCLE_TRANSITION', () async {
-      if (!isNetworkAvailable) return;
-
-      try {
-        await dio.patch(
-          '/orders/$order2Id',
           data: {
             'status': 'processing',
             'updated_at': DateTime.now().toIso8601String(),
           },
-          options: Options(headers: {'X-Operation-ID': 'op-canc-to-proc-$runId'}),
+          options: Options(headers: {'X-Operation-ID': correctOpId}),
         );
-        fail('Cancelled -> Processing must be rejected');
-      } on DioException catch (e) {
-        expect(e.response?.statusCode, anyOf(equals(409), equals(422)));
-        final body = e.response?.data.toString() ?? '';
-        expect(body.contains('INVALID_LIFECYCLE_TRANSITION'), isTrue);
-      }
-    });
+
+        expect(repeatRes.statusCode, equals(200));
+        expect(repeatRes.data['status'], equals('processing'));
+        expect(repeatRes.data['completed_at'], isNull);
+
+        // Verify sync_changes still has exactly one row for this operation ID
+        final changesRes = await dio.get(
+          '/sync/changes',
+          queryParameters: {'after': baseSeq, 'limit': 100},
+        );
+        final changes = (changesRes.data['changes'] as List?) ?? [];
+        final matchingChanges = changes
+            .where((c) => c['operation_id'] == correctOpId)
+            .toList();
+        expect(matchingChanges.length, equals(1));
+      },
+    );
+
+    test(
+      'C. Completed -> Ready is rejected with INVALID_LIFECYCLE_TRANSITION',
+      () async {
+
+        // Re-complete order 1 for negative tests
+        final recompTime = DateTime.now().toIso8601String();
+        await dio.patch(
+          '/orders/$order1Id',
+          data: {
+            'status': 'completed',
+            'completed_at': recompTime,
+            'updated_at': recompTime,
+          },
+          options: Options(headers: {'X-Operation-ID': 'op-recomp-$runId'}),
+        );
+
+        // Try Completed -> Ready
+        try {
+          await dio.patch(
+            '/orders/$order1Id',
+            data: {
+              'status': 'ready',
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            options: Options(
+              headers: {'X-Operation-ID': 'op-comp-to-ready-$runId'},
+            ),
+          );
+          fail('Completed -> Ready must be rejected');
+        } on DioException catch (e) {
+          expect(e.response?.statusCode, anyOf(equals(409), equals(422)));
+          final body = e.response?.data.toString() ?? '';
+          expect(body.contains('INVALID_LIFECYCLE_TRANSITION'), isTrue);
+        }
+      },
+    );
+
+    test(
+      'D. Completed -> Cancelled is rejected with INVALID_LIFECYCLE_TRANSITION',
+      () async {
+
+        try {
+          await dio.patch(
+            '/orders/$order1Id',
+            data: {
+              'status': 'cancelled',
+              'cancelled_at': DateTime.now().toIso8601String(),
+              'cancellation_reason': 'محاولة غير مسموحة',
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            options: Options(
+              headers: {'X-Operation-ID': 'op-comp-to-canc-$runId'},
+            ),
+          );
+          fail('Completed -> Cancelled must be rejected');
+        } on DioException catch (e) {
+          expect(e.response?.statusCode, anyOf(equals(409), equals(422)));
+          final body = e.response?.data.toString() ?? '';
+          expect(body.contains('INVALID_LIFECYCLE_TRANSITION'), isTrue);
+        }
+      },
+    );
+
+    test(
+      'E. Cancelled -> Processing is rejected with INVALID_LIFECYCLE_TRANSITION',
+      () async {
+
+        try {
+          await dio.patch(
+            '/orders/$order2Id',
+            data: {
+              'status': 'processing',
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            options: Options(
+              headers: {'X-Operation-ID': 'op-canc-to-proc-$runId'},
+            ),
+          );
+          fail('Cancelled -> Processing must be rejected');
+        } on DioException catch (e) {
+          expect(e.response?.statusCode, anyOf(equals(409), equals(422)));
+          final body = e.response?.data.toString() ?? '';
+          expect(body.contains('INVALID_LIFECYCLE_TRANSITION'), isTrue);
+        }
+      },
+    );
   });
 }

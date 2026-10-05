@@ -29,9 +29,7 @@ class SyncStatusCubit extends Cubit<SyncStatusState> {
     required NetworkInfo networkInfo,
   }) : _syncEngine = syncEngine,
        _networkInfo = networkInfo,
-       super(
-         _computeInitialState(syncEngine.state, syncEngine.isSyncing),
-       ) {
+       super(_computeInitialState(syncEngine.state, syncEngine.isSyncing)) {
     _init();
   }
 
@@ -82,12 +80,9 @@ class SyncStatusCubit extends Cubit<SyncStatusState> {
       },
     );
 
-    _syncEngineSubscription = _syncEngine.stateStream.listen(
-      (_) {
-        _recomputeStatus();
-      },
-      onError: (_) {},
-    );
+    _syncEngineSubscription = _syncEngine.stateStream.listen((_) {
+      _recomputeStatus();
+    }, onError: (_) {});
   }
 
   void _recomputeStatus() {
@@ -109,11 +104,7 @@ class SyncStatusCubit extends Cubit<SyncStatusState> {
 
     // 2. SYNCING: SyncEngine is actively syncing
     if (isSyncing || engineState.status == SyncEngineStatus.syncing) {
-      emit(
-        SyncStatusState.syncing(
-          lastSyncTime: engineState.lastSyncTime,
-        ),
-      );
+      emit(SyncStatusState.syncing(lastSyncTime: engineState.lastSyncTime));
       return;
     }
 
@@ -141,18 +132,12 @@ class SyncStatusCubit extends Cubit<SyncStatusState> {
     // 4. STARTUP: Before the first successful sync has finished
     if (engineState.lastSyncTime == null) {
       // Network is available, initial sync pass is either queued or running
-      emit(
-        const SyncStatusState.syncing(),
-      );
+      emit(const SyncStatusState.syncing());
       return;
     }
 
     // 5. CONNECTED: Successful sync completed, network available, no unresolved error
-    emit(
-      SyncStatusState.connected(
-        lastSyncTime: engineState.lastSyncTime,
-      ),
-    );
+    emit(SyncStatusState.connected(lastSyncTime: engineState.lastSyncTime));
   }
 
   /// Determines whether a sync failure is an infrastructure network/transport failure.

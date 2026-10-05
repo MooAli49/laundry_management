@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:get_it/get_it.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../application/license/license_service.dart';
 import '../../application/use_cases/cancel_order_use_case.dart';
 import '../../application/use_cases/change_order_status_use_case.dart';
 import '../../application/use_cases/complete_order_use_case.dart';
@@ -10,6 +12,20 @@ import '../../application/use_cases/edit_processing_order_use_case.dart';
 import '../../application/use_cases/move_stored_item_use_case.dart';
 import '../../application/use_cases/store_order_items_use_case.dart';
 import '../../application/use_cases/unstore_item_use_case.dart';
+import '../../core/license/license_guard.dart';
+import '../../data/datasources/remote/customer_remote_api.dart';
+import '../../data/datasources/remote/expense_remote_api.dart';
+import '../../data/datasources/remote/license_remote_api.dart';
+import '../../data/datasources/remote/license_remote_data_source.dart';
+import '../../data/datasources/remote/master_data_remote_api.dart';
+import '../../data/datasources/remote/order_remote_api.dart';
+import '../../data/datasources/remote/payment_remote_api.dart';
+import '../../data/datasources/remote/refund_remote_api.dart';
+import '../../data/datasources/remote/remote_api_dispatcher.dart';
+import '../../data/datasources/remote/storage_remote_api.dart';
+import '../../data/datasources/remote/supabase_realtime_sync_adapter.dart';
+import '../../data/datasources/remote/sync_remote_api.dart';
+import '../../data/datasources/remote/sync_remote_data_source.dart';
 import '../../data/local/daos/business_settings_dao.dart';
 import '../../data/local/daos/carpet_sizes_dao.dart';
 import '../../data/local/daos/customers_dao.dart';
@@ -17,6 +33,7 @@ import '../../data/local/daos/expense_categories_dao.dart';
 import '../../data/local/daos/expenses_dao.dart';
 import '../../data/local/daos/item_definitions_dao.dart';
 import '../../data/local/daos/item_types_dao.dart';
+import '../../data/local/daos/license_cache_dao.dart';
 import '../../data/local/daos/orders_dao.dart';
 import '../../data/local/daos/payments_dao.dart';
 import '../../data/local/daos/refunds_dao.dart';
@@ -24,6 +41,7 @@ import '../../data/local/daos/services_dao.dart';
 import '../../data/local/daos/storage_locations_dao.dart';
 import '../../data/local/daos/storage_records_dao.dart';
 import '../../data/local/daos/sync_operations_dao.dart';
+import '../../data/local/daos/sync_state_dao.dart';
 import '../../data/local/database/app_database.dart';
 import '../../data/local/database/dev_test_data.dart';
 import '../../data/repositories/carpet_size_repository_impl.dart';
@@ -41,6 +59,8 @@ import '../../data/repositories/service_repository_impl.dart';
 import '../../data/repositories/settings_repository_impl.dart';
 import '../../data/repositories/storage_location_repository_impl.dart';
 import '../../data/repositories/storage_repository_impl.dart';
+import '../../data/sync/remote_change_applier.dart';
+import '../../data/sync/sync_engine.dart';
 import '../../domain/repositories/carpet_size_repository.dart';
 import '../../domain/repositories/customer_repository.dart';
 import '../../domain/repositories/dashboard_repository.dart';
@@ -56,16 +76,22 @@ import '../../domain/repositories/service_repository.dart';
 import '../../domain/repositories/settings_repository.dart';
 import '../../domain/repositories/storage_location_repository.dart';
 import '../../domain/repositories/storage_repository.dart';
+import '../../domain/sync/sync_error_classifier.dart';
+import '../../domain/sync/sync_retry_policy.dart';
 import '../../features/customers/presentation/cubit/customer_detail_cubit.dart';
 import '../../features/customers/presentation/cubit/customers_list_cubit.dart';
 import '../../features/dashboard/presentation/cubit/dashboard_cubit.dart';
 import '../../features/dashboard/presentation/cubit/record_payment_cubit.dart';
 import '../../features/expenses/presentation/cubit/add_expense_cubit.dart';
+import '../../features/expenses/presentation/cubit/expenses_list_cubit.dart';
+import '../../features/orders/presentation/cubit/bluetooth_printer_cubit.dart';
 import '../../features/orders/presentation/cubit/create_order_cubit.dart';
 import '../../features/orders/presentation/cubit/edit_processing_order_cubit.dart';
 import '../../features/orders/presentation/cubit/order_detail_cubit.dart';
 import '../../features/orders/presentation/cubit/orders_list_cubit.dart';
 import '../../features/orders/presentation/cubit/refund_cubit.dart';
+import '../../features/orders/presentation/services/bluetooth_printer/bluetooth_printer_service.dart';
+import '../../features/orders/presentation/services/bluetooth_printer/bluetooth_printer_service_impl.dart';
 import '../../features/reports/presentation/cubit/reports_cubit.dart';
 import '../../features/settings/presentation/cubit/carpet_sizes_management_cubit.dart';
 import '../../features/settings/presentation/cubit/expense_categories_management_cubit.dart';
@@ -74,32 +100,18 @@ import '../../features/settings/presentation/cubit/services_management_cubit.dar
 import '../../features/settings/presentation/cubit/settings_cubit.dart';
 import '../../features/settings/presentation/cubit/storage_locations_management_cubit.dart';
 import '../../features/storage/presentation/cubit/storage_cubit.dart';
-import '../widgets/sync_status_cubit.dart';
+import '../config/supabase_config.dart';
 import '../network/dio_client.dart';
 import '../network/network_info.dart';
-import '../../data/datasources/remote/customer_remote_api.dart';
-import '../../data/datasources/remote/expense_remote_api.dart';
-import '../../data/datasources/remote/master_data_remote_api.dart';
-import '../../data/datasources/remote/order_remote_api.dart';
-import '../../data/datasources/remote/payment_remote_api.dart';
-import '../../data/datasources/remote/refund_remote_api.dart';
-import '../../data/datasources/remote/remote_api_dispatcher.dart';
-import '../../data/datasources/remote/storage_remote_api.dart';
-import '../../data/datasources/remote/sync_remote_api.dart';
-import '../../data/datasources/remote/sync_remote_data_source.dart';
-import '../../data/local/daos/sync_state_dao.dart';
-import '../../data/sync/remote_change_applier.dart';
-import '../../data/sync/sync_engine.dart';
-import '../../domain/sync/sync_error_classifier.dart';
-import '../../domain/sync/sync_retry_policy.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../config/supabase_config.dart';
 import '../network/realtime_sync_adapter.dart';
-import '../../data/datasources/remote/supabase_realtime_sync_adapter.dart';
+import '../widgets/sync_status_cubit.dart';
 
 final getIt = GetIt.instance;
 
-Future<void> initDependencies({bool? enableDevTestData}) async {
+Future<void> initDependencies({
+  bool? enableDevTestData,
+  bool? enableCanonicalSeed,
+}) async {
   // 0. Supabase Configuration
   if (!getIt.isRegistered<SupabaseConfig>()) {
     getIt.registerLazySingleton<SupabaseConfig>(() => SupabaseConfig.resolve());
@@ -107,7 +119,9 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
 
   // 1. Core Local Database
   if (!getIt.isRegistered<AppDatabase>()) {
-    getIt.registerLazySingleton<AppDatabase>(() => AppDatabase());
+    getIt.registerLazySingleton<AppDatabase>(
+      () => AppDatabase(null, enableCanonicalSeed),
+    );
   }
 
   // Core Networking Infrastructure
@@ -261,11 +275,46 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
       () => SyncStateDao(getIt<AppDatabase>()),
     );
   }
+  // License Infrastructure (registered before SyncEngine; must be ready
+  // before runApp so LicenseService.initialize() can be awaited in main()).
+  if (!getIt.isRegistered<LicenseCacheDao>()) {
+    getIt.registerLazySingleton<LicenseCacheDao>(
+      () => LicenseCacheDao(getIt<AppDatabase>()),
+    );
+  }
+  if (!getIt.isRegistered<LicenseRemoteApi>()) {
+    getIt.registerLazySingleton<LicenseRemoteApi>(
+      () => LicenseRemoteApi(getIt<Dio>()),
+    );
+  }
+  if (!getIt.isRegistered<LicenseRemoteDataSource>()) {
+    getIt.registerLazySingleton<LicenseRemoteDataSource>(
+      () => LicenseRemoteDataSourceImpl(getIt<LicenseRemoteApi>()),
+    );
+  }
+  if (!getIt.isRegistered<LicenseService>()) {
+    getIt.registerLazySingleton<LicenseService>(
+      () => LicenseService(
+        remoteDataSource: getIt<LicenseRemoteDataSource>(),
+        cacheDao: getIt<LicenseCacheDao>(),
+        networkInfo: getIt<NetworkInfo>(),
+      ),
+      dispose: (service) => service.dispose(),
+    );
+  }
+  if (!getIt.isRegistered<LicenseGuard>()) {
+    getIt.registerLazySingleton<LicenseGuard>(
+      () => LicenseGuard(getIt<LicenseService>()),
+      dispose: (guard) => guard.dispose(),
+    );
+  }
+
   if (!getIt.isRegistered<RemoteChangeApplier>()) {
     getIt.registerLazySingleton<RemoteChangeApplier>(
       () => RemoteChangeApplier(
         db: getIt<AppDatabase>(),
         syncStateDao: getIt<SyncStateDao>(),
+        syncOperationsDao: getIt<SyncOperationsDao>(),
       ),
     );
   }
@@ -476,9 +525,8 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
   }
   if (!getIt.isRegistered<EditProcessingOrderUseCase>()) {
     getIt.registerLazySingleton<EditProcessingOrderUseCase>(
-      () => EditProcessingOrderUseCase(
-        orderRepository: getIt<OrderRepository>(),
-      ),
+      () =>
+          EditProcessingOrderUseCase(orderRepository: getIt<OrderRepository>()),
     );
   }
   if (!getIt.isRegistered<StoreOrderItemsUseCase>()) {
@@ -587,9 +635,7 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
   }
   if (!getIt.isRegistered<RefundCubit>()) {
     getIt.registerFactory<RefundCubit>(
-      () => RefundCubit(
-        createRefundUseCase: getIt<CreateRefundUseCase>(),
-      ),
+      () => RefundCubit(createRefundUseCase: getIt<CreateRefundUseCase>()),
     );
   }
   if (!getIt.isRegistered<CustomersListCubit>()) {
@@ -637,6 +683,14 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
       () => AddExpenseCubit(
         categoryRepository: getIt<ExpenseCategoryRepository>(),
         expenseRepository: getIt<ExpenseRepository>(),
+      ),
+    );
+  }
+  if (!getIt.isRegistered<ExpensesListCubit>()) {
+    getIt.registerFactory<ExpensesListCubit>(
+      () => ExpensesListCubit(
+        expenseRepository: getIt<ExpenseRepository>(),
+        categoryRepository: getIt<ExpenseCategoryRepository>(),
       ),
     );
   }
@@ -697,6 +751,21 @@ Future<void> initDependencies({bool? enableDevTestData}) async {
         syncEngine: getIt<SyncEngine>(),
         networkInfo: getIt<NetworkInfo>(),
       ),
+    );
+  }
+
+  // Bluetooth Thermal Printer
+  if (!getIt.isRegistered<BluetoothPrinterService>()) {
+    final impl = BluetoothPrinterServiceImpl();
+    impl.init();
+    getIt.registerSingleton<BluetoothPrinterService>(impl);
+  }
+  if (!getIt.isRegistered<BluetoothPrinterCubit>()) {
+    getIt.registerLazySingleton<BluetoothPrinterCubit>(
+      () => BluetoothPrinterCubit(
+        printerService: getIt<BluetoothPrinterService>(),
+      )..init(),
+      dispose: (cubit) => cubit.close(),
     );
   }
 

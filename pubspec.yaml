@@ -1,6 +1,6 @@
 name: laundry_management
 description: "Laundry Management System - Foundation"
-publish_to: 'none'
+publish_to: "none"
 version: 1.0.0+1
 
 environment:
@@ -28,6 +28,9 @@ dependencies:
   connectivity_plus: ^6.0.3
   supabase_flutter: ^2.17.2
   flutter_svg: ^2.0.17
+  bluetooth_print_plus:
+    path: packages/bluetooth_print_plus
+  shared_preferences: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -42,7 +45,6 @@ flutter:
 
   assets:
     - assets/images/
-    
 
   fonts:
     - family: IBM Plex Sans Arabic

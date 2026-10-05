@@ -314,7 +314,8 @@ void main() {
         await tester.pumpWidget(
           testBoilerplate(
             AddCustomerDialog(
-              onSave: ({required name, required phone, address, notes}) async {},
+              onSave:
+                  ({required name, required phone, address, notes}) async {},
             ),
           ),
         );

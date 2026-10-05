@@ -29,7 +29,7 @@ void main() {
           expect(config.urlRoot, equals('https://staging.supabase.co'));
           expect(
             config.apiUrl,
-            equals('https://staging.supabase.co/functions/v1/api'),
+            equals('https://staging.supabase.co/functions/v1'),
           );
           expect(config.anonKey, equals(SupabaseConfig.defaultDevAnonKey));
         },
@@ -46,7 +46,7 @@ void main() {
           expect(config.urlRoot, equals('https://custom-api.supabase.co'));
           expect(
             config.apiUrl,
-            equals('https://custom-api.supabase.co/functions/v1/api'),
+            equals('https://custom-api.supabase.co/functions/v1'),
           );
           expect(config.anonKey, equals(SupabaseConfig.defaultDevAnonKey));
         },
@@ -102,7 +102,9 @@ void main() {
                 (e) => e.message,
                 'message',
                 allOf(
-                  contains('missing required environment variables: SUPABASE_ANON_KEY.'),
+                  contains(
+                    'missing required environment variables: SUPABASE_ANON_KEY.',
+                  ),
                   contains('--dart-define=SUPABASE_ANON_KEY'),
                 ),
               ),
@@ -124,7 +126,9 @@ void main() {
                 (e) => e.message,
                 'message',
                 allOf(
-                  contains('missing required environment variables: SUPABASE_URL_ROOT (or SUPABASE_URL).'),
+                  contains(
+                    'missing required environment variables: SUPABASE_URL_ROOT (or SUPABASE_URL).',
+                  ),
                   contains('--dart-define=SUPABASE_URL_ROOT'),
                 ),
               ),
@@ -133,25 +137,28 @@ void main() {
         },
       );
 
-      test('resolve(isRelease: true) treats whitespace-only inputs as empty', () {
-        expect(
-          () => SupabaseConfig.resolve(
-            customUrlRoot: '   ',
-            customAnonKey: '   ',
-            isRelease: true,
-          ),
-          throwsA(isA<StateError>()),
-        );
+      test(
+        'resolve(isRelease: true) treats whitespace-only inputs as empty',
+        () {
+          expect(
+            () => SupabaseConfig.resolve(
+              customUrlRoot: '   ',
+              customAnonKey: '   ',
+              isRelease: true,
+            ),
+            throwsA(isA<StateError>()),
+          );
 
-        expect(
-          () => SupabaseConfig.resolve(
-            customUrlRoot: 'https://prod.supabase.co',
-            customAnonKey: '   ',
-            isRelease: true,
-          ),
-          throwsA(isA<StateError>()),
-        );
-      });
+          expect(
+            () => SupabaseConfig.resolve(
+              customUrlRoot: 'https://prod.supabase.co',
+              customAnonKey: '   ',
+              isRelease: true,
+            ),
+            throwsA(isA<StateError>()),
+          );
+        },
+      );
 
       test(
         'resolve(isRelease: true) succeeds when valid production URL and anonKey are supplied',
@@ -165,7 +172,7 @@ void main() {
           expect(config.urlRoot, equals('https://prod-project.supabase.co'));
           expect(
             config.apiUrl,
-            equals('https://prod-project.supabase.co/functions/v1/api'),
+            equals('https://prod-project.supabase.co/functions/v1'),
           );
           expect(config.anonKey, equals('prod-public-anon-key-12345'));
         },
@@ -183,7 +190,7 @@ void main() {
           expect(config.urlRoot, equals('https://prod-api.supabase.co'));
           expect(
             config.apiUrl,
-            equals('https://prod-api.supabase.co/functions/v1/api'),
+            equals('https://prod-api.supabase.co/functions/v1'),
           );
           expect(config.anonKey, equals('prod-public-anon-key-67890'));
         },
@@ -206,10 +213,7 @@ void main() {
             config.urlRoot,
             isNot(equals(SupabaseConfig.defaultDevUrlRoot)),
           );
-          expect(
-            config.apiUrl,
-            isNot(equals(SupabaseConfig.defaultDevApiUrl)),
-          );
+          expect(config.apiUrl, isNot(equals(SupabaseConfig.defaultDevApiUrl)));
           expect(
             config.anonKey,
             isNot(equals(SupabaseConfig.defaultDevAnonKey)),
@@ -254,7 +258,9 @@ void main() {
                 (e) => e.message,
                 'message',
                 allOf(
-                  contains('Development Supabase anon key cannot be used in release builds'),
+                  contains(
+                    'Development Supabase anon key cannot be used in release builds',
+                  ),
                 ),
               ),
             ),
@@ -291,8 +297,14 @@ void main() {
             isRelease: true,
           );
 
-          expect(config.urlRoot, equals('https://rvrskluqfbrkvvlxtxfp.supabase.co'));
-          expect(config.apiUrl, equals('https://rvrskluqfbrkvvlxtxfp.supabase.co/functions/v1/api'));
+          expect(
+            config.urlRoot,
+            equals('https://rvrskluqfbrkvvlxtxfp.supabase.co'),
+          );
+          expect(
+            config.apiUrl,
+            equals('https://rvrskluqfbrkvvlxtxfp.supabase.co/functions/v1'),
+          );
           expect(config.anonKey, equals('valid-prod-anon-key-67890'));
         },
       );
@@ -331,58 +343,61 @@ void main() {
     });
 
     group('DioClient & ApiKeyInterceptor Integration', () {
-      test('DioClient uses SupabaseConfig to configure baseUrl and headers', () {
-        const customUrl = 'https://unit-test.supabase.co';
-        const customKey = 'unit-test-anon-key';
-        final config = SupabaseConfig.resolve(
-          customUrlRoot: customUrl,
-          customAnonKey: customKey,
-          isRelease: false,
-        );
+      test(
+        'DioClient uses SupabaseConfig to configure baseUrl and headers',
+        () {
+          const customUrl = 'https://unit-test.supabase.co';
+          const customKey = 'unit-test-anon-key';
+          final config = SupabaseConfig.resolve(
+            customUrlRoot: customUrl,
+            customAnonKey: customKey,
+            isRelease: false,
+          );
 
-        final client = DioClient(config: config);
-        expect(
-          client.dio.options.baseUrl,
-          equals('$customUrl/functions/v1/api'),
-        );
+          final client = DioClient(config: config);
+          expect(client.dio.options.baseUrl, equals('$customUrl/functions/v1'));
 
-        final interceptor = client.dio.interceptors
-            .whereType<ApiKeyInterceptor>()
-            .first;
-        final options = RequestOptions(path: '/orders');
-        final handler = RequestInterceptorHandler();
-        interceptor.onRequest(options, handler);
+          final interceptor = client.dio.interceptors
+              .whereType<ApiKeyInterceptor>()
+              .first;
+          final options = RequestOptions(path: '/orders');
+          final handler = RequestInterceptorHandler();
+          interceptor.onRequest(options, handler);
 
-        expect(options.headers['apikey'], equals(customKey));
-        expect(options.headers['Authorization'], equals('Bearer $customKey'));
-      });
+          expect(options.headers['apikey'], equals(customKey));
+          expect(options.headers['Authorization'], equals('Bearer $customKey'));
+        },
+      );
 
-      test('DioClient direct parameter overrides take precedence over config', () {
-        final config = SupabaseConfig.resolve(isRelease: false);
-        final client = DioClient(
-          config: config,
-          baseUrl: 'https://direct-override.supabase.co',
-          apiKey: 'direct-override-key',
-        );
+      test(
+        'DioClient direct parameter overrides take precedence over config',
+        () {
+          final config = SupabaseConfig.resolve(isRelease: false);
+          final client = DioClient(
+            config: config,
+            baseUrl: 'https://direct-override.supabase.co',
+            apiKey: 'direct-override-key',
+          );
 
-        expect(
-          client.dio.options.baseUrl,
-          equals('https://direct-override.supabase.co'),
-        );
+          expect(
+            client.dio.options.baseUrl,
+            equals('https://direct-override.supabase.co'),
+          );
 
-        final interceptor = client.dio.interceptors
-            .whereType<ApiKeyInterceptor>()
-            .first;
-        final options = RequestOptions(path: '/orders');
-        final handler = RequestInterceptorHandler();
-        interceptor.onRequest(options, handler);
+          final interceptor = client.dio.interceptors
+              .whereType<ApiKeyInterceptor>()
+              .first;
+          final options = RequestOptions(path: '/orders');
+          final handler = RequestInterceptorHandler();
+          interceptor.onRequest(options, handler);
 
-        expect(options.headers['apikey'], equals('direct-override-key'));
-        expect(
-          options.headers['Authorization'],
-          equals('Bearer direct-override-key'),
-        );
-      });
+          expect(options.headers['apikey'], equals('direct-override-key'));
+          expect(
+            options.headers['Authorization'],
+            equals('Bearer direct-override-key'),
+          );
+        },
+      );
 
       test(
         'ApiKeyInterceptor attaches apikey and Authorization Bearer headers',

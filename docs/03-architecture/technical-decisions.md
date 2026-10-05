@@ -597,7 +597,6 @@ The following remain deferred:
 - Complex distributed merge algorithms
 - CRDTs
 - Raw WebSocket / full real-time collaborative document editing
-- Full automatic CURSOR_TOO_OLD resync/bootstrap recovery
 - Flutter client OCC (server_version/base_version) propagation
 - Distributed locking
 - Multi-tenant / SaaS conflict administration
@@ -1507,7 +1506,6 @@ The following are intentionally deferred from V1:
 
     Complex Distributed Merge Algorithms & CRDTs
     Raw WebSocket / Full Real-time Collaborative Document Sync
-    Full Automatic CURSOR_TOO_OLD Bootstrap / Resync Recovery
     Flutter Client OCC (server_version/base_version) Propagation
     Automatic Background Sync Operations Purge (retention is 90 days, manual purge)
     Multi-tenant / SaaS / Multi-branch Administration
@@ -1517,7 +1515,7 @@ The following are intentionally deferred from V1:
     Advanced Caching Architecture
     File/Image Storage Architecture when not required by V1
 
-*Note: 2-device bidirectional synchronization, cursor-based pull synchronization, and Realtime wake-up signal adapter are Approved for V1 and are no longer deferred.*
+*Note: 2-device bidirectional synchronization, cursor-based pull synchronization, Realtime wake-up signal adapter, and CURSOR_TOO_OLD snapshot recovery (SUSP-01) are Approved for V1 and are no longer deferred.*
 
 These should not be implemented unless requirements change.
 
@@ -1567,7 +1565,119 @@ The exact technology choices marked as TBD must be finalized before implementati
 
 ---
 
-## 60. Final Rule
+## 61. License Control System (Approved)
+
+### Status
+Approved
+
+### Context
+The application is deployed to client-operated Android tablets and requires a reliable remote operational kill-switch/suspension mechanism while preserving the application's strict offline-first guarantees and protecting historical business data.
+
+### Decision
+1. **Remote Read-Only Endpoint**:
+   - The Flutter client queries `GET /api/v1/license` exposed by a Supabase Edge Function using the public anonymous key.
+   - The Edge Function queries the private `public.license_info` singleton table using the privileged `service_role` key.
+   - Direct PostgREST write access (`INSERT`, `UPDATE`, `PATCH`, `DELETE`) to `license_info` is strictly denied via PostgreSQL RLS policies.
+   - The endpoint returns only two valid operational statuses: `'active'` and `'suspended'`. Any missing, null, malformed, or unrecognized status throws a format error and falls back to cached state without defaulting to active.
+
+2. **Authoritative Suspension Anchor**:
+   - The 7-day grace period clock is strictly anchored to the remote `license_info.suspended_at` timestamp.
+   - Local device detection time is NEVER used as the suspension anchor, preventing tampering or offline clock manipulation.
+   - When a suspension is first detected, the remote `suspended_at` timestamp is persisted to local SQLite.
+   - If the remote timestamp is updated to a newer date, the local cache is updated accordingly.
+   - When reinstated to `'active'`, the local suspension timestamp is cleared.
+
+3. **7-Day Grace Period Duration**:
+   - Fixed constant: `kLicenseGracePeriod = Duration(days: 7)`.
+   - When remote status is `'suspended'` and `now - suspendedAt < 7 days`, effective status is `LicenseStatus.gracePeriod`.
+   - The app remains fully functional; a non-blocking warning banner (`LicenseWarningBanner`) is displayed across all screens inside `AppShell`.
+   - When `now - suspendedAt >= 7 days`, effective status is `LicenseStatus.lockedOut`.
+   - The app completely blocks navigation; `LicenseGuard` redirects `GoRouter` to the full-screen `LicenseLockScreen` outside `AppShell`.
+
+4. **Timer-Based Local Expiration**:
+   - To guarantee the app does not remain indefinitely in `gracePeriod` when running continuously without network events or restarts, `LicenseService` schedules an in-memory Dart `Timer` for the exact remaining duration (`suspended_at + 7 days - now()`).
+   - When the timer expires, `LicenseService` re-evaluates the effective license status, transitions to `lockedOut`, and emits the new status on `statusStream`.
+   - `LicenseGuard` receives the stream event and notifies `GoRouter.refreshListenable`, immediately redirecting to `/license-locked`.
+   - If reinstated or disposed, the active timer is cancelled immediately.
+   - On app restart, status is re-evaluated from the local cache: if expired, it locks immediately; if still valid, it reschedules the timer for the remaining duration.
+
+5. **24-Hour Remote Check Policy (Policy A)**:
+   - **Startup (`initialize()`)**: Evaluates local cache immediately for instantaneous, zero-latency UI launch (offline-first). If network is available, it immediately performs a remote check to fetch the latest license status from Supabase.
+   - **Background / Resume (`checkIfDue()`)**: Throttled to once every 24 hours based on `last_checked_at`. Frequent screen unlocks and app switches do not generate remote network traffic.
+   - **Offline Operation**: Continues using the cached license state without interruption.
+
+6. **Fail-Open Policy for Fresh Installs**:
+   - Only a fresh installation with NO local cache row and NO usable network result defaults to `active` (fail-open).
+   - Once any license state is cached locally, offline operation strictly follows the cached state: cached active stays active; cached suspension within grace enters `gracePeriod`; cached suspension past 7 days enters `lockedOut`.
+
+7. **Local Persistence (`license_cache` Table)**:
+   - Dedicated singleton table in local SQLite (Drift schema version 7).
+   - Stores: `remote_status` (TEXT), `suspended_at` (DATETIME nullable), `last_checked_at` (DATETIME nullable).
+   - Completely isolated from business data tables and from the SyncEngine / outbox queue (`sync_operations`). It is never synced.
+
+8. **Production Environment Safety**:
+   - Smoke test against live Production (`test/smoke/production_license_smoke_test.dart`) is strictly opt-in via `RUN_PRODUCTION_SMOKE_TEST=true`.
+   - Standard `flutter test` automatically skips the live production smoke test suite to guarantee zero accidental Production database or network access during regular testing and CI.
+
+---
+
+## 62. Bluetooth Thermal Printer Capability (Approved)
+
+### Status
+Approved
+
+### Context
+Physical POS checkout requires direct, instant printing of 80mm receipts from Android tablets to companion Bluetooth thermal receipt printers without requiring system print dialogs or external printer drivers.
+
+### Decision
+1. **Direct ESC/POS Thermal Printing**:
+   - Supports 80mm (standard) and 58mm Bluetooth thermal printers via the `bluetooth_print_plus` native Android plugin.
+   - Encapsulated within `lib/features/orders/presentation/services/bluetooth_printer/`.
+   - Includes custom ESC/POS command builder (`ThermalCommandBuilder`) and raster receipt renderer (`ThermalInvoiceRenderer`) supporting Arabic typography, inverted headers, item tables, and dashed dividers.
+2. **Dual-Mode Printing Support**:
+   - Fulfills the V1 receipt/invoice printing requirement (Section 14.4) by providing both:
+     - Direct Bluetooth Thermal Printing (primary POS receipt workflow).
+     - Standard System / PDF Printing (fallback and standard document workflow).
+3. **Architectural Isolation**:
+   - The printer subsystem interacts exclusively with domain invoice data snapshots and does not bypass repository boundaries or introduce duplicate state-management abstractions.
+
+---
+
+## 63. Landscape-Only Form Factor & Device Orientation (Approved)
+
+### Status
+Approved
+
+### Context
+The Laundry Management System is a POS / point-of-sale management system designed primarily for tablet and large-screen counter environments. Dual-orientation support (portrait and landscape) introduces unwarranted layout complexity, inconsistent checkout flows, and fragile responsive compromises without providing operational value for counter POS operations.
+
+### Decision
+1. **Landscape-Only Orientation Lock**:
+   - The application operates exclusively in landscape mode:
+     - `DeviceOrientation.landscapeLeft`
+     - `DeviceOrientation.landscapeRight`
+   - Portrait orientation (`portraitUp`, `portraitDown`) is strictly unsupported across the entire application.
+2. **Centralized Enforcement**:
+   - Orientation locking is applied once and centrally at application bootstrap in `lib/main.dart` immediately after `WidgetsFlutterBinding.ensureInitialized()` via:
+     ```dart
+     await SystemChrome.setPreferredOrientations([
+       DeviceOrientation.landscapeLeft,
+       DeviceOrientation.landscapeRight,
+     ]);
+     ```
+   - Orientation calls must NOT be scattered across individual screens or features.
+   - Native Android launch configuration (`android/app/src/main/AndroidManifest.xml`) configures `android:screenOrientation="sensorLandscape"` on `MainActivity` to lock the native launch window and prevent rotation flicker during startup.
+3. **Responsive Landscape Support**:
+   - While Portrait mode is unsupported and out of scope, the application remains responsive across different Landscape viewport widths and heights (e.g., varying tablet sizes, landscape phone viewports, desktop/windowed environments).
+   - Layout decisions rely on local constraints (e.g., `LayoutBuilder`, `MediaQuery.sizeOf(context).width`) rather than orientation switching.
+4. **Prohibition of Portrait Workarounds**:
+   - Do NOT add Portrait-specific layouts or conditional Portrait UI logic.
+   - Do NOT attempt to fix Portrait-only overflow issues by adding unnecessary wrappers (`SingleChildScrollView`, `Expanded`, `Flexible`, `OrientationBuilder`).
+   - Overflows occurring only in unsupported Portrait mode are by definition unsupported behavior and must not be patched.
+
+---
+
+## 64. Final Rule
 
 The most important technical rule is:
 
@@ -1589,4 +1699,4 @@ The system should remain:
     +
     Easy for AI coding tools to implement
 
-Any significant technical decision made after this document is finalized must either fit within these principles or be explicitly documented as a new architectural decision.
+Any significant technical decision made after this document is finalized must either fit within these principles or be explicitly documented as a new architectural decision.

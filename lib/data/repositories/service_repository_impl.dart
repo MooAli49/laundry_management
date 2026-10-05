@@ -1,8 +1,11 @@
 import 'package:drift/drift.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../core/errors/failures.dart';
 import '../../domain/entities/service.dart';
+import '../../domain/entities/service_item_type.dart';
 import '../../domain/enums/pricing_type.dart';
+import '../../domain/models/service_with_pricing.dart';
 import '../../domain/repositories/service_repository.dart';
 import '../../domain/value_objects/money.dart';
 import '../local/daos/services_dao.dart';
@@ -26,7 +29,7 @@ class ServiceRepositoryImpl implements ServiceRepository {
   @override
   Future<Service> createService(
     Service service, {
-    required List<String> supportedItemTypeIds,
+    required List<ServiceItemType> serviceItemTypes,
   }) async {
     try {
       return await _db.transaction(() async {
@@ -35,20 +38,27 @@ class ServiceRepositoryImpl implements ServiceRepository {
             id: Value(service.id),
             name: Value(service.name),
             description: Value(service.description),
-            pricingType: Value(service.pricingType.value),
-            price: Value(service.price.piastres),
             isActive: Value(service.isActive),
             createdAt: Value(service.createdAt),
             updatedAt: Value(service.updatedAt),
           ),
         );
 
-        if (supportedItemTypeIds.isNotEmpty) {
-          await _servicesDao.replaceSupportedItemTypes(
-            service.id,
-            supportedItemTypeIds,
-          );
-        }
+        final companions = serviceItemTypes
+            .map(
+              (sit) => app_db.ServiceItemTypesCompanion(
+                id: Value(sit.id),
+                serviceId: Value(service.id),
+                itemTypeId: Value(sit.itemTypeId),
+                pricingType: Value(sit.pricingType.value),
+                price: Value(sit.price.piastres),
+                createdAt: Value(sit.createdAt),
+                updatedAt: Value(sit.updatedAt),
+              ),
+            )
+            .toList();
+
+        await _servicesDao.replaceServiceItemTypes(service.id, companions);
 
         await _syncOperationsDao.recordOperation(
           entityType: 'service',
@@ -56,7 +66,7 @@ class ServiceRepositoryImpl implements ServiceRepository {
           operationType: 'create',
           payload: SyncPayloadBuilder.buildServicePayload(
             service,
-            supportedItemTypeIds,
+            serviceItemTypes,
           ),
         );
 
@@ -73,13 +83,13 @@ class ServiceRepositoryImpl implements ServiceRepository {
   @override
   Future<Service> updateService(
     Service service, {
-    List<String>? supportedItemTypeIds,
+    List<ServiceItemType>? serviceItemTypes,
   }) async {
     try {
       return await _db.transaction(() async {
         final existing = await _servicesDao.getServiceById(service.id);
         if (existing == null) {
-          throw ValidationFailure('Service not found');
+          throw const ValidationFailure('Service not found');
         }
 
         await _servicesDao.updateService(
@@ -87,33 +97,54 @@ class ServiceRepositoryImpl implements ServiceRepository {
             id: Value(service.id),
             name: Value(service.name),
             description: Value(service.description),
-            pricingType: Value(service.pricingType.value),
-            price: Value(service.price.piastres),
             isActive: Value(service.isActive),
             createdAt: Value(service.createdAt),
             updatedAt: Value(service.updatedAt),
           ),
         );
 
-        if (supportedItemTypeIds != null) {
-          await _servicesDao.replaceSupportedItemTypes(
+        List<ServiceItemType> finalConfigs;
+        if (serviceItemTypes != null) {
+          final existingRows = await _servicesDao.getServiceItemTypes(
             service.id,
-            supportedItemTypeIds,
           );
-        }
+          final existingByItemTypeId = {
+            for (final r in existingRows) r.itemTypeId: r,
+          };
 
-        final finalSupportedItemTypes =
-            supportedItemTypeIds ??
-            await _servicesDao.getSupportedItemTypeIds(service.id);
+          final companions = serviceItemTypes
+              .map(
+                (sit) {
+                  final existing = existingByItemTypeId[sit.itemTypeId];
+                  final idToUse = sit.id.isNotEmpty
+                      ? sit.id
+                      : (existing?.id ?? const Uuid().v4());
+                  return app_db.ServiceItemTypesCompanion(
+                    id: Value(idToUse),
+                    serviceId: Value(service.id),
+                    itemTypeId: Value(sit.itemTypeId),
+                    pricingType: Value(sit.pricingType.value),
+                    price: Value(sit.price.piastres),
+                    createdAt: Value(existing?.createdAt ?? sit.createdAt),
+                    updatedAt: Value(sit.updatedAt),
+                  );
+                },
+              )
+              .toList();
+          await _servicesDao.replaceServiceItemTypes(service.id, companions);
+          finalConfigs = serviceItemTypes;
+        } else {
+          final existingRows = await _servicesDao.getServiceItemTypes(
+            service.id,
+          );
+          finalConfigs = existingRows.map(_mapSitToDomain).toList();
+        }
 
         await _syncOperationsDao.recordOperation(
           entityType: 'service',
           entityId: service.id,
           operationType: 'update',
-          payload: SyncPayloadBuilder.buildServicePayload(
-            service,
-            finalSupportedItemTypes,
-          ),
+          payload: SyncPayloadBuilder.buildServicePayload(service, finalConfigs),
         );
 
         return service;
@@ -160,10 +191,46 @@ class ServiceRepositoryImpl implements ServiceRepository {
   }
 
   @override
-  Future<List<Service>> getServicesForItemType(String itemTypeId) async {
+  Future<List<ServiceWithPricing>> getServicesForItemType(
+    String itemTypeId,
+  ) async {
     try {
-      final rows = await _servicesDao.getServicesForItemType(itemTypeId);
-      return rows.map(_mapToDomain).toList();
+      final rows = await _servicesDao.getServicesWithPricingForItemType(
+        itemTypeId,
+      );
+      return rows
+          .map(
+            (r) => ServiceWithPricing(
+              service: _mapToDomain(r.service),
+              serviceItemType: _mapSitToDomain(r.serviceItemType),
+            ),
+          )
+          .toList();
+    } catch (e) {
+      if (e is Failure) rethrow;
+      throw DatabaseFailure(e.toString());
+    }
+  }
+
+  @override
+  Future<ServiceItemType?> getServiceItemType(
+    String serviceId,
+    String itemTypeId,
+  ) async {
+    try {
+      final row = await _servicesDao.getServiceItemType(serviceId, itemTypeId);
+      return row != null ? _mapSitToDomain(row) : null;
+    } catch (e) {
+      if (e is Failure) rethrow;
+      throw DatabaseFailure(e.toString());
+    }
+  }
+
+  @override
+  Future<List<ServiceItemType>> getServiceItemTypes(String serviceId) async {
+    try {
+      final rows = await _servicesDao.getServiceItemTypes(serviceId);
+      return rows.map(_mapSitToDomain).toList();
     } catch (e) {
       if (e is Failure) rethrow;
       throw DatabaseFailure(e.toString());
@@ -176,7 +243,7 @@ class ServiceRepositoryImpl implements ServiceRepository {
       await _db.transaction(() async {
         final existing = await _servicesDao.getServiceById(id);
         if (existing == null) {
-          throw ValidationFailure('Service not found');
+          throw const ValidationFailure('Service not found');
         }
 
         final now = DateTime.now();
@@ -204,7 +271,7 @@ class ServiceRepositoryImpl implements ServiceRepository {
       await _db.transaction(() async {
         final existing = await _servicesDao.getServiceById(id);
         if (existing == null) {
-          throw ValidationFailure('Service not found');
+          throw const ValidationFailure('Service not found');
         }
 
         final now = DateTime.now();
@@ -241,9 +308,19 @@ class ServiceRepositoryImpl implements ServiceRepository {
       id: row.id,
       name: row.name,
       description: row.description,
+      isActive: row.isActive,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    );
+  }
+
+  ServiceItemType _mapSitToDomain(app_db.ServiceItemType row) {
+    return ServiceItemType(
+      id: row.id,
+      serviceId: row.serviceId,
+      itemTypeId: row.itemTypeId,
       pricingType: PricingType.fromValue(row.pricingType),
       price: Money.fromPiastres(row.price),
-      isActive: row.isActive,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     );

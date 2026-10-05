@@ -11,8 +11,10 @@ import '../../../../domain/entities/customer.dart';
 import '../../../../domain/entities/item_definition.dart';
 import '../../../../domain/entities/item_type.dart';
 import '../../../../domain/entities/service.dart';
+import '../../../../domain/entities/service_item_type.dart';
 import '../../../../domain/enums/order_status.dart';
 import '../../../../domain/enums/pricing_type.dart';
+import '../../../../domain/models/service_with_pricing.dart';
 import '../../../../domain/repositories/carpet_size_repository.dart';
 import '../../../../domain/repositories/customer_repository.dart';
 import '../../../../domain/repositories/item_definition_repository.dart';
@@ -84,19 +86,24 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
         return;
       }
 
-      final totalPaidPiastres = await _paymentsDao.getTotalPaidForOrder(orderId);
+      final totalPaidPiastres = await _paymentsDao.getTotalPaidForOrder(
+        orderId,
+      );
       final totalPaid = Money.fromPiastres(totalPaidPiastres);
 
-      final customer = await _customerRepository.getCustomerById(order.customerId);
+      final customer = await _customerRepository.getCustomerById(
+        order.customerId,
+      );
       final rawItems = await _orderRepository.getOrderItems(orderId);
 
       // Fetch storage records for items
       final editableItems = <EditableOrderItem>[];
       for (final item in rawItems) {
-        final count =
-            await _storageRecordsDao.countAllRecordsForOrderItem(item.id);
-        final activeRecord =
-            await _storageRecordsDao.getActiveRecordForOrderItem(item.id);
+        final count = await _storageRecordsDao.countAllRecordsForOrderItem(
+          item.id,
+        );
+        final activeRecord = await _storageRecordsDao
+            .getActiveRecordForOrderItem(item.id);
         String? locName;
         if (activeRecord != null) {
           final loc = await _storageLocationRepository.getStorageLocationById(
@@ -116,6 +123,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
             serviceName: item.serviceNameSnapshot,
             pricingType: item.pricingType,
             unitPrice: item.unitPrice,
+            customTotal: item.calculatedTotal,
             physicalQuantity: 1,
             carpetSizeId: item.carpetData?.carpetSizeId,
             length: item.carpetData?.length ?? 0.0,
@@ -162,7 +170,12 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
   Future<void> searchCustomers(String query) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) {
-      emit(state.copyWith(customerSearchResults: const [], isSearchingCustomer: false));
+      emit(
+        state.copyWith(
+          customerSearchResults: const [],
+          isSearchingCustomer: false,
+        ),
+      );
       return;
     }
 
@@ -170,7 +183,12 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
     try {
       final results = await _customerRepository.searchCustomers(query: trimmed);
       if (isClosed) return;
-      emit(state.copyWith(customerSearchResults: results, isSearchingCustomer: false));
+      emit(
+        state.copyWith(
+          customerSearchResults: results,
+          isSearchingCustomer: false,
+        ),
+      );
     } catch (e) {
       if (isClosed) return;
       emit(state.copyWith(isSearchingCustomer: false));
@@ -238,11 +256,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
   }
 
   void toggleCustomerPickup(bool requested) {
-    emit(
-      state.copyWith(
-        customerPickupRequested: requested,
-      ),
-    );
+    emit(state.copyWith(customerPickupRequested: requested));
   }
 
   void updateCustomerPickupFee(Money fee) {
@@ -250,11 +264,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
   }
 
   void toggleCustomerDelivery(bool requested) {
-    emit(
-      state.copyWith(
-        customerDeliveryRequested: requested,
-      ),
-    );
+    emit(state.copyWith(customerDeliveryRequested: requested));
   }
 
   void updateCustomerDeliveryFee(Money fee) {
@@ -286,6 +296,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
           clearDraftItemType: true,
           clearDraftItemDefinition: true,
           clearDraftService: true,
+          clearDraftPricingType: true,
           clearDraftUnitPrice: true,
           compatibleServices: const [],
           itemDefinitions: const [],
@@ -295,20 +306,26 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
     }
 
     try {
-      final services =
-          await _serviceRepository.getServicesForItemType(itemType.id);
+      final services = await _serviceRepository.getServicesForItemType(
+        itemType.id,
+      );
       final definitions = await _itemDefinitionRepository
           .getDefinitionsForItemType(itemType.id, activeOnly: true);
 
       // Deduplicate by ID
-      final uniqueServices = {for (final s in services.where((s) => s.isActive)) s.id: s}.values.toList();
-      final uniqueDefs = {for (final d in definitions.where((d) => d.isActive)) d.id: d}.values.toList();
+      final uniqueServices = {
+        for (final s in services.where((s) => s.isActive)) s.id: s,
+      }.values.toList();
+      final uniqueDefs = {
+        for (final d in definitions.where((d) => d.isActive)) d.id: d,
+      }.values.toList();
 
       emit(
         state.copyWith(
           draftItemType: itemType,
           clearDraftItemDefinition: true,
           clearDraftService: true,
+          clearDraftPricingType: true,
           clearDraftUnitPrice: true,
           compatibleServices: uniqueServices,
           itemDefinitions: uniqueDefs,
@@ -329,12 +346,14 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
     );
   }
 
-  void selectService(Service? service) {
-    if (service == null) {
+  void selectService(ServiceWithPricing? serviceWithPricing) {
+    if (serviceWithPricing == null) {
       emit(
         state.copyWith(
           clearDraftService: true,
+          clearDraftPricingType: true,
           clearDraftUnitPrice: true,
+          clearDraftItemTotal: true,
           clearDraftCarpetSize: true,
           draftCarpetLength: 0.0,
           draftCarpetWidth: 0.0,
@@ -345,19 +364,34 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
 
     emit(
       state.copyWith(
-        draftService: service,
-        draftUnitPrice: service.price,
-        clearDraftCarpetSize: service.pricingType != PricingType.perSquareMeter,
+        draftService: serviceWithPricing.service,
+        draftPricingType: serviceWithPricing.pricingType,
+        draftUnitPrice: serviceWithPricing.price,
+        clearDraftItemTotal: true,
+        clearDraftCarpetSize:
+            serviceWithPricing.pricingType != PricingType.perSquareMeter,
         draftCarpetLength:
-            service.pricingType != PricingType.perSquareMeter ? 0.0 : state.draftCarpetLength,
+            serviceWithPricing.pricingType != PricingType.perSquareMeter
+                ? 0.0
+                : state.draftCarpetLength,
         draftCarpetWidth:
-            service.pricingType != PricingType.perSquareMeter ? 0.0 : state.draftCarpetWidth,
+            serviceWithPricing.pricingType != PricingType.perSquareMeter
+                ? 0.0
+                : state.draftCarpetWidth,
       ),
     );
   }
 
   void updateDraftUnitPrice(Money price) {
-    emit(state.copyWith(draftUnitPrice: price));
+    emit(state.copyWith(draftUnitPrice: price, clearDraftItemTotal: true));
+  }
+
+  void updateDraftTotal(Money total) {
+    emit(state.copyWith(draftItemTotal: total));
+  }
+
+  void resetDraftTotal() {
+    emit(state.copyWith(clearDraftItemTotal: true));
   }
 
   void updateDraftQuantity(int quantity) {
@@ -379,12 +413,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
   }
 
   void updateDraftCarpetDimensions(double length, double width) {
-    emit(
-      state.copyWith(
-        draftCarpetLength: length,
-        draftCarpetWidth: width,
-      ),
-    );
+    emit(state.copyWith(draftCarpetLength: length, draftCarpetWidth: width));
   }
 
   void updateDraftNotes(String? notes) {
@@ -407,22 +436,39 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
     );
 
     // Load compatible services and definitions
-    final services =
-        await _serviceRepository.getServicesForItemType(matchingType.id);
+    final services = await _serviceRepository.getServicesForItemType(
+      matchingType.id,
+    );
     final definitions = await _itemDefinitionRepository
         .getDefinitionsForItemType(matchingType.id, activeOnly: true);
 
-    final matchingService = services.firstWhere(
-      (s) => s.id == item.serviceId,
-      orElse: () => Service(
+    ServiceWithPricing matchingServiceWithPricing;
+    try {
+      matchingServiceWithPricing = services.firstWhere(
+        (s) => s.id == item.serviceId,
+      );
+    } catch (_) {
+      final now = DateTime.now();
+      final serviceEntity = Service(
         id: item.serviceId,
         name: item.serviceName,
-        price: item.unitPrice,
+        createdAt: now,
+        updatedAt: now,
+      );
+      final sit = ServiceItemType(
+        id: 'fallback-${item.serviceId}',
+        serviceId: item.serviceId,
+        itemTypeId: matchingType.id,
         pricingType: item.pricingType,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-    );
+        price: item.unitPrice,
+        createdAt: now,
+        updatedAt: now,
+      );
+      matchingServiceWithPricing = ServiceWithPricing(
+        service: serviceEntity,
+        serviceItemType: sit,
+      );
+    }
 
     ItemDefinition? matchingDef;
     if (item.itemDefinitionId != null) {
@@ -444,7 +490,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
 
     // Deduplicate and ensure matchingService and matchingDef are in lists
     final servicesList = {for (final s in services) s.id: s};
-    servicesList[matchingService.id] = matchingService;
+    servicesList[matchingServiceWithPricing.id] = matchingServiceWithPricing;
 
     final defsList = {for (final d in definitions) d.id: d};
     if (matchingDef != null) {
@@ -457,8 +503,10 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
         draftItemType: matchingType,
         draftItemDefinition: matchingDef,
         clearDraftItemDefinition: matchingDef == null,
-        draftService: matchingService,
+        draftService: matchingServiceWithPricing.service,
+        draftPricingType: matchingServiceWithPricing.pricingType,
         draftUnitPrice: item.unitPrice,
+        draftItemTotal: item.calculatedTotal,
         draftQuantity: item.physicalQuantity,
         draftCarpetSize: matchingSize,
         clearDraftCarpetSize: matchingSize == null,
@@ -480,7 +528,9 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
         clearDraftItemType: true,
         clearDraftItemDefinition: true,
         clearDraftService: true,
+        clearDraftPricingType: true,
         clearDraftUnitPrice: true,
+        clearDraftItemTotal: true,
         clearDraftCarpetSize: true,
         draftCarpetLength: 0.0,
         draftCarpetWidth: 0.0,
@@ -497,19 +547,31 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
       emit(state.copyWith(errorMessage: 'نوع العنصر مطلوب'));
       return;
     }
-    if (state.draftService == null) {
+    if (state.draftService == null || state.draftPricingType == null) {
       emit(state.copyWith(errorMessage: 'الخدمة مطلوبة'));
       return;
     }
-    final unitPrice = state.draftUnitPrice ?? state.draftService!.price;
-    if (unitPrice <= Money.zero) {
-      emit(state.copyWith(errorMessage: 'يجب أن يكون السعر أكبر من الصفر'));
+    if (state.draftUnitPrice == null) {
+      emit(state.copyWith(errorMessage: 'سعر الخدمة مطلوب'));
+      return;
+    }
+    final unitPrice = state.draftUnitPrice!;
+    final pricingType = state.draftPricingType!;
+    final effectiveTotal = state.effectiveDraftTotal;
+    if (effectiveTotal <= Money.zero) {
+      emit(
+        state.copyWith(errorMessage: 'إجمالي الخدمة يجب أن يكون أكبر من الصفر'),
+      );
       return;
     }
 
-    if (state.draftService!.pricingType == PricingType.perSquareMeter) {
+    if (pricingType == PricingType.perSquareMeter) {
       if (state.draftCarpetLength <= 0 || state.draftCarpetWidth <= 0) {
-        emit(state.copyWith(errorMessage: 'أبعاد السجاد مطلوبة ويجب أن تكون أكبر من الصفر'));
+        emit(
+          state.copyWith(
+            errorMessage: 'أبعاد السجاد مطلوبة ويجب أن تكون أكبر من الصفر',
+          ),
+        );
         return;
       }
     }
@@ -525,8 +587,9 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
         clearItemDefinition: state.draftItemDefinition == null,
         serviceId: state.draftService!.id,
         serviceName: state.draftService!.name,
-        pricingType: state.draftService!.pricingType,
+        pricingType: pricingType,
         unitPrice: unitPrice,
+        customTotal: state.isDraftTotalOverridden ? state.draftItemTotal : null,
         carpetSizeId: state.draftCarpetSize?.id,
         length: state.draftCarpetLength,
         width: state.draftCarpetWidth,
@@ -536,24 +599,55 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
     } else {
       // Adding new item(s) - expand physical quantity into individual physical piece entries
       final count = state.draftQuantity > 0 ? state.draftQuantity : 1;
-      for (var i = 0; i < count; i++) {
-        final newItem = EditableOrderItem(
-          itemTypeId: state.draftItemType!.id,
-          itemTypeName: state.draftItemType!.name,
-          itemDefinitionId: state.draftItemDefinition?.id,
-          itemDefinitionName: state.draftItemDefinition?.name,
-          serviceId: state.draftService!.id,
-          serviceName: state.draftService!.name,
-          pricingType: state.draftService!.pricingType,
-          unitPrice: unitPrice,
-          physicalQuantity: 1,
-          carpetSizeId: state.draftCarpetSize?.id,
-          length: state.draftCarpetLength,
-          width: state.draftCarpetWidth,
-          notes: state.draftNotes,
-          hasStorageRecords: false,
-        );
-        currentItems.add(newItem);
+      final customTotal = state.isDraftTotalOverridden
+          ? state.draftItemTotal
+          : null;
+      if (customTotal != null && count > 1) {
+        final totalPiastres = customTotal.piastres;
+        final base = totalPiastres ~/ count;
+        final remainder = totalPiastres % count;
+        for (var i = 0; i < count; i++) {
+          final itemPiastres = base + (i < remainder ? 1 : 0);
+          final newItem = EditableOrderItem(
+            itemTypeId: state.draftItemType!.id,
+            itemTypeName: state.draftItemType!.name,
+            itemDefinitionId: state.draftItemDefinition?.id,
+            itemDefinitionName: state.draftItemDefinition?.name,
+            serviceId: state.draftService!.id,
+            serviceName: state.draftService!.name,
+            pricingType: pricingType,
+            unitPrice: unitPrice,
+            customTotal: Money.fromPiastres(itemPiastres),
+            physicalQuantity: 1,
+            carpetSizeId: state.draftCarpetSize?.id,
+            length: state.draftCarpetLength,
+            width: state.draftCarpetWidth,
+            notes: state.draftNotes,
+            hasStorageRecords: false,
+          );
+          currentItems.add(newItem);
+        }
+      } else {
+        for (var i = 0; i < count; i++) {
+          final newItem = EditableOrderItem(
+            itemTypeId: state.draftItemType!.id,
+            itemTypeName: state.draftItemType!.name,
+            itemDefinitionId: state.draftItemDefinition?.id,
+            itemDefinitionName: state.draftItemDefinition?.name,
+            serviceId: state.draftService!.id,
+            serviceName: state.draftService!.name,
+            pricingType: pricingType,
+            unitPrice: unitPrice,
+            customTotal: customTotal,
+            physicalQuantity: 1,
+            carpetSizeId: state.draftCarpetSize?.id,
+            length: state.draftCarpetLength,
+            width: state.draftCarpetWidth,
+            notes: state.draftNotes,
+            hasStorageRecords: false,
+          );
+          currentItems.add(newItem);
+        }
       }
     }
 
@@ -564,7 +658,9 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
         clearDraftItemType: true,
         clearDraftItemDefinition: true,
         clearDraftService: true,
+        clearDraftPricingType: true,
         clearDraftUnitPrice: true,
+        clearDraftItemTotal: true,
         clearDraftCarpetSize: true,
         draftCarpetLength: 0.0,
         draftCarpetWidth: 0.0,
@@ -620,7 +716,11 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
       return;
     }
     if (state.items.isEmpty) {
-      emit(state.copyWith(errorMessage: 'يجب أن يحتوي الطلب على عنصر واحد على الأقل'));
+      emit(
+        state.copyWith(
+          errorMessage: 'يجب أن يحتوي الطلب على عنصر واحد على الأقل',
+        ),
+      );
       return;
     }
     if (!state.isTotalValid) {
@@ -664,6 +764,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
               itemDefinitionId: item.itemDefinitionId,
               serviceId: item.serviceId,
               customUnitPrice: item.unitPrice,
+              customTotal: item.customTotal,
               notes: item.notes,
               carpetData: carpetInput,
             ),
@@ -675,6 +776,7 @@ class EditProcessingOrderCubit extends Cubit<EditProcessingOrderState> {
               itemDefinitionId: item.itemDefinitionId,
               serviceId: item.serviceId,
               customUnitPrice: item.unitPrice,
+              customTotal: item.customTotal,
               physicalQuantity: item.physicalQuantity,
               notes: item.notes,
               carpetData: carpetInput,

@@ -7,7 +7,8 @@ import 'package:laundry_management/data/local/daos/orders_dao.dart';
 import 'package:laundry_management/data/local/daos/payments_dao.dart';
 import 'package:laundry_management/data/local/daos/refunds_dao.dart';
 import 'package:laundry_management/data/local/daos/sync_operations_dao.dart';
-import 'package:laundry_management/data/local/database/app_database.dart' as db_pkg;
+import 'package:laundry_management/data/local/database/app_database.dart'
+    as db_pkg;
 import 'package:laundry_management/data/repositories/expense_repository_impl.dart';
 import 'package:laundry_management/data/repositories/reports_repository_impl.dart';
 import 'package:laundry_management/domain/value_objects/order_date.dart';
@@ -74,7 +75,9 @@ void main() {
       required String status,
       required DateTime createdAt,
     }) async {
-      await db.into(db.orders).insert(
+      await db
+          .into(db.orders)
+          .insert(
             db_pkg.OrdersCompanion.insert(
               id: id,
               orderNumber: orderNumber,
@@ -93,22 +96,25 @@ void main() {
           );
     }
 
-    test('A. Expected pickup = yesterday (active) is counted as OVERDUE', () async {
-      await insertTestOrder(
-        id: 'ord-yesterday',
-        orderNumber: '26-101',
-        expectedPickup: yesterday,
-        status: 'processing',
-        createdAt: now.subtract(const Duration(days: 2)),
-      );
+    test(
+      'A. Expected pickup = yesterday (active) is counted as OVERDUE',
+      () async {
+        await insertTestOrder(
+          id: 'ord-yesterday',
+          orderNumber: '26-101',
+          expectedPickup: yesterday,
+          status: 'processing',
+          createdAt: now.subtract(const Duration(days: 2)),
+        );
 
-      final report = await reportsRepository.getOrdersReport(
-        startDate: now.subtract(const Duration(days: 5)),
-        endDate: now.add(const Duration(days: 5)),
-      );
+        final report = await reportsRepository.getOrdersReport(
+          startDate: now.subtract(const Duration(days: 5)),
+          endDate: now.add(const Duration(days: 5)),
+        );
 
-      expect(report.overdueOrdersCount, 1);
-    });
+        expect(report.overdueOrdersCount, 1);
+      },
+    );
 
     test('B. Expected pickup = TODAY (active) is NOT overdue', () async {
       await insertTestOrder(
@@ -144,97 +150,106 @@ void main() {
       expect(report.overdueOrdersCount, 0);
     });
 
-    test('D. Completed old order (expected pickup = yesterday) is NOT overdue', () async {
-      await insertTestOrder(
-        id: 'ord-completed-old',
-        orderNumber: '26-104',
-        expectedPickup: yesterday,
-        status: 'completed',
-        createdAt: now.subtract(const Duration(days: 3)),
-      );
+    test(
+      'D. Completed old order (expected pickup = yesterday) is NOT overdue',
+      () async {
+        await insertTestOrder(
+          id: 'ord-completed-old',
+          orderNumber: '26-104',
+          expectedPickup: yesterday,
+          status: 'completed',
+          createdAt: now.subtract(const Duration(days: 3)),
+        );
 
-      final report = await reportsRepository.getOrdersReport(
-        startDate: now.subtract(const Duration(days: 5)),
-        endDate: now.add(const Duration(days: 5)),
-      );
+        final report = await reportsRepository.getOrdersReport(
+          startDate: now.subtract(const Duration(days: 5)),
+          endDate: now.add(const Duration(days: 5)),
+        );
 
-      expect(report.overdueOrdersCount, 0);
-    });
+        expect(report.overdueOrdersCount, 0);
+      },
+    );
 
-    test('E. Cancelled old order (expected pickup = yesterday) is NOT overdue', () async {
-      await insertTestOrder(
-        id: 'ord-cancelled-old',
-        orderNumber: '26-105',
-        expectedPickup: yesterday,
-        status: 'cancelled',
-        createdAt: now.subtract(const Duration(days: 3)),
-      );
+    test(
+      'E. Cancelled old order (expected pickup = yesterday) is NOT overdue',
+      () async {
+        await insertTestOrder(
+          id: 'ord-cancelled-old',
+          orderNumber: '26-105',
+          expectedPickup: yesterday,
+          status: 'cancelled',
+          createdAt: now.subtract(const Duration(days: 3)),
+        );
 
-      final report = await reportsRepository.getOrdersReport(
-        startDate: now.subtract(const Duration(days: 5)),
-        endDate: now.add(const Duration(days: 5)),
-      );
+        final report = await reportsRepository.getOrdersReport(
+          startDate: now.subtract(const Duration(days: 5)),
+          endDate: now.add(const Duration(days: 5)),
+        );
 
-      expect(report.overdueOrdersCount, 0);
-    });
+        expect(report.overdueOrdersCount, 0);
+      },
+    );
 
-    test('Combined boundary test: only active past orders are overdue', () async {
-      // 1. Yesterday processing -> overdue
-      await insertTestOrder(
-        id: 'o1',
-        orderNumber: '26-201',
-        expectedPickup: yesterday,
-        status: 'processing',
-        createdAt: now.subtract(const Duration(days: 2)),
-      );
-      // 2. Yesterday ready -> overdue
-      await insertTestOrder(
-        id: 'o2',
-        orderNumber: '26-202',
-        expectedPickup: yesterday,
-        status: 'ready',
-        createdAt: now.subtract(const Duration(days: 2)),
-      );
-      // 3. Today processing -> NOT overdue
-      await insertTestOrder(
-        id: 'o3',
-        orderNumber: '26-203',
-        expectedPickup: today,
-        status: 'processing',
-        createdAt: now.subtract(const Duration(days: 1)),
-      );
-      // 4. Tomorrow processing -> NOT overdue
-      await insertTestOrder(
-        id: 'o4',
-        orderNumber: '26-204',
-        expectedPickup: tomorrow,
-        status: 'processing',
-        createdAt: now,
-      );
-      // 5. Yesterday completed -> NOT overdue
-      await insertTestOrder(
-        id: 'o5',
-        orderNumber: '26-205',
-        expectedPickup: yesterday,
-        status: 'completed',
-        createdAt: now.subtract(const Duration(days: 3)),
-      );
-      // 6. Yesterday cancelled -> NOT overdue
-      await insertTestOrder(
-        id: 'o6',
-        orderNumber: '26-206',
-        expectedPickup: yesterday,
-        status: 'cancelled',
-        createdAt: now.subtract(const Duration(days: 3)),
-      );
+    test(
+      'Combined boundary test: only active past orders are overdue',
+      () async {
+        // 1. Yesterday processing -> overdue
+        await insertTestOrder(
+          id: 'o1',
+          orderNumber: '26-201',
+          expectedPickup: yesterday,
+          status: 'processing',
+          createdAt: now.subtract(const Duration(days: 2)),
+        );
+        // 2. Yesterday ready -> overdue
+        await insertTestOrder(
+          id: 'o2',
+          orderNumber: '26-202',
+          expectedPickup: yesterday,
+          status: 'ready',
+          createdAt: now.subtract(const Duration(days: 2)),
+        );
+        // 3. Today processing -> NOT overdue
+        await insertTestOrder(
+          id: 'o3',
+          orderNumber: '26-203',
+          expectedPickup: today,
+          status: 'processing',
+          createdAt: now.subtract(const Duration(days: 1)),
+        );
+        // 4. Tomorrow processing -> NOT overdue
+        await insertTestOrder(
+          id: 'o4',
+          orderNumber: '26-204',
+          expectedPickup: tomorrow,
+          status: 'processing',
+          createdAt: now,
+        );
+        // 5. Yesterday completed -> NOT overdue
+        await insertTestOrder(
+          id: 'o5',
+          orderNumber: '26-205',
+          expectedPickup: yesterday,
+          status: 'completed',
+          createdAt: now.subtract(const Duration(days: 3)),
+        );
+        // 6. Yesterday cancelled -> NOT overdue
+        await insertTestOrder(
+          id: 'o6',
+          orderNumber: '26-206',
+          expectedPickup: yesterday,
+          status: 'cancelled',
+          createdAt: now.subtract(const Duration(days: 3)),
+        );
 
-      final report = await reportsRepository.getOrdersReport(
-        startDate: now.subtract(const Duration(days: 5)),
-        endDate: now.add(const Duration(days: 5)),
-      );
+        final report = await reportsRepository.getOrdersReport(
+          startDate: now.subtract(const Duration(days: 5)),
+          endDate: now.add(const Duration(days: 5)),
+        );
 
-      // Only o1 and o2 are overdue
-      expect(report.overdueOrdersCount, 2);
-    });
+        // Only o1 and o2 are overdue
+        expect(report.overdueOrdersCount, 2);
+      },
+    );
   });
 }

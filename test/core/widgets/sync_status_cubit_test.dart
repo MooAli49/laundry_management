@@ -132,9 +132,7 @@ void main() {
         () async {
           networkInfo.isConnectedValue = true;
           syncEngine.emitState(
-            SyncEngineState.completed(
-              lastSyncTime: fixedTimestamp,
-            ),
+            SyncEngineState.completed(lastSyncTime: fixedTimestamp),
           );
 
           cubit = SyncStatusCubit(
@@ -258,72 +256,66 @@ void main() {
     });
 
     group('E. Error Handling & Classification', () {
-      test(
-        'transport/network timeout failure -> OFFLINE',
-        () async {
-          networkInfo.isConnectedValue = true;
-          syncEngine.emitState(
-            SyncEngineState.completed(lastSyncTime: fixedTimestamp),
-          );
+      test('transport/network timeout failure -> OFFLINE', () async {
+        networkInfo.isConnectedValue = true;
+        syncEngine.emitState(
+          SyncEngineState.completed(lastSyncTime: fixedTimestamp),
+        );
 
-          cubit = SyncStatusCubit(
-            syncEngine: syncEngine,
-            networkInfo: networkInfo,
-          );
-          await pumpEventQueue();
+        cubit = SyncStatusCubit(
+          syncEngine: syncEngine,
+          networkInfo: networkInfo,
+        );
+        await pumpEventQueue();
 
-          // Sync fails due to timeout
-          syncEngine.emitState(
-            SyncEngineState.failed(
-              error: 'Request timeout',
-              lastSyncTime: fixedTimestamp,
-              errorDetails: const SyncErrorDetails.network(
-                SyncNetworkErrorType.timeout,
-                message: 'Request timeout',
-              ),
+        // Sync fails due to timeout
+        syncEngine.emitState(
+          SyncEngineState.failed(
+            error: 'Request timeout',
+            lastSyncTime: fixedTimestamp,
+            errorDetails: const SyncErrorDetails.network(
+              SyncNetworkErrorType.timeout,
+              message: 'Request timeout',
             ),
-            isSyncing: false,
-          );
-          await pumpEventQueue();
+          ),
+          isSyncing: false,
+        );
+        await pumpEventQueue();
 
-          expect(cubit.state.status, equals(SyncStatus.offline));
-          expect(cubit.state.label, equals('غير متصل'));
-        },
-      );
+        expect(cubit.state.status, equals(SyncStatus.offline));
+        expect(cubit.state.label, equals('غير متصل'));
+      });
 
-      test(
-        'backend/server/application sync error -> SYNC_ERROR',
-        () async {
-          networkInfo.isConnectedValue = true;
-          syncEngine.emitState(
-            SyncEngineState.completed(lastSyncTime: fixedTimestamp),
-          );
+      test('backend/server/application sync error -> SYNC_ERROR', () async {
+        networkInfo.isConnectedValue = true;
+        syncEngine.emitState(
+          SyncEngineState.completed(lastSyncTime: fixedTimestamp),
+        );
 
-          cubit = SyncStatusCubit(
-            syncEngine: syncEngine,
-            networkInfo: networkInfo,
-          );
-          await pumpEventQueue();
+        cubit = SyncStatusCubit(
+          syncEngine: syncEngine,
+          networkInfo: networkInfo,
+        );
+        await pumpEventQueue();
 
-          // Sync fails with HTTP 500
-          syncEngine.emitState(
-            SyncEngineState.failed(
-              error: 'HTTP 500 Internal Server Error',
-              lastSyncTime: fixedTimestamp,
-              errorDetails: const SyncErrorDetails.http(
-                500,
-                message: 'Internal Server Error',
-              ),
+        // Sync fails with HTTP 500
+        syncEngine.emitState(
+          SyncEngineState.failed(
+            error: 'HTTP 500 Internal Server Error',
+            lastSyncTime: fixedTimestamp,
+            errorDetails: const SyncErrorDetails.http(
+              500,
+              message: 'Internal Server Error',
             ),
-            isSyncing: false,
-          );
-          await pumpEventQueue();
+          ),
+          isSyncing: false,
+        );
+        await pumpEventQueue();
 
-          expect(cubit.state.status, equals(SyncStatus.syncError));
-          expect(cubit.state.label, equals('فشل المزامنة'));
-          expect(cubit.state.errorMessage, contains('HTTP 500'));
-        },
-      );
+        expect(cubit.state.status, equals(SyncStatus.syncError));
+        expect(cubit.state.label, equals('فشل المزامنة'));
+        expect(cubit.state.errorMessage, contains('HTTP 500'));
+      });
 
       test(
         'old successful lastSyncTime does NOT mask a current unresolved sync error',
@@ -354,46 +346,43 @@ void main() {
     });
 
     group('F. Recovery from Error', () {
-      test(
-        'SYNC_ERROR + successful later sync -> CONNECTED',
-        () async {
-          networkInfo.isConnectedValue = true;
-          syncEngine.emitState(
-            SyncEngineState.failed(
-              error: 'Server error',
-              lastSyncTime: fixedTimestamp,
-              errorDetails: const SyncErrorDetails.http(500),
-            ),
-          );
+      test('SYNC_ERROR + successful later sync -> CONNECTED', () async {
+        networkInfo.isConnectedValue = true;
+        syncEngine.emitState(
+          SyncEngineState.failed(
+            error: 'Server error',
+            lastSyncTime: fixedTimestamp,
+            errorDetails: const SyncErrorDetails.http(500),
+          ),
+        );
 
-          cubit = SyncStatusCubit(
-            syncEngine: syncEngine,
-            networkInfo: networkInfo,
-          );
-          await pumpEventQueue();
-          expect(cubit.state.status, equals(SyncStatus.syncError));
+        cubit = SyncStatusCubit(
+          syncEngine: syncEngine,
+          networkInfo: networkInfo,
+        );
+        await pumpEventQueue();
+        expect(cubit.state.status, equals(SyncStatus.syncError));
 
-          // Next sync attempt begins
-          syncEngine.emitState(
-            SyncEngineState.syncing(lastSyncTime: fixedTimestamp),
-            isSyncing: true,
-          );
-          await pumpEventQueue();
-          expect(cubit.state.status, equals(SyncStatus.syncing));
+        // Next sync attempt begins
+        syncEngine.emitState(
+          SyncEngineState.syncing(lastSyncTime: fixedTimestamp),
+          isSyncing: true,
+        );
+        await pumpEventQueue();
+        expect(cubit.state.status, equals(SyncStatus.syncing));
 
-          // Sync succeeds
-          final recoveredTime = fixedTimestamp.add(const Duration(hours: 1));
-          syncEngine.emitState(
-            SyncEngineState.completed(lastSyncTime: recoveredTime),
-            isSyncing: false,
-          );
-          await pumpEventQueue();
+        // Sync succeeds
+        final recoveredTime = fixedTimestamp.add(const Duration(hours: 1));
+        syncEngine.emitState(
+          SyncEngineState.completed(lastSyncTime: recoveredTime),
+          isSyncing: false,
+        );
+        await pumpEventQueue();
 
-          expect(cubit.state.status, equals(SyncStatus.connected));
-          expect(cubit.state.label, equals('متصل'));
-          expect(cubit.state.lastSyncTime, equals(recoveredTime));
-        },
-      );
+        expect(cubit.state.status, equals(SyncStatus.connected));
+        expect(cubit.state.label, equals('متصل'));
+        expect(cubit.state.lastSyncTime, equals(recoveredTime));
+      });
     });
 
     group('G. Offline-First Non-blocking Invariant', () {
@@ -401,9 +390,7 @@ void main() {
         'offline state preserves clean contract without throwing or blocking',
         () async {
           networkInfo.isConnectedValue = false;
-          syncEngine.emitState(
-            const SyncEngineState.idle(lastSyncTime: null),
-          );
+          syncEngine.emitState(const SyncEngineState.idle(lastSyncTime: null));
 
           cubit = SyncStatusCubit(
             syncEngine: syncEngine,

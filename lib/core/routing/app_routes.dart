@@ -10,7 +10,9 @@ class AppRoutes {
   static const String customersDetail = '/customers/:id';
   static const String storage = '/storage';
   static const String reports = '/reports';
+  static const String expenses = '/expenses';
   static const String settings = '/settings';
+  static const String licenseLockedOut = '/license-locked';
 
   static String orderDetailPath(String id) => '/orders/$id';
   static String orderEditPath(String id) => '/orders/$id/edit';

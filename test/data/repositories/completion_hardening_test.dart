@@ -28,7 +28,7 @@ void main() {
   late PaymentRepositoryImpl paymentRepository;
 
   setUp(() async {
-    db = AppDatabase(NativeDatabase.memory());
+    db = AppDatabase(NativeDatabase.memory(), true);
     ordersDao = OrdersDao(db);
     storageRecordsDao = StorageRecordsDao(db);
     syncOperationsDao = SyncOperationsDao(db);
@@ -55,11 +55,21 @@ void main() {
       ['cust-comp', 'عميل التسليم', '01012341234', nowTimestamp, nowTimestamp],
     );
     await db.customStatement(
-      'INSERT INTO services (id, name, pricing_type, price, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?);',
+      'INSERT INTO services (id, name, is_active, created_at, updated_at) VALUES (?, ?, 1, ?, ?);',
       [
         'srv-comp',
         'خدمة التسليم',
-        'perPiece',
+        nowTimestamp,
+        nowTimestamp,
+      ],
+    );
+    await db.customStatement(
+      'INSERT INTO service_item_types (id, service_id, item_type_id, pricing_type, price, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?);',
+      [
+        'sit-comp',
+        'srv-comp',
+        '00000000-0000-0000-0001-000000000001',
+        'per_piece',
         5000,
         nowTimestamp,
         nowTimestamp,

@@ -7,11 +7,13 @@ class PullChangesResponseDto {
   final List<SyncChangeDto> changes;
   final bool hasMore;
   final int latestSequence;
+  final int? oldestAvailableSequence;
 
   const PullChangesResponseDto({
     required this.changes,
     required this.hasMore,
     required this.latestSequence,
+    this.oldestAvailableSequence,
   });
 
   factory PullChangesResponseDto.fromJson(Map<String, dynamic> json) {
@@ -24,6 +26,8 @@ class PullChangesResponseDto {
       changes: parsedChanges,
       hasMore: json['has_more'] as bool? ?? false,
       latestSequence: (json['latest_sequence'] as num?)?.toInt() ?? 0,
+      oldestAvailableSequence: (json['oldest_available_sequence'] as num?)
+          ?.toInt(),
     );
   }
 
@@ -31,6 +35,8 @@ class PullChangesResponseDto {
     'changes': changes.map((c) => c.toJson()).toList(),
     'has_more': hasMore,
     'latest_sequence': latestSequence,
+    if (oldestAvailableSequence != null)
+      'oldest_available_sequence': oldestAvailableSequence,
   };
 
   @override

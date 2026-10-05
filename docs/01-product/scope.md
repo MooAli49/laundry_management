@@ -241,41 +241,50 @@ The system calculates the area automatically.
 - Create service
 - Edit service
 - Activate/deactivate service
-- Configure pricing type
-- Configure price
-- Configure supported item types
+- Configure supported item types and their pricing (pricing type and price per Service + Item Type combination)
 - Manage item definitions
 - Manage common carpet sizes
 
 Services & Pricing is part of Settings in the V1 navigation structure.
 
-## Supported Pricing Types at Domain Level
+The Service entity does NOT own a single default/current price. Pricing configuration belongs to the **Service–Item Type** relationship (`ServiceItemType`).
 
-- Per Piece
-- Per Kilogram
-- Per Square Meter
-- Fixed Price
+## Supported Operational Pricing Types
 
-Only relevant pricing options should be exposed in the V1 UI.
+The supported V1 operational pricing types are:
+
+- Per Piece (`per_piece`)
+- Per Square Meter (`per_square_meter`)
+
+*(Note: `fixed_price` has been removed from the V1 operational model because each physical item is represented as an individual OrderItem and receives a unit price; it does not represent a distinct business behavior. Per Kilogram pricing remains completely excluded from V1).*
 
 ## Current Expected Usage
 
-| Item Type | Typical Pricing |
-|---|---|
-| Clothing | Per Piece |
-| Blankets | Per Piece |
-| Carpet Covers | Per Piece |
-| Carpets | Per Square Meter |
+In this laundry system, the actual price depends on the combination of Service + Item Type.
+
+Example:
+
+Washing
+  ├── Clothing → per_piece → 50 EGP
+  ├── Blanket  → per_piece → 100 EGP
+  └── Carpet   → per_square_meter → 60 EGP
+
+| Item Type | Supported Pricing Type | Example Rate |
+|---|---|---|
+| Clothing | Per Piece (`per_piece`) | 50 EGP |
+| Blankets | Per Piece (`per_piece`) | 100 EGP |
+| Carpet Covers | Per Piece (`per_piece`) | 70 EGP |
+| Carpets | Per Square Meter (`per_square_meter`) | 60 EGP / m² |
 
 ---
 
 # 10. Pricing History Scope
 
-Historical order prices must remain unchanged after service prices are modified.
+Historical order prices must remain unchanged after service pricing configurations are modified.
 
-V1 must preserve the price used when the OrderItem was created.
+V1 must preserve the actual price used when the OrderItem was created (snapshotted into `order_items.unit_price`).
 
-The system must not recalculate historical orders using current service prices.
+The system must not recalculate historical orders using current service pricing configurations.
 
 The user may adjust the applicable OrderItem price during Order creation according to the approved pricing behavior.
 
@@ -570,7 +579,7 @@ Delivery remains an Order-level operational and financial option in V1.
 
 The Invoice / Receipt must use the historical information of the Order.
 
-It must not recalculate historical Order information using current Service prices or other current master data.
+It must not recalculate historical Order information using current Service pricing configurations or other current master data.
 
 ## Not Included
 

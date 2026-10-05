@@ -998,7 +998,7 @@ Changes to configuration must not silently rewrite historical transactions.
 
 Examples include:
 
-- Service price changes
+- Service–Item Type pricing configuration changes
 - Service name changes
 - Item definition changes
 - Expense category changes
@@ -1235,15 +1235,23 @@ Avoid implementing RTL by manually reversing arbitrary left/right values.
 
 The architecture should allow localization and RTL behavior to be handled globally.
 
-## 67. Tablet-First Architecture
+## 67. Tablet-First & Landscape-Only Architecture
 
-The application is tablet-first.
+The application is a tablet-first, point-of-sale management system.
 
-Feature layouts should be designed to work well on tablet-sized screens.
+1. **Landscape-Only Operation**:
+   - The application operates strictly in landscape orientations (`DeviceOrientation.landscapeLeft` and `DeviceOrientation.landscapeRight`).
+   - Portrait orientation (`portraitUp`, `portraitDown`) is explicitly unsupported across the entire application.
+2. **Centralized Enforcement**:
+   - Device orientation is locked globally at application bootstrap (`lib/main.dart`) via `SystemChrome.setPreferredOrientations` and natively via `android:screenOrientation="sensorLandscape"`.
+   - Orientation logic must never be scattered across feature widgets or screens.
+3. **Responsive Landscape Boundaries**:
+   - Layouts must adapt gracefully across different landscape viewport widths and heights (e.g., varying tablet form factors, landscape terminals).
+   - Reusable widgets should avoid hardcoding narrow portrait assumptions.
+4. **Prohibition of Portrait Workarounds**:
+   - Do NOT introduce portrait-specific layouts, portrait conditional checks, or orientation toggling.
+   - Do NOT patch layout overflows that occur only in unsupported portrait mode with unnecessary wrappers (`SingleChildScrollView`, `Expanded`, `Flexible`, `OrientationBuilder`).
 
-Architecture should not assume a mobile-only layout.
-
-Reusable widgets should avoid hardcoding narrow screen assumptions.
 
 ## 68. Responsive Boundaries
 
@@ -1344,19 +1352,14 @@ Examples:
 
 Do not create redundant mapper classes when direct conversion is clearer and safe.
 
-## 75. Application Layer
+## 75. Application Layer Scope & Boundaries
 
-There is no mandatory separate Application layer in V1.
+The Application layer (`lib/application/`) exists exclusively for two approved purposes:
 
-Do not create:
+1. **Selective Domain Use Cases** (`lib/application/use_cases/`): Complex, multi-step business workflows (order creation, storage, relocation, status transitions, completion, cancellation) where cross-repository orchestration is required.
+2. **Cross-Cutting Orchestration Exception: License Control** (`lib/application/license/license_service.dart`): Orchestrating cross-cutting operational license enforcement across SQLite cache, remote API, connectivity, and router gating.
 
-application/
-services/
-use_cases/
-
-merely because they are common in other architectures.
-
-If future complexity requires such a layer, update the architecture documentation first.
+Do not introduce generic CRUD Use Cases, generic managers, or unnecessary services for simple entity operations. Simple entity operations interact directly with Repository contracts.
 
 ## 76. Testing Architecture
 

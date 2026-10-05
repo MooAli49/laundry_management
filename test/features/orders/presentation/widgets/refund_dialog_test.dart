@@ -205,9 +205,7 @@ void main() {
       expect(fakeUseCase.lastInput?.amount, Money.fromPiastres(2500));
     });
 
-    testWidgets('12. Reason is optional and trims whitespace', (
-      tester,
-    ) async {
+    testWidgets('12. Reason is optional and trims whitespace', (tester) async {
       configureViewport(tester);
       await tester.pumpWidget(
         testBoilerplate(

@@ -9,6 +9,8 @@ import 'package:laundry_management/core/network/interceptors/logging_interceptor
 import 'package:laundry_management/core/network/network_info.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('DioClient Tests', () {
     test('configures default 15-second timeouts', () {
       final client = DioClient();

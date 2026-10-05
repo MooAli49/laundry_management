@@ -272,9 +272,9 @@ This represents the total value of Orders included in the selected period.
 
 Historical Order values must be used.
 
-The report must not recalculate old Orders using current Service prices.
+The report must not recalculate old Orders using current Service + Item Type prices.
 
-Historical transaction values are explicitly required to remain independent from current Service pricing. :contentReference[oaicite:4]{index=4}
+Historical transaction values are explicitly required to remain independent from current Service + Item Type pricing.
 
 ---
 
@@ -413,7 +413,7 @@ Refunds are not subtracted from Total Sales.
 
 Historical Order totals must be used.
 
-The system must not reconstruct historical sales using current Service prices.
+The system must not reconstruct historical sales using current Service + Item Type prices.
 
 ---
 
@@ -1051,12 +1051,12 @@ Reports must always use historical transaction values.
 
 Example:
 
-    Service Price at Order Creation
+    Service + Item Type Price at Order Creation
         100 ج.م
 
 Later:
 
-    Current Service Price
+    Current Service + Item Type Price
         120 ج.م
 
 Historical Order:
@@ -1946,7 +1946,7 @@ Current master data must not be used to reconstruct historical transactions.
 
 Examples:
 
-    Current Service Price
+    Current Service + Item Type Price
         ≠
     Historical OrderItem Price
 

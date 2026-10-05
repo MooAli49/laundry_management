@@ -218,7 +218,11 @@ The bidirectional synchronization mechanism uses internal local infrastructure t
     sync_operations (local outgoing mutation queue)
     sync_state (local pull cursor: last_applied_sequence)
 
-Together, the local Drift database manages 19 tables at **schema version 6**.
+The system licensing mechanism uses an internal local infrastructure table:
+
+    license_cache (local singleton license state & 24h throttle cache)
+
+Together, the local Drift database manages 20 tables at **schema version 7**.
 
 Key entity attributes and rules:
 - `customers`: includes optional `address TEXT NULL` (nullable profile attribute; whitespace normalizes to NULL; no delivery routing in V1).
@@ -484,7 +488,7 @@ Changes to current master data must not rewrite historical transactions.
 
 Examples:
 
-    Service Price Changes
+    Service + Item Type Price Changes
         ↓
     Existing OrderItems
         ↓
@@ -939,13 +943,13 @@ Should enforce appropriate low-level data integrity constraints where practical.
 
 ## 32. Pricing and Historical Prices
 
-Current Service pricing belongs to master data.
+Current Service–Item Type pricing (`service_item_types.price`) belongs to master data.
 
 Historical OrderItem pricing belongs to the transaction.
 
 Therefore:
 
-    Current Service Price
+    Current Service + Item Type Price
 
 must never be used to reconstruct:
 
@@ -953,7 +957,7 @@ must never be used to reconstruct:
 
 An OrderItem must preserve its transaction-time pricing information.
 
-This allows reports and historical orders to remain correct after Service price changes.
+This allows reports and historical orders to remain correct after Service + Item Type price changes.
 
 ---
 
@@ -1004,17 +1008,21 @@ This is represented through:
 
     service_item_types
 
-The junction table represents service compatibility.
+The associative table represents service compatibility as well as operational pricing configuration (`pricing_type` and `price`). The Service entity does NOT own a single default/current price.
 
 ---
 
-## 35. Service Compatibility
+## 35. Service Compatibility and Pricing
 
 An OrderItem's selected Service must support its Item Type.
 
-The database stores the relationship.
+In this laundry system, the actual price depends on the combination of:
 
-The Domain/Application layer validates that the selected combination is valid.
+    Service + Item Type
+
+The database stores the relationship and pricing configuration in `service_item_types`.
+
+The Domain/Application layer validates that the selected combination is valid and snapshots the configured price into `order_items.unit_price`.
 
 The database should not allow the application to silently create invalid service/item combinations where the constraint can reasonably be enforced.
 
@@ -1258,7 +1266,7 @@ Examples:
     Historical Expense Amount
     Historical Expense Category Name
 
-Reports must not calculate historical sales using current Service prices.
+Reports must not calculate historical sales using current Service + Item Type prices.
 
 Payment reports must be based on the Payment transaction date when the report is specifically reporting payments.
 
@@ -2044,7 +2052,7 @@ Changing current configuration must not rewrite historical financial transaction
 
 Examples:
 
-    Service Price Changed
+    Service + Item Type Price Changed
         ↓
     Existing OrderItem Price Unchanged
 
@@ -2317,7 +2325,7 @@ and:
 
 when the approved Order editing workflow permits it.
 
-The current Service price is not automatically reapplied when opening an existing Order.
+Current Service + Item Type pricing is not automatically reapplied when opening an existing Order.
 
 This ensures that editing an Order is an explicit action rather than an unintended side effect.
 
@@ -2677,6 +2685,20 @@ The approved V1 database direction is:
     Simple V1 Schema
 
 The database must remain simple, reliable, relational, and aligned with the approved Domain Model.
+
+---
+
+## 90A. Local Infrastructure Cache — license_cache
+
+The SQLite database includes a local singleton cache table dedicated to system license enforcement:
+
+- **Table**: `license_cache`
+- **Role**: Infrastructure cache for offline license gating and 24-hour check throttling.
+- **Nature**: Singleton row (`id = 'singleton'`).
+- **Isolation**:
+  - Excluded from synchronization (`SyncEngine` and `sync_operations` outbox).
+  - No foreign keys or relationships to business entities.
+  - Schema migration version 7 in Drift.
 
 ---
 

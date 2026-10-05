@@ -159,7 +159,7 @@ void main() {
         serviceId: services.first.id,
         itemTypeNameSnapshot: itemTypes.first.name,
         serviceNameSnapshot: services.first.name,
-        pricingType: PricingType.fixedPrice,
+        pricingType: PricingType.perPiece,
         quantity: 1,
         unitPrice: const Money.fromPiastres(12000),
         calculatedTotal: const Money.fromPiastres(12000),
@@ -182,8 +182,9 @@ void main() {
       expect(find.text('المتبقي: 120.00 ج.م'), findsOneWidget);
 
       // Verify outstanding amount uses AppColors.warning (amber) and NOT AppColors.error (red)
-      final remainingText =
-          tester.widget<Text>(find.text('المتبقي: 120.00 ج.م'));
+      final remainingText = tester.widget<Text>(
+        find.text('المتبقي: 120.00 ج.م'),
+      );
       expect(remainingText.style?.color, AppColors.warning);
 
       final outstandingKpiText = tester.widget<Text>(find.text('120.00 ج.م'));
@@ -303,7 +304,7 @@ void main() {
             serviceId: services.first.id,
             itemTypeNameSnapshot: itemTypes.first.name,
             serviceNameSnapshot: services.first.name,
-            pricingType: PricingType.fixedPrice,
+            pricingType: PricingType.perPiece,
             quantity: 1,
             unitPrice: const Money.fromPiastres(1000),
             calculatedTotal: const Money.fromPiastres(1000),

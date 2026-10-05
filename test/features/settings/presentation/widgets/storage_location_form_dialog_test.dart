@@ -27,8 +27,7 @@ class MockStorageLocationRepo implements StorageLocationRepository {
   Future<StorageLocation> updateStorageLocation(
     StorageLocation location, {
     List<String>? supportedItemTypeIds,
-  }) async =>
-      location;
+  }) async => location;
 
   @override
   Future<List<StorageLocation>> getAllLocations() async => locations;
@@ -40,12 +39,14 @@ class MockStorageLocationRepo implements StorageLocationRepository {
   Future<StorageLocation?> getStorageLocationById(String id) async => null;
 
   @override
-  Future<List<StorageLocation>> getCompatibleLocationsForItemType(String itemTypeId) async =>
-      locations;
+  Future<List<StorageLocation>> getCompatibleLocationsForItemType(
+    String itemTypeId,
+  ) async => locations;
 
   @override
-  Future<List<String>> getSupportedItemTypeIds(String storageLocationId) async =>
-      supportedTypes[storageLocationId] ?? [];
+  Future<List<String>> getSupportedItemTypeIds(
+    String storageLocationId,
+  ) async => supportedTypes[storageLocationId] ?? [];
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -72,7 +73,8 @@ class MockItemTypeRepo implements ItemTypeRepository {
   @override
   Future<List<ItemType>> getActiveItemTypes() async => types;
   @override
-  Future<List<ItemType>> getAllItemTypes({bool activeOnly = false}) async => types;
+  Future<List<ItemType>> getAllItemTypes({bool activeOnly = false}) async =>
+      types;
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -113,7 +115,9 @@ void main() {
   }
 
   group('UAT-C — StorageLocationFormDialog Widget Tests', () {
-    testWidgets('renders compactly and fits content without occupying 680px', (tester) async {
+    testWidgets('renders compactly and fits content without occupying 680px', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildDialog());
       await tester.pumpAndSettle();
 
@@ -126,7 +130,9 @@ void main() {
       expect(contentSize.width, lessThanOrEqualTo(480));
     });
 
-    testWidgets('checkboxes/chips and fields remain fully accessible', (tester) async {
+    testWidgets('checkboxes/chips and fields remain fully accessible', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildDialog());
       await tester.pumpAndSettle();
 
@@ -148,7 +154,9 @@ void main() {
       expect(find.text(AppStrings.storageLocationNameRequired), findsOneWidget);
     });
 
-    testWidgets('rejects when no supported item types selected', (tester) async {
+    testWidgets('rejects when no supported item types selected', (
+      tester,
+    ) async {
       await tester.pumpWidget(buildDialog());
       await tester.pumpAndSettle();
 
@@ -178,7 +186,9 @@ void main() {
 
       expect(locationRepo.locations.length, 1);
       expect(locationRepo.locations.first.name, 'موقع تجريبي');
-      expect(locationRepo.supportedTypes[locationRepo.locations.first.id], ['t-1']);
+      expect(locationRepo.supportedTypes[locationRepo.locations.first.id], [
+        't-1',
+      ]);
     });
   });
 }

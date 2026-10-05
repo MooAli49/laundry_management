@@ -66,6 +66,8 @@ Offline-first
 
 The system officially supports **Bidirectional Push + Pull Synchronization** across two terminal devices sharing a single remote Supabase backend.
 
+*Deployment Policy Note: In the initial deployment, one physical device is dedicated to order intake / cashier reception. A second terminal may operate for read-only tracking, storage assignment, fulfillment, and payments. Multi-terminal concurrent order intake is architecturally prepared via station-partitioned numbering, which is intentionally deferred to avoid premature onboarding complexity.*
+
 The local SQLite/Drift database remains the operational source of truth for each device.
 
 ### PUSH Flow:
@@ -1245,7 +1247,7 @@ Synchronization must never modify historical transaction snapshots merely becaus
 
 Example:
 
-Service current price:
+ServiceItemType current price:
 
 60 EGP
 
@@ -1253,7 +1255,7 @@ Historical OrderItem:
 
 50 EGP
 
-Syncing the Service update must not change:
+Syncing the Service / ServiceItemType pricing update must not change:
 
 OrderItem.unit\_price
 
@@ -1625,7 +1627,7 @@ Master data updates can affect future operations but must not rewrite history.
 
 Examples:
 
-Service price changes.
+Service–Item Type pricing configuration changes.
 
 Expense Category rename.
 
@@ -2156,8 +2158,8 @@ If a device cursor falls behind the retained change history in `sync_changes`:
 3. **CRITICAL INVARIANT**: A full resync or bootstrap must **NEVER delete or overwrite locally pending unsynced business data** stored in `sync_operations`.
 4. Locally pending operations remain preserved in `sync_operations` and are drained through normal push after the baseline is refreshed.
 
-> **Known Deferred Limitation (Automatic Resync / Bootstrap)**:
-> Full automatic device bootstrap and automated `CURSOR_TOO_OLD` resync recovery are **deferred** in V1. The detection and safety contracts exist, but automatic reconciliation is not implemented in this phase.
+> **Automated Recovery Contract (SUSP-01 Implementation)**:
+> Automatic recovery from `CURSOR_TOO_OLD` (HTTP 410) is fully implemented. When `CursorTooOldException` occurs, `SyncEngine` initiates an authoritative full snapshot fetch (`GET /sync/snapshot` backed by PostgreSQL RPC `get_sync_snapshot()`). `RemoteChangeApplier.applySnapshot()` applies all 13 tiers in strict foreign-key dependency order within a single local SQLite transaction, preserves locally pending mutations in `sync_operations`, advances `sync_state.last_applied_sequence` to `snapshot.latestSequence`, and immediately drains pending outbox operations. Full resync can also be triggered administratively via `SyncEngine.fullResync()`.
 
 ---
 
@@ -2574,7 +2576,7 @@ Synchronization must never rewrite historical business truth because current mas
 
 Examples:
 
-Service price changes
+Service–Item Type pricing changes
 
 ≠
 
@@ -2597,6 +2599,20 @@ Storage Location rename/deactivation
 ≠
 
 Historical StorageRecord deletion
+
+\---
+
+**# 107A. Non-Synchronized Infrastructure Tables**
+
+The following tables reside exclusively in local SQLite and are strictly excluded from bidirectional synchronization:
+
+1. `sync_operations`: Local outbox persistent queue.
+2. `sync_state`: Local cursor tracking the highest applied pull sequence number.
+3. `license_cache`: Local singleton cache storing remote license status, authoritative suspension timestamp, and last check timestamp for the 24-hour throttle.
+   - It does NOT generate `SyncOperation` outbox records.
+   - It is NOT tracked or transmitted by `SyncEngine.push()`.
+   - It is NOT updated by `SyncEngine.pull()`.
+   - It communicates directly and read-only with the Supabase Edge Function `/api/v1/license` via `LicenseRemoteDataSource` and is persisted locally by `LicenseCacheDao`.
 
 \---
 

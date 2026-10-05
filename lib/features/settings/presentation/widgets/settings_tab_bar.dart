@@ -17,7 +17,7 @@ class SettingsTabBar extends StatelessWidget {
 
   static const List<String> tabs = [
     AppStrings.tabBusinessInfo,
-    AppStrings.tabInvoice,
+    AppStrings.tabBluetoothPrinter,
     AppStrings.tabServices,
     AppStrings.tabItemTypes,
     AppStrings.tabItemDefinitions,

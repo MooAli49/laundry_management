@@ -159,7 +159,26 @@ void main() {
       ),
     );
 
-    final itemTypes = await db.select(db.itemTypes).get();
+    var itemTypes = await db.select(db.itemTypes).get();
+    if (itemTypes.length < 2) {
+      await db.into(db.itemTypes).insertOnConflictUpdate(
+        db_pkg.ItemTypesCompanion.insert(
+          id: '00000000-0000-0000-0001-000000000001',
+          name: 'ملابس',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      await db.into(db.itemTypes).insertOnConflictUpdate(
+        db_pkg.ItemTypesCompanion.insert(
+          id: '00000000-0000-0000-0001-000000000003',
+          name: 'سجاد',
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+      itemTypes = await db.select(db.itemTypes).get();
+    }
 
     await storageLocationRepository.createStorageLocation(
       StorageLocation(
@@ -176,8 +195,6 @@ void main() {
       db_pkg.ServicesCompanion.insert(
         id: 'srv-$orderId',
         name: 'غسيل وكي $orderId',
-        pricingType: 'perPiece',
-        price: totalPiastres ~/ 2,
         createdAt: now,
         updatedAt: now,
       ),

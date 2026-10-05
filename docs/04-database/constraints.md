@@ -519,7 +519,7 @@ Changes to current configuration must not silently rewrite historical Order fina
 
 Examples:
 
-    Service Price Changes
+    Service + Item Type Price Changes
         ↓
     Existing OrderItems
         ↓
@@ -689,12 +689,9 @@ Examples:
     1
 
     Per Square Meter:
-    6.25
+    6.25 (calculated area)
 
-    Fixed Price:
-    1
-
-    (Note: Per Kilogram pricing is not supported in V1 operations)
+    (Note: fixed_price has been removed as it is identical to per_piece; per_kg remains excluded from V1)
 
 The exact numeric precision is determined by the approved implementation.
 
@@ -775,9 +772,9 @@ The following are required:
 Allowed V1 pricing types:
 
     per_piece
-    per_kg
     per_square_meter
-    fixed_price
+
+*(Note: fixed_price is removed from V1 operational model, per_kg remains excluded)*
 
 No unsupported pricing type may be persisted.
 
@@ -805,13 +802,13 @@ Persisted monetary values use integer minor units.
 
 When an OrderItem is created:
 
-    Current Service Price
+    Configured Service + Item Type Price (service_item_types.price)
         ↓
     OrderItem.unit_price
 
 After the OrderItem is created:
 
-    services.price
+    service_item_types.price
 
 may change independently.
 
@@ -821,7 +818,7 @@ The historical:
 
 must remain unchanged unless an explicit approved Order Edit operation changes the transaction.
 
-The database must not reconstruct historical prices from current Service prices.
+The database must not reconstruct historical prices from current Service pricing configurations.
 
 ---
 
@@ -1164,8 +1161,6 @@ Every Service must have:
     id
     name
     description
-    pricing_type
-    price
     is_active
     created_at
     updated_at
@@ -1175,36 +1170,28 @@ Every Service must have:
     Required
     Unique
 
-### Pricing Type
+### Description
 
-    Required
-
-Allowed V1 values:
-
-    per_piece
-    per_kg
-    per_square_meter
-    fixed_price
-
-### Price
-
-    Required
-    >= 0
-
-The current Service price uses integer minor currency units.
+    Optional (nullable)
 
 ### Active State
 
     Required
     Default = true
 
+### Pricing Configuration Policy
+
+The Service entity must NOT own a single default/current price or pricing type.
+
+Pricing configuration belongs to the Service–Item Type relationship in `service_item_types`.
+
 ---
 
-## 44. Service Price History Constraint
+## 44. Service Pricing History Constraint
 
-The current:
+The configured:
 
-    services.price
+    service_item_types.price
 
 is master data.
 
@@ -1216,7 +1203,7 @@ is transaction data.
 
 Changing:
 
-    services.price
+    service_item_types.price
 
 must not modify:
 
@@ -1226,17 +1213,27 @@ This is required for historical financial correctness.
 
 ---
 
-## 45. Service / Item Type Compatibility Constraints
+## 45. Service / Item Type Associative & Pricing Constraints
 
-The junction table:
+The associative table:
 
     service_item_types
 
-represents the many-to-many relationship between:
+represents the many-to-many relationship and operational pricing configuration between:
 
     Service
     +
     Item Type
+
+Required Fields:
+
+    id (Primary Key, UUID)
+    service_id (Foreign Key to services.id)
+    item_type_id (Foreign Key to item_types.id)
+    pricing_type (TEXT, Required)
+    price (INTEGER, Required)
+    created_at (DATETIME, Required)
+    updated_at (DATETIME, Required)
 
 Required Foreign Keys:
 
@@ -1248,15 +1245,25 @@ Required Foreign Keys:
         →
     item_types.id
 
+Uniqueness:
+
 The combination:
 
     service_id
         +
     item_type_id
 
-must be unique.
+must be unique. The same Service must not be linked to the same Item Type more than once.
 
-The same Service must not be linked to the same Item Type more than once.
+Pricing Type Constraint:
+
+    CHECK (pricing_type IN ('per_piece', 'per_square_meter'))
+
+Price Constraint:
+
+    CHECK (price > 0)
+
+Persisted in integer minor currency units. Zero and negative prices are prohibited.
 
 ---
 
@@ -1950,7 +1957,7 @@ Historical transaction data must remain understandable after master-data changes
 
 Examples include:
 
-    Service Price
+    Service + Item Type Price
         ↓
     Historical OrderItem.unit_price
 
@@ -2132,11 +2139,14 @@ The following values may be zero but must never be negative:
     orders.total
     orders.customer_pickup_fee
     orders.customer_delivery_fee
-    services.price
-    order_items.unit_price
-    order_items.calculated_total
     business_settings.tax_rate
     sync_operations.retry_count
+
+The following pricing values must be strictly positive (`> 0`):
+
+    service_item_types.price
+    order_items.unit_price
+    order_items.calculated_total
 
 ---
 
@@ -2635,7 +2645,7 @@ must be calculated from authoritative data.
 
 Invoice output must use historical transaction values.
 
-The Invoice must not retrieve current Service prices and use them for historical Orders.
+The Invoice must not retrieve current Service + Item Type prices and use them for historical Orders.
 
 It must use:
 
@@ -3385,8 +3395,8 @@ The database must preserve the following principles:
 34. Carpet dimensions are preserved historically.
 35. An OrderItemCarpet uses order_item_id as both its Primary Key and Foreign Key to OrderItem.
 36. An OrderItem can have at most one OrderItemCarpet.
-37. Service prices are master data.
-38. OrderItem prices are historical transaction data.
+37. Service + Item Type prices are master data (`service_item_types.price`).
+38. OrderItem prices are historical transaction data (`order_items.unit_price`).
 39. Historical snapshots remain stable after master-data changes.
 40. Master data is deactivated instead of destructively deleted when historical references exist.
 41. Orders are cancelled rather than deleted.

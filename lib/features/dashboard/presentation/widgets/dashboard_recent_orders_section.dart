@@ -128,12 +128,16 @@ class DashboardRecentOrdersSection extends StatelessWidget {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                displayNumber,
-                                textDirection: TextDirection.ltr,
-                                style: AppTextStyles.labelLarge.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
+                              Flexible(
+                                child: Text(
+                                  displayNumber,
+                                  textDirection: TextDirection.ltr,
+                                  style: AppTextStyles.labelLarge.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               AppSpacing.gapHorizontalSm,
@@ -156,6 +160,8 @@ class DashboardRecentOrdersSection extends StatelessWidget {
                             style: AppTextStyles.bodySmall.copyWith(
                               color: AppColors.textTertiary,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
@@ -175,7 +181,15 @@ class DashboardRecentOrdersSection extends StatelessWidget {
                           ),
                         ),
                         AppSpacing.gapXs,
-                        if (hasRemaining)
+                        if (item.isCancelled)
+                          Text(
+                            item.cancelledFinancialLabel,
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          )
+                        else if (hasRemaining)
                           Text(
                             'متبقي: ${item.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
                             style: AppTextStyles.bodySmall.copyWith(

@@ -283,7 +283,7 @@ void main() {
           serviceId: service.id,
           itemTypeNameSnapshot: itemType.name,
           serviceNameSnapshot: service.name,
-          pricingType: PricingType.fixedPrice,
+          pricingType: PricingType.perPiece,
           quantity: 1,
           unitPrice: const Money.fromPiastres(10000),
           calculatedTotal: const Money.fromPiastres(10000),
@@ -362,7 +362,7 @@ void main() {
           serviceId: services.first.id,
           itemTypeNameSnapshot: itemTypes.first.name,
           serviceNameSnapshot: services.first.name,
-          pricingType: PricingType.fixedPrice,
+          pricingType: PricingType.perPiece,
           quantity: 1,
           unitPrice: const Money.fromPiastres(5000),
           calculatedTotal: const Money.fromPiastres(5000),
@@ -396,7 +396,7 @@ void main() {
         serviceId: services.first.id,
         itemTypeNameSnapshot: itemTypes.first.name,
         serviceNameSnapshot: services.first.name,
-        pricingType: PricingType.fixedPrice,
+        pricingType: PricingType.perPiece,
         quantity: 1,
         unitPrice: const Money.fromPiastres(5000),
         calculatedTotal: const Money.fromPiastres(5000),
@@ -419,23 +419,28 @@ void main() {
     });
 
     group('Customer Address', () {
-      test('1. Create customer with address persists and normalizes address', () async {
-        final now = DateTime.now();
-        final customer = Customer(
-          id: 'cust-addr-1',
-          name: 'عميل العنوان',
-          phone: '01099887766',
-          address: '  شارع التحرير، الدقي  ',
-          createdAt: now,
-          updatedAt: now,
-        );
+      test(
+        '1. Create customer with address persists and normalizes address',
+        () async {
+          final now = DateTime.now();
+          final customer = Customer(
+            id: 'cust-addr-1',
+            name: 'عميل العنوان',
+            phone: '01099887766',
+            address: '  شارع التحرير، الدقي  ',
+            createdAt: now,
+            updatedAt: now,
+          );
 
-        final created = await customerRepository.createCustomer(customer);
-        expect(created.address, equals('شارع التحرير، الدقي'));
+          final created = await customerRepository.createCustomer(customer);
+          expect(created.address, equals('شارع التحرير، الدقي'));
 
-        final fetched = await customerRepository.getCustomerById('cust-addr-1');
-        expect(fetched?.address, equals('شارع التحرير، الدقي'));
-      });
+          final fetched = await customerRepository.getCustomerById(
+            'cust-addr-1',
+          );
+          expect(fetched?.address, equals('شارع التحرير، الدقي'));
+        },
+      );
 
       test('2. Create customer without address persists null', () async {
         final now = DateTime.now();
@@ -497,24 +502,27 @@ void main() {
         expect(fetched?.address, isNull);
       });
 
-      test('6. Whitespace-only address becomes NULL on create and update', () async {
-        final now = DateTime.now();
-        final customer = Customer(
-          id: 'cust-addr-6',
-          name: 'عميل مسافات',
-          phone: '01099887770',
-          address: '     ',
-          createdAt: now,
-          updatedAt: now,
-        );
-        final created = await customerRepository.createCustomer(customer);
-        expect(created.address, isNull);
+      test(
+        '6. Whitespace-only address becomes NULL on create and update',
+        () async {
+          final now = DateTime.now();
+          final customer = Customer(
+            id: 'cust-addr-6',
+            name: 'عميل مسافات',
+            phone: '01099887770',
+            address: '     ',
+            createdAt: now,
+            updatedAt: now,
+          );
+          final created = await customerRepository.createCustomer(customer);
+          expect(created.address, isNull);
 
-        final updated = await customerRepository.updateCustomer(
-          created.copyWith(address: '\t \n '),
-        );
-        expect(updated.address, isNull);
-      });
+          final updated = await customerRepository.updateCustomer(
+            created.copyWith(address: '\t \n '),
+          );
+          expect(updated.address, isNull);
+        },
+      );
 
       test('7. Address persists after local database reload', () async {
         final now = DateTime.now();
@@ -540,44 +548,55 @@ void main() {
         expect(fetched?.address, equals('15 شارع طلعت حرب'));
       });
 
-      test('8 & 9. Address appears in create and update outbox payloads', () async {
-        final now = DateTime.now();
-        final customer = Customer(
-          id: 'cust-addr-8',
-          name: 'عميل المزامنة',
-          phone: '01099887772',
-          address: 'شارع العروبة',
-          createdAt: now,
-          updatedAt: now,
-        );
-        await customerRepository.createCustomer(customer);
+      test(
+        '8 & 9. Address appears in create and update outbox payloads',
+        () async {
+          final now = DateTime.now();
+          final customer = Customer(
+            id: 'cust-addr-8',
+            name: 'عميل المزامنة',
+            phone: '01099887772',
+            address: 'شارع العروبة',
+            createdAt: now,
+            updatedAt: now,
+          );
+          await customerRepository.createCustomer(customer);
 
-        final ops = await syncOperationsDao.getPendingOperations();
-        final createOp = ops.firstWhere((o) => o.entityId == 'cust-addr-8' && o.operationType == 'create');
-        expect(createOp.payload, contains('"address":"شارع العروبة"'));
+          final ops = await syncOperationsDao.getPendingOperations();
+          final createOp = ops.firstWhere(
+            (o) => o.entityId == 'cust-addr-8' && o.operationType == 'create',
+          );
+          expect(createOp.payload, contains('"address":"شارع العروبة"'));
 
-        await customerRepository.updateCustomer(
-          customer.copyWith(address: 'شارع مصدق'),
-        );
-        final updatedOps = await syncOperationsDao.getPendingOperations();
-        final updateOp = updatedOps.firstWhere((o) => o.entityId == 'cust-addr-8' && o.operationType == 'update');
-        expect(updateOp.payload, contains('"address":"شارع مصدق"'));
-      });
+          await customerRepository.updateCustomer(
+            customer.copyWith(address: 'شارع مصدق'),
+          );
+          final updatedOps = await syncOperationsDao.getPendingOperations();
+          final updateOp = updatedOps.firstWhere(
+            (o) => o.entityId == 'cust-addr-8' && o.operationType == 'update',
+          );
+          expect(updateOp.payload, contains('"address":"شارع مصدق"'));
+        },
+      );
 
       test('12. Existing customer with NULL address remains valid', () async {
         final now = DateTime.now();
         // Insert directly into Drift DB with NULL address (simulating row created before schema v6)
-        await db.into(db.customers).insert(
-          app_db.CustomersCompanion.insert(
-            id: 'legacy-cust-1',
-            name: 'عميل قديم',
-            phone: '01011119999',
-            createdAt: now,
-            updatedAt: now,
-          ),
-        );
+        await db
+            .into(db.customers)
+            .insert(
+              app_db.CustomersCompanion.insert(
+                id: 'legacy-cust-1',
+                name: 'عميل قديم',
+                phone: '01011119999',
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
 
-        final existing = await customerRepository.getCustomerById('legacy-cust-1');
+        final existing = await customerRepository.getCustomerById(
+          'legacy-cust-1',
+        );
         expect(existing, isNotNull);
         expect(existing?.address, isNull);
 

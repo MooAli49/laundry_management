@@ -9,7 +9,7 @@ The Laundry Management System V1 has successfully completed all development task
 
 ## 2. Technology Stack
 
-- **Framework**: Flutter (Targeting Android, Windows Desktop, Desktop/Tablet responsive viewports)
+- **Framework**: Flutter (Targeting Android tablets and large screens, strictly Landscape-only: `landscapeLeft` & `landscapeRight`)
 - **Language**: Dart (Sound null safety)
 - **State Management**: Bloc / Cubit
 - **Dependency Injection**: GetIt (Service locator pattern with clean lazy singletons and factories)
@@ -29,22 +29,24 @@ The Laundry Management System V1 has successfully completed all development task
   - `domain/`: Pure business entities, value objects, repository contracts, and UseCases. Zero Flutter or Drift dependencies.
   - `data/`: Local Drift database, DAOs, Retrofit remote APIs, and repository implementations bridging domain and storage.
   - `presentation/`: Screens, Cubits, States, Dialogs, and widgets styled according to the Design System.
+- **Tablet-First & Landscape-Only POS Form Factor**: Centrally locked to landscape orientations at application startup (`lib/main.dart` and `AndroidManifest.xml`). Portrait orientation is officially unsupported and out of scope.
 - **Repository Pattern**: Repositories orchestrate atomic local persistence and sync operation enqueueing inside single database transactions.
 - **Local-First Operation**: The local SQLite database is the immediate operational source of truth. All user workflows remain fully functional without network connectivity.
 - **Synchronization Boundary**: Decoupled background synchronization engine operating independently of UI threads and presentation widgets.
+
 
 ---
 
 ## 4. Database Architecture
 
 - **Local Database (Drift / SQLite)**:
-  - Schema version 6 containing 19 tables (17 business tables + 2 sync tables: `sync_operations`, `sync_states`).
+  - Schema version 7 containing 20 tables (17 business tables + 2 sync tables: `sync_operations`, `sync_states` + 1 license infrastructure table: `license_cache`).
   - Strict foreign key enforcement (`PRAGMA foreign_keys = ON;`), custom indexes, partial unique index on active storage records.
   - Customer profile support with optional address (`customers.address TEXT NULL`), normalized to null on whitespace.
   - Dedicated `refunds` table: append-only financial records linked to orders, omitting `server_version`.
   - Baseline singleton (`business_settings`) and default categories seeded on schema creation.
 - **Remote Database (Supabase PostgreSQL)**:
-  - 13 applied migrations from `supabase/migrations/` (through `20260925000000_customer_address.sql`).
+  - 15 migrations in `supabase/migrations/` (through `20260926000000_security_hardening.sql` and `20260930000000_license_info.sql`).
   - Relational tables protected by Row Level Security (`rowsecurity: true`). Direct PostgREST mutations disabled; all mutations route through `SECURITY DEFINER` RPCs.
   - Monotonically increasing `sequence BIGSERIAL` in `sync_changes` change log.
   - Dedicated `sync_idempotency_log` table storing client operation hashes.
@@ -103,7 +105,7 @@ The Laundry Management System V1 has successfully completed all development task
 
 The following items are intentionally deferred from V1 and are documented as out of scope:
 1. **Client-side `server_version` / `base_version` propagation**: Backend RPCs support integer OCC, but client does not track or propagate base version.
-2. **Automatic `CURSOR_TOO_OLD` bootstrap recovery**: HTTP 410 triggers error state; automatic snapshot resync is deferred.
+2. **Automatic `CURSOR_TOO_OLD` bootstrap recovery**: Fully implemented in V1 via `GET /sync/snapshot` and `RemoteChangeApplier.applySnapshot()` (SUSP-01). Reconstructs 13 tiers and preserves outbox.
 3. **Automatic sync operation retention purge**: Synced operations retained for audit; automated background cleanup is deferred.
 4. **OS-level platform background sync**: No platform WorkManager / BGTaskScheduler; sync relies on foreground lifecycle triggers (`onResume`, network recovery, timer).
 5. **Raw WebSocket data streaming**: WebSockets used purely for lightweight wake-up signals; data travels via HTTP pull.

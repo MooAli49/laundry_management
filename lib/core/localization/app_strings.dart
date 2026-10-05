@@ -211,14 +211,14 @@ class AppStrings {
   static const String pricingTypeLabel = 'نوع التسعير *';
   static const String pricingPerPiece = 'بالقطعة';
   static const String pricingPerSquareMeter = 'بالمتر المربع';
-  static const String pricingFixedPrice = 'سعر ثابت';
   static const String servicePriceLabel = 'السعر *';
   static const String priceLabelPerPiece = 'سعر القطعة';
   static const String priceLabelPerSquareMeter = 'سعر المتر المربع';
-  static const String priceLabelFixedPrice = 'السعر الثابت';
-  static const String supportedItemTypesLabel = 'أنواع القطع المدعومة *';
+  static const String supportedItemTypesLabel = 'أنواع القطع المدعومة والتسعير *';
+  static const String itemTypePricingMatrixPrompt =
+      'حدد أنواع القطع المدعومة وضع تسعيراً خاصاً لكل نوع:';
   static const String selectAtLeastOneItemType =
-      'يجب اختيار نوع قطعة واحد على الأقل';
+      'يجب اختيار نوع قطعة واحد على الأقل مع تحديد السعر';
   static const String serviceNameRequired = 'اسم الخدمة مطلوب';
   static const String servicePriceRequired = 'السعر مطلوب';
   static const String servicePriceMustBePositive =
@@ -290,6 +290,21 @@ class AppStrings {
       'سيتم تعطيل تصنيف المصروفات ولن يظهر في تسجيل المصروفات الجديدة.';
   static const String noExpenseCategories = 'لا توجد تصنيفات مصروفات مضافة';
 
+  // Expenses Screen
+  static const String expenses = 'المصروفات';
+  static const String expensesSubtitle = 'إدارة وسجل مصروفات المغسلة التشغيلية';
+  static const String addExpense = 'إضافة مصروف';
+  static const String noExpenses = 'لا توجد مصروفات';
+  static const String noExpensesPrompt = 'لم يتم تسجيل أي مصروفات للفترة المحددة.';
+  static const String totalExpensesAmount = 'إجمالي المصروفات';
+  static const String expensesCount = 'عدد المصروفات';
+  static const String topCategory = 'أعلى تصنيف';
+  static const String allCategories = 'جميع التصنيفات';
+  static const String searchExpensesPlaceholder =
+      'بحث باسم المصروف أو الملاحظات...';
+  static const String failedToLoadExpenses = 'تعذر تحميل المصروفات';
+  static const String viewAllExpenses = 'عرض كل المصروفات';
+
   // Settings — Shared Table & Status
   static const String statusActive = 'مُفعّلة';
   static const String statusInactive = 'معطّلة';
@@ -306,4 +321,37 @@ class AppStrings {
   static const String tableHeaderDimensions = 'المقاس';
   static const String tableHeaderArea = 'المساحة';
   static const String tableHeaderItemType = 'نوع القطعة';
+
+  // Bluetooth Thermal Printer
+  static const String tabBluetoothPrinter = 'الطابعة';
+  static const String btPrinterTitle = 'الطابعة الحرارية';
+  static const String btPrinterSubtitle =
+      'إعداد طابعة البلوتوث الحرارية لطباعة الفواتير مباشرةً';
+  static const String btPrinterConnected = 'الطابعة متصلة';
+  static const String btPrinterScanning = 'جاري البحث عن الطابعات...';
+  static const String btPrinterNotFound = 'لم يتم العثور على طابعة';
+  static const String btPrinterPermissionRequired = 'صلاحية البلوتوث مطلوبة';
+  static const String btPrinterBluetoothOff = 'البلوتوث مغلق';
+  static const String btPrinterConnecting = 'جاري الاتصال بالطابعة...';
+  static const String btPrinterConnectionSuccess = 'تم الاتصال بالطابعة';
+  static const String btPrinterConnectionFailed = 'فشل الاتصال بالطابعة';
+  static const String btPrinterPrintFailed = 'فشلت عملية الطباعة';
+  static const String btPrinterDisconnected = 'تم قطع الاتصال بالطابعة';
+  static const String btPrinterPrinting = 'جاري الطباعة...';
+
+  // Invoice print selection
+  static const String printMethodTitle = 'اختر طريقة الطباعة';
+  static const String printViaBluetooth = 'طباعة عبر الطابعة الحرارية';
+  static const String printViaPdf = 'طباعة PDF / النظام';
+  static const String btPrinterNotConfigured =
+      'لم يتم إعداد طابعة بعد.\nيمكنك إعداد الطابعة من الإعدادات ← الطابعة.';
+
+  // License Control
+  static const String licenseSuspendedTitle = 'تم تعليق ترخيص النظام';
+  static const String licenseSuspendedDescription =
+      'يرجى التواصل مع مزود النظام لإعادة تفعيل التطبيق.';
+  static const String licenseWarningImmediate =
+      'تنبيه: الترخيص معلق. يرجى التواصل مع مزود النظام فوراً.';
+  static String licenseWarningGrace(int days) =>
+      'تنبيه: الترخيص معلق. متبقٍ $days ${days == 1 ? "يوم" : "أيام"} قبل إيقاف التطبيق. يرجى التواصل مع مزود النظام.';
 }

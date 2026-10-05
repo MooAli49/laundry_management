@@ -25,7 +25,7 @@ void main() {
   late ExpenseCategoryRepositoryImpl expenseCategoryRepository;
 
   setUp(() async {
-    db = db_pkg.AppDatabase(NativeDatabase.memory());
+    db = db_pkg.AppDatabase(NativeDatabase.memory(), true);
     expensesDao = ExpensesDao(db);
     expenseCategoriesDao = ExpenseCategoriesDao(db);
     syncOperationsDao = SyncOperationsDao(db);
@@ -240,159 +240,180 @@ void main() {
       },
     );
 
-    test('createExpense and updateExpense enqueue valid non-null payloads', () async {
-      final now = DateTime.utc(2026, 9, 16, 12, 0, 0);
-      final cats = await expenseCategoryRepository.getAllCategories();
-      final cat = cats.firstWhere((c) => c.name == 'كهرباء');
+    test(
+      'createExpense and updateExpense enqueue valid non-null payloads',
+      () async {
+        final now = DateTime.utc(2026, 9, 16, 12, 0, 0);
+        final cats = await expenseCategoryRepository.getAllCategories();
+        final cat = cats.firstWhere((c) => c.name == 'كهرباء');
 
-      final expense = Expense(
-        id: 'exp-sync-1',
-        expenseCategoryId: cat.id,
-        amount: const Money.fromPiastres(4500),
-        expenseName: 'فاتورة أغسطس',
-        expenseDate: OrderDate(2026, 9, 15),
-        notes: 'دفع فوري',
-        categoryNameSnapshot: cat.name,
-        createdAt: now,
-        updatedAt: now,
-      );
+        final expense = Expense(
+          id: 'exp-sync-1',
+          expenseCategoryId: cat.id,
+          amount: const Money.fromPiastres(4500),
+          expenseName: 'فاتورة أغسطس',
+          expenseDate: OrderDate(2026, 9, 15),
+          notes: 'دفع فوري',
+          categoryNameSnapshot: cat.name,
+          createdAt: now,
+          updatedAt: now,
+        );
 
-      // 1. Create
-      await expenseRepository.createExpense(expense);
-      final opsAfterCreate = await syncOperationsDao.getPendingOperations();
-      final createOp = opsAfterCreate.firstWhere(
-        (op) => op.entityId == 'exp-sync-1' && op.operationType == 'create',
-      );
-      expect(createOp.payload, isNotNull);
-      final createMap = jsonDecode(createOp.payload!) as Map<String, dynamic>;
-      expect(createMap['id'], 'exp-sync-1');
-      expect(createMap['amount'], 4500);
-      expect(createMap['expense_date'], '2026-09-15');
-      expect(createMap['expense_name'], 'فاتورة أغسطس');
-      expect(createMap['notes'], 'دفع فوري');
-      expect(createMap['category_name_snapshot'], 'كهرباء');
+        // 1. Create
+        await expenseRepository.createExpense(expense);
+        final opsAfterCreate = await syncOperationsDao.getPendingOperations();
+        final createOp = opsAfterCreate.firstWhere(
+          (op) => op.entityId == 'exp-sync-1' && op.operationType == 'create',
+        );
+        expect(createOp.payload, isNotNull);
+        final createMap = jsonDecode(createOp.payload!) as Map<String, dynamic>;
+        expect(createMap['id'], 'exp-sync-1');
+        expect(createMap['amount'], 4500);
+        expect(createMap['expense_date'], '2026-09-15');
+        expect(createMap['expense_name'], 'فاتورة أغسطس');
+        expect(createMap['notes'], 'دفع فوري');
+        expect(createMap['category_name_snapshot'], 'كهرباء');
 
-      // 2. Update
-      final updatedExpense = expense.copyWith(
-        amount: const Money.fromPiastres(5000),
-        notes: 'تعديل بعد التدقيق',
-      );
-      await expenseRepository.updateExpense(updatedExpense);
-      final opsAfterUpdate = await syncOperationsDao.getPendingOperations();
-      final updateOp = opsAfterUpdate.firstWhere(
-        (op) => op.entityId == 'exp-sync-1' && op.operationType == 'update',
-      );
-      expect(updateOp.payload, isNotNull);
-      final updateMap = jsonDecode(updateOp.payload!) as Map<String, dynamic>;
-      expect(updateMap['amount'], 5000);
-      expect(updateMap['notes'], 'تعديل بعد التدقيق');
-    });
+        // 2. Update
+        final updatedExpense = expense.copyWith(
+          amount: const Money.fromPiastres(5000),
+          notes: 'تعديل بعد التدقيق',
+        );
+        await expenseRepository.updateExpense(updatedExpense);
+        final opsAfterUpdate = await syncOperationsDao.getPendingOperations();
+        final updateOp = opsAfterUpdate.firstWhere(
+          (op) => op.entityId == 'exp-sync-1' && op.operationType == 'update',
+        );
+        expect(updateOp.payload, isNotNull);
+        final updateMap = jsonDecode(updateOp.payload!) as Map<String, dynamic>;
+        expect(updateMap['amount'], 5000);
+        expect(updateMap['notes'], 'تعديل بعد التدقيق');
+      },
+    );
 
-    test('expense category operations enqueue valid non-null payloads', () async {
-      final now = DateTime.utc(2026, 9, 16, 12, 0, 0);
-      final cat = ExpenseCategory(
-        id: 'cat-sync-1',
-        name: 'أدوات نظافة خاصة',
-        isActive: true,
-        createdAt: now,
-        updatedAt: now,
-      );
+    test(
+      'expense category operations enqueue valid non-null payloads',
+      () async {
+        final now = DateTime.utc(2026, 9, 16, 12, 0, 0);
+        final cat = ExpenseCategory(
+          id: 'cat-sync-1',
+          name: 'أدوات نظافة خاصة',
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        );
 
-      // 1. Create
-      await expenseCategoryRepository.createCategory(cat);
-      var ops = await syncOperationsDao.getPendingOperations();
-      final createOp = ops.firstWhere(
-        (op) => op.entityId == 'cat-sync-1' && op.operationType == 'create',
-      );
-      expect(createOp.payload, isNotNull);
-      final createMap = jsonDecode(createOp.payload!) as Map<String, dynamic>;
-      expect(createMap['id'], 'cat-sync-1');
-      expect(createMap['name'], 'أدوات نظافة خاصة');
-      expect(createMap['is_active'], isTrue);
+        // 1. Create
+        await expenseCategoryRepository.createCategory(cat);
+        var ops = await syncOperationsDao.getPendingOperations();
+        final createOp = ops.firstWhere(
+          (op) => op.entityId == 'cat-sync-1' && op.operationType == 'create',
+        );
+        expect(createOp.payload, isNotNull);
+        final createMap = jsonDecode(createOp.payload!) as Map<String, dynamic>;
+        expect(createMap['id'], 'cat-sync-1');
+        expect(createMap['name'], 'أدوات نظافة خاصة');
+        expect(createMap['is_active'], isTrue);
 
-      // 2. Update / Rename
-      final updatedCat = cat.copyWith(name: 'أدوات نظافة متطورة');
-      await expenseCategoryRepository.updateCategory(updatedCat);
-      ops = await syncOperationsDao.getPendingOperations();
-      final updateOp = ops.firstWhere(
-        (op) => op.entityId == 'cat-sync-1' && op.operationType == 'update',
-      );
-      expect(updateOp.payload, isNotNull);
-      final updateMap = jsonDecode(updateOp.payload!) as Map<String, dynamic>;
-      expect(updateMap['name'], 'أدوات نظافة متطورة');
+        // 2. Update / Rename
+        final updatedCat = cat.copyWith(name: 'أدوات نظافة متطورة');
+        await expenseCategoryRepository.updateCategory(updatedCat);
+        ops = await syncOperationsDao.getPendingOperations();
+        final updateOp = ops.firstWhere(
+          (op) => op.entityId == 'cat-sync-1' && op.operationType == 'update',
+        );
+        expect(updateOp.payload, isNotNull);
+        final updateMap = jsonDecode(updateOp.payload!) as Map<String, dynamic>;
+        expect(updateMap['name'], 'أدوات نظافة متطورة');
 
-      // 3. Deactivate
-      await expenseCategoryRepository.deactivateCategory('cat-sync-1');
-      ops = await syncOperationsDao.getPendingOperations();
-      final deactivateOp = ops.firstWhere(
-        (op) => op.entityId == 'cat-sync-1' && op.operationType == 'deactivate',
-      );
-      expect(deactivateOp.payload, isNotNull);
-      final deactMap = jsonDecode(deactivateOp.payload!) as Map<String, dynamic>;
-      expect(deactMap['id'], 'cat-sync-1');
-      expect(deactMap['is_active'], isFalse);
+        // 3. Deactivate
+        await expenseCategoryRepository.deactivateCategory('cat-sync-1');
+        ops = await syncOperationsDao.getPendingOperations();
+        final deactivateOp = ops.firstWhere(
+          (op) =>
+              op.entityId == 'cat-sync-1' && op.operationType == 'deactivate',
+        );
+        expect(deactivateOp.payload, isNotNull);
+        final deactMap =
+            jsonDecode(deactivateOp.payload!) as Map<String, dynamic>;
+        expect(deactMap['id'], 'cat-sync-1');
+        expect(deactMap['is_active'], isFalse);
 
-      // 4. Activate
-      await expenseCategoryRepository.activateCategory('cat-sync-1');
-      ops = await syncOperationsDao.getPendingOperations();
-      final activateOp = ops.firstWhere(
-        (op) => op.entityId == 'cat-sync-1' && op.operationType == 'activate',
-      );
-      expect(activateOp.payload, isNotNull);
-      final actMap = jsonDecode(activateOp.payload!) as Map<String, dynamic>;
-      expect(actMap['id'], 'cat-sync-1');
-      expect(actMap['is_active'], isTrue);
-    });
+        // 4. Activate
+        await expenseCategoryRepository.activateCategory('cat-sync-1');
+        ops = await syncOperationsDao.getPendingOperations();
+        final activateOp = ops.firstWhere(
+          (op) => op.entityId == 'cat-sync-1' && op.operationType == 'activate',
+        );
+        expect(activateOp.payload, isNotNull);
+        final actMap = jsonDecode(activateOp.payload!) as Map<String, dynamic>;
+        expect(actMap['id'], 'cat-sync-1');
+        expect(actMap['is_active'], isTrue);
+      },
+    );
 
-    test('sync queue failure rolls back local expense and category mutations', () async {
-      final failingSyncDao = _FailingSyncOperationsDao(db);
-      final failingExpenseRepo = ExpenseRepositoryImpl(
-        expensesDao: expensesDao,
-        syncOperationsDao: failingSyncDao,
-        db: db,
-      );
-      final failingCategoryRepo = ExpenseCategoryRepositoryImpl(
-        expenseCategoriesDao: expenseCategoriesDao,
-        syncOperationsDao: failingSyncDao,
-        db: db,
-      );
+    test(
+      'sync queue failure rolls back local expense and category mutations',
+      () async {
+        final failingSyncDao = _FailingSyncOperationsDao(db);
+        final failingExpenseRepo = ExpenseRepositoryImpl(
+          expensesDao: expensesDao,
+          syncOperationsDao: failingSyncDao,
+          db: db,
+        );
+        final failingCategoryRepo = ExpenseCategoryRepositoryImpl(
+          expenseCategoriesDao: expenseCategoriesDao,
+          syncOperationsDao: failingSyncDao,
+          db: db,
+        );
 
-      final now = DateTime.now();
+        final now = DateTime.now();
 
-      // 1. Category creation rollback
-      final cat = ExpenseCategory(
-        id: 'cat-fail-1',
-        name: 'تصنيف سيفشل',
-        isActive: true,
-        createdAt: now,
-        updatedAt: now,
-      );
-      expect(
-        () => failingCategoryRepo.createCategory(cat),
-        throwsA(isA<DatabaseFailure>()),
-      );
-      final catInDb = await expenseCategoriesDao.getCategoryById('cat-fail-1');
-      expect(catInDb, isNull, reason: 'Category must be rolled back on sync queue failure');
+        // 1. Category creation rollback
+        final cat = ExpenseCategory(
+          id: 'cat-fail-1',
+          name: 'تصنيف سيفشل',
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        );
+        expect(
+          () => failingCategoryRepo.createCategory(cat),
+          throwsA(isA<DatabaseFailure>()),
+        );
+        final catInDb = await expenseCategoriesDao.getCategoryById(
+          'cat-fail-1',
+        );
+        expect(
+          catInDb,
+          isNull,
+          reason: 'Category must be rolled back on sync queue failure',
+        );
 
-      // 2. Expense creation rollback
-      final cats = await expenseCategoryRepository.getAllCategories();
-      final existingCat = cats.first;
-      final expense = Expense(
-        id: 'exp-fail-1',
-        expenseCategoryId: existingCat.id,
-        amount: const Money.fromPiastres(1000),
-        expenseDate: OrderDate(2026, 9, 16),
-        categoryNameSnapshot: existingCat.name,
-        createdAt: now,
-        updatedAt: now,
-      );
-      expect(
-        () => failingExpenseRepo.createExpense(expense),
-        throwsA(isA<DatabaseFailure>()),
-      );
-      final expInDb = await expensesDao.getExpenseById('exp-fail-1');
-      expect(expInDb, isNull, reason: 'Expense must be rolled back on sync queue failure');
-    });
+        // 2. Expense creation rollback
+        final cats = await expenseCategoryRepository.getAllCategories();
+        final existingCat = cats.first;
+        final expense = Expense(
+          id: 'exp-fail-1',
+          expenseCategoryId: existingCat.id,
+          amount: const Money.fromPiastres(1000),
+          expenseDate: OrderDate(2026, 9, 16),
+          categoryNameSnapshot: existingCat.name,
+          createdAt: now,
+          updatedAt: now,
+        );
+        expect(
+          () => failingExpenseRepo.createExpense(expense),
+          throwsA(isA<DatabaseFailure>()),
+        );
+        final expInDb = await expensesDao.getExpenseById('exp-fail-1');
+        expect(
+          expInDb,
+          isNull,
+          reason: 'Expense must be rolled back on sync queue failure',
+        );
+      },
+    );
   });
 }
 

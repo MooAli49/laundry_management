@@ -8,8 +8,10 @@ void main() {
   late AppDatabase db;
 
   setUp(() {
-    // In-memory database for fast, isolated testing
-    db = AppDatabase(NativeDatabase.memory());
+    // In-memory database for fast, isolated testing.
+    // Canonical seeding is opt-in (disabled by default); most tests in this
+    // file rely on the canonical catalog, so enable it explicitly here.
+    db = AppDatabase(NativeDatabase.memory(), true);
   });
 
   tearDown(() async {
@@ -17,10 +19,10 @@ void main() {
   });
 
   group('1. Schema and Table Initialization', () {
-    test('all 19 tables exist and schema version is 6', () async {
-      expect(db.schemaVersion, equals(6));
+    test('all 20 tables exist and schema version is 9', () async {
+      expect(db.schemaVersion, equals(9));
 
-      // Query sqlite_master to verify all 19 tables are physically present
+      // Query sqlite_master to verify all 20 tables are physically present
       final tables = await db
           .customSelect(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%';",
@@ -49,6 +51,7 @@ void main() {
         'business_settings',
         'sync_operations',
         'sync_state',
+        'license_cache',
       };
 
       for (final table in expectedTables) {
@@ -100,9 +103,7 @@ void main() {
             .insert(
               ServicesCompanion.insert(
                 id: 'serv-1',
-                name: 'غسيل سجاد',
-                pricingType: 'per_square_meter',
-                price: 5000,
+                name: 'غسيل سجاد تجريبي',
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -120,7 +121,7 @@ void main() {
                 itemTypeId: carpetItemTypeId,
                 serviceId: 'serv-1',
                 itemTypeNameSnapshot: 'سجاد',
-                serviceNameSnapshot: 'غسيل سجاد',
+                serviceNameSnapshot: 'غسيل سجاد تجريبي',
                 pricingType: 'per_square_meter',
                 quantity: 6.0,
                 unitPrice: 5000,
@@ -368,8 +369,6 @@ void main() {
               ServicesCompanion.insert(
                 id: 'serv-kg',
                 name: 'غسيل بالكيلو',
-                pricingType: 'per_kg',
-                price: 5000,
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -628,7 +627,7 @@ void main() {
               ItemDefinitionsCompanion.insert(
                 id: 'def-1',
                 itemTypeId: itemTypeId,
-                name: 'قميص',
+                name: 'قميص تجريبي',
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -642,7 +641,7 @@ void main() {
                 ItemDefinitionsCompanion.insert(
                   id: 'def-2',
                   itemTypeId: itemTypeId,
-                  name: 'قميص',
+                  name: 'قميص تجريبي',
                   createdAt: now,
                   updatedAt: now,
                 ),
@@ -692,8 +691,6 @@ void main() {
               ServicesCompanion.insert(
                 id: 'serv-storage',
                 name: 'خدمة تخزين',
-                pricingType: 'per_piece',
-                price: 1000,
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -811,8 +808,42 @@ void main() {
 
   group('9. Seed Data Idempotency & Safety', () {
     test(
-      'seeds initial settings, 4 item types, and 7 expense categories',
+      'fresh database is completely empty by default (no canonical seed)',
       () async {
+        expect(SeedData.isEnabled, isFalse);
+        final db = AppDatabase(NativeDatabase.memory());
+        addTearDown(db.close);
+
+        expect((await db.select(db.businessSettings).get()).isEmpty, isTrue);
+        expect((await db.select(db.itemTypes).get()).isEmpty, isTrue);
+        expect((await db.select(db.expenseCategories).get()).isEmpty, isTrue);
+        expect((await db.select(db.services).get()).isEmpty, isTrue);
+        expect((await db.select(db.serviceItemTypes).get()).isEmpty, isTrue);
+        expect((await db.select(db.carpetSizes).get()).isEmpty, isTrue);
+        expect((await db.select(db.storageLocations).get()).isEmpty, isTrue);
+        expect(
+          (await db.select(db.storageLocationItemTypes).get()).isEmpty,
+          isTrue,
+        );
+        expect((await db.select(db.itemDefinitions).get()).isEmpty, isTrue);
+        expect((await db.select(db.customers).get()).isEmpty, isTrue);
+        expect((await db.select(db.orders).get()).isEmpty, isTrue);
+        expect((await db.select(db.orderItems).get()).isEmpty, isTrue);
+        expect((await db.select(db.payments).get()).isEmpty, isTrue);
+        expect((await db.select(db.refunds).get()).isEmpty, isTrue);
+        expect((await db.select(db.expenses).get()).isEmpty, isTrue);
+        expect((await db.select(db.storageRecords).get()).isEmpty, isTrue);
+        expect((await db.select(db.syncStates).get()).isEmpty, isTrue);
+        expect((await db.select(db.syncOperations).get()).isEmpty, isTrue);
+      },
+    );
+
+    test(
+      'explicit opt-in seeds initial settings, 4 item types, 7 expense categories, and complete master catalog',
+      () async {
+        final db = AppDatabase(NativeDatabase.memory(), true);
+        addTearDown(db.close);
+
         // Check BusinessSettings
         final settings = await db.select(db.businessSettings).get();
         expect(settings.length, equals(1));
@@ -841,11 +872,48 @@ void main() {
           }),
         );
 
+        // Check Services (5 canonical services)
+        final services = await db.select(db.services).get();
+        expect(services.length, equals(5));
+
+        // Check ServiceItemTypes (5 canonical pricing configs)
+        final serviceItemTypes = await db.select(db.serviceItemTypes).get();
+        expect(serviceItemTypes.length, equals(5));
+
+        // Check CarpetSizes (3 canonical carpet sizes)
+        final carpetSizes = await db.select(db.carpetSizes).get();
+        expect(carpetSizes.length, equals(3));
+
+        // Check StorageLocations (5 canonical storage locations)
+        final storageLocations = await db.select(db.storageLocations).get();
+        expect(storageLocations.length, equals(5));
+
+        // Check StorageLocationItemTypes (9 junction associations)
+        final locItemTypes = await db.select(db.storageLocationItemTypes).get();
+        expect(locItemTypes.length, equals(9));
+
+        // Check ItemDefinitions (10 canonical item definitions)
+        final itemDefinitions = await db.select(db.itemDefinitions).get();
+        expect(itemDefinitions.length, equals(10));
+
+        // Check SyncState singleton
+        final syncState = await db.select(db.syncStates).get();
+        expect(syncState.length, equals(1));
+        expect(
+          syncState.first.lastAppliedSequence,
+          equals(SeedData.canonicalBaselineSequence),
+        );
+
+        // Invariant: ZERO sync operations generated by canonical seed
+        final syncOps = await db.select(db.syncOperations).get();
+        expect(syncOps.isEmpty, isTrue);
+
         // Invariant: Transactional tables MUST be empty!
         expect((await db.select(db.customers).get()).isEmpty, isTrue);
         expect((await db.select(db.orders).get()).isEmpty, isTrue);
         expect((await db.select(db.orderItems).get()).isEmpty, isTrue);
         expect((await db.select(db.payments).get()).isEmpty, isTrue);
+        expect((await db.select(db.refunds).get()).isEmpty, isTrue);
         expect((await db.select(db.expenses).get()).isEmpty, isTrue);
         expect((await db.select(db.storageRecords).get()).isEmpty, isTrue);
       },
@@ -854,6 +922,9 @@ void main() {
     test(
       're-running seed data is idempotent and does not overwrite modifications',
       () async {
+        final db = AppDatabase(NativeDatabase.memory(), true);
+        addTearDown(db.close);
+
         // Modify an expense category name
         await (db.update(db.expenseCategories)..where(
               (t) => t.id.equals('00000000-0000-0000-0002-000000000001'),
@@ -966,16 +1037,28 @@ void main() {
       );
     });
 
-    test('rejects negative price on services', () async {
+    test('rejects non-positive price on service_item_types', () async {
       final now = DateTime.now();
+
+      await db
+          .into(db.services)
+          .insert(
+            ServicesCompanion.insert(
+              id: 'serv-neg-price',
+              name: 'خدمة سالبة',
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
 
       expect(
         () async => await db
-            .into(db.services)
+            .into(db.serviceItemTypes)
             .insert(
-              ServicesCompanion.insert(
-                id: 'serv-neg-price',
-                name: 'خدمة سالبة',
+              ServiceItemTypesCompanion.insert(
+                id: 'sit-neg-price',
+                serviceId: 'serv-neg-price',
+                itemTypeId: '00000000-0000-0000-0001-000000000001',
                 pricingType: 'per_piece',
                 price: -1000, // Invalid!
                 createdAt: now,
@@ -1024,8 +1107,6 @@ void main() {
               ServicesCompanion.insert(
                 id: 'serv-chk-2',
                 name: 'خدمة فحص',
-                pricingType: 'per_piece',
-                price: 1000,
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -1339,8 +1420,6 @@ void main() {
               ServicesCompanion.insert(
                 id: 'serv-setnull-1',
                 name: 'غسيل بدلة',
-                pricingType: 'per_piece',
-                price: 15000,
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -1442,8 +1521,6 @@ void main() {
               ServicesCompanion.insert(
                 id: 'serv-setnull-2',
                 name: 'تنظيف سجاد فاخر',
-                pricingType: 'per_square_meter',
-                price: 5000,
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -1518,8 +1595,6 @@ void main() {
             ServicesCompanion.insert(
               id: 'serv-u-1',
               name: 'كي بالبخار',
-              pricingType: 'per_piece',
-              price: 2000,
               createdAt: now,
               updatedAt: now,
             ),
@@ -1532,8 +1607,6 @@ void main() {
               ServicesCompanion.insert(
                 id: 'serv-u-2',
                 name: 'كي بالبخار', // Duplicate name!
-                pricingType: 'per_piece',
-                price: 2500,
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -1621,8 +1694,6 @@ void main() {
               ServicesCompanion.insert(
                 id: 'serv-sit-1',
                 name: 'خدمة تجربة توافق',
-                pricingType: 'per_piece',
-                price: 1000,
                 createdAt: now,
                 updatedAt: now,
               ),
@@ -1635,7 +1706,10 @@ void main() {
                 id: 'sit-1',
                 serviceId: 'serv-sit-1',
                 itemTypeId: itemTypeId,
+                pricingType: 'per_piece',
+                price: 1000,
                 createdAt: now,
+                updatedAt: now,
               ),
             );
 
@@ -1648,7 +1722,10 @@ void main() {
                   id: 'sit-2',
                   serviceId: 'serv-sit-1',
                   itemTypeId: itemTypeId, // Duplicate composite pair!
+                  pricingType: 'per_piece',
+                  price: 1500,
                   createdAt: now,
+                  updatedAt: now,
                 ),
               ),
           throwsA(isA<SqliteException>()),
@@ -1737,8 +1814,6 @@ void main() {
               ServicesCompanion.insert(
                 id: 'serv-snap-1',
                 name: 'تنظيف جاف أصلي',
-                pricingType: 'per_piece',
-                price: 5000,
                 createdAt: now,
                 updatedAt: now,
               ),

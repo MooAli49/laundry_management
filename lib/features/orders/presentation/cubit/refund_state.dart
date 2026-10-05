@@ -24,8 +24,9 @@ class RefundState {
     return RefundState(
       isSubmitting: isSubmitting ?? this.isSubmitting,
       refund: clearRefund ? null : (refund ?? this.refund),
-      errorMessage:
-          clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
     );
   }
 

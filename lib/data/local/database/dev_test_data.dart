@@ -102,50 +102,56 @@ class DevTestData {
     GeneratedDatabase db,
     int nowTimestamp,
   ) async {
+    // Item Types required by the dev data below (FK targets).
+    // DevTestData is independent of the opt-in canonical [SeedData], so it
+    // must not assume these rows already exist.
+    const itemTypes = [
+      {'id': typeClothingId, 'name': 'ملابس'},
+      {'id': typeBlanketsId, 'name': 'بطاطين'},
+      {'id': typeCarpetsId, 'name': 'سجاد'},
+      {'id': typeCoversId, 'name': 'أغطية'},
+    ];
+
+    for (final t in itemTypes) {
+      await db.customStatement(
+        'INSERT OR IGNORE INTO item_types (id, name, is_active, created_at, updated_at) '
+        'VALUES (?, ?, 1, ?, ?);',
+        [t['id'], t['name'], nowTimestamp, nowTimestamp],
+      );
+    }
+
     // Services
     final services = [
       {
         'id': srvWashIronId,
         'name': 'غسيل ومكوى',
-        'pricing_type': 'perPiece',
-        'price': 2500,
       },
       {
         'id': srvDryCleanId,
         'name': 'دراي كلين',
-        'pricing_type': 'perPiece',
-        'price': 4500,
       },
       {
         'id': srvCarpetWashId,
         'name': 'غسيل سجاد',
-        'pricing_type': 'perSquareMeter',
-        'price': 6000,
       },
       {
         'id': srvBlanketId,
         'name': 'تنظيف بطاطين',
-        'pricing_type': 'fixedPrice',
-        'price': 8000,
       },
       {
         'id': srvCoverId,
         'name': 'غسيل أغطية',
-        'pricing_type': 'fixedPrice',
-        'price': 3500,
       },
     ];
 
     for (final s in services) {
       await db.customStatement(
-        'INSERT OR IGNORE INTO services (id, name, description, pricing_type, price, is_active, created_at, updated_at) '
-        'VALUES (?, ?, ?, ?, ?, 1, ?, ?);',
+        'INSERT OR IGNORE INTO services (id, name, description, is_active, created_at, updated_at) '
+        'VALUES (?, ?, ?, 1, ?, ?);',
         [
           s['id'],
           s['name'],
           'خدمة تجريبية',
-          s['pricing_type'],
-          s['price'],
           nowTimestamp,
           nowTimestamp,
         ],
@@ -154,20 +160,53 @@ class DevTestData {
 
     // Service Item Types links
     final serviceItemTypeLinks = [
-      {'service_id': srvWashIronId, 'item_type_id': typeClothingId},
-      {'service_id': srvDryCleanId, 'item_type_id': typeClothingId},
-      {'service_id': srvCarpetWashId, 'item_type_id': typeCarpetsId},
-      {'service_id': srvBlanketId, 'item_type_id': typeBlanketsId},
-      {'service_id': srvCoverId, 'item_type_id': typeCoversId},
+      {
+        'service_id': srvWashIronId,
+        'item_type_id': typeClothingId,
+        'pricing_type': 'per_piece',
+        'price': 2500,
+      },
+      {
+        'service_id': srvDryCleanId,
+        'item_type_id': typeClothingId,
+        'pricing_type': 'per_piece',
+        'price': 4500,
+      },
+      {
+        'service_id': srvCarpetWashId,
+        'item_type_id': typeCarpetsId,
+        'pricing_type': 'per_square_meter',
+        'price': 6000,
+      },
+      {
+        'service_id': srvBlanketId,
+        'item_type_id': typeBlanketsId,
+        'pricing_type': 'per_piece',
+        'price': 8000,
+      },
+      {
+        'service_id': srvCoverId,
+        'item_type_id': typeCoversId,
+        'pricing_type': 'per_piece',
+        'price': 3500,
+      },
     ];
 
     for (var i = 0; i < serviceItemTypeLinks.length; i++) {
       final link = serviceItemTypeLinks[i];
       final linkId = _formatUuid(8, i + 1);
       await db.customStatement(
-        'INSERT OR IGNORE INTO service_item_types (id, service_id, item_type_id, created_at) '
-        'VALUES (?, ?, ?, ?);',
-        [linkId, link['service_id'], link['item_type_id'], nowTimestamp],
+        'INSERT OR IGNORE INTO service_item_types (id, service_id, item_type_id, pricing_type, price, created_at, updated_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?);',
+        [
+          linkId,
+          link['service_id'],
+          link['item_type_id'],
+          link['pricing_type'],
+          link['price'],
+          nowTimestamp,
+          nowTimestamp,
+        ],
       );
     }
 
@@ -646,7 +685,7 @@ class DevTestData {
       itemTypeName: 'بطاطين',
       itemDefinitionName: 'بطانية مفرد',
       serviceName: 'تنظيف بطاطين',
-      pricingType: 'fixedPrice',
+      pricingType: 'per_piece',
       quantity: 1.0,
       unitPrice: 8000,
       calculatedTotal: 8000,
@@ -878,7 +917,7 @@ class DevTestData {
       itemTypeName: 'بطاطين',
       itemDefinitionName: 'بطانية مفرد',
       serviceName: 'تنظيف بطاطين',
-      pricingType: 'fixedPrice',
+      pricingType: 'per_piece',
       quantity: 1.0,
       unitPrice: 8000,
       calculatedTotal: 8000,
@@ -909,7 +948,7 @@ class DevTestData {
       itemTypeName: 'أغطية',
       itemDefinitionName: 'غطاء لحاف',
       serviceName: 'غسيل أغطية',
-      pricingType: 'fixedPrice',
+      pricingType: 'per_piece',
       quantity: 1.0,
       unitPrice: 3500,
       calculatedTotal: 3500,
@@ -1125,7 +1164,7 @@ class DevTestData {
       itemTypeName: 'أغطية',
       itemDefinitionName: 'كوفرتة',
       serviceName: 'غسيل أغطية',
-      pricingType: 'fixedPrice',
+      pricingType: 'per_piece',
       quantity: 1.0,
       unitPrice: 3500,
       calculatedTotal: 3500,
@@ -1173,7 +1212,7 @@ class DevTestData {
       itemTypeName: 'بطاطين',
       itemDefinitionName: 'بطانية دبل',
       serviceName: 'تنظيف بطاطين',
-      pricingType: 'fixedPrice',
+      pricingType: 'per_piece',
       quantity: 1.0,
       unitPrice: 8000,
       calculatedTotal: 8000,
@@ -1214,7 +1253,7 @@ class DevTestData {
       itemTypeName: 'بطاطين',
       itemDefinitionName: 'بطانية مفرد',
       serviceName: 'تنظيف بطاطين',
-      pricingType: 'fixedPrice',
+      pricingType: 'per_piece',
       quantity: 1.0,
       unitPrice: 8000,
       calculatedTotal: 8000,

@@ -17,7 +17,7 @@ void main() {
     test(
       'production seed initializes with 0 customers/orders/payments/storage records',
       () async {
-        final db = AppDatabase(NativeDatabase.memory());
+        final db = AppDatabase(NativeDatabase.memory(), true);
         // On creation, beforeOpen runs SeedData.seedInitialData
         // Trigger database open by running a simple query
         final itemTypes = await db.select(db.itemTypes).get();

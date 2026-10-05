@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laundry_management/data/datasources/remote/customer_remote_api.dart';
 import 'package:laundry_management/data/datasources/remote/expense_remote_api.dart';
+import 'package:laundry_management/data/datasources/remote/license_remote_api.dart';
 import 'package:laundry_management/data/datasources/remote/master_data_remote_api.dart';
 import 'package:laundry_management/data/datasources/remote/order_remote_api.dart';
 import 'package:laundry_management/data/datasources/remote/payment_remote_api.dart';
@@ -31,6 +32,23 @@ void main() {
         ),
       );
     });
+
+    test(
+      'LicenseRemoteApi resolves the function and route prefixes once',
+      () async {
+        await LicenseRemoteApi(
+          dio,
+          baseUrl: 'https://test.supabase.co/functions/v1',
+        ).getLicenseInfo();
+
+        expect(
+          lastRequest?.uri,
+          equals(
+            Uri.parse('https://test.supabase.co/functions/v1/api/v1/license'),
+          ),
+        );
+      },
+    );
 
     group('CustomerRemoteApi', () {
       late CustomerRemoteApi api;
@@ -138,7 +156,7 @@ void main() {
           final payload = {
             'notes': 'updated notes',
             'items': [
-              {'id': 'oi-1', 'unit_price': 1500}
+              {'id': 'oi-1', 'unit_price': 1500},
             ],
           };
           await api.editOrderAggregate(

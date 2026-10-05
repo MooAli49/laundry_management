@@ -21,6 +21,7 @@ class CreateOrderItemInput {
   final String? itemDefinitionId;
   final String serviceId;
   final Money? customUnitPrice;
+  final Money? customTotal;
   final int physicalQuantity;
   final String? notes;
   final CarpetItemInput? carpetData;
@@ -30,6 +31,7 @@ class CreateOrderItemInput {
     this.itemDefinitionId,
     required this.serviceId,
     this.customUnitPrice,
+    this.customTotal,
     required this.physicalQuantity,
     this.notes,
     this.carpetData,
@@ -195,31 +197,35 @@ class CreateOrderUseCase {
         throw const BusinessRuleFailure('Service is inactive');
       }
 
-      final compatibleServices = await _serviceRepository
-          .getServicesForItemType(itemType.id);
-      final isCompatible = compatibleServices.any((s) => s.id == service.id);
-      if (!isCompatible) {
+      final serviceItemType = await _serviceRepository.getServiceItemType(
+        service.id,
+        itemType.id,
+      );
+      if (serviceItemType == null) {
         throw IncompatibleServiceFailure(
           serviceId: service.id,
           itemTypeId: itemType.id,
         );
       }
 
-      final unitPrice = itemInput.customUnitPrice ?? service.price;
+      final configuredPrice = serviceItemType.price;
+      final pricingType = serviceItemType.pricingType;
+
+      final unitPrice = itemInput.customUnitPrice ?? configuredPrice;
       if (unitPrice <= Money.zero) {
         throw const ValidationFailure(
           'Unit price must be strictly greater than zero',
         );
       }
 
-      if (service.pricingType != PricingType.perSquareMeter &&
+      if (pricingType != PricingType.perSquareMeter &&
           itemInput.carpetData != null) {
         throw const ValidationFailure(
           'Carpet data is not allowed for non-carpet pricing types',
         );
       }
 
-      if (service.pricingType == PricingType.perSquareMeter) {
+      if (pricingType == PricingType.perSquareMeter) {
         if (itemInput.carpetData == null) {
           throw const ValidationFailure(
             'Carpet data is required for per-square-meter services',
@@ -233,9 +239,21 @@ class CreateOrderUseCase {
         }
 
         final area = itemInput.carpetData!.length * itemInput.carpetData!.width;
-        final calculatedTotal = Money.fromPiastres(
+        final defaultPieceTotal = Money.fromPiastres(
           (unitPrice.piastres * area).round(),
         );
+        final totalPiastres = itemInput.customTotal != null
+            ? itemInput.customTotal!.piastres
+            : (defaultPieceTotal.piastres * itemInput.physicalQuantity);
+
+        final basePiecePiastres = totalPiastres ~/ itemInput.physicalQuantity;
+        final remainder = totalPiastres % itemInput.physicalQuantity;
+
+        final effectiveUnitPrice = itemInput.customTotal != null && area > 0
+            ? Money.fromPiastres(
+                (totalPiastres / (area * itemInput.physicalQuantity)).round(),
+              )
+            : unitPrice;
 
         for (var i = 0; i < itemInput.physicalQuantity; i++) {
           final itemId = _uuid.v4();
@@ -250,6 +268,9 @@ class CreateOrderUseCase {
             updatedAt: now,
           );
 
+          final piecePiastres = basePiecePiastres + (i < remainder ? 1 : 0);
+          final pieceTotal = Money.fromPiastres(piecePiastres);
+
           expandedItems.add(
             OrderItem(
               id: itemId,
@@ -260,10 +281,10 @@ class CreateOrderUseCase {
               itemTypeNameSnapshot: itemType.name,
               itemDefinitionNameSnapshot: itemDefinitionName,
               serviceNameSnapshot: service.name,
-              pricingType: service.pricingType,
-              quantity: 1.0,
-              unitPrice: unitPrice,
-              calculatedTotal: calculatedTotal,
+              pricingType: pricingType,
+              quantity: area,
+              unitPrice: effectiveUnitPrice,
+              calculatedTotal: pieceTotal,
               notes: itemInput.notes,
               carpetData: carpetData,
               createdAt: now,
@@ -272,11 +293,25 @@ class CreateOrderUseCase {
           );
         }
       } else {
-        // perPiece or fixedPrice
-        final calculatedTotal = unitPrice;
+        // perPiece
+        final totalPiastres = itemInput.customTotal != null
+            ? itemInput.customTotal!.piastres
+            : (unitPrice.piastres * itemInput.physicalQuantity);
+
+        final basePiecePiastres = totalPiastres ~/ itemInput.physicalQuantity;
+        final remainder = totalPiastres % itemInput.physicalQuantity;
+
+        final effectiveUnitPrice = itemInput.customTotal != null
+            ? Money.fromPiastres(
+                (totalPiastres / itemInput.physicalQuantity).round(),
+              )
+            : unitPrice;
 
         for (var i = 0; i < itemInput.physicalQuantity; i++) {
           final itemId = _uuid.v4();
+          final piecePiastres = basePiecePiastres + (i < remainder ? 1 : 0);
+          final pieceTotal = Money.fromPiastres(piecePiastres);
+
           expandedItems.add(
             OrderItem(
               id: itemId,
@@ -287,10 +322,10 @@ class CreateOrderUseCase {
               itemTypeNameSnapshot: itemType.name,
               itemDefinitionNameSnapshot: itemDefinitionName,
               serviceNameSnapshot: service.name,
-              pricingType: service.pricingType,
+              pricingType: pricingType,
               quantity: 1.0,
-              unitPrice: unitPrice,
-              calculatedTotal: calculatedTotal,
+              unitPrice: effectiveUnitPrice,
+              calculatedTotal: pieceTotal,
               notes: itemInput.notes,
               createdAt: now,
               updatedAt: now,

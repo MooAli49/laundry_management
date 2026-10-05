@@ -94,47 +94,40 @@ void main() {
   }
 
   group('SyncStatusIndicator Widget Tests', () {
-    testWidgets(
-      '1. CONNECTED state renders "متصل" with green circle dot',
-      (WidgetTester tester) async {
-        networkInfo.isConnectedValue = true;
-        syncEngine.emitState(
-          SyncEngineState.completed(
-            lastSyncTime: DateTime.utc(2026, 9, 21, 12, 0, 0),
-          ),
-        );
+    testWidgets('1. CONNECTED state renders "متصل" with green circle dot', (
+      WidgetTester tester,
+    ) async {
+      networkInfo.isConnectedValue = true;
+      syncEngine.emitState(
+        SyncEngineState.completed(
+          lastSyncTime: DateTime.utc(2026, 9, 21, 12, 0, 0),
+        ),
+      );
 
-        cubit = SyncStatusCubit(
-          syncEngine: syncEngine,
-          networkInfo: networkInfo,
-        );
-        await tester.pumpWidget(buildTestableWidget(cubit));
-        await tester.pumpAndSettle();
+      cubit = SyncStatusCubit(syncEngine: syncEngine, networkInfo: networkInfo);
+      await tester.pumpWidget(buildTestableWidget(cubit));
+      await tester.pumpAndSettle();
 
-        expect(find.text('متصل'), findsOneWidget);
-        expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('متصل'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
 
-        // Verify the 8x8 green dot Container exists
-        final containerFinder = find.byWidgetPredicate(
-          (widget) =>
-              widget is Container &&
-              widget.constraints?.maxWidth == 8 &&
-              widget.constraints?.maxHeight == 8 &&
-              widget.decoration is BoxDecoration &&
-              (widget.decoration as BoxDecoration).color == AppColors.success,
-        );
-        expect(containerFinder, findsOneWidget);
-      },
-    );
+      // Verify the 8x8 green dot Container exists
+      final containerFinder = find.byWidgetPredicate(
+        (widget) =>
+            widget is Container &&
+            widget.constraints?.maxWidth == 8 &&
+            widget.constraints?.maxHeight == 8 &&
+            widget.decoration is BoxDecoration &&
+            (widget.decoration as BoxDecoration).color == AppColors.success,
+      );
+      expect(containerFinder, findsOneWidget);
+    });
 
     testWidgets(
       '2. SYNCING state renders "جاري المزامنة" with 8x8 primary spinner',
       (WidgetTester tester) async {
         networkInfo.isConnectedValue = true;
-        syncEngine.emitState(
-          const SyncEngineState.syncing(),
-          isSyncing: true,
-        );
+        syncEngine.emitState(const SyncEngineState.syncing(), isSyncing: true);
 
         cubit = SyncStatusCubit(
           syncEngine: syncEngine,
@@ -157,125 +150,111 @@ void main() {
       },
     );
 
-    testWidgets(
-      '3. OFFLINE state renders "غير متصل" with warning dot',
-      (WidgetTester tester) async {
-        networkInfo.isConnectedValue = false;
-        syncEngine.emitState(const SyncEngineState.idle(lastSyncTime: null));
+    testWidgets('3. OFFLINE state renders "غير متصل" with warning dot', (
+      WidgetTester tester,
+    ) async {
+      networkInfo.isConnectedValue = false;
+      syncEngine.emitState(const SyncEngineState.idle(lastSyncTime: null));
 
-        cubit = SyncStatusCubit(
-          syncEngine: syncEngine,
-          networkInfo: networkInfo,
-        );
-        await tester.pumpWidget(buildTestableWidget(cubit));
-        await tester.pumpAndSettle();
+      cubit = SyncStatusCubit(syncEngine: syncEngine, networkInfo: networkInfo);
+      await tester.pumpWidget(buildTestableWidget(cubit));
+      await tester.pumpAndSettle();
 
-        expect(find.text('غير متصل'), findsOneWidget);
-        expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('غير متصل'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
 
-        final containerFinder = find.byWidgetPredicate(
-          (widget) =>
-              widget is Container &&
-              widget.constraints?.maxWidth == 8 &&
-              widget.constraints?.maxHeight == 8 &&
-              widget.decoration is BoxDecoration &&
-              (widget.decoration as BoxDecoration).color == AppColors.warning,
-        );
-        expect(containerFinder, findsOneWidget);
-      },
-    );
+      final containerFinder = find.byWidgetPredicate(
+        (widget) =>
+            widget is Container &&
+            widget.constraints?.maxWidth == 8 &&
+            widget.constraints?.maxHeight == 8 &&
+            widget.decoration is BoxDecoration &&
+            (widget.decoration as BoxDecoration).color == AppColors.warning,
+      );
+      expect(containerFinder, findsOneWidget);
+    });
 
-    testWidgets(
-      '4. SYNC_ERROR state renders "فشل المزامنة" with error dot',
-      (WidgetTester tester) async {
-        networkInfo.isConnectedValue = true;
-        syncEngine.emitState(
-          SyncEngineState.failed(
-            error: 'HTTP 500 Internal Server Error',
-            errorDetails: const SyncErrorDetails.http(500),
-          ),
-        );
+    testWidgets('4. SYNC_ERROR state renders "فشل المزامنة" with error dot', (
+      WidgetTester tester,
+    ) async {
+      networkInfo.isConnectedValue = true;
+      syncEngine.emitState(
+        SyncEngineState.failed(
+          error: 'HTTP 500 Internal Server Error',
+          errorDetails: const SyncErrorDetails.http(500),
+        ),
+      );
 
-        cubit = SyncStatusCubit(
-          syncEngine: syncEngine,
-          networkInfo: networkInfo,
-        );
-        await tester.pumpWidget(buildTestableWidget(cubit));
-        await tester.pumpAndSettle();
+      cubit = SyncStatusCubit(syncEngine: syncEngine, networkInfo: networkInfo);
+      await tester.pumpWidget(buildTestableWidget(cubit));
+      await tester.pumpAndSettle();
 
-        expect(find.text('فشل المزامنة'), findsOneWidget);
-        expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('فشل المزامنة'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
 
-        final containerFinder = find.byWidgetPredicate(
-          (widget) =>
-              widget is Container &&
-              widget.constraints?.maxWidth == 8 &&
-              widget.constraints?.maxHeight == 8 &&
-              widget.decoration is BoxDecoration &&
-              (widget.decoration as BoxDecoration).color == AppColors.error,
-        );
-        expect(containerFinder, findsOneWidget);
-      },
-    );
+      final containerFinder = find.byWidgetPredicate(
+        (widget) =>
+            widget is Container &&
+            widget.constraints?.maxWidth == 8 &&
+            widget.constraints?.maxHeight == 8 &&
+            widget.decoration is BoxDecoration &&
+            (widget.decoration as BoxDecoration).color == AppColors.error,
+      );
+      expect(containerFinder, findsOneWidget);
+    });
 
-    testWidgets(
-      '5. Reactive updates without rebuilding parent widget',
-      (WidgetTester tester) async {
-        networkInfo.isConnectedValue = true;
-        syncEngine.emitState(
-          SyncEngineState.completed(
-            lastSyncTime: DateTime.utc(2026, 9, 21, 12, 0, 0),
-          ),
-        );
+    testWidgets('5. Reactive updates without rebuilding parent widget', (
+      WidgetTester tester,
+    ) async {
+      networkInfo.isConnectedValue = true;
+      syncEngine.emitState(
+        SyncEngineState.completed(
+          lastSyncTime: DateTime.utc(2026, 9, 21, 12, 0, 0),
+        ),
+      );
 
-        cubit = SyncStatusCubit(
-          syncEngine: syncEngine,
-          networkInfo: networkInfo,
-        );
+      cubit = SyncStatusCubit(syncEngine: syncEngine, networkInfo: networkInfo);
 
-        int parentBuildCount = 0;
+      int parentBuildCount = 0;
 
-        final parentWidget = StatefulBuilder(
-          builder: (context, setState) {
-            parentBuildCount++;
-            return MaterialApp(
-              home: Directionality(
-                textDirection: TextDirection.rtl,
-                child: Scaffold(
-                  body: SyncStatusIndicator(cubit: cubit),
-                ),
-              ),
-            );
-          },
-        );
+      final parentWidget = StatefulBuilder(
+        builder: (context, setState) {
+          parentBuildCount++;
+          return MaterialApp(
+            home: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Scaffold(body: SyncStatusIndicator(cubit: cubit)),
+            ),
+          );
+        },
+      );
 
-        await tester.pumpWidget(parentWidget);
-        await tester.pumpAndSettle();
+      await tester.pumpWidget(parentWidget);
+      await tester.pumpAndSettle();
 
-        expect(find.text('متصل'), findsOneWidget);
-        expect(parentBuildCount, equals(1));
+      expect(find.text('متصل'), findsOneWidget);
+      expect(parentBuildCount, equals(1));
 
-        // Trigger reactive transition to offline
-        networkInfo.emitConnectivity(false);
-        await tester.pumpAndSettle();
+      // Trigger reactive transition to offline
+      networkInfo.emitConnectivity(false);
+      await tester.pumpAndSettle();
 
-        expect(find.text('غير متصل'), findsOneWidget);
-        // Parent MUST NOT have rebuilt!
-        expect(parentBuildCount, equals(1));
+      expect(find.text('غير متصل'), findsOneWidget);
+      // Parent MUST NOT have rebuilt!
+      expect(parentBuildCount, equals(1));
 
-        // Trigger reactive recovery
-        networkInfo.emitConnectivity(true);
-        syncEngine.emitState(
-          SyncEngineState.completed(
-            lastSyncTime: DateTime.utc(2026, 9, 21, 12, 5, 0),
-          ),
-        );
-        await tester.pumpAndSettle();
+      // Trigger reactive recovery
+      networkInfo.emitConnectivity(true);
+      syncEngine.emitState(
+        SyncEngineState.completed(
+          lastSyncTime: DateTime.utc(2026, 9, 21, 12, 5, 0),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-        expect(find.text('متصل'), findsOneWidget);
-        expect(parentBuildCount, equals(1));
-      },
-    );
+      expect(find.text('متصل'), findsOneWidget);
+      expect(parentBuildCount, equals(1));
+    });
 
     testWidgets(
       '6. RTL text layout renders dot first (right) and text second (left)',

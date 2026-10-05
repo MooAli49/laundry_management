@@ -5,6 +5,8 @@ import '../../../../domain/entities/item_definition.dart';
 import '../../../../domain/entities/item_type.dart';
 import '../../../../domain/entities/order.dart';
 import '../../../../domain/entities/service.dart';
+import '../../../../domain/enums/pricing_type.dart';
+import '../../../../domain/models/service_with_pricing.dart';
 import '../../../../domain/value_objects/money.dart';
 import '../../../../domain/value_objects/order_date.dart';
 import '../models/editable_order_item.dart';
@@ -34,17 +36,20 @@ class EditProcessingOrderState {
 
   // Master Data
   final List<ItemType> itemTypes;
-  final List<Service> compatibleServices;
+  final List<ServiceWithPricing> compatibleServices;
   final List<ItemDefinition> itemDefinitions;
   final List<CarpetSize> carpetSizes;
   final BusinessSettings? settings;
 
   // Draft for adding or editing an item
-  final int? editingItemIndex; // null when adding new item; index when editing item
+  final int?
+  editingItemIndex; // null when adding new item; index when editing item
   final ItemType? draftItemType;
   final ItemDefinition? draftItemDefinition;
   final Service? draftService;
+  final PricingType? draftPricingType;
   final Money? draftUnitPrice;
+  final Money? draftItemTotal;
   final int draftQuantity;
   final CarpetSize? draftCarpetSize;
   final double draftCarpetLength;
@@ -79,7 +84,9 @@ class EditProcessingOrderState {
     this.draftItemType,
     this.draftItemDefinition,
     this.draftService,
+    this.draftPricingType,
     this.draftUnitPrice,
+    this.draftItemTotal,
     this.draftQuantity = 1,
     this.draftCarpetSize,
     this.draftCarpetLength = 0.0,
@@ -88,6 +95,25 @@ class EditProcessingOrderState {
   });
 
   bool get canChangeCustomer => totalPaid == Money.zero;
+
+  Money get draftDefaultTotal {
+    if (draftService == null || draftPricingType == null || draftUnitPrice == null) {
+      return Money.zero;
+    }
+    final price = draftUnitPrice!;
+    if (draftPricingType == PricingType.perSquareMeter) {
+      final area = draftCarpetLength * draftCarpetWidth;
+      if (area <= 0) return Money.zero;
+      final areaTotalPiastres = (price.piastres * area).round();
+      return Money.fromPiastres(areaTotalPiastres * draftQuantity);
+    }
+    return price * draftQuantity;
+  }
+
+  Money get effectiveDraftTotal => draftItemTotal ?? draftDefaultTotal;
+
+  bool get isDraftTotalOverridden =>
+      draftItemTotal != null && draftItemTotal != draftDefaultTotal;
 
   Money get subtotal {
     var sum = Money.zero;
@@ -104,7 +130,8 @@ class EditProcessingOrderState {
       customerDeliveryRequested ? customerDeliveryFee : Money.zero;
 
   Money get total {
-    final computed = subtotal - discount + effectivePickupFee + effectiveDeliveryFee;
+    final computed =
+        subtotal - discount + effectivePickupFee + effectiveDeliveryFee;
     return computed.isNegative ? Money.zero : computed;
   }
 
@@ -116,7 +143,8 @@ class EditProcessingOrderState {
   bool get isTotalValid => total >= totalPaid;
 
   bool get isPickupDateValid {
-    if (initialOrder != null && expectedPickupDate == initialOrder!.expectedPickupDate) {
+    if (initialOrder != null &&
+        expectedPickupDate == initialOrder!.expectedPickupDate) {
       return true;
     }
     return !expectedPickupDate.isBeforeToday;
@@ -153,7 +181,7 @@ class EditProcessingOrderState {
     Money? discount,
     Order? savedOrder,
     List<ItemType>? itemTypes,
-    List<Service>? compatibleServices,
+    List<ServiceWithPricing>? compatibleServices,
     List<ItemDefinition>? itemDefinitions,
     List<CarpetSize>? carpetSizes,
     BusinessSettings? settings,
@@ -165,8 +193,12 @@ class EditProcessingOrderState {
     bool clearDraftItemDefinition = false,
     Service? draftService,
     bool clearDraftService = false,
+    PricingType? draftPricingType,
+    bool clearDraftPricingType = false,
     Money? draftUnitPrice,
     bool clearDraftUnitPrice = false,
+    Money? draftItemTotal,
+    bool clearDraftItemTotal = false,
     int? draftQuantity,
     CarpetSize? draftCarpetSize,
     bool clearDraftCarpetSize = false,
@@ -178,21 +210,26 @@ class EditProcessingOrderState {
     return EditProcessingOrderState(
       isLoading: isLoading ?? this.isLoading,
       isSubmitting: isSubmitting ?? this.isSubmitting,
-      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
       initialOrder: initialOrder ?? this.initialOrder,
       totalPaid: totalPaid ?? this.totalPaid,
       selectedCustomer: clearSelectedCustomer
           ? null
           : (selectedCustomer ?? this.selectedCustomer),
-      customerSearchResults: customerSearchResults ?? this.customerSearchResults,
+      customerSearchResults:
+          customerSearchResults ?? this.customerSearchResults,
       isSearchingCustomer: isSearchingCustomer ?? this.isSearchingCustomer,
       items: items ?? this.items,
       deletedItemIds: deletedItemIds ?? this.deletedItemIds,
       expectedPickupDate: expectedPickupDate ?? this.expectedPickupDate,
       notes: notes ?? this.notes,
-      customerPickupRequested: customerPickupRequested ?? this.customerPickupRequested,
+      customerPickupRequested:
+          customerPickupRequested ?? this.customerPickupRequested,
       customerPickupFee: customerPickupFee ?? this.customerPickupFee,
-      customerDeliveryRequested: customerDeliveryRequested ?? this.customerDeliveryRequested,
+      customerDeliveryRequested:
+          customerDeliveryRequested ?? this.customerDeliveryRequested,
       customerDeliveryFee: customerDeliveryFee ?? this.customerDeliveryFee,
       discount: discount ?? this.discount,
       savedOrder: savedOrder ?? this.savedOrder,
@@ -204,14 +241,28 @@ class EditProcessingOrderState {
       editingItemIndex: clearEditingItemIndex
           ? null
           : (editingItemIndex ?? this.editingItemIndex),
-      draftItemType: clearDraftItemType ? null : (draftItemType ?? this.draftItemType),
+      draftItemType: clearDraftItemType
+          ? null
+          : (draftItemType ?? this.draftItemType),
       draftItemDefinition: clearDraftItemDefinition
           ? null
           : (draftItemDefinition ?? this.draftItemDefinition),
-      draftService: clearDraftService ? null : (draftService ?? this.draftService),
-      draftUnitPrice: clearDraftUnitPrice ? null : (draftUnitPrice ?? this.draftUnitPrice),
+      draftService: clearDraftService
+          ? null
+          : (draftService ?? this.draftService),
+      draftPricingType: clearDraftPricingType
+          ? null
+          : (draftPricingType ?? this.draftPricingType),
+      draftUnitPrice: clearDraftUnitPrice
+          ? null
+          : (draftUnitPrice ?? this.draftUnitPrice),
+      draftItemTotal: clearDraftItemTotal
+          ? null
+          : (draftItemTotal ?? this.draftItemTotal),
       draftQuantity: draftQuantity ?? this.draftQuantity,
-      draftCarpetSize: clearDraftCarpetSize ? null : (draftCarpetSize ?? this.draftCarpetSize),
+      draftCarpetSize: clearDraftCarpetSize
+          ? null
+          : (draftCarpetSize ?? this.draftCarpetSize),
       draftCarpetLength: draftCarpetLength ?? this.draftCarpetLength,
       draftCarpetWidth: draftCarpetWidth ?? this.draftCarpetWidth,
       draftNotes: clearDraftNotes ? null : (draftNotes ?? this.draftNotes),

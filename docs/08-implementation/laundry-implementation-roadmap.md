@@ -204,7 +204,7 @@ The Dashboard provides an operational overview of real system data without repla
   3. Items requiring storage (`itemsRequiringStorageCount` matching active orders with no active storage records via `StorageRepository.countItemsRequiringStorage()`)
   4. Outstanding payments (`totalRemaining` in piastres + `unpaidOrdersCount` for non-cancelled orders with `total - paid > 0`)
   5. Overdue orders (`overdueOrdersCount` where `expectedPickupDate < today` and order not completed or cancelled)
-  6. Today's expected pickups (`todayPickupOrdersCount` count + list capped at 5 active orders due today)
+  6. Today's expected pickups (Removed from V1 Dashboard UI)
   7. Recent orders (latest 5 orders with `PaymentSummary` remaining amount enrichment)
 - **Reactive Stream**: `DashboardRepository.watchDashboardData()` reactive via Drift `db.tableUpdates` monitoring `orders`, `payments`, `storage_records`, and `order_items` tables with zero polling and zero pending timers.
 - **Quick Actions**: All 4 actions operational:
@@ -250,7 +250,7 @@ The architecture officially supports **Bidirectional Push + Pull Synchronization
 - **Conflict Handling**: Domain-aware conflict resolution (no generic LWW). Payments are append-oriented and idempotent; Storage enforces at most one active record per `OrderItem` and rejects stale moves via server concurrency checks; Order status transitions follow lifecycle rules.
 - **Known Deferred Limitations**:
   - *Optimistic Concurrency Propagation*: Remote backend supports `server_version`, but Flutter client currently does NOT maintain local `server_version` columns and does NOT propagate `base_version` through `SyncOperation` (Deferred V1 Limitation).
-  - *Recovery & Bootstrap*: `CURSOR_TOO_OLD` is detected (`CursorTooOldException`). Full automatic resync / initial bootstrap recovery is deferred; current implementation guarantees locally pending operations in `sync_operations` are never deleted.
+  - *Recovery & Bootstrap*: `CURSOR_TOO_OLD` (HTTP 410) automated snapshot recovery is fully implemented (SUSP-01) via `GET /sync/snapshot` and `RemoteChangeApplier.applySnapshot()`. Reconstructs 13 tiers and guarantees locally pending operations in `sync_operations` are never deleted.
   - *Retention*: Synced operations retained for 90 days; automatic background purge is deferred (manual maintenance).
 
 ---
@@ -287,13 +287,14 @@ Important current constraints include:
 
 ### Pricing
 
-V1 supports only:
+Pricing belongs to the Service + Item Type relationship (`service_item_types`). Services do not own a single price.
 
-- Per Piece
-- Fixed Price
-- Per Square Meter
+V1 operational pricing supports only:
 
-Per Kg is not part of the current V1 implementation.
+- Per Piece (`per_piece`)
+- Per Square Meter (`per_square_meter`)
+
+*(Fixed Price is removed from the V1 operational model; Per Kg remains completely excluded from V1).*
 
 ### Pricing Validation
 
@@ -432,4 +433,13 @@ Task #15  Offline / Sync Integration       ✅ LOCKED (C1–C4-C Bidirectional S
 Task #16  Full Integration / QA / Hardening ✅ LOCKED (Phase 3A-C Hardening, Fresh Bootstrap & Manual QA Complete)
 ```
 
-**V1 Status**: All Tasks #01 through #16 are Completed and Locked. Current V1 implementation is complete.
+**Post-V1 Hardening & Validation Milestones**:
+- **BUG-04**: Single-Terminal Order Numbering & Immutability (`single_terminal_order_sync_test.dart`) ✅ LOCKED
+- **BUG-05**: Expense Category Update Sync (`expense_update_sync_test.dart`) ✅ LOCKED
+- **BUG-06**: Integration Test Runner Skipping & Assertion Hardening ✅ LOCKED
+- **SUSP-01**: CURSOR_TOO_OLD Recovery & 13-Tier Full Resync (`cursor_too_old_recovery_test.dart`) ✅ LOCKED
+- **SUSP-02**: Optimistic Concurrency & Base Version Control (`optimistic_concurrency_test.dart`) ✅ LOCKED
+- **FINAL-E2E**: Comprehensive Live Supabase E2E Sync Validation (`final_e2e_sync_validation_test.dart`) ✅ LOCKED
+- **AUDIT-V1**: Comprehensive V1 Product & Business Rules Audit (`v1-product-audit.md`), Standalone `/expenses` Screen & Documentation Alignment ✅ LOCKED (PASS / V1 READY)
+
+**V1 Status**: All Tasks #01 through #16, post-V1 hardening/validation milestones, and V1 Product Audit gap closures (including standalone `/expenses` screen) are Completed and Locked. Current implementation is PASS / V1 READY.

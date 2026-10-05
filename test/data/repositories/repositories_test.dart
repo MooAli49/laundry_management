@@ -48,7 +48,7 @@ void main() {
   late SettingsRepositoryImpl settingsRepository;
 
   setUp(() {
-    db = db_pkg.AppDatabase(NativeDatabase.memory());
+    db = db_pkg.AppDatabase(NativeDatabase.memory(), true);
     customersDao = CustomersDao(db);
     ordersDao = OrdersDao(db);
     paymentsDao = PaymentsDao(db);
@@ -126,8 +126,6 @@ void main() {
           db_pkg.ServicesCompanion.insert(
             id: 'srv-1',
             name: 'غسيل سجاد يدوي',
-            pricingType: 'perSquareMeter',
-            price: 2500, // 25 EGP / m2
             createdAt: now,
             updatedAt: now,
           ),
@@ -215,8 +213,6 @@ void main() {
           db_pkg.ServicesCompanion.insert(
             id: 'srv-1',
             name: 'مكواة',
-            pricingType: 'perPiece',
-            price: 1000,
             createdAt: now,
             updatedAt: now,
           ),
@@ -379,8 +375,6 @@ void main() {
           db_pkg.ServicesCompanion.insert(
             id: 'srv-1',
             name: 'غسيل',
-            pricingType: 'perPiece',
-            price: 2000,
             createdAt: now,
             updatedAt: now,
           ),
@@ -468,8 +462,6 @@ void main() {
           db_pkg.ServicesCompanion.insert(
             id: 'srv-1',
             name: 'غسيل',
-            pricingType: 'perPiece',
-            price: 2000,
             createdAt: now,
             updatedAt: now,
           ),
@@ -556,8 +548,6 @@ void main() {
           db_pkg.ServicesCompanion.insert(
             id: 'srv-1',
             name: 'غسيل',
-            pricingType: 'perPiece',
-            price: 5000,
             createdAt: now,
             updatedAt: now,
           ),
@@ -677,8 +667,6 @@ void main() {
           db_pkg.ServicesCompanion.insert(
             id: 'srv-100',
             name: 'غسيل',
-            pricingType: 'perPiece',
-            price: 1000,
             createdAt: now,
             updatedAt: now,
           ),

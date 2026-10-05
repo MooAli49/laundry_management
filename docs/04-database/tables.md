@@ -1054,9 +1054,9 @@ Historical pricing type used for this OrderItem.
 Expected V1 values:
 
     per_piece
-    per_kg
     per_square_meter
-    fixed_price
+
+*(Note: fixed_price is removed from V1, per_kg remains excluded)*
 
 The value is stored as transaction-time historical data.
 
@@ -1086,12 +1086,9 @@ Examples:
     1
 
     Per Square Meter:
-    6.25
+    6.25 (calculated area)
 
-    Fixed Price:
-    1
-
-    (Note: Per Kilogram pricing is not supported in V1 operations)
+    (Note: fixed_price has been removed as it is identical to per_piece; per_kg remains excluded from V1)
 
 The exact physical representation of decimal quantities must follow the approved implementation strategy.
 
@@ -1119,7 +1116,7 @@ Example:
     →
     10050
 
-This value must not be reconstructed from the current Service price.
+This value must not be reconstructed from current Service + Item Type pricing (`service_item_types.price`).
 
 ---
 
@@ -1969,56 +1966,17 @@ Optional Service description.
 
 ---
 
-### pricing_type
+### Pricing Configuration Note
 
-Type:
+The Service entity must NOT own a single default/current price or pricing type.
 
-    TEXT
+In this laundry system, the actual price depends on the combination of:
 
-Required:
+    Service + Item Type
 
-    Yes
+Therefore, pricing configuration belongs to the `service_item_types` table, not directly to `services`.
 
-Description:
 
-Current pricing model for the Service.
-
-Approved V1 values:
-
-    per_piece
-    per_kg
-    per_square_meter
-    fixed_price
-
----
-
-### price
-
-Type:
-
-    INTEGER
-
-Required:
-
-    Yes
-
-Description:
-
-Current configured Service price.
-
-Stored in minor currency units.
-
-Example:
-
-    100.50 EGP
-    →
-    10050
-
-This is master-data pricing.
-
-It must not be used to reconstruct historical OrderItem prices.
-
-The current Service price is editable through Settings.
 
 ---
 
@@ -2078,19 +2036,23 @@ Timestamp of the latest Service update.
 
 ## Purpose
 
-Junction table defining which Services are compatible with which Item Types.
+Associative table defining which Services are compatible with which Item Types, as well as the operational pricing configuration for each combination.
 
 Relationship:
 
     Service
-        N
+        1
         ↕
-    ServiceItemType
+    ServiceItemType (pricing_type, price)
         ↕
     ItemType
-        N
+        1
 
-This represents the many-to-many relationship between Services and Item Types.
+In this laundry system, the actual price depends on the combination of:
+
+    Service + Item Type
+
+The Service entity does NOT own a single default/current price. Pricing configuration belongs here.
 
 ---
 
@@ -2112,7 +2074,7 @@ Primary Key:
 
 Description:
 
-Stable identifier for the compatibility record.
+Stable identifier for the Service–Item Type configuration record.
 
 ---
 
@@ -2132,7 +2094,7 @@ Foreign Key:
 
 Description:
 
-Service participating in the compatibility relationship.
+Service participating in the compatibility and pricing relationship.
 
 ---
 
@@ -2156,6 +2118,51 @@ Item Type supported by the Service.
 
 ---
 
+### pricing_type
+
+Type:
+
+    TEXT
+
+Required:
+
+    Yes
+
+Description:
+
+Operational pricing type for this Service + Item Type combination.
+
+Approved V1 values:
+
+    per_piece
+    per_square_meter
+
+*(Note: fixed_price is removed from V1 operational model, per_kg remains excluded)*
+
+---
+
+### price
+
+Type:
+
+    INTEGER
+
+Required:
+
+    Yes
+
+Description:
+
+Current configured price for this Service + Item Type combination.
+
+Stored in minor currency units (e.g. 5000 = 50.00 EGP).
+
+Must be strictly positive (`price > 0`).
+
+This is master-data pricing. When an OrderItem is created, this price is snapshotted into `order_items.unit_price`. Modifying this value later does not alter historical orders.
+
+---
+
 ### created_at
 
 Type:
@@ -2168,19 +2175,39 @@ Required:
 
 Description:
 
-Timestamp when the compatibility record was created.
+Timestamp when the record was created.
 
 ---
 
-## Compatibility Rule
+### updated_at
 
-The same:
+Type:
+
+    DATETIME
+
+Required:
+
+    Yes
+
+Description:
+
+Timestamp when the record was last updated.
+
+---
+
+## Compatibility and Pricing Rules
+
+1. **Uniqueness**: The combination:
 
     service_id + item_type_id
 
-combination must not be duplicated.
+must not be duplicated. Each Service + Item Type pair has exactly one pricing configuration.
 
-This relationship determines whether a Service can be selected for a particular Item Type.
+2. **Supported Pricing Types**: Must be one of `per_piece` or `per_square_meter`.
+
+3. **Strictly Positive Price**: `price > 0` (zero and negative prices are prohibited).
+
+4. **Historical Price Stability**: Modifying `price` or `pricing_type` on `service_item_types` does not affect existing `order_items`. Existing items preserve their transaction-time `unit_price` snapshot.
 
 ---
 
@@ -3825,7 +3852,7 @@ Applicable fields include:
     orders.total
     order_items.unit_price
     order_items.calculated_total
-    services.price
+    service_item_types.price
     payments.amount
     expenses.amount
 
@@ -4139,15 +4166,19 @@ The historical StorageRecords remain preserved.
 
 ---
 
-# 39. Service Pricing Rule
+# 39. Service Pricing Configuration Rule
 
-The Service table contains the current master price.
+The Service entity does NOT own a single default/current price.
 
-The OrderItem table contains the historical transaction price.
+Pricing configuration belongs to the Service + Item Type combination in:
+
+    service_item_types
+
+The `order_items` table contains the historical transaction price (`order_items.unit_price`).
 
 Therefore:
 
-    services.price
+    service_item_types.price
 
 may change.
 
@@ -4159,18 +4190,18 @@ must remain historically stable.
 
 Example:
 
-Current Service:
+Current Service + Item Type (Washing + Blanket):
 
-    غسيل
-    150 EGP
+    بطانية + غسيل
+    100 EGP
 
 Historical OrderItem:
 
-    120 EGP
+    90 EGP
 
-Changing the Service price to:
+Changing the `service_item_types.price` to:
 
-    160 EGP
+    110 EGP
 
 does not modify the historical OrderItem price.
 
@@ -4649,6 +4680,42 @@ using:
     delivery_to_laundry_fee
     customer_delivery_requested
     customer_delivery_fee
+
+---
+
+# 57A. License Cache Table — license_cache
+
+Location:
+
+    data/local/tables/license_cache_table.dart
+
+Purpose:
+
+Stores the locally cached license verification state for offline license enforcement and 24-hour check throttling.
+
+Table definition:
+
+    CREATE TABLE license_cache (
+        id TEXT NOT NULL PRIMARY KEY DEFAULT 'singleton',
+        remote_status TEXT NOT NULL,
+        suspended_at INTEGER,
+        last_checked_at INTEGER
+    );
+
+Column details:
+
+| Column | Type | Nullable | Default | Description |
+|---|---|---|---|---|
+| `id` | TEXT | No | `'singleton'` | Technical primary key; fixed constant singleton row. |
+| `remote_status` | TEXT | No | None | Last verified remote status (`'active'` or `'suspended'`). |
+| `suspended_at` | INTEGER | Yes | NULL | Authoritative suspension UTC timestamp from remote `license_info.suspended_at`. |
+| `last_checked_at` | INTEGER | Yes | NULL | Local timestamp when remote check was last performed (used for 24h throttling). |
+
+Operational rules:
+- **Singleton**: Only one row ever exists (`id = 'singleton'`).
+- **Isolation**: Excluded from synchronization (`sync_operations` / `SyncEngine`).
+- **No Foreign Keys**: Independent infrastructure cache with no business table relationships.
+- **Migration**: Added in Drift database schema version 7.
 
 ---
 

@@ -2,12 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'app.dart';
+import 'application/license/license_service.dart';
 import 'core/di/injection.dart';
 import 'data/sync/sync_engine.dart';
 
 AppLifecycleListener? _appLifecycleListener;
+AppLifecycleListener? _licenseLifecycleListener;
 
 /// Attaches an [AppLifecycleListener] to trigger [SyncEngine.sync] when the application resumes.
 AppLifecycleListener setupAppLifecycleSync(SyncEngine syncEngine) {
@@ -30,8 +33,30 @@ void disposeAppLifecycleSync() {
   } catch (_) {}
 }
 
+/// Attaches an [AppLifecycleListener] to call [LicenseService.checkIfDue]
+/// on application resume. The service internally enforces the 24-hour
+/// throttle, so this is safe to call on every resume event.
+AppLifecycleListener setupAppLifecycleLicenseCheck(
+  LicenseService licenseService,
+) {
+  _licenseLifecycleListener?.dispose();
+  final listener = AppLifecycleListener(
+    onResume: () {
+      unawaited(licenseService.checkIfDue().catchError((_) {}));
+    },
+  );
+  _licenseLifecycleListener = listener;
+  return listener;
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Enforce Landscape-only application mode (POS / Tablet architecture)
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+  ]);
 
   // Intercept known Flutter framework assertion mismatch on Android Emulator
   // when forwarding host physical keyboard shortcuts (e.g. Ctrl+V / modifier keys).
@@ -39,14 +64,34 @@ void main() async {
   if (kDebugMode) {
     PlatformDispatcher.instance.onError = (error, stack) {
       if (error is AssertionError &&
-          error.message?.toString().contains('hardware_keyboard.dart') == true) {
+          error.message?.toString().contains('hardware_keyboard.dart') ==
+              true) {
         return true;
       }
       return false;
     };
   }
 
-  await initDependencies(enableDevTestData: kDebugMode);
+  const bool enableCanonicalSeed = bool.fromEnvironment(
+    'ENABLE_CANONICAL_SEED',
+    defaultValue: false,
+  );
+  const bool enableDevSeeds = bool.fromEnvironment(
+    'ENABLE_DEV_TEST_DATA',
+    defaultValue: false,
+  );
+
+  await initDependencies(
+    enableCanonicalSeed: enableCanonicalSeed,
+    enableDevTestData: enableDevSeeds,
+  );
+
+  // Initialize license service BEFORE runApp so GoRouter's initial redirect
+  // has the correct license status on the first frame.
+  // Fails open (active) if there is no cache and no connectivity.
+  final licenseService = getIt<LicenseService>();
+  await licenseService.initialize();
+  setupAppLifecycleLicenseCheck(licenseService);
 
   // Initialize foreground synchronization infrastructure (non-blocking)
   final syncEngine = getIt<SyncEngine>();

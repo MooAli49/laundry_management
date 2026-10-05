@@ -9,10 +9,9 @@ import 'refund_state.dart';
 class RefundCubit extends Cubit<RefundState> {
   final CreateRefundUseCase _createRefundUseCase;
 
-  RefundCubit({
-    required CreateRefundUseCase createRefundUseCase,
-  })  : _createRefundUseCase = createRefundUseCase,
-        super(const RefundState());
+  RefundCubit({required CreateRefundUseCase createRefundUseCase})
+    : _createRefundUseCase = createRefundUseCase,
+      super(const RefundState());
 
   Future<void> submitRefund({
     required String orderId,
@@ -40,12 +39,7 @@ class RefundCubit extends Cubit<RefundState> {
           reason: reason,
         ),
       );
-      emit(
-        state.copyWith(
-          isSubmitting: false,
-          refund: refund,
-        ),
-      );
+      emit(state.copyWith(isSubmitting: false, refund: refund));
     } on Failure catch (f) {
       emit(
         state.copyWith(

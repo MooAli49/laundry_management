@@ -15,8 +15,8 @@ import '../../../../core/widgets/loading_indicator.dart';
 import '../../../../domain/entities/carpet_size.dart';
 import '../../../../domain/entities/item_definition.dart';
 import '../../../../domain/entities/item_type.dart';
-import '../../../../domain/entities/service.dart';
 import '../../../../domain/enums/pricing_type.dart';
+import '../../../../domain/models/service_with_pricing.dart';
 import '../../../../domain/value_objects/money.dart';
 import '../../../../domain/value_objects/order_date.dart';
 import '../cubit/edit_processing_order_cubit.dart';
@@ -95,18 +95,14 @@ class _EditOrderViewState extends State<EditOrderView> {
   }
 
   void _syncItemFormControllers(EditProcessingOrderState state) {
-    if (state.draftUnitPrice != null) {
-      final textVal = state.draftUnitPrice!.toEgp.toStringAsFixed(2);
-      if (_priceController.text != textVal) {
-        _priceController.text = textVal;
-      }
-    } else if (state.draftService != null) {
-      final textVal = state.draftService!.price.toEgp.toStringAsFixed(2);
-      if (_priceController.text != textVal) {
-        _priceController.text = textVal;
-      }
-    } else {
+    if (state.draftService == null && state.draftItemTotal == null) {
       _priceController.clear();
+    } else {
+      final currentNum = double.tryParse(_priceController.text);
+      final targetNum = state.effectiveDraftTotal.toEgp;
+      if (currentNum == null || (currentNum - targetNum).abs() > 0.001) {
+        _priceController.text = targetNum.toStringAsFixed(2);
+      }
     }
 
     final quantityText = state.draftQuantity.toString();
@@ -229,7 +225,9 @@ class _EditOrderViewState extends State<EditOrderView> {
                 // Left Column (Financial Summary & Save Button)
                 Expanded(
                   flex: 3,
-                  child: _buildFinancialSummaryColumn(context, state, cubit),
+                  child: SingleChildScrollView(
+                    child: _buildFinancialSummaryColumn(context, state, cubit),
+                  ),
                 ),
               ],
             ),
@@ -434,10 +432,6 @@ class _EditOrderViewState extends State<EditOrderView> {
               final uniqueServices = {
                 for (final s in state.compatibleServices) s.id: s,
               }.values.toList();
-              if (state.draftService != null &&
-                  !uniqueServices.any((s) => s.id == state.draftService!.id)) {
-                uniqueServices.insert(0, state.draftService!);
-              }
               final selectedService = state.draftService != null
                   ? uniqueServices
                         .where((s) => s.id == state.draftService!.id)
@@ -556,7 +550,7 @@ class _EditOrderViewState extends State<EditOrderView> {
                           children: [
                             Text('الخدمة *', style: AppTextStyles.labelMedium),
                             AppSpacing.gapXs,
-                            DropdownButtonFormField<Service>(
+                            DropdownButtonFormField<ServiceWithPricing>(
                               key: ValueKey('service_${selectedService?.id}'),
                               initialValue: selectedService,
                               isExpanded: true,
@@ -564,11 +558,11 @@ class _EditOrderViewState extends State<EditOrderView> {
                                 hintText: 'اختر الخدمة',
                                 border: OutlineInputBorder(),
                               ),
-                              items: uniqueServices.map((service) {
+                              items: uniqueServices.map((sp) {
                                 return DropdownMenuItem(
-                                  value: service,
+                                  value: sp,
                                   child: Text(
-                                    '${service.name} (${service.price.toEgp} ج.م)',
+                                    '${sp.name} (${sp.price.toEgp} ج.م)',
                                   ),
                                 );
                               }).toList(),
@@ -584,26 +578,56 @@ class _EditOrderViewState extends State<EditOrderView> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'سعر الوحدة (ج.م) *',
-                              style: AppTextStyles.labelMedium,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'إجمالي الخدمة (ج.م) *',
+                                  style: AppTextStyles.labelMedium,
+                                ),
+                                if (state.isDraftTotalOverridden)
+                                  InkWell(
+                                    onTap: () {
+                                      cubit.resetDraftTotal();
+                                    },
+                                    child: Text(
+                                      'إعادة الحساب الافتراضي',
+                                      style: AppTextStyles.labelSmall.copyWith(
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                             AppSpacing.gapXs,
                             AppTextField(
                               controller: _priceController,
-                              hintText: 'سعر الوحدة',
+                              hintText: 'إجمالي الخدمة',
                               keyboardType:
                                   const TextInputType.numberWithOptions(
                                     decimal: true,
                                   ),
                               onChanged: (val) {
                                 final parsed = double.tryParse(val);
-                                if (parsed != null && parsed > 0) {
-                                  cubit.updateDraftUnitPrice(
-                                    Money.fromEgp(parsed),
-                                  );
+                                if (parsed != null && parsed >= 0) {
+                                  cubit.updateDraftTotal(Money.fromEgp(parsed));
                                 }
                               },
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              state.isDraftTotalOverridden
+                                  ? 'تم تعديل الإجمالي يدوياً (الافتراضي: ${state.draftDefaultTotal.toEgp.toStringAsFixed(2)} ج.م)'
+                                  : (selectedService != null
+                                        ? 'سعر الوحدة الافتراضي: ${(state.draftUnitPrice ?? selectedService.price).toEgp.toStringAsFixed(2)} ج.م'
+                                        : 'يُحسب تلقائياً من سعر الخدمة'),
+                              style: AppTextStyles.labelSmall.copyWith(
+                                color: state.isDraftTotalOverridden
+                                    ? AppColors.warning
+                                    : AppColors.textTertiary,
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         ),
@@ -683,7 +707,7 @@ class _EditOrderViewState extends State<EditOrderView> {
                   ],
 
                   // Row 4: Carpet details if perSquareMeter (independent from quantity)
-                  if (state.draftService?.pricingType ==
+                  if (state.draftPricingType ==
                       PricingType.perSquareMeter) ...[
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,

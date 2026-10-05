@@ -36,7 +36,7 @@ V1 intentionally avoids unnecessary layers such as:
 
 - Use Cases for every operation
 - Dedicated Mapper classes
-- Separate Application layer
+- Mandatory Application layer for simple operations
 - Excessive interfaces
 - Generic abstractions
 - Duplicate models without a real need
@@ -68,12 +68,18 @@ The Domain layer provides:
 - Repository contracts
 - Important domain logic
 
-The Application layer (`lib/application/use_cases/`) provides:
+The Application layer provides two distinct, explicitly approved responsibilities:
 
-- Selective orchestration for complex, multi-step business workflows (e.g. Order Creation, Storage, Relocation, Status Transitions, Completion, Cancellation)
-- Cross-repository orchestration without coupling Cubits to multi-step business logic
-- Strict pure Dart implementation (no Flutter, Drift, SQLite, or DAO dependencies)
-- Note: UseCases are NOT mandatory CRUD wrappers; simple entity operations go directly to Repositories.
+1. **Selective Domain Use Cases** (`lib/application/use_cases/`):
+   - Selective orchestration for complex, multi-step business workflows (e.g. Order Creation, Storage, Relocation, Status Transitions, Completion, Cancellation).
+   - Cross-repository orchestration without coupling Cubits to multi-step business choreography.
+   - Strict pure Dart implementation (no Flutter, Drift, SQLite, or DAO dependencies).
+   - Note: UseCases are NOT mandatory CRUD wrappers; simple entity operations go directly to Repositories.
+
+2. **Cross-Cutting Orchestration Exception: License Control** (`lib/application/license/`):
+   - `LicenseService` is an explicit, approved architectural exception in the Application layer.
+   - **Responsibility**: It orchestrates cross-cutting operational license enforcement across multiple layers: coordinating the local SQLite cache (`LicenseCacheDao`), the remote API (`LicenseRemoteDataSource`), and network connectivity (`NetworkInfo`), maintaining the local grace period expiration timer, and broadcasting effective license state changes to `LicenseGuard` which drives declarative routing in `GoRouter`.
+   - **Boundaries**: It does NOT perform business data CRUD, does NOT modify domain entities, does NOT interact with the SyncEngine outbox, and must NOT be used as a precedent to introduce generic 'Manager' or 'Service' classes for CRUD features.
 
 The Data layer provides:
 
@@ -823,7 +829,7 @@ The feature handles:
 
 Reports should use local historical data.
 
-Historical transaction values must not depend on current Service prices.
+Historical transaction values must not depend on current Service pricing configurations.
 
 ---
 
@@ -850,19 +856,31 @@ Examples of fixed V1 configuration:
 
 Pricing logic should not be implemented directly inside widgets.
 
-The pricing calculation should be performed by Domain logic or a small Domain Service when appropriate.
+The Service entity must NOT own a single default/current price.
+
+In this laundry system, the actual price depends on the combination of:
+
+> **Service + Item Type**
+
+Pricing configuration belongs to the `ServiceItemType` associative entity.
 
 Supported V1 Operational Pricing Types are:
 
-    Per Piece
-    Fixed Price
-    Per Square Meter
+    Per Piece (`per_piece`)
+    Per Square Meter (`per_square_meter`)
 
-*(Note: Per Kilogram pricing has been completely removed from the V1 operational model and workflow by locked business decision).*
+*(Note: `fixed_price` is removed from the V1 operational model because each physical item is represented as an individual OrderItem with a unit price, making fixed price functionally identical to per-piece pricing. Per Kilogram remains excluded).*
 
-Historical OrderItem pricing must be preserved.
+Example:
 
-Current Service prices must not silently recalculate old orders.
+Washing
+  ├── Clothing → per_piece → 50 EGP
+  ├── Blanket  → per_piece → 100 EGP
+  └── Carpet   → per_square_meter → 60 EGP
+
+Historical OrderItem pricing must be preserved (`order_items.unit_price`).
+
+Current Service pricing configurations must not silently recalculate old orders.
 
 ---
 

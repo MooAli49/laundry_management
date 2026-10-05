@@ -45,11 +45,10 @@ void main() {
       status: status,
       completedAt: status == OrderStatus.completed ? now : null,
       cancelledAt: status == OrderStatus.cancelled ? now : null,
-      cancellationReason:
-          status == OrderStatus.cancelled ? 'إلغاء تجريبي' : null,
-      expectedPickupDate: OrderDate.fromDate(
-        now.add(const Duration(days: 2)),
-      ),
+      cancellationReason: status == OrderStatus.cancelled
+          ? 'إلغاء تجريبي'
+          : null,
+      expectedPickupDate: OrderDate.fromDate(now.add(const Duration(days: 2))),
       subtotal: Money.fromPiastres(10000),
       discount: Money.zero,
       tax: Money.zero,
@@ -138,155 +137,154 @@ void main() {
       },
     );
 
-    testWidgets(
-      '2. Refund action hidden/not available for processing order',
-      (tester) async {
-        configureViewport(tester);
+    testWidgets('2. Refund action hidden/not available for processing order', (
+      tester,
+    ) async {
+      configureViewport(tester);
 
-        final processingState = OrderDetailState(
-          isLoading: false,
-          order: createTestOrder(status: OrderStatus.processing),
-          items: [testItem],
-          customer: testCustomer,
+      final processingState = OrderDetailState(
+        isLoading: false,
+        order: createTestOrder(status: OrderStatus.processing),
+        items: [testItem],
+        customer: testCustomer,
+        totalPaid: Money.fromPiastres(5000),
+        remainingAmount: Money.fromPiastres(5000),
+        refundBalance: const RefundBalanceSummary(
           totalPaid: Money.fromPiastres(5000),
-          remainingAmount: Money.fromPiastres(5000),
-          refundBalance: const RefundBalanceSummary(
-            totalPaid: Money.fromPiastres(5000),
-            totalRefunded: Money.zero,
-            remainingRefundable: Money.fromPiastres(5000),
+          totalRefunded: Money.zero,
+          remainingRefundable: Money.fromPiastres(5000),
+        ),
+      );
+
+      final fakeCubit = FakeOrderDetailCubit(processingState);
+      getIt.registerFactory<OrderDetailCubit>(() => fakeCubit);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: const Directionality(
+            textDirection: TextDirection.rtl,
+            child: OrderDetailScreen(orderId: 'ord-test-1'),
           ),
-        );
+        ),
+      );
+      await tester.pumpAndSettle();
 
-        final fakeCubit = FakeOrderDetailCubit(processingState);
-        getIt.registerFactory<OrderDetailCubit>(() => fakeCubit);
+      expect(find.text('استرداد المبلغ'), findsNothing);
+    });
 
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: AppTheme.lightTheme,
-            home: const Directionality(
-              textDirection: TextDirection.rtl,
-              child: OrderDetailScreen(orderId: 'ord-test-1'),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
+    testWidgets('3. Refund action hidden/not available for ready order', (
+      tester,
+    ) async {
+      configureViewport(tester);
 
-        expect(find.text('استرداد المبلغ'), findsNothing);
-      },
-    );
-
-    testWidgets(
-      '3. Refund action hidden/not available for ready order',
-      (tester) async {
-        configureViewport(tester);
-
-        final readyState = OrderDetailState(
-          isLoading: false,
-          order: createTestOrder(status: OrderStatus.ready),
-          items: [testItem],
-          customer: testCustomer,
+      final readyState = OrderDetailState(
+        isLoading: false,
+        order: createTestOrder(status: OrderStatus.ready),
+        items: [testItem],
+        customer: testCustomer,
+        totalPaid: Money.fromPiastres(10000),
+        remainingAmount: Money.zero,
+        refundBalance: const RefundBalanceSummary(
           totalPaid: Money.fromPiastres(10000),
-          remainingAmount: Money.zero,
-          refundBalance: const RefundBalanceSummary(
-            totalPaid: Money.fromPiastres(10000),
-            totalRefunded: Money.zero,
-            remainingRefundable: Money.fromPiastres(10000),
+          totalRefunded: Money.zero,
+          remainingRefundable: Money.fromPiastres(10000),
+        ),
+      );
+
+      final fakeCubit = FakeOrderDetailCubit(readyState);
+      getIt.registerFactory<OrderDetailCubit>(() => fakeCubit);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: const Directionality(
+            textDirection: TextDirection.rtl,
+            child: OrderDetailScreen(orderId: 'ord-test-1'),
           ),
-        );
+        ),
+      );
+      await tester.pumpAndSettle();
 
-        final fakeCubit = FakeOrderDetailCubit(readyState);
-        getIt.registerFactory<OrderDetailCubit>(() => fakeCubit);
+      expect(find.text('استرداد المبلغ'), findsNothing);
+    });
 
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: AppTheme.lightTheme,
-            home: const Directionality(
-              textDirection: TextDirection.rtl,
-              child: OrderDetailScreen(orderId: 'ord-test-1'),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
+    testWidgets('4. Refund action hidden/not available for completed order', (
+      tester,
+    ) async {
+      configureViewport(tester);
 
-        expect(find.text('استرداد المبلغ'), findsNothing);
-      },
-    );
-
-    testWidgets(
-      '4. Refund action hidden/not available for completed order',
-      (tester) async {
-        configureViewport(tester);
-
-        final completedState = OrderDetailState(
-          isLoading: false,
-          order: createTestOrder(status: OrderStatus.completed),
-          items: [testItem],
-          customer: testCustomer,
+      final completedState = OrderDetailState(
+        isLoading: false,
+        order: createTestOrder(status: OrderStatus.completed),
+        items: [testItem],
+        customer: testCustomer,
+        totalPaid: Money.fromPiastres(10000),
+        remainingAmount: Money.zero,
+        refundBalance: const RefundBalanceSummary(
           totalPaid: Money.fromPiastres(10000),
-          remainingAmount: Money.zero,
-          refundBalance: const RefundBalanceSummary(
-            totalPaid: Money.fromPiastres(10000),
-            totalRefunded: Money.zero,
-            remainingRefundable: Money.fromPiastres(10000),
+          totalRefunded: Money.zero,
+          remainingRefundable: Money.fromPiastres(10000),
+        ),
+      );
+
+      final fakeCubit = FakeOrderDetailCubit(completedState);
+      getIt.registerFactory<OrderDetailCubit>(() => fakeCubit);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: const Directionality(
+            textDirection: TextDirection.rtl,
+            child: OrderDetailScreen(orderId: 'ord-test-1'),
           ),
-        );
+        ),
+      );
+      await tester.pumpAndSettle();
 
-        final fakeCubit = FakeOrderDetailCubit(completedState);
-        getIt.registerFactory<OrderDetailCubit>(() => fakeCubit);
+      expect(find.text('استرداد المبلغ'), findsNothing);
+    });
 
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: AppTheme.lightTheme,
-            home: const Directionality(
-              textDirection: TextDirection.rtl,
-              child: OrderDetailScreen(orderId: 'ord-test-1'),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
+    testWidgets('5. Refund action unavailable when refundable == 0', (
+      tester,
+    ) async {
+      configureViewport(tester);
 
-        expect(find.text('استرداد المبلغ'), findsNothing);
-      },
-    );
-
-    testWidgets(
-      '5. Refund action unavailable when refundable == 0',
-      (tester) async {
-        configureViewport(tester);
-
-        final fullyRefundedCancelledState = OrderDetailState(
-          isLoading: false,
-          order: createTestOrder(status: OrderStatus.cancelled),
-          items: [testItem],
-          customer: testCustomer,
+      final fullyRefundedCancelledState = OrderDetailState(
+        isLoading: false,
+        order: createTestOrder(status: OrderStatus.cancelled),
+        items: [testItem],
+        customer: testCustomer,
+        totalPaid: Money.fromPiastres(10000),
+        remainingAmount: Money.zero,
+        refundBalance: const RefundBalanceSummary(
           totalPaid: Money.fromPiastres(10000),
-          remainingAmount: Money.zero,
-          refundBalance: const RefundBalanceSummary(
-            totalPaid: Money.fromPiastres(10000),
-            totalRefunded: Money.fromPiastres(10000),
-            remainingRefundable: Money.zero,
+          totalRefunded: Money.fromPiastres(10000),
+          remainingRefundable: Money.zero,
+        ),
+      );
+
+      final fakeCubit = FakeOrderDetailCubit(fullyRefundedCancelledState);
+      getIt.registerFactory<OrderDetailCubit>(() => fakeCubit);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: const Directionality(
+            textDirection: TextDirection.rtl,
+            child: OrderDetailScreen(orderId: 'ord-test-1'),
           ),
-        );
+        ),
+      );
+      await tester.pumpAndSettle();
 
-        final fakeCubit = FakeOrderDetailCubit(fullyRefundedCancelledState);
-        getIt.registerFactory<OrderDetailCubit>(() => fakeCubit);
-
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: AppTheme.lightTheme,
-            home: const Directionality(
-              textDirection: TextDirection.rtl,
-              child: OrderDetailScreen(orderId: 'ord-test-1'),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        // "استرداد المبلغ" action button should NOT be present
-        expect(find.text('استرداد المبلغ'), findsNothing);
-        // Notice indicating full refund was completed
-        expect(find.text('تم استرداد كامل المبلغ المدفوع بنجاح.'), findsOneWidget);
-      },
-    );
+      // "استرداد المبلغ" action button should NOT be present
+      expect(find.text('استرداد المبلغ'), findsNothing);
+      // Notice indicating full refund was completed
+      expect(
+        find.text('تم استرداد كامل المبلغ المدفوع بنجاح.'),
+        findsOneWidget,
+      );
+    });
   });
 }

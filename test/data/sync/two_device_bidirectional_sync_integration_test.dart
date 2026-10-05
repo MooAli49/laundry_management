@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -227,8 +228,6 @@ void main() {
     late String supabaseAnonKey;
     late TestDevice deviceA;
     late TestDevice deviceB;
-    bool isLiveBackendAvailable = true;
-
     final runId = (DateTime.now().microsecondsSinceEpoch % 0xFFFFFFFFFFFF)
         .toRadixString(16)
         .padLeft(12, '0');
@@ -273,25 +272,30 @@ void main() {
       drift.driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
 
       try {
-        final res = await dio.get('/customers', queryParameters: {'limit': 1});
+        final res = await dio.get('/api/v1/customers', queryParameters: {'limit': 1});
         if (res.statusCode != 200) {
-          isLiveBackendAvailable = false;
+          fail('Backend /api/v1/customers probe returned ${res.statusCode}');
         }
-      } catch (_) {
-        isLiveBackendAvailable = false;
+      } catch (e) {
+        fail('Backend probe failed: $e. Configure live Supabase before running integration tests.');
       }
-
-      if (!isLiveBackendAvailable) return;
 
       // Provision a run-scoped test service on remote Supabase before devices start
       final srvRes = await dio.post(
-        '/services',
+        '/api/v1/services',
         data: {
           'id': testServiceId,
           'name': 'خدمة سجاد C4C $runId',
-          'pricing_type': 'per_square_meter',
-          'price': 4000,
           'is_active': true,
+          'service_item_types': [
+            {
+              'id': const Uuid().v4(),
+              'service_id': testServiceId,
+              'item_type_id': '00000000-0000-0000-0001-000000000003',
+              'pricing_type': 'per_square_meter',
+              'price': 4000,
+            }
+          ],
         },
         options: Options(
           headers: {'X-Operation-ID': 'op-c4c-srv-$runId'},
@@ -302,7 +306,6 @@ void main() {
     });
 
     setUp(() async {
-      if (!isLiveBackendAvailable) return;
 
       deviceA = await TestDevice.create(
         name: 'Device A',
@@ -325,8 +328,6 @@ void main() {
               app_db.ServicesCompanion.insert(
                 id: testServiceId,
                 name: 'خدمة سجاد C4C $runId',
-                pricingType: 'per_square_meter',
-                price: 4000,
                 isActive: const drift.Value(true),
                 createdAt: now,
                 updatedAt: now,
@@ -343,6 +344,20 @@ void main() {
             now.millisecondsSinceEpoch ~/ 1000,
           ],
         );
+
+        await device.db
+            .into(device.db.serviceItemTypes)
+            .insertOnConflictUpdate(
+              app_db.ServiceItemTypesCompanion.insert(
+                id: 'sit-bidirectional-${device.name}',
+                serviceId: testServiceId,
+                itemTypeId: '00000000-0000-0000-0001-000000000003',
+                pricingType: 'per_square_meter',
+                price: 4000,
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
 
         await device.db
             .into(device.db.carpetSizes)
@@ -396,7 +411,6 @@ void main() {
     });
 
     tearDown(() async {
-      if (!isLiveBackendAvailable) return;
       await deviceA.dispose();
       await deviceB.dispose();
     });
@@ -445,8 +459,7 @@ void main() {
     test(
       'Full Bidirectional E2E Sync: A -> B Order, B -> A Payment & Storage with Zero-Echo, Realtime Signals, and Cursor Independence',
       () async {
-        if (!isLiveBackendAvailable) return;
-
+  
         final headCursor = await deviceA.syncStateDao.getLastAppliedSequence();
 
         // =====================================================================

@@ -155,33 +155,38 @@ void main() {
   );
 
   group('UAT-A — Storage Item Details in StorageItemCard', () {
-    testWidgets('renders carpet dimensions and area when carpetData is present', (tester) async {
-      await tester.pumpWidget(
-        wrapWidget(
-          StorageItemCard(
-            item: storedCarpetStorageItem,
-            onStore: () {},
-            onMove: () {},
-            onUnstore: () {},
+    testWidgets(
+      'renders carpet dimensions and area when carpetData is present',
+      (tester) async {
+        await tester.pumpWidget(
+          wrapWidget(
+            StorageItemCard(
+              item: storedCarpetStorageItem,
+              onStore: () {},
+              onMove: () {},
+              onUnstore: () {},
+            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      // Carpet dimensions & area: 2.0 × 3.0 م = 6 م²
-      expect(find.text('2.0 × 3.0 م = 6 م²'), findsOneWidget);
+        // Carpet dimensions & area: 2.0 × 3.0 م = 6 م²
+        expect(find.text('2.0 × 3.0 م = 6 م²'), findsOneWidget);
 
-      // Existing identification information remains intact
-      expect(find.text('سجاد'), findsOneWidget);
-      expect(find.text('صوف'), findsOneWidget);
-      expect(find.textContaining('غسيل سجاد'), findsOneWidget);
-      expect(find.text('#26-101'), findsOneWidget);
-      expect(find.textContaining('محمد أحمد'), findsWidgets);
-      expect(find.textContaining('بقعة حبر في الزاوية'), findsOneWidget);
-      expect(find.text('رف السجاد أ1'), findsOneWidget);
-    });
+        // Existing identification information remains intact
+        expect(find.text('سجاد'), findsOneWidget);
+        expect(find.text('صوف'), findsOneWidget);
+        expect(find.textContaining('غسيل سجاد'), findsOneWidget);
+        expect(find.text('#26-101'), findsOneWidget);
+        expect(find.textContaining('محمد أحمد'), findsWidgets);
+        expect(find.textContaining('بقعة حبر في الزاوية'), findsOneWidget);
+        expect(find.text('رف السجاد أ1'), findsOneWidget);
+      },
+    );
 
-    testWidgets('does NOT render carpet dimensions for non-carpet items', (tester) async {
+    testWidgets('does NOT render carpet dimensions for non-carpet items', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         wrapWidget(
           StorageItemCard(
@@ -205,52 +210,61 @@ void main() {
   });
 
   group('UAT-A — Storage Item Details in MoveStorageDialog', () {
-    testWidgets('displays rich item summary including carpet dimensions and current location', (tester) async {
-      await tester.pumpWidget(
-        wrapWidget(
-          MoveStorageDialog(
-            item: storedCarpetStorageItem,
-            destinationLocations: [testDestinationLocation],
-            onConfirm: (_) async {},
+    testWidgets(
+      'displays rich item summary including carpet dimensions and current location',
+      (tester) async {
+        await tester.pumpWidget(
+          wrapWidget(
+            MoveStorageDialog(
+              item: storedCarpetStorageItem,
+              destinationLocations: [testDestinationLocation],
+              onConfirm: (_) async {},
+            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      // Should display type and definition
-      expect(find.textContaining('سجاد'), findsWidgets);
-      expect(find.textContaining('صوف'), findsWidgets);
-      // Dimensions
-      expect(find.textContaining('2.0 × 3.0 م = 6 م²'), findsOneWidget);
-      // Service
-      expect(find.textContaining('غسيل سجاد'), findsWidgets);
-      // Order number and customer name
-      expect(find.textContaining('#26-101'), findsWidgets);
-      expect(find.textContaining('محمد أحمد'), findsWidgets);
-      // Current location
-      expect(find.textContaining('الموقع الحالي: رف السجاد أ1'), findsOneWidget);
-    });
+        // Should display type and definition
+        expect(find.textContaining('سجاد'), findsWidgets);
+        expect(find.textContaining('صوف'), findsWidgets);
+        // Dimensions
+        expect(find.textContaining('2.0 × 3.0 م = 6 م²'), findsOneWidget);
+        // Service
+        expect(find.textContaining('غسيل سجاد'), findsWidgets);
+        // Order number and customer name
+        expect(find.textContaining('#26-101'), findsWidgets);
+        expect(find.textContaining('محمد أحمد'), findsWidgets);
+        // Current location
+        expect(
+          find.textContaining('الموقع الحالي: رف السجاد أ1'),
+          findsOneWidget,
+        );
+      },
+    );
   });
 
   group('UAT-A — Storage Item Details in StoreStorageDialog', () {
-    testWidgets('displays rich item summary including carpet dimensions for single item store', (tester) async {
-      await tester.pumpWidget(
-        wrapWidget(
-          StoreStorageDialog(
-            itemsToStore: [unstoredCarpetStorageItem],
-            availableLocations: [testDestinationLocation],
-            onConfirm: (_) async {},
+    testWidgets(
+      'displays rich item summary including carpet dimensions for single item store',
+      (tester) async {
+        await tester.pumpWidget(
+          wrapWidget(
+            StoreStorageDialog(
+              itemsToStore: [unstoredCarpetStorageItem],
+              availableLocations: [testDestinationLocation],
+              onConfirm: (_) async {},
+            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      // Type, definition, dimensions
-      expect(find.textContaining('سجاد'), findsWidgets);
-      expect(find.textContaining('صوف'), findsWidgets);
-      expect(find.textContaining('2.0 × 3.0 م = 6 م²'), findsOneWidget);
-      expect(find.textContaining('#26-101'), findsWidgets);
-      expect(find.textContaining('محمد أحمد'), findsWidgets);
-    });
+        // Type, definition, dimensions
+        expect(find.textContaining('سجاد'), findsWidgets);
+        expect(find.textContaining('صوف'), findsWidgets);
+        expect(find.textContaining('2.0 × 3.0 م = 6 م²'), findsOneWidget);
+        expect(find.textContaining('#26-101'), findsWidgets);
+        expect(find.textContaining('محمد أحمد'), findsWidgets);
+      },
+    );
   });
 }

@@ -7,8 +7,10 @@ import 'package:laundry_management/domain/entities/item_type.dart';
 import 'package:laundry_management/domain/entities/order.dart';
 import 'package:laundry_management/domain/entities/order_item.dart';
 import 'package:laundry_management/domain/entities/service.dart';
+import 'package:laundry_management/domain/entities/service_item_type.dart';
 import 'package:laundry_management/domain/enums/order_status.dart';
 import 'package:laundry_management/domain/enums/pricing_type.dart';
+import 'package:laundry_management/domain/models/service_with_pricing.dart';
 import 'package:laundry_management/domain/entities/payment.dart';
 import 'package:laundry_management/domain/enums/payment_method.dart';
 import 'package:laundry_management/domain/repositories/customer_repository.dart';
@@ -52,14 +54,26 @@ class FakeCustomerRepository implements CustomerRepository {
 
 class FakeServiceRepository implements ServiceRepository {
   final Map<String, Service> services = {};
-  final Map<String, List<Service>> servicesByItemType = {};
+  final Map<String, List<ServiceWithPricing>> servicesByItemType = {};
+  final Map<String, ServiceItemType> serviceItemTypes = {};
 
   @override
   Future<Service?> getServiceById(String id) async => services[id];
 
   @override
-  Future<List<Service>> getServicesForItemType(String itemTypeId) async =>
+  Future<List<ServiceWithPricing>> getServicesForItemType(String itemTypeId) async =>
       servicesByItemType[itemTypeId] ?? [];
+
+  @override
+  Future<ServiceItemType?> getServiceItemType(
+    String serviceId,
+    String itemTypeId,
+  ) async =>
+      serviceItemTypes['$serviceId:$itemTypeId'];
+
+  @override
+  Future<List<ServiceItemType>> getServiceItemTypes(String serviceId) async =>
+      serviceItemTypes.values.where((sit) => sit.serviceId == serviceId).toList();
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -164,51 +178,65 @@ void main() {
     final washIronService = Service(
       id: 'srv-wash-iron',
       name: 'غسيل ومكواة',
-      pricingType: PricingType.perPiece,
-      price: const Money.fromPiastres(1500), // 15 EGP
       isActive: true,
       createdAt: now,
       updatedAt: now,
     );
     serviceRepo.services['srv-wash-iron'] = washIronService;
-
-    final fixedService = Service(
-      id: 'srv-fixed',
-      name: 'خدمة بسعر ثابت',
-      pricingType: PricingType.fixedPrice,
-      price: const Money.fromPiastres(2500),
-      isActive: true,
+    final sitWashIron = ServiceItemType(
+      id: 'sit-wash-iron-clothes',
+      serviceId: 'srv-wash-iron',
+      itemTypeId: 'type-clothes',
+      pricingType: PricingType.perPiece,
+      price: const Money.fromPiastres(1500), // 15 EGP
       createdAt: now,
       updatedAt: now,
     );
-    serviceRepo.services['srv-fixed'] = fixedService;
+    serviceRepo.serviceItemTypes['srv-wash-iron:type-clothes'] = sitWashIron;
     serviceRepo.servicesByItemType['type-clothes'] = [
-      washIronService,
-      fixedService,
+      ServiceWithPricing(service: washIronService, serviceItemType: sitWashIron),
     ];
 
     final carpetService = Service(
       id: 'srv-carpet',
       name: 'غسيل سجاد',
-      pricingType: PricingType.perSquareMeter,
-      price: const Money.fromPiastres(3000), // 30 EGP / m2
       isActive: true,
       createdAt: now,
       updatedAt: now,
     );
     serviceRepo.services['srv-carpet'] = carpetService;
-    serviceRepo.servicesByItemType['type-carpet'] = [carpetService];
+    final sitCarpet = ServiceItemType(
+      id: 'sit-carpet-carpet',
+      serviceId: 'srv-carpet',
+      itemTypeId: 'type-carpet',
+      pricingType: PricingType.perSquareMeter,
+      price: const Money.fromPiastres(3000), // 30 EGP / m2
+      createdAt: now,
+      updatedAt: now,
+    );
+    serviceRepo.serviceItemTypes['srv-carpet:type-carpet'] = sitCarpet;
+    serviceRepo.servicesByItemType['type-carpet'] = [
+      ServiceWithPricing(service: carpetService, serviceItemType: sitCarpet),
+    ];
 
     final inactiveService = Service(
       id: 'srv-inactive',
       name: 'خدمة ملغاة',
-      pricingType: PricingType.perPiece,
-      price: const Money.fromPiastres(1000),
       isActive: false,
       createdAt: now,
       updatedAt: now,
     );
     serviceRepo.services['srv-inactive'] = inactiveService;
+    final sitInactive = ServiceItemType(
+      id: 'sit-inactive-clothes',
+      serviceId: 'srv-inactive',
+      itemTypeId: 'type-clothes',
+      pricingType: PricingType.perPiece,
+      price: const Money.fromPiastres(1000),
+      createdAt: now,
+      updatedAt: now,
+    );
+    serviceRepo.serviceItemTypes['srv-inactive:type-clothes'] = sitInactive;
   });
 
   group('CreateOrderUseCase', () {
@@ -574,31 +602,28 @@ void main() {
       );
     });
 
-    test('rejects carpetData for fixedPrice pricing', () async {
-      expect(
-        () => useCase.execute(
-          CreateOrderInput(
-            customerId: 'cust-1',
-            expectedPickupDate: OrderDate.today(),
-            items: [
-              const CreateOrderItemInput(
-                itemTypeId: 'type-clothes',
-                serviceId: 'srv-fixed',
-                physicalQuantity: 1,
-                carpetData: CarpetItemInput(length: 2.0, width: 3.0),
-              ),
-            ],
+    test(
+      'rejects incompatible service when ServiceItemType configuration is missing',
+      () async {
+        // srv-carpet is configured only for type-carpet, not for type-clothes
+        expect(
+          () => useCase.execute(
+            CreateOrderInput(
+              customerId: 'cust-1',
+              expectedPickupDate: OrderDate.today(),
+              items: [
+                const CreateOrderItemInput(
+                  itemTypeId: 'type-clothes',
+                  serviceId: 'srv-carpet',
+                  physicalQuantity: 1,
+                ),
+              ],
+            ),
           ),
-        ),
-        throwsA(
-          isA<ValidationFailure>().having(
-            (e) => e.message,
-            'message',
-            contains('Carpet data is not allowed'),
-          ),
-        ),
-      );
-    });
+          throwsA(isA<IncompatibleServiceFailure>()),
+        );
+      },
+    );
 
     test('rejects perSquareMeter pricing without carpetData', () async {
       expect(
@@ -684,47 +709,53 @@ void main() {
     });
 
     group('Advance Payment (Initial Payment)', () {
-      test('passes null initialPayment to repository when not provided', () async {
-        final result = await useCase.execute(
-          CreateOrderInput(
-            customerId: 'cust-1',
-            expectedPickupDate: OrderDate.today(),
-            items: [
-              const CreateOrderItemInput(
-                itemTypeId: 'type-clothes',
-                serviceId: 'srv-wash-iron',
-                physicalQuantity: 1,
-              ),
-            ],
-          ),
-        );
-
-        expect(result, isNotNull);
-        expect(orderRepo.lastCreatedInitialPayment, isNull);
-      });
-
-      test('passes null initialPayment to repository when amount is zero', () async {
-        final result = await useCase.execute(
-          CreateOrderInput(
-            customerId: 'cust-1',
-            expectedPickupDate: OrderDate.today(),
-            initialPayment: const InitialPaymentInput(
-              amount: Money.zero,
-              paymentMethod: PaymentMethod.cash,
+      test(
+        'passes null initialPayment to repository when not provided',
+        () async {
+          final result = await useCase.execute(
+            CreateOrderInput(
+              customerId: 'cust-1',
+              expectedPickupDate: OrderDate.today(),
+              items: [
+                const CreateOrderItemInput(
+                  itemTypeId: 'type-clothes',
+                  serviceId: 'srv-wash-iron',
+                  physicalQuantity: 1,
+                ),
+              ],
             ),
-            items: [
-              const CreateOrderItemInput(
-                itemTypeId: 'type-clothes',
-                serviceId: 'srv-wash-iron',
-                physicalQuantity: 1,
-              ),
-            ],
-          ),
-        );
+          );
 
-        expect(result, isNotNull);
-        expect(orderRepo.lastCreatedInitialPayment, isNull);
-      });
+          expect(result, isNotNull);
+          expect(orderRepo.lastCreatedInitialPayment, isNull);
+        },
+      );
+
+      test(
+        'passes null initialPayment to repository when amount is zero',
+        () async {
+          final result = await useCase.execute(
+            CreateOrderInput(
+              customerId: 'cust-1',
+              expectedPickupDate: OrderDate.today(),
+              initialPayment: const InitialPaymentInput(
+                amount: Money.zero,
+                paymentMethod: PaymentMethod.cash,
+              ),
+              items: [
+                const CreateOrderItemInput(
+                  itemTypeId: 'type-clothes',
+                  serviceId: 'srv-wash-iron',
+                  physicalQuantity: 1,
+                ),
+              ],
+            ),
+          );
+
+          expect(result, isNotNull);
+          expect(orderRepo.lastCreatedInitialPayment, isNull);
+        },
+      );
 
       test('rejects negative initial payment with ValidationFailure', () async {
         expect(
@@ -755,16 +786,50 @@ void main() {
         );
       });
 
-      test('rejects initial payment exceeding order total with BusinessRuleFailure', () async {
-        // Total = 1500 piastres
-        expect(
-          () => useCase.execute(
+      test(
+        'rejects initial payment exceeding order total with BusinessRuleFailure',
+        () async {
+          // Total = 1500 piastres
+          expect(
+            () => useCase.execute(
+              CreateOrderInput(
+                customerId: 'cust-1',
+                expectedPickupDate: OrderDate.today(),
+                initialPayment: const InitialPaymentInput(
+                  amount: Money.fromPiastres(2000), // > 1500
+                  paymentMethod: PaymentMethod.cash,
+                ),
+                items: [
+                  const CreateOrderItemInput(
+                    itemTypeId: 'type-clothes',
+                    serviceId: 'srv-wash-iron',
+                    physicalQuantity: 1,
+                  ),
+                ],
+              ),
+            ),
+            throwsA(
+              isA<BusinessRuleFailure>().having(
+                (f) => f.message,
+                'message',
+                'Initial payment cannot exceed order total',
+              ),
+            ),
+          );
+        },
+      );
+
+      test(
+        'creates and passes Payment entity to repository for valid partial initial payment',
+        () async {
+          // Total = 1500 piastres (15 EGP)
+          final result = await useCase.execute(
             CreateOrderInput(
               customerId: 'cust-1',
               expectedPickupDate: OrderDate.today(),
               initialPayment: const InitialPaymentInput(
-                amount: Money.fromPiastres(2000), // > 1500
-                paymentMethod: PaymentMethod.cash,
+                amount: Money.fromPiastres(500),
+                paymentMethod: PaymentMethod.instapay,
               ),
               items: [
                 const CreateOrderItemInput(
@@ -774,103 +839,81 @@ void main() {
                 ),
               ],
             ),
-          ),
-          throwsA(
-            isA<BusinessRuleFailure>().having(
-              (f) => f.message,
-              'message',
-              'Initial payment cannot exceed order total',
-            ),
-          ),
-        );
-      });
+          );
 
-      test('creates and passes Payment entity to repository for valid partial initial payment', () async {
-        // Total = 1500 piastres (15 EGP)
-        final result = await useCase.execute(
-          CreateOrderInput(
-            customerId: 'cust-1',
-            expectedPickupDate: OrderDate.today(),
-            initialPayment: const InitialPaymentInput(
-              amount: Money.fromPiastres(500),
-              paymentMethod: PaymentMethod.instapay,
-            ),
-            items: [
-              const CreateOrderItemInput(
-                itemTypeId: 'type-clothes',
-                serviceId: 'srv-wash-iron',
-                physicalQuantity: 1,
+          expect(result, isNotNull);
+          final payment = orderRepo.lastCreatedInitialPayment;
+          expect(payment, isNotNull);
+          expect(payment!.amount, const Money.fromPiastres(500));
+          expect(payment.paymentMethod, PaymentMethod.instapay);
+          expect(payment.orderId, result.id);
+        },
+      );
+
+      test(
+        'creates and passes Payment entity for full initial payment (100% total)',
+        () async {
+          // Total = 1500 piastres
+          final result = await useCase.execute(
+            CreateOrderInput(
+              customerId: 'cust-1',
+              expectedPickupDate: OrderDate.today(),
+              initialPayment: const InitialPaymentInput(
+                amount: Money.fromPiastres(1500),
+                paymentMethod: PaymentMethod.ewallet,
               ),
-            ],
-          ),
-        );
-
-        expect(result, isNotNull);
-        final payment = orderRepo.lastCreatedInitialPayment;
-        expect(payment, isNotNull);
-        expect(payment!.amount, const Money.fromPiastres(500));
-        expect(payment.paymentMethod, PaymentMethod.instapay);
-        expect(payment.orderId, result.id);
-      });
-
-      test('creates and passes Payment entity for full initial payment (100% total)', () async {
-        // Total = 1500 piastres
-        final result = await useCase.execute(
-          CreateOrderInput(
-            customerId: 'cust-1',
-            expectedPickupDate: OrderDate.today(),
-            initialPayment: const InitialPaymentInput(
-              amount: Money.fromPiastres(1500),
-              paymentMethod: PaymentMethod.ewallet,
+              items: [
+                const CreateOrderItemInput(
+                  itemTypeId: 'type-clothes',
+                  serviceId: 'srv-wash-iron',
+                  physicalQuantity: 1,
+                ),
+              ],
             ),
-            items: [
-              const CreateOrderItemInput(
-                itemTypeId: 'type-clothes',
-                serviceId: 'srv-wash-iron',
-                physicalQuantity: 1,
+          );
+
+          expect(result, isNotNull);
+          final payment = orderRepo.lastCreatedInitialPayment;
+          expect(payment, isNotNull);
+          expect(payment!.amount, const Money.fromPiastres(1500));
+          expect(payment.paymentMethod, PaymentMethod.ewallet);
+          expect(payment.orderId, result.id);
+        },
+      );
+
+      test(
+        'creates and passes Payment entity for full initial payment including tax',
+        () async {
+          // Subtotal = 1500, Tax = 210, Total = 1710 piastres
+          final result = await useCase.execute(
+            CreateOrderInput(
+              customerId: 'cust-1',
+              expectedPickupDate: OrderDate.today(),
+              tax: const Money.fromPiastres(210),
+              initialPayment: const InitialPaymentInput(
+                amount: Money.fromPiastres(1710),
+                paymentMethod: PaymentMethod.instapay,
               ),
-            ],
-          ),
-        );
-
-        expect(result, isNotNull);
-        final payment = orderRepo.lastCreatedInitialPayment;
-        expect(payment, isNotNull);
-        expect(payment!.amount, const Money.fromPiastres(1500));
-        expect(payment.paymentMethod, PaymentMethod.ewallet);
-        expect(payment.orderId, result.id);
-      });
-
-      test('creates and passes Payment entity for full initial payment including tax', () async {
-        // Subtotal = 1500, Tax = 210, Total = 1710 piastres
-        final result = await useCase.execute(
-          CreateOrderInput(
-            customerId: 'cust-1',
-            expectedPickupDate: OrderDate.today(),
-            tax: const Money.fromPiastres(210),
-            initialPayment: const InitialPaymentInput(
-              amount: Money.fromPiastres(1710),
-              paymentMethod: PaymentMethod.instapay,
+              items: [
+                const CreateOrderItemInput(
+                  itemTypeId: 'type-clothes',
+                  serviceId: 'srv-wash-iron',
+                  physicalQuantity: 1,
+                ),
+              ],
             ),
-            items: [
-              const CreateOrderItemInput(
-                itemTypeId: 'type-clothes',
-                serviceId: 'srv-wash-iron',
-                physicalQuantity: 1,
-              ),
-            ],
-          ),
-        );
+          );
 
-        expect(result, isNotNull);
-        expect(result.tax, const Money.fromPiastres(210));
-        expect(result.total, const Money.fromPiastres(1710));
-        final payment = orderRepo.lastCreatedInitialPayment;
-        expect(payment, isNotNull);
-        expect(payment!.amount, const Money.fromPiastres(1710));
-        expect(payment.paymentMethod, PaymentMethod.instapay);
-        expect(payment.orderId, result.id);
-      });
+          expect(result, isNotNull);
+          expect(result.tax, const Money.fromPiastres(210));
+          expect(result.total, const Money.fromPiastres(1710));
+          final payment = orderRepo.lastCreatedInitialPayment;
+          expect(payment, isNotNull);
+          expect(payment!.amount, const Money.fromPiastres(1710));
+          expect(payment.paymentMethod, PaymentMethod.instapay);
+          expect(payment.orderId, result.id);
+        },
+      );
 
       test('rejects negative tax with ValidationFailure', () async {
         expect(
@@ -891,6 +934,49 @@ void main() {
           throwsA(isA<ValidationFailure>()),
         );
       });
+
+      test(
+        'HIGH-01: sets quantity = calculated area for perSquareMeter, and quantity = 1.0 for perPiece',
+        () async {
+          final result = await useCase.execute(
+            CreateOrderInput(
+              customerId: 'cust-1',
+              expectedPickupDate: OrderDate.today(),
+              items: [
+                const CreateOrderItemInput(
+                  itemTypeId: 'type-clothes',
+                  serviceId: 'srv-wash-iron',
+                  physicalQuantity: 2,
+                ),
+                const CreateOrderItemInput(
+                  itemTypeId: 'type-carpet',
+                  serviceId: 'srv-carpet',
+                  physicalQuantity: 1,
+                  carpetData: CarpetItemInput(
+                    length: 2.0,
+                    width: 3.0,
+                  ),
+                ),
+              ],
+            ),
+          );
+
+          expect(result, isNotNull);
+          final items = orderRepo.lastCreatedItems!;
+          expect(items.length, equals(3));
+
+          // Clothes items: perPiece, quantity = 1.0
+          expect(items[0].pricingType, equals(PricingType.perPiece));
+          expect(items[0].quantity, equals(1.0));
+          expect(items[1].pricingType, equals(PricingType.perPiece));
+          expect(items[1].quantity, equals(1.0));
+
+          // Carpet item: perSquareMeter, quantity = area (6.0)
+          expect(items[2].pricingType, equals(PricingType.perSquareMeter));
+          expect(items[2].quantity, equals(6.0));
+          expect(items[2].carpetData!.area, equals(6.0));
+        },
+      );
     });
   });
 }

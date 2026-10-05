@@ -8,11 +8,14 @@ void main() {
     late final SupabaseConfig config;
     late final Dio directPostgrestDio;
     late final Dio edgeFunctionDio;
-    bool isNetworkAvailable = true;
 
     setUpAll(() async {
       config = SupabaseConfig.resolve();
-      edgeFunctionDio = DioClient(config: config).dio;
+      edgeFunctionDio = DioClient(
+        baseUrl: '${config.apiUrl}/api/v1',
+        receiveTimeout: const Duration(seconds: 30),
+        connectTimeout: const Duration(seconds: 30),
+      ).dio;
 
       // Direct client simulating an untrusted external client targeting PostgREST endpoints directly
       directPostgrestDio = Dio(
@@ -29,19 +32,21 @@ void main() {
       );
 
       try {
-        final res = await edgeFunctionDio.get('/customers', queryParameters: {'limit': 1});
+        final res = await edgeFunctionDio.get(
+          '/customers',
+          queryParameters: {'limit': 1},
+        );
         if (res.statusCode != 200) {
-          isNetworkAvailable = false;
+          fail('Backend /customers probe returned ${res.statusCode}');
         }
-      } catch (_) {
-        isNetworkAvailable = false;
+      } catch (e) {
+        fail('Backend probe failed: $e. Configure live Supabase before running integration tests.');
       }
     });
 
     test(
       'Direct PostgREST RPC get_sync_changes is forbidden for anon role (HTTP 401/403)',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await directPostgrestDio.post(
           '/rest/v1/rpc/get_sync_changes',
@@ -56,7 +61,6 @@ void main() {
     test(
       'Direct PostgREST RPC sync_create_customer is forbidden for anon role (HTTP 401/403)',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await directPostgrestDio.post(
           '/rest/v1/rpc/sync_create_customer',
@@ -74,7 +78,6 @@ void main() {
     test(
       'Direct PostgREST table SELECT on customers returns empty set under RLS default-deny',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await directPostgrestDio.get('/rest/v1/customers');
 
@@ -87,7 +90,6 @@ void main() {
     test(
       'Edge Function /sync/changes remains authorized and functional via service-role bridge',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await edgeFunctionDio.get(
           '/sync/changes',
@@ -103,7 +105,6 @@ void main() {
     test(
       'Edge Function /customers remains authorized and functional via service-role bridge',
       () async {
-        if (!isNetworkAvailable) return;
 
         final res = await edgeFunctionDio.get(
           '/customers',

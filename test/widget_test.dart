@@ -41,9 +41,8 @@ class _FakeSyncEngine implements SyncEngine {
       StreamController<SyncEngineState>.broadcast();
 
   @override
-  SyncEngineState get state => SyncEngineState.completed(
-        lastSyncTime: DateTime(2026, 9, 24),
-      );
+  SyncEngineState get state =>
+      SyncEngineState.completed(lastSyncTime: DateTime(2026, 9, 24));
 
   @override
   Stream<SyncEngineState> get stateStream => _stateController.stream;

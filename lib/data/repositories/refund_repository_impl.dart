@@ -24,11 +24,11 @@ class RefundRepositoryImpl implements RefundRepository {
     required OrdersDao ordersDao,
     required SyncOperationsDao syncOperationsDao,
     required app_db.AppDatabase db,
-  })  : _refundsDao = refundsDao,
-        _paymentsDao = paymentsDao,
-        _ordersDao = ordersDao,
-        _syncOperationsDao = syncOperationsDao,
-        _db = db;
+  }) : _refundsDao = refundsDao,
+       _paymentsDao = paymentsDao,
+       _ordersDao = ordersDao,
+       _syncOperationsDao = syncOperationsDao,
+       _db = db;
 
   @override
   Future<Refund> createRefund(Refund refund) async {
@@ -65,9 +65,7 @@ class RefundRepositoryImpl implements RefundRepository {
           );
         }
 
-        await _refundsDao.insertRefund(
-          RefundMapper.toCompanion(refund),
-        );
+        await _refundsDao.insertRefund(RefundMapper.toCompanion(refund));
 
         await _syncOperationsDao.recordOperation(
           entityType: 'refund',
@@ -139,8 +137,9 @@ class RefundRepositoryImpl implements RefundRepository {
         throw ValidationFailure('Order with id $orderId not found');
       }
       final paidPiastres = await _paymentsDao.getTotalPaidForOrder(orderId);
-      final refundedPiastres =
-          await _refundsDao.getTotalRefundedForOrder(orderId);
+      final refundedPiastres = await _refundsDao.getTotalRefundedForOrder(
+        orderId,
+      );
       final remaining = paidPiastres - refundedPiastres;
       return Money.fromPiastres(remaining > 0 ? remaining : 0);
     } catch (e) {
@@ -159,8 +158,9 @@ class RefundRepositoryImpl implements RefundRepository {
         throw ValidationFailure('Order with id $orderId not found');
       }
       final paidPiastres = await _paymentsDao.getTotalPaidForOrder(orderId);
-      final refundedPiastres =
-          await _refundsDao.getTotalRefundedForOrder(orderId);
+      final refundedPiastres = await _refundsDao.getTotalRefundedForOrder(
+        orderId,
+      );
       final remaining = paidPiastres - refundedPiastres;
       return RefundBalanceSummary(
         totalPaid: Money.fromPiastres(paidPiastres),

@@ -1,7 +1,6 @@
 enum PricingType {
   perPiece('per_piece'),
-  perSquareMeter('per_square_meter'),
-  fixedPrice('fixed_price');
+  perSquareMeter('per_square_meter');
 
   final String value;
 

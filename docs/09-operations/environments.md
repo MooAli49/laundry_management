@@ -46,8 +46,8 @@ This document establishes the official multi-environment architecture, isolation
 - **URL Root**: `https://rvrskluqfbrkvvlxtxfp.supabase.co`
 - **Edge Function API URL**: `https://rvrskluqfbrkvvlxtxfp.supabase.co/functions/v1/api`
 
-### 3.2 Applied Migrations (14 Total)
-The production database was provisioned using `npx supabase db push` across all 14 repository migrations in chronological order:
+### 3.2 Applied Migrations (15 Total)
+The production database was provisioned using `npx supabase db push` across all 15 repository migrations in chronological order:
 1. `20260916000000_step8_sync_schema.sql`
 2. `20260916000001_sync_rpc_functions.sql`
 3. `20260916000002_payments_schema.sql`
@@ -62,11 +62,12 @@ The production database was provisioned using `npx supabase db push` across all 
 12. `20260924000000_refunds_schema.sql`
 13. `20260925000000_customer_address.sql`
 14. `20260926000000_security_hardening.sql`
+15. `20260930000000_license_info.sql`
 
 ### 3.3 Database Security & Posture Verification
 - **Advisors Report**: `npx supabase db advisors --linked` reports **0 issues found** (0 warnings, 0 errors).
-- **Public Tables**: Exactly 19 tables in `public` schema.
-- **Row Level Security (RLS)**: Enabled with default-deny on all 19 public tables (`policy_count = 0`).
+- **Public Tables**: Exactly 20 tables in `public` schema (including `license_info`).
+- **Row Level Security (RLS)**: Enabled with default-deny on all 20 public tables (`policy_count = 0`).
 - **Direct Table DML Permissions**: Direct `INSERT`, `UPDATE`, `DELETE`, and `TRUNCATE` revoked from `PUBLIC`, `anon`, and `authenticated` roles.
 - **Stored Functions (26 Total)**:
   - All 26 functions configured as `SECURITY DEFINER`.

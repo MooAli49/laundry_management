@@ -27,11 +27,8 @@ class RefundBalanceSummary {
           remainingRefundable == other.remainingRefundable;
 
   @override
-  int get hashCode => Object.hash(
-        totalPaid,
-        totalRefunded,
-        remainingRefundable,
-      );
+  int get hashCode =>
+      Object.hash(totalPaid, totalRefunded, remainingRefundable);
 
   @override
   String toString() =>

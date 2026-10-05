@@ -5,7 +5,7 @@ enum OrderListFilter {
   today('طلبات اليوم'),
   processing('قيد التجهيز'),
   ready('جاهز'),
-  todayPickup('استلام اليوم'),
+  todayPickup('تسليمات اليوم'),
   overdue('طلبات متأخرة'),
   hasRemaining('يوجد مبلغ متبقي'),
   completed('مكتمل'),

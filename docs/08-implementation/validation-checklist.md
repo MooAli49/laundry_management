@@ -1432,7 +1432,7 @@ Never silently invent a new rule during implementation.
 - [x] Remote tables `item_types`, `item_definitions`, `carpet_sizes`, `storage_locations`, `storage_location_item_types`, and `business_settings` created with RLS and default-deny policies.
 - [x] Unique constraints enforced: `item_types(name)`, `item_definitions(item_type_id, name)`, `carpet_sizes(length, width)`, `storage_locations(name)`.
 - [x] Foreign key constraints enforced: `item_definitions.item_type_id -> item_types.id`, `storage_location_item_types -> storage_locations.id, item_types.id`.
-- [x] Check constraints enforced: `carpet_sizes` dimensions > 0, `item_definitions` default_price >= 0, `business_settings.tax_rate >= 0 AND <= 1`.
+- [x] Check constraints enforced: `carpet_sizes` dimensions > 0, `business_settings.tax_rate >= 0 AND <= 1`.
 - [x] 9 PostgreSQL RPCs deployed with `SECURITY DEFINER` and ACID transactions with idempotency logging in `sync_idempotency_log`.
 - [x] Replaying operations with identical `X-Operation-ID` returns cached response without duplicate mutations.
 - [x] Edge Function `api` routes `/item-types`, `/item-definitions`, `/carpet-sizes`, `/storage-locations`, `/business-settings` deployed (version 5) and operational.
@@ -1457,15 +1457,13 @@ Never silently invent a new rule during implementation.
   - `totalRemaining`: remaining balance in minor units (piastres) on non-cancelled orders (`total - paid > 0`).
   - `unpaidOrdersCount`: count of non-cancelled orders with positive remaining balance.
   - `overdueOrdersCount`: active orders (`status != completed AND status != cancelled`) with `expectedPickupDate < today`.
-  - `todayPickupOrdersCount`: active orders with `expectedPickupDate == today`.
 - [x] Order lists:
-  - `todayPickupOrders`: up to 5 active orders scheduled for pickup today, sorted by pickup date ascending.
   - `recentOrders`: up to 5 latest orders created, sorted by `createdAt` descending, enriched with `PaymentSummary` calculations.
 - [x] Date handling and boundary enforcement:
   - Today start (`00:00:00.000`) and end (`23:59:59.999`) strictly tested across midnight boundaries.
   - `OrderDate.today()` serialized to `DateTime.utc(year, month, day)` matching Drift `expected_pickup_date` column format.
   - Overdue vs due today vs tomorrow boundary separation strictly validated.
-  - Completed and cancelled orders strictly excluded from attention cards and pickup lists.
+  - Completed and cancelled orders strictly excluded from attention cards and recent orders.
 - [x] Outstanding payment semantics:
   - Reuses existing payment calculation rules (`total - paid`).
   - Fully paid orders (`remaining == 0`) excluded from outstanding lists and counts.

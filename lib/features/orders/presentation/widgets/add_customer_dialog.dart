@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/utils/phone_utils.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_text_field.dart';
 
@@ -35,10 +36,13 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
   void initState() {
     super.initState();
     final query = widget.initialQuery?.trim() ?? '';
-    final isDigitsOnly = RegExp(r'^[0-9]+$').hasMatch(query);
+    final normalizedQuery = PhoneUtils.normalizePhoneNumber(query);
+    final isDigitsOnly = RegExp(r'^[0-9]+$').hasMatch(normalizedQuery);
 
     _nameController = TextEditingController(text: isDigitsOnly ? '' : query);
-    _phoneController = TextEditingController(text: isDigitsOnly ? query : '');
+    _phoneController = TextEditingController(
+      text: isDigitsOnly ? normalizedQuery : '',
+    );
   }
 
   @override
@@ -52,7 +56,7 @@ class _AddCustomerDialogState extends State<AddCustomerDialog> {
 
   Future<void> _handleSave() async {
     final name = _nameController.text.trim();
-    final phone = _phoneController.text.trim();
+    final phone = PhoneUtils.normalizePhoneNumber(_phoneController.text);
     final rawAddress = _addressController.text.trim();
     final address = rawAddress.isNotEmpty ? rawAddress : null;
 

@@ -5,7 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:laundry_management/application/use_cases/edit_processing_order_use_case.dart';
 import 'package:laundry_management/data/local/daos/payments_dao.dart';
 import 'package:laundry_management/data/local/daos/storage_records_dao.dart';
-import 'package:laundry_management/data/local/database/app_database.dart' as app_db;
+import 'package:laundry_management/data/local/database/app_database.dart'
+    as app_db;
 import 'package:laundry_management/domain/entities/business_settings.dart';
 import 'package:laundry_management/domain/entities/carpet_size.dart';
 import 'package:laundry_management/domain/entities/customer.dart';
@@ -13,10 +14,10 @@ import 'package:laundry_management/domain/entities/item_definition.dart';
 import 'package:laundry_management/domain/entities/item_type.dart';
 import 'package:laundry_management/domain/entities/order.dart';
 import 'package:laundry_management/domain/entities/order_item.dart';
-import 'package:laundry_management/domain/entities/service.dart';
 import 'package:laundry_management/domain/entities/storage_location.dart';
 import 'package:laundry_management/domain/enums/order_status.dart';
 import 'package:laundry_management/domain/enums/pricing_type.dart';
+import 'package:laundry_management/domain/models/service_with_pricing.dart';
 import 'package:laundry_management/domain/repositories/carpet_size_repository.dart';
 import 'package:laundry_management/domain/repositories/customer_repository.dart';
 import 'package:laundry_management/domain/repositories/item_definition_repository.dart';
@@ -75,10 +76,10 @@ class MockCustomerRepo implements CustomerRepository {
 }
 
 class MockServiceRepo implements ServiceRepository {
-  List<Service> services = [];
+  List<ServiceWithPricing> services = [];
 
   @override
-  Future<List<Service>> getServicesForItemType(String itemTypeId) async =>
+  Future<List<ServiceWithPricing>> getServicesForItemType(String itemTypeId) async =>
       services;
 
   @override
@@ -89,7 +90,8 @@ class MockItemTypeRepo implements ItemTypeRepository {
   List<ItemType> types = [];
 
   @override
-  Future<List<ItemType>> getAllItemTypes({bool activeOnly = false}) async => types;
+  Future<List<ItemType>> getAllItemTypes({bool activeOnly = false}) async =>
+      types;
 
   @override
   Future<List<ItemType>> getActiveItemTypes() async => types;
@@ -105,8 +107,7 @@ class MockItemDefRepo implements ItemDefinitionRepository {
   Future<List<ItemDefinition>> getDefinitionsForItemType(
     String itemTypeId, {
     bool activeOnly = false,
-  }) async =>
-      defs;
+  }) async => defs;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -133,11 +134,11 @@ class MockStorageLocRepo implements StorageLocationRepository {
 class MockSettingsRepo implements SettingsRepository {
   @override
   Future<BusinessSettings> getSettings() async => BusinessSettings(
-        id: 'settings-1',
-        businessName: 'مغسلة النقاء',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
+    id: 'settings-1',
+    businessName: 'مغسلة النقاء',
+    createdAt: DateTime.now(),
+    updatedAt: DateTime.now(),
+  );
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -163,8 +164,7 @@ class MockStorageRecordsDao implements StorageRecordsDao {
   @override
   Future<app_db.StorageRecord?> getActiveRecordForOrderItem(
     String orderItemId,
-  ) async =>
-      null;
+  ) async => null;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -235,7 +235,8 @@ void main() {
     orderRepo = MockOrderRepo()
       ..order = testOrder
       ..items = [testItem];
-    customerRepo = MockCustomerRepo()..customers = [initialCustomer, secondCustomer];
+    customerRepo = MockCustomerRepo()
+      ..customers = [initialCustomer, secondCustomer];
     itemTypeRepo = MockItemTypeRepo()..types = [];
     itemDefRepo = MockItemDefRepo()..defs = [];
     serviceRepo = MockServiceRepo()..services = [];
@@ -283,14 +284,13 @@ void main() {
         ),
         GoRoute(
           path: '/orders/:id',
-          builder: (context, state) => const Scaffold(body: Text('Order Detail')),
+          builder: (context, state) =>
+              const Scaffold(body: Text('Order Detail')),
         ),
       ],
     );
 
-    return MaterialApp.router(
-      routerConfig: router,
-    );
+    return MaterialApp.router(routerConfig: router);
   }
 
   group('EditOrderScreen — Customer Change UAT Tests', () {
@@ -326,10 +326,7 @@ void main() {
         expect(find.text('+ عميل جديد'), findsOneWidget);
 
         // 3. Search and select another customer
-        await tester.enterText(
-          find.byType(TextField).first,
-          'ثانٍ',
-        );
+        await tester.enterText(find.byType(TextField).first, 'ثانٍ');
         await tester.pumpAndSettle();
 
         // Search results show 'عميل ثانٍ معدل'

@@ -10,6 +10,8 @@ import 'package:laundry_management/data/datasources/remote/remote_api_dispatcher
 import 'package:laundry_management/data/datasources/remote/storage_remote_api.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('Remote APIs & Dispatcher DI Registration Tests', () {
     tearDown(() async {
       await GetIt.instance.reset();

@@ -164,7 +164,9 @@ class PaymentRepositoryImpl implements PaymentRepository {
         final paidPiastres = paidMap[order.id] ?? 0;
         final refundedPiastres = refundedMap[order.id] ?? 0;
         final isCancelled = order.status == 'cancelled';
-        final remainingPiastres = isCancelled ? 0 : (order.total - paidPiastres);
+        final remainingPiastres = isCancelled
+            ? 0
+            : (order.total - paidPiastres);
         summaries[order.id] = OrderPaymentSummary(
           totalPaid: Money.fromPiastres(paidPiastres),
           totalRefunded: Money.fromPiastres(refundedPiastres),

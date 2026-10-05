@@ -523,15 +523,10 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
     required DateTime todayStart,
     required DateTime todayEnd,
     required DateTime todayDate,
-    DateTime? tomorrowDate,
   }) async {
     final startOfToday = todayDate.isUtc
         ? DateTime.utc(todayDate.year, todayDate.month, todayDate.day)
         : DateTime(todayDate.year, todayDate.month, todayDate.day);
-    final startOfNextDay = tomorrowDate ??
-        (todayDate.isUtc
-            ? DateTime.utc(todayDate.year, todayDate.month, todayDate.day + 1)
-            : DateTime(todayDate.year, todayDate.month, todayDate.day + 1));
 
     final query = db.customSelect(
       '''
@@ -541,8 +536,7 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
         COALESCE(SUM(CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END), 0) AS ready_orders_count,
         COALESCE(SUM(CASE WHEN o.status != 'cancelled' AND (o.total - COALESCE(p.paid_amount, 0)) > 0 THEN (o.total - COALESCE(p.paid_amount, 0)) ELSE 0 END), 0) AS total_remaining_piastres,
         COALESCE(SUM(CASE WHEN o.status != 'cancelled' AND (o.total - COALESCE(p.paid_amount, 0)) > 0 THEN 1 ELSE 0 END), 0) AS unpaid_orders_count,
-        COALESCE(SUM(CASE WHEN o.expected_pickup_date < ? AND o.status != 'completed' AND o.status != 'cancelled' THEN 1 ELSE 0 END), 0) AS overdue_orders_count,
-        COALESCE(SUM(CASE WHEN o.expected_pickup_date >= ? AND o.expected_pickup_date < ? AND o.status != 'completed' AND o.status != 'cancelled' THEN 1 ELSE 0 END), 0) AS today_pickup_orders_count
+        COALESCE(SUM(CASE WHEN o.expected_pickup_date < ? AND o.status != 'completed' AND o.status != 'cancelled' THEN 1 ELSE 0 END), 0) AS overdue_orders_count
       FROM orders o
       LEFT JOIN (
         SELECT order_id, SUM(amount) AS paid_amount
@@ -554,8 +548,6 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
         Variable.withDateTime(todayStart),
         Variable.withDateTime(todayEnd),
         Variable.withDateTime(startOfToday),
-        Variable.withDateTime(startOfToday),
-        Variable.withDateTime(startOfNextDay),
       ],
       readsFrom: {db.orders, db.payments},
     );
@@ -572,7 +564,6 @@ class OrdersDao extends DatabaseAccessor<app_db.AppDatabase> {
       totalRemainingPiastres: row.read<int>('total_remaining_piastres'),
       unpaidOrdersCount: row.read<int>('unpaid_orders_count'),
       overdueOrdersCount: row.read<int>('overdue_orders_count'),
-      todayPickupOrdersCount: row.read<int>('today_pickup_orders_count'),
     );
   }
 

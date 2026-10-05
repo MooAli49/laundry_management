@@ -10,6 +10,20 @@ import '../../../../domain/repositories/service_repository.dart';
 import '../../../../domain/value_objects/money.dart';
 import 'services_management_state.dart';
 
+import '../../../../domain/entities/service_item_type.dart';
+
+class ServiceItemTypeConfig {
+  final String itemTypeId;
+  final PricingType pricingType;
+  final Money price;
+
+  const ServiceItemTypeConfig({
+    required this.itemTypeId,
+    required this.pricingType,
+    required this.price,
+  });
+}
+
 class ServicesManagementCubit extends Cubit<ServicesManagementState> {
   final ServiceRepository _serviceRepository;
   final ItemTypeRepository _itemTypeRepository;
@@ -56,6 +70,14 @@ class ServicesManagementCubit extends Cubit<ServicesManagementState> {
     }
   }
 
+  Future<List<ServiceItemType>> getServiceItemTypes(String serviceId) async {
+    try {
+      return await _serviceRepository.getServiceItemTypes(serviceId);
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<List<String>> getSupportedItemTypeIds(String serviceId) async {
     try {
       return await _serviceRepository.getSupportedItemTypeIds(serviceId);
@@ -67,22 +89,24 @@ class ServicesManagementCubit extends Cubit<ServicesManagementState> {
   Future<bool> createService({
     required String name,
     String? description,
-    required PricingType pricingType,
-    required Money price,
-    required List<String> supportedItemTypeIds,
+    required List<ServiceItemTypeConfig> itemTypeConfigs,
   }) async {
     final trimmedName = name.trim();
     if (trimmedName.isEmpty) {
       emit(state.copyWith(errorMessage: AppStrings.serviceNameRequired));
       return false;
     }
-    if (price <= Money.zero) {
-      emit(state.copyWith(errorMessage: AppStrings.servicePriceMustBePositive));
-      return false;
-    }
-    if (supportedItemTypeIds.isEmpty) {
+    if (itemTypeConfigs.isEmpty) {
       emit(state.copyWith(errorMessage: AppStrings.selectAtLeastOneItemType));
       return false;
+    }
+    for (final cfg in itemTypeConfigs) {
+      if (cfg.price <= Money.zero) {
+        emit(
+          state.copyWith(errorMessage: AppStrings.servicePriceMustBePositive),
+        );
+        return false;
+      }
     }
 
     emit(
@@ -95,22 +119,33 @@ class ServicesManagementCubit extends Cubit<ServicesManagementState> {
 
     try {
       final now = DateTime.now();
+      final serviceId = const Uuid().v4();
       final service = Service(
-        id: const Uuid().v4(),
+        id: serviceId,
         name: trimmedName,
         description: description?.trim().isEmpty == true
             ? null
             : description?.trim(),
-        pricingType: pricingType,
-        price: price,
         isActive: true,
         createdAt: now,
         updatedAt: now,
       );
 
+      final serviceItemTypes = itemTypeConfigs.map((cfg) {
+        return ServiceItemType(
+          id: const Uuid().v4(),
+          serviceId: serviceId,
+          itemTypeId: cfg.itemTypeId,
+          pricingType: cfg.pricingType,
+          price: cfg.price,
+          createdAt: now,
+          updatedAt: now,
+        );
+      }).toList();
+
       await _serviceRepository.createService(
         service,
-        supportedItemTypeIds: supportedItemTypeIds,
+        serviceItemTypes: serviceItemTypes,
       );
 
       final services = await _serviceRepository.getAllServices();
@@ -133,20 +168,24 @@ class ServicesManagementCubit extends Cubit<ServicesManagementState> {
 
   Future<bool> updateService({
     required Service service,
-    required List<String> supportedItemTypeIds,
+    required List<ServiceItemTypeConfig> itemTypeConfigs,
   }) async {
     final trimmedName = service.name.trim();
     if (trimmedName.isEmpty) {
       emit(state.copyWith(errorMessage: AppStrings.serviceNameRequired));
       return false;
     }
-    if (service.price <= Money.zero) {
-      emit(state.copyWith(errorMessage: AppStrings.servicePriceMustBePositive));
-      return false;
-    }
-    if (supportedItemTypeIds.isEmpty) {
+    if (itemTypeConfigs.isEmpty) {
       emit(state.copyWith(errorMessage: AppStrings.selectAtLeastOneItemType));
       return false;
+    }
+    for (final cfg in itemTypeConfigs) {
+      if (cfg.price <= Money.zero) {
+        emit(
+          state.copyWith(errorMessage: AppStrings.servicePriceMustBePositive),
+        );
+        return false;
+      }
     }
 
     emit(
@@ -158,14 +197,51 @@ class ServicesManagementCubit extends Cubit<ServicesManagementState> {
     );
 
     try {
+      final now = DateTime.now();
       final updated = service.copyWith(
         name: trimmedName,
-        updatedAt: DateTime.now(),
+        updatedAt: now,
       );
+
+      final existingSits = await _serviceRepository.getServiceItemTypes(
+        service.id,
+      );
+      final existingByItemTypeId = {
+        for (final sit in existingSits) sit.itemTypeId: sit,
+      };
+
+      // Get active item types to distinguish between types the user explicitly
+      // deselected in the UI vs types that were hidden because they are inactive.
+      final activeItemTypes = await _itemTypeRepository.getActiveItemTypes();
+      final activeItemTypeIds = activeItemTypes.map((t) => t.id).toSet();
+      final submittedItemTypeIds = itemTypeConfigs
+          .map((c) => c.itemTypeId)
+          .toSet();
+
+      final serviceItemTypes = itemTypeConfigs.map((cfg) {
+        final existing = existingByItemTypeId[cfg.itemTypeId];
+        return ServiceItemType(
+          id: existing?.id ?? const Uuid().v4(),
+          serviceId: service.id,
+          itemTypeId: cfg.itemTypeId,
+          pricingType: cfg.pricingType,
+          price: cfg.price,
+          createdAt: existing?.createdAt ?? now,
+          updatedAt: now,
+        );
+      }).toList();
+
+      // MED-01: Preserve existing mappings for inactive item types that were hidden in UI
+      for (final existing in existingSits) {
+        if (!submittedItemTypeIds.contains(existing.itemTypeId) &&
+            !activeItemTypeIds.contains(existing.itemTypeId)) {
+          serviceItemTypes.add(existing);
+        }
+      }
 
       await _serviceRepository.updateService(
         updated,
-        supportedItemTypeIds: supportedItemTypeIds,
+        serviceItemTypes: serviceItemTypes,
       );
 
       final services = await _serviceRepository.getAllServices();

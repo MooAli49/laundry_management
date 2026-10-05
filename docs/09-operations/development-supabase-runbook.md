@@ -132,4 +132,5 @@ The following 13 migrations are applied to the development Supabase project (`dy
 | `20260923000002_allow_completed_to_processing_correction.sql` | Allow `Completed -> Processing` administrative correction |
 | `20260924000000_refunds_schema.sql` | Refunds schema, constraints & `sync_create_refund` RPC |
 | `20260925000000_customer_address.sql` | Customer address column (`customers.address TEXT NULL`) |
+| `20261001000000_service_item_pricing_model.sql` | Service + item type pricing model migration (`service_item_types.pricing_type`, `price`, drop legacy columns from `services`) |
 

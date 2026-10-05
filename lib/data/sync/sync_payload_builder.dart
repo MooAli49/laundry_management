@@ -13,6 +13,7 @@ import '../../domain/entities/order_item.dart';
 import '../../domain/entities/payment.dart';
 import '../../domain/entities/refund.dart';
 import '../../domain/entities/service.dart';
+import '../../domain/entities/service_item_type.dart';
 import '../../domain/entities/storage_location.dart';
 import '../../domain/entities/storage_record.dart';
 import '../../domain/enums/order_status.dart';
@@ -122,8 +123,9 @@ class SyncPayloadBuilder {
       'id': order.id,
       'order_number': order.orderNumber,
       'customer_id': order.customerId,
-      'expected_pickup_date':
-          order.expectedPickupDate.toDateTime().toIso8601String(),
+      'expected_pickup_date': order.expectedPickupDate
+          .toDateTime()
+          .toIso8601String(),
       'notes': order.notes,
       'customer_pickup_requested': order.customerPickupRequested,
       'customer_pickup_fee': order.customerPickupFee.piastres,
@@ -210,16 +212,21 @@ class SyncPayloadBuilder {
   /// Builds a self-contained payload for service creation and update.
   static String buildServicePayload(
     Service service,
-    List<String> supportedItemTypeIds,
+    List<ServiceItemType> serviceItemTypes,
   ) {
     return jsonEncode(<String, dynamic>{
       'id': service.id,
       'name': service.name,
       'description': service.description,
-      'pricing_type': service.pricingType.value,
-      'price': service.price.piastres,
       'is_active': service.isActive,
-      'supported_item_type_ids': supportedItemTypeIds,
+      'service_item_types': serviceItemTypes
+          .map((sit) => <String, dynamic>{
+                'id': sit.id,
+                'item_type_id': sit.itemTypeId,
+                'pricing_type': sit.pricingType.value,
+                'price': sit.price.piastres,
+              })
+          .toList(),
       'created_at': service.createdAt.toIso8601String(),
       'updated_at': service.updatedAt.toIso8601String(),
     });
@@ -244,15 +251,22 @@ class SyncPayloadBuilder {
   // ===========================================================================
 
   /// Builds a self-contained payload for storage record creation and relocation.
-  static String buildStorageRecordPayload(StorageRecord record) {
-    return jsonEncode(<String, dynamic>{
+  static String buildStorageRecordPayload(
+    StorageRecord record, {
+    String? previousStorageLocationId,
+  }) {
+    final map = <String, dynamic>{
       'id': record.id,
       'order_item_id': record.orderItemId,
       'storage_location_id': record.storageLocationId,
       'is_active': record.isActive,
       'created_at': record.createdAt.toIso8601String(),
       'updated_at': record.updatedAt.toIso8601String(),
-    });
+    };
+    if (previousStorageLocationId != null) {
+      map['previous_storage_location_id'] = previousStorageLocationId;
+    }
+    return jsonEncode(map);
   }
 
   /// Builds a payload for storage record status update (e.g. unstore / release).
@@ -354,6 +368,8 @@ class SyncPayloadBuilder {
   /// Builds a payload for expense update (PATCH contract).
   static String buildExpenseUpdatePayload(Expense expense) {
     return jsonEncode(<String, dynamic>{
+      'expense_category_id': expense.expenseCategoryId,
+      'category_name_snapshot': expense.categoryNameSnapshot,
       'amount': expense.amount.piastres,
       'expense_name': expense.expenseName,
       'expense_date': expense.expenseDate.toString(),
@@ -456,7 +472,9 @@ class SyncPayloadBuilder {
   }
 
   /// Builds a payload for item definition update (PATCH contract).
-  static String buildItemDefinitionUpdatePayload(ItemDefinition itemDefinition) {
+  static String buildItemDefinitionUpdatePayload(
+    ItemDefinition itemDefinition,
+  ) {
     return jsonEncode(<String, dynamic>{
       'item_type_id': itemDefinition.itemTypeId,
       'name': itemDefinition.name,

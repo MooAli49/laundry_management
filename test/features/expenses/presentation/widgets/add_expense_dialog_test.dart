@@ -16,7 +16,7 @@ void main() {
 
   setUp(() async {
     await getIt.reset();
-    db = AppDatabase(NativeDatabase.memory());
+    db = AppDatabase(NativeDatabase.memory(), true);
     getIt.registerLazySingleton<AppDatabase>(() => db);
     await initDependencies();
   });

@@ -205,19 +205,20 @@ void main() {
             equals('idx_sync_operations_status_next_retry'),
           );
 
-          // Verify schema version is now 6 (migrated through v3, v4, v5, and v6)
+          // Verify schema version is now 9 (migrated through current version)
           final versionRow = await migratedDb
               .customSelect('PRAGMA user_version;')
               .getSingle();
-          expect(versionRow.read<int>('user_version'), equals(6));
-          expect(migratedDb.schemaVersion, equals(6));
+          expect(versionRow.read<int>('user_version'), equals(9));
+          expect(migratedDb.schemaVersion, equals(9));
 
           // Verify customer table has address column added in v6
           final customerCols = await migratedDb
               .customSelect("PRAGMA table_info('customers');")
               .get();
-          final customerColNames =
-              customerCols.map((r) => r.read<String>('name')).toSet();
+          final customerColNames = customerCols
+              .map((r) => r.read<String>('name'))
+              .toSet();
           expect(customerColNames, contains('address'));
 
           // 8. Verify inserting a record with nextRetryAt works on migrated schema

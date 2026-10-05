@@ -207,9 +207,10 @@ Manages:
 - Services
 - Item types
 - Item definitions
-- Pricing types
-- Service prices
+- Service–Item Type pricing configurations (pricing type and price per combination)
 - Common carpet sizes
+
+Note: The Service entity does NOT own a single default/current price. Pricing configuration belongs to the Service–Item Type relationship. Supported V1 pricing types are `per_piece` and `per_square_meter`.
 
 Services & Pricing is part of Settings in the V1 navigation structure.
 

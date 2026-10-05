@@ -165,7 +165,7 @@ void main() {
             serviceId: services.first.id,
             itemTypeNameSnapshot: itemTypes.first.name,
             serviceNameSnapshot: services.first.name,
-            pricingType: PricingType.fixedPrice,
+            pricingType: PricingType.perPiece,
             quantity: 1,
             unitPrice: const Money.fromPiastres(3000),
             calculatedTotal: const Money.fromPiastres(3000),
@@ -228,7 +228,7 @@ void main() {
           serviceId: services.first.id,
           itemTypeNameSnapshot: itemTypes.first.name,
           serviceNameSnapshot: services.first.name,
-          pricingType: PricingType.fixedPrice,
+          pricingType: PricingType.perPiece,
           quantity: 1,
           unitPrice: const Money.fromPiastres(10000),
           calculatedTotal: const Money.fromPiastres(10000),
@@ -273,7 +273,7 @@ void main() {
           serviceId: services.first.id,
           itemTypeNameSnapshot: itemTypes.first.name,
           serviceNameSnapshot: services.first.name,
-          pricingType: PricingType.fixedPrice,
+          pricingType: PricingType.perPiece,
           quantity: 1,
           unitPrice: const Money.fromPiastres(5000),
           calculatedTotal: const Money.fromPiastres(5000),
@@ -437,7 +437,7 @@ void main() {
             serviceId: services.first.id,
             itemTypeNameSnapshot: itemTypes.first.name,
             serviceNameSnapshot: services.first.name,
-            pricingType: PricingType.fixedPrice,
+            pricingType: PricingType.perPiece,
             quantity: 1,
             unitPrice: const Money.fromPiastres(2000),
             calculatedTotal: const Money.fromPiastres(2000),
@@ -497,7 +497,10 @@ void main() {
 
         // 3. Financial totals across non-cancelled orders for remaining:
         expect(data.totalPaid, equals(const Money.fromPiastres(34500)));
-        expect(data.totalRemaining, equals(const Money.fromPiastres(10000))); // Non-cancelled orders only
+        expect(
+          data.totalRemaining,
+          equals(const Money.fromPiastres(10000)),
+        ); // Non-cancelled orders only
 
         // 4. First history page remains limited to 20 orders:
         expect(data.orders.length, equals(20));

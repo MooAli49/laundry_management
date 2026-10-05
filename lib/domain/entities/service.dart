@@ -1,12 +1,7 @@
-import '../enums/pricing_type.dart';
-import '../value_objects/money.dart';
-
 class Service {
   final String id;
   final String name;
   final String? description;
-  final PricingType pricingType;
-  final Money price;
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -15,8 +10,6 @@ class Service {
     required this.id,
     required this.name,
     this.description,
-    required this.pricingType,
-    required this.price,
     this.isActive = true,
     required this.createdAt,
     required this.updatedAt,
@@ -27,21 +20,12 @@ class Service {
     if (name.trim().isEmpty) {
       throw ArgumentError('Service name cannot be empty');
     }
-    if (price.isNegative) {
-      throw ArgumentError.value(
-        price,
-        'price',
-        'Service price cannot be negative',
-      );
-    }
   }
 
   Service copyWith({
     String? id,
     String? name,
     String? description,
-    PricingType? pricingType,
-    Money? price,
     bool? isActive,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -50,8 +34,6 @@ class Service {
       id: id ?? this.id,
       name: name ?? this.name,
       description: description ?? this.description,
-      pricingType: pricingType ?? this.pricingType,
-      price: price ?? this.price,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -66,8 +48,6 @@ class Service {
           id == other.id &&
           name == other.name &&
           description == other.description &&
-          pricingType == other.pricingType &&
-          price == other.price &&
           isActive == other.isActive &&
           createdAt == other.createdAt &&
           updatedAt == other.updatedAt;
@@ -77,8 +57,6 @@ class Service {
     id,
     name,
     description,
-    pricingType,
-    price,
     isActive,
     createdAt,
     updatedAt,
@@ -86,5 +64,5 @@ class Service {
 
   @override
   String toString() =>
-      'Service(id: $id, name: $name, price: $price, active: $isActive)';
+      'Service(id: $id, name: $name, active: $isActive)';
 }
