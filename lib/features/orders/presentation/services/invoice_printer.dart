@@ -110,13 +110,13 @@ class InvoicePrinter {
           : null;
 
       if (isCarpet) {
-        final totalPieces = group.fold<double>(
+        // Persisted OrderItem.quantity for carpets holds the pricing area (m²),
+        // NOT the physical piece count. Each carpet row with carpetData is one
+        // physical piece, so never display quantity (area) as piece count.
+        final pieceCount = group.fold<double>(
           0.0,
-          (sum, item) => sum + item.quantity,
+          (sum, item) => sum + (item.carpetData != null ? 1.0 : item.quantity),
         );
-        final pieceCount = totalPieces > 0
-            ? totalPieces
-            : group.length.toDouble();
         final quantityDisplay = formatPieceCount(pieceCount);
 
         // Price for ONE carpet piece

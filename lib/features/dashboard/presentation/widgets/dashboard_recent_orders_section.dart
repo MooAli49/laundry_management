@@ -181,7 +181,15 @@ class DashboardRecentOrdersSection extends StatelessWidget {
                           ),
                         ),
                         AppSpacing.gapXs,
-                        if (hasRemaining)
+                        if (item.isCancelled)
+                          Text(
+                            item.cancelledFinancialLabel,
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          )
+                        else if (hasRemaining)
                           Text(
                             'متبقي: ${item.remainingAmount.toEgp.toStringAsFixed(2)} ج.م',
                             style: AppTextStyles.bodySmall.copyWith(

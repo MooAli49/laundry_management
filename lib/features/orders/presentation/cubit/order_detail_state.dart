@@ -7,6 +7,7 @@ import '../../../../domain/entities/refund.dart';
 import '../../../../domain/entities/refund_balance_summary.dart';
 import '../../../../domain/entities/storage_location.dart';
 import '../../../../domain/entities/storage_record.dart';
+import '../../../../domain/enums/order_status.dart';
 import '../../../../domain/value_objects/money.dart';
 
 class OrderDetailState {
@@ -51,7 +52,9 @@ class OrderDetailState {
     this.actionSuccessMessage,
   });
 
-  bool get isFullyPaid => remainingAmount.isZero || remainingAmount.isNegative;
+  bool get isFullyPaid =>
+      order?.status != OrderStatus.cancelled &&
+      (remainingAmount.isZero || remainingAmount.isNegative);
   Money get totalRefunded => refundBalance.totalRefunded;
   Money get remainingRefundable => refundBalance.remainingRefundable;
   bool get allItemsStored =>

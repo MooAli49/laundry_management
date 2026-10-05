@@ -143,7 +143,16 @@ class OrderCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                if (item.isFullyPaid)
+                if (item.isCancelled)
+                  Text(
+                    item.cancelledFinancialLabel,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 12,
+                    ),
+                  )
+                else if (item.isFullyPaid)
                   Text(
                     'مدفوع بالكامل',
                     style: AppTextStyles.caption.copyWith(
